@@ -159,3 +159,16 @@ export const deleteUserAccount = body => {
 export const fetchLaundries = () => {
   return request('/api/laundries', { method: methods.GET });
 };
+
+// Best-effort call, fired after a booking's `accept` transition succeeds, to
+// create the availability-exception "buffer window" (pickup/cleaning/return
+// turnaround) around the booking's rental dates on the garment owner's
+// listing. Uses the Integration API server-side since it needs to act on a
+// listing regardless of which party (customer/operator) triggered `accept`.
+//
+// See `server/api/create-availability-buffer.js` for the request/response
+// shape. Callers should treat failures here as non-fatal (see the call site
+// in TransactionPage.duck.js) - the booking itself is not affected.
+export const createAvailabilityBuffer = body => {
+  return post('/api/create-availability-buffer', body);
+};

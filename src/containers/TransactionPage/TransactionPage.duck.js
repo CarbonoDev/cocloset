@@ -11,7 +11,7 @@ import {
   stringifyDateToISO8601,
 } from '../../util/dates';
 import { isTransactionsTransitionInvalidTransition, storableError } from '../../util/errors';
-import { transactionLineItems, transitionPrivileged } from '../../util/api';
+import { createAvailabilityBuffer, transactionLineItems, transitionPrivileged } from '../../util/api';
 import * as log from '../../util/log';
 import {
   updatedEntities,
@@ -24,6 +24,7 @@ import {
   isBookingProcess,
   isNegotiationProcess,
 } from '../../transactions/transaction';
+import { transitions as bookingProcessTransitions } from '../../transactions/transactionProcessBooking';
 import { messageHasPendingFiles, executeFileUpload } from '../../util/fileHelpers';
 
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -373,6 +374,27 @@ const makeTransitionPayloadCreator = (
     ? acceptUpdateTransition
     : normalTransition;
 
+  // Booking accepted -> create the laundry buffer-window availability
+  // exception on the garment owner's listing. This is Cocloset-specific
+  // infrastructure, not part of the core transition flow: it must not
+  // affect (or be affected by) the outcome of the transition above, so it
+  // runs as a fire-and-continue call after the transition has already
+  // succeeded, and its own failures are only logged - never thrown, never
+  // shown to the user, never rolled back. See create-availability-buffer.js
+  // for why this needs the Integration API rather than a trusted token.
+  const isAcceptTransition = [
+    bookingProcessTransitions.ACCEPT,
+    bookingProcessTransitions.OPERATOR_ACCEPT,
+  ].includes(transitionName);
+  const maybeCreateAvailabilityBuffer = () => {
+    if (!isAcceptTransition) {
+      return;
+    }
+    createAvailabilityBuffer({ transactionId: txId }).catch(e => {
+      log.error(e, 'create-availability-buffer-failed', { txId, transition: transitionName });
+    });
+  };
+
   return makeCall()
     .then(response => {
       dispatch(addMarketplaceEntities(response));
@@ -383,6 +405,8 @@ const makeTransitionPayloadCreator = (
       // Here, we make 1-2 delayed updates for the tx entity.
       // This way "leave a review" link should show up for the customer.
       refreshTransactionEntity(sdk, txId, dispatch);
+
+      maybeCreateAvailabilityBuffer();
 
       return response;
     })

@@ -4,6 +4,7 @@ const {
   calculateShippingFee,
   getProviderCommissionMaybe,
   getCustomerCommissionMaybe,
+  getCleaningFeeLineItemMaybe,
 } = require('./lineItemHelpers');
 const { types } = require('sharetribe-flex-sdk');
 const { Money } = types;
@@ -141,9 +142,18 @@ const getDateRangeQuantityAndLineItems = (orderData, code) => {
  * @param {Money} [orderData.offer] - The offer for the offer (if transition intent is "make-offer")
  * @param {Object} providerCommission
  * @param {Object} customerCommission
+ * @param {number} [cleaningFeeInSubunits] - Cleaning fee (customer-paid) in the listing's
+ * currency subunits, already resolved by the caller (see lineItemHelpers.resolveCleaningFeeInSubunits) -
+ * this function stays synchronous, so the Integration API lookup happens before it's called.
  * @returns {Array} lineItems
  */
-exports.transactionLineItems = (listing, orderData, providerCommission, customerCommission) => {
+exports.transactionLineItems = (
+  listing,
+  orderData,
+  providerCommission,
+  customerCommission,
+  cleaningFeeInSubunits
+) => {
   const publicData = listing.attributes.publicData;
   // Note: the unitType needs to be one of the following:
   // day, night, hour, fixed, or item (these are related to payment processes)
@@ -242,6 +252,7 @@ exports.transactionLineItems = (listing, orderData, providerCommission, customer
   const lineItems = [
     order,
     ...extraLineItems,
+    ...getCleaningFeeLineItemMaybe(cleaningFeeInSubunits, currency),
     ...getProviderCommissionMaybe(providerCommission, order, currency),
     ...getCustomerCommissionMaybe(customerCommission, order, currency),
   ];

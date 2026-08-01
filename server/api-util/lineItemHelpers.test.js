@@ -1,6 +1,21 @@
 const { types } = require('sharetribe-flex-sdk');
 const { Money } = types;
 
+// resolveCleaningFeeInSubunits() calls out to the Integration SDK (see
+// server/api-util/integrationSdk.js) to read the assigned laundry's
+// privateData.cleaningFee. Mock that module so these are true unit tests -
+// no real network calls - and so we can control what users.show() resolves to.
+const mockUsersShow = jest.fn();
+jest.mock('./integrationSdk', () => ({
+  getIntegrationSdk: jest.fn(() => ({
+    users: {
+      show: mockUsersShow,
+    },
+  })),
+}));
+
+const { getIntegrationSdk } = require('./integrationSdk');
+
 const {
   calculateTotalPriceFromQuantity,
   calculateTotalPriceFromPercentage,
@@ -17,6 +32,8 @@ const {
   hasMinimumCommission,
   getProviderCommissionMaybe,
   getCustomerCommissionMaybe,
+  getCleaningFeeLineItemMaybe,
+  resolveCleaningFeeInSubunits,
 } = require('./lineItemHelpers');
 
 describe('calculateTotalPriceFromQuantity()', () => {
@@ -718,5 +735,159 @@ describe('getCustomerCommissionMaybe()', () => {
       },
     ];
     expect(getCustomerCommissionMaybe(commission, order, currency)).toEqual(expectedLineItems);
+  });
+});
+
+describe('getCleaningFeeLineItemMaybe()', () => {
+  it('should return a cleaning-fee line item for a positive amount', () => {
+    expect(getCleaningFeeLineItemMaybe(1250, 'EUR')).toEqual([
+      {
+        code: 'line-item/cleaning-fee',
+        unitPrice: new Money(1250, 'EUR'),
+        quantity: 1,
+        includeFor: ['customer'],
+      },
+    ]);
+  });
+
+  it('should return an empty array for a zero amount (no cleaning fee to charge)', () => {
+    expect(getCleaningFeeLineItemMaybe(0, 'EUR')).toEqual([]);
+  });
+
+  it('should return an empty array when the amount is not a valid number', () => {
+    expect(getCleaningFeeLineItemMaybe(undefined, 'EUR')).toEqual([]);
+    expect(getCleaningFeeLineItemMaybe(null, 'EUR')).toEqual([]);
+    expect(getCleaningFeeLineItemMaybe(NaN, 'EUR')).toEqual([]);
+    expect(getCleaningFeeLineItemMaybe(-500, 'EUR')).toEqual([]);
+  });
+
+  it('should return an empty array when currency is missing', () => {
+    expect(getCleaningFeeLineItemMaybe(1000, null)).toEqual([]);
+  });
+});
+
+describe('resolveCleaningFeeInSubunits()', () => {
+  const originalEnv = process.env.DEFAULT_CLEANING_FEE;
+
+  beforeEach(() => {
+    // jest config has resetMocks: true, which wipes mock implementations
+    // (not just call history) before every test - including the one set by
+    // the jest.mock() factory above - so getIntegrationSdk() needs to be
+    // re-armed here on every test, not just once at module load.
+    getIntegrationSdk.mockReturnValue({ users: { show: mockUsersShow } });
+  });
+
+  afterEach(() => {
+    process.env.DEFAULT_CLEANING_FEE = originalEnv;
+  });
+
+  const listingWithLaundry = laundryId => ({
+    attributes: { publicData: { assignedLaundryId: laundryId } },
+  });
+
+  const listingWithoutLaundry = { attributes: { publicData: {} } };
+
+  it("should use the assigned laundry's own privateData.cleaningFee when set", async () => {
+    delete process.env.DEFAULT_CLEANING_FEE;
+    mockUsersShow.mockResolvedValue({
+      data: {
+        data: {
+          attributes: {
+            profile: {
+              privateData: { cleaningFee: 12.5 }, // EUR 12.50, major units
+            },
+          },
+        },
+      },
+    });
+
+    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-1'), 'EUR');
+
+    expect(result).toBe(1250);
+    expect(mockUsersShow).toHaveBeenCalledWith({ id: 'laundry-1' }, { expand: true });
+  });
+
+  it('should fall back to DEFAULT_CLEANING_FEE when the laundry has not set a fee', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    mockUsersShow.mockResolvedValue({
+      data: {
+        data: {
+          attributes: {
+            profile: {
+              privateData: {}, // no cleaningFee set
+            },
+          },
+        },
+      },
+    });
+
+    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-2'), 'EUR');
+
+    expect(result).toBe(800);
+  });
+
+  it('should treat an explicit cleaningFee of 0 as set (not fall back to the env default)', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    mockUsersShow.mockResolvedValue({
+      data: {
+        data: {
+          attributes: {
+            profile: {
+              privateData: { cleaningFee: 0 },
+            },
+          },
+        },
+      },
+    });
+
+    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-3'), 'EUR');
+
+    expect(result).toBe(0);
+  });
+
+  it('should skip the Integration API lookup and use the env default when there is no assigned laundry', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '15';
+
+    const result = await resolveCleaningFeeInSubunits(listingWithoutLaundry, 'EUR');
+
+    expect(result).toBe(1500);
+    expect(mockUsersShow).not.toHaveBeenCalled();
+  });
+
+  it('should default to 0 when there is no assigned laundry and no env default set', async () => {
+    delete process.env.DEFAULT_CLEANING_FEE;
+
+    const result = await resolveCleaningFeeInSubunits(listingWithoutLaundry, 'EUR');
+
+    expect(result).toBe(0);
+    expect(mockUsersShow).not.toHaveBeenCalled();
+  });
+
+  it('should fall back to the env default when the Integration API lookup fails (e.g. laundry removed)', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '5';
+    mockUsersShow.mockRejectedValue(new Error('laundry not found'));
+
+    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-4'), 'EUR');
+
+    expect(result).toBe(500);
+  });
+
+  it('should default to 0 when neither the laundry nor the env default provides a fee', async () => {
+    delete process.env.DEFAULT_CLEANING_FEE;
+    mockUsersShow.mockResolvedValue({
+      data: {
+        data: {
+          attributes: {
+            profile: {
+              privateData: {},
+            },
+          },
+        },
+      },
+    });
+
+    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-5'), 'EUR');
+
+    expect(result).toBe(0);
   });
 });
