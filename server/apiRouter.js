@@ -16,6 +16,7 @@ const transactionLineItems = require('./api/transaction-line-items');
 const initiatePrivileged = require('./api/initiate-privileged');
 const transitionPrivileged = require('./api/transition-privileged');
 const deleteAccount = require('./api/delete-account');
+const laundryPartnerApplication = require('./api/laundry-partner-application');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -56,6 +57,11 @@ router.post('/transaction-line-items', transactionLineItems);
 router.post('/initiate-privileged', initiatePrivileged);
 router.post('/transition-privileged', transitionPrivileged);
 router.post('/delete-account', deleteAccount);
+
+// Public, unauthenticated: laundry-partner applications from PartnerLandingPage.
+// The handler never builds a Marketplace or Integration API SDK, so it cannot touch
+// marketplace data. See server/api/laundry-partner-application.js.
+router.post('/laundry-partner-application', laundryPartnerApplication);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed

@@ -1,0 +1,69 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.fieldsetLegend {
+  margin-top: 30px;
+  margin-bottom: 6px;
+
+  @media (--viewportMedium) {
+    margin-top: 40px;
+    margin-bottom: 8px;
+  }
+}
+
+.field {
+  margin-top: 18px;
+
+  @media (--viewportMedium) {
+    margin-top: 24px;
+  }
+}
+
+.error {
+  composes: h4 from global;
+
+  color: var(--colorFail);
+  margin-top: 24px;
+  margin-bottom: 0;
+
+  @media (--viewportMedium) {
+    margin-top: 32px;
+  }
+}
+
+.submitButton {
+  margin-top: 30px;
+
+  @media (--viewportMedium) {
+    margin-top: 40px;
+  }
+}
+
+.finePrint {
+  composes: textSmall from global;
+
+  color: var(--colorGrey700);
+  margin-top: 12px;
+  margin-bottom: 0;
+
+  @media (--viewportMedium) {
+    margin-top: 16px;
+  }
+}
+
+/* Honeypot wrapper. Kept in the DOM and in the accessibility-free zone: moved
+   off-screen rather than `display: none`, because trivial bots skip hidden inputs
+   but happily fill positioned ones. Paired with aria-hidden and tabindex="-1"
+   on the field itself, so keyboard and screen-reader users never encounter it. */
+.honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

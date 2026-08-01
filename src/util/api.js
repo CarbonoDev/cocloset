@@ -151,3 +151,14 @@ export const createUserWithIdp = body => {
 export const deleteUserAccount = body => {
   return post('/api/delete-account', body);
 };
+
+// Submit a laundry-partner application from the public PartnerLandingPage.
+//
+// This endpoint is unauthenticated on purpose — prospective partners do not have an
+// account yet. It is also deliberately inert: the server only validates, length-caps
+// and forwards the application, it never touches marketplace data.
+//
+// See `server/api/laundry-partner-application.js` for the accepted fields and limits.
+export const submitLaundryPartnerApplication = body => {
+  return post('/api/laundry-partner-application', body);
+};
