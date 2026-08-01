@@ -48,6 +48,9 @@ const EditListingLaundryPanel = props => {
   const [laundries, setLaundries] = useState([]);
   const [fetchLaundriesInProgress, setFetchLaundriesInProgress] = useState(true);
   const [fetchLaundriesError, setFetchLaundriesError] = useState(null);
+  // Set when the picked laundry turns out to be unusable at submit time (see
+  // the guard in onSubmit below). Without it the failure is silent.
+  const [selectionError, setSelectionError] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -123,6 +126,12 @@ const EditListingLaundryPanel = props => {
         </p>
       ) : null}
 
+      {selectionError ? (
+        <p className={css.error}>
+          <FormattedMessage id="EditListingLaundryPanel.laundryUnavailable" />
+        </p>
+      ) : null}
+
       <EditListingLaundryForm
         className={css.form}
         initialValues={getInitialValues(props)}
@@ -132,18 +141,33 @@ const EditListingLaundryPanel = props => {
         onSubmit={values => {
           const { assignedLaundryId } = values;
           const selectedLaundry = laundries.find(l => l.id === assignedLaundryId);
-          const { laundryProfile = {} } = selectedLaundry?.publicData || {};
-          const { address, origin } = laundryProfile;
+
+          // The picker's list can go stale between load and submit: the laundry
+          // could have been de-flagged, or the fetch could have failed leaving
+          // `laundries` empty while initialValues still carries a saved id.
+          // Guarding here matters twice over. Without it, `selectedLaundry.id`
+          // throws a TypeError on submit (the form's submitDisabled only checks
+          // `invalid`, and a stale id IS a valid value). And a laundry with no
+          // usable address/origin would write no `geolocation`, which leaves
+          // the wizard's LAUNDRY tab permanently incomplete - the owner saves
+          // successfully, is redirected forward, is bounced straight back, and
+          // is never told why. /api/laundries already filters out
+          // profile-less laundries; this is the second line of defence.
+          if (!selectedLaundry?.origin || !selectedLaundry?.address) {
+            setSelectionError(true);
+            return;
+          }
+          setSelectionError(false);
 
           // New values for listing attributes. The listing's own geolocation
           // and pickup address now come from the assigned laundry, not the
           // owner (see the module docblock above / EditListingLocationPanel).
           const updateValues = {
-            geolocation: origin,
+            geolocation: selectedLaundry.origin,
             publicData: {
               assignedLaundryId: selectedLaundry.id,
               assignedLaundryName: selectedLaundry.displayName,
-              pickupAddress: address,
+              pickupAddress: selectedLaundry.address,
             },
           };
           onSubmit(updateValues);

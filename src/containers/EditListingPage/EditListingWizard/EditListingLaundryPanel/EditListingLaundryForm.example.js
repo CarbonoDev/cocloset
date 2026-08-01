@@ -1,31 +1,27 @@
 /* eslint-disable no-console */
 import EditListingLaundryForm from './EditListingLaundryForm';
 
+// Flat, allowlisted record shape returned by /api/laundries - see
+// server/api-util/laundryDirectory.js.
 const laundries = [
   {
     id: 'laundry-1',
     displayName: 'Studio Pigalle',
-    publicData: {
-      laundryProfile: {
-        studioName: 'Studio Pigalle',
-        address: '21 Rue Frochot, Paris',
-        businessHours: 'Mon–Sat · 11:00–21:00',
-      },
-      acceptedCategories: ['Eveningwear', 'Sequins', 'Embroidery'],
-    },
+    studioName: 'Studio Pigalle',
+    address: '21 Rue Frochot, Paris',
+    origin: { lat: 48.882, lng: 2.338 },
+    businessHours: 'Mon–Sat · 11:00–21:00',
+    acceptedCategories: ['Eveningwear', 'Sequins', 'Embroidery'],
     turnaroundHours: 48,
   },
   {
     id: 'laundry-2',
     displayName: 'Maison du Marais',
-    publicData: {
-      laundryProfile: {
-        studioName: 'Maison du Marais',
-        address: '5 Rue des Rosiers, Paris',
-        businessHours: 'Tue–Sun · 10:00–19:00',
-      },
-      acceptedCategories: ['Denim', 'Cotton', 'Leather goods'],
-    },
+    studioName: 'Maison du Marais',
+    address: '5 Rue des Rosiers, Paris',
+    origin: { lat: 48.857, lng: 2.359 },
+    businessHours: 'Tue–Sun · 10:00–19:00',
+    acceptedCategories: ['Denim', 'Cotton', 'Leather goods'],
     turnaroundHours: 36,
   },
 ];

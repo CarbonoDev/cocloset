@@ -11,7 +11,11 @@ import {
   stringifyDateToISO8601,
 } from '../../util/dates';
 import { isTransactionsTransitionInvalidTransition, storableError } from '../../util/errors';
-import { createAvailabilityBuffer, transactionLineItems, transitionPrivileged } from '../../util/api';
+import {
+  createAvailabilityBuffer,
+  transactionLineItems,
+  transitionPrivileged,
+} from '../../util/api';
 import * as log from '../../util/log';
 import {
   updatedEntities,
@@ -386,13 +390,35 @@ const makeTransitionPayloadCreator = (
     bookingProcessTransitions.ACCEPT,
     bookingProcessTransitions.OPERATOR_ACCEPT,
   ].includes(transitionName);
+  // KNOWN RESIDUAL GAP: because this is fired from the browser, the buffer is
+  // never created when the tab is closed mid-request, when an operator accepts
+  // from Sharetribe Console (this code never runs), or on an automatic
+  // transition. Closing that hole needs a server-side worker on Sharetribe's
+  // transaction events - see the header comment in
+  // server/api/create-availability-buffer.js. Until then the server logs every
+  // failure explicitly; this call stays fire-and-continue so it cannot affect
+  // the outcome of the transition that already succeeded.
   const maybeCreateAvailabilityBuffer = () => {
     if (!isAcceptTransition) {
       return;
     }
-    createAvailabilityBuffer({ transactionId: txId }).catch(e => {
-      log.error(e, 'create-availability-buffer-failed', { txId, transition: transitionName });
-    });
+    createAvailabilityBuffer({ transactionId: txId })
+      .then(response => {
+        // The server reports overlapping exceptions that leave the listing
+        // still bookable inside the buffer window. It can't create over them
+        // (the API rejects overlaps), so surface it here too.
+        const unblockedOverlaps = response?.data?.unblockedOverlaps;
+        if (unblockedOverlaps?.length > 0) {
+          log.error(
+            new Error('Availability buffer overlaps bookable exceptions'),
+            'create-availability-buffer-bookable-overlap',
+            { txId, transition: transitionName, unblockedOverlaps }
+          );
+        }
+      })
+      .catch(e => {
+        log.error(e, 'create-availability-buffer-failed', { txId, transition: transitionName });
+      });
   };
 
   return makeCall()

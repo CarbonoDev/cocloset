@@ -20,16 +20,14 @@ import css from './EditListingLaundryForm.module.css';
 const LaundryCard = props => {
   const { formId, laundry, selected } = props;
   const intl = useIntl();
-  const { laundryProfile = {}, acceptedCategories = [] } = laundry.publicData || {};
-  const { studioName, address, businessHours } = laundryProfile;
+  // /api/laundries returns a flat, explicitly allowlisted record (see
+  // server/api-util/laundryDirectory.js) rather than the raw publicData blob.
+  const { studioName, address, businessHours, acceptedCategories = [] } = laundry || {};
   const name = laundry.displayName || studioName;
   const inputId = `${formId}.assignedLaundryId.${laundry.id}`;
 
   return (
-    <label
-      htmlFor={inputId}
-      className={classNames(css.card, { [css.cardSelected]: selected })}
-    >
+    <label htmlFor={inputId} className={classNames(css.card, { [css.cardSelected]: selected })}>
       <Field
         id={inputId}
         className={css.cardInput}
@@ -53,7 +51,7 @@ const LaundryCard = props => {
           />
         </span>
       ) : null}
-      {acceptedCategories.length > 0 ? (
+      {acceptedCategories?.length > 0 ? (
         <span className={css.cardCategories}>{acceptedCategories.join(' · ')}</span>
       ) : null}
     </label>
@@ -125,7 +123,7 @@ export const EditListingLaundryForm = props => (
       const submitDisabled = invalid || disabled || submitInProgress || fetchLaundriesInProgress;
 
       const selectedLaundry = laundries.find(l => l.id === values.assignedLaundryId);
-      const selectedAcceptedCategories = selectedLaundry?.publicData?.acceptedCategories || [];
+      const selectedAcceptedCategories = selectedLaundry?.acceptedCategories || [];
       const showCategoryWarning =
         !!selectedLaundry &&
         !!listingCategory &&

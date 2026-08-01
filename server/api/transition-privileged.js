@@ -1,6 +1,5 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
-const { transactionLineItems } = require('../api-util/lineItems');
-const { resolveCleaningFeeInSubunits } = require('../api-util/lineItemHelpers');
+const { buildLineItemsForListing } = require('../api-util/lineItems');
 const {
   addOfferToMetadata,
   getAmountFromPreviousOffer,
@@ -143,17 +142,19 @@ module.exports = (req, res) => {
       const { providerCommission, customerCommission } =
         commissionAsset?.type === 'jsonAsset' ? commissionAsset.attributes.data : {};
 
-      // Cleaning fee is sourced from the assigned laundry's privateData (Integration
-      // API only - see lineItemHelpers.resolveCleaningFeeInSubunits), so it has to be
-      // resolved before we can build the (synchronous) line items array.
-      return resolveCleaningFeeInSubunits(listing, currency).then(cleaningFeeInSubunits => {
-        lineItems = transactionLineItems(
-          listing,
-          getFullOrderData(orderData, bodyParams, currency, existingOffers),
-          providerCommission,
-          customerCommission,
-          cleaningFeeInSubunits
-        );
+      // Cleaning fee is sourced from the assigned laundry's privateData
+      // (Integration API only), so it has to be resolved before the
+      // (synchronous) line items array can be built - see
+      // lineItems.buildLineItemsForListing, which all three line-item
+      // endpoints share so preview and charge cannot drift apart.
+      return buildLineItemsForListing({
+        listing,
+        orderData: getFullOrderData(orderData, bodyParams, currency, existingOffers),
+        providerCommission,
+        customerCommission,
+        currency,
+      }).then(builtLineItems => {
+        lineItems = builtLineItems;
 
         metadataMaybe = getUpdatedMetadata(orderData, transitionName, existingMetadata);
 

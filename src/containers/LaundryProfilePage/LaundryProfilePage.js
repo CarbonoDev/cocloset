@@ -39,6 +39,106 @@ const getInitialValues = currentUser => {
 };
 
 /**
+ * The editable part of the page. Split out from LaundryProfilePageComponent
+ * (and mounted with key={currentUser.id.uuid}) for a specific reason:
+ *
+ * `initialValues` has to be snapshotted in local state, because
+ * FieldLocationAutocompleteInput keeps no internal state and re-rendering with
+ * fresh initialValues from props during the update XHR would blow away what
+ * the laundry just typed. But a `useState` initializer runs exactly ONCE, on
+ * first render — and on a hard load of /laundry-profile, `currentUser` is null
+ * on first render (ClientApp fetches it asynchronously). Snapshotting there
+ * captured an all-undefined object permanently: the laundry opened the page,
+ * saw a blank form, retyped the required fields, saved — and wiped their
+ * configured `cleaningFee`, silently repricing every future booking to the
+ * DEFAULT_CLEANING_FEE env fallback.
+ *
+ * Keeping the snapshot in a child that is only mounted once `currentUser` is
+ * loaded (and remounted via `key` if the user identity ever changes) means the
+ * initializer can only ever run against real data, while preserving the
+ * don't-clobber-in-flight-edits behaviour the snapshot was there for.
+ *
+ * @param {Object} props
+ * @param {propTypes.currentUser} props.currentUser - a LOADED current user
+ * @returns {JSX.Element}
+ */
+const LaundryProfileFormSection = props => {
+  const { currentUser, onUpdateProfile, updateProfileInProgress, updateProfileError } = props;
+
+  const [state, setState] = useState({ initialValues: getInitialValues(currentUser) });
+
+  const handleSubmit = values => {
+    const {
+      studioName,
+      businessHours,
+      turnaroundHours,
+      cleaningFee,
+      acceptedCategories,
+      location,
+    } = values;
+    const { address, origin } = location?.selectedPlace || {};
+
+    const acceptedCategoriesArray = (acceptedCategories || '')
+      .split(',')
+      .map(category => category.trim())
+      .filter(category => category.length > 0);
+
+    const { privateData: currentPrivateData = {} } = currentUser?.attributes?.profile || {};
+
+    // Belt and braces on the two money/scheduling values: `cleaningFee` has no
+    // `validate` on the form, so an absent value would submit as null. Never
+    // let an absent field erase a stored one — a wiped cleaningFee silently
+    // changes what every future customer is charged. Clearing them
+    // deliberately is not a Phase 1 requirement; not destroying them is.
+    const preserved = (submitted, existing) =>
+      typeof submitted === 'number' && Number.isFinite(submitted) ? submitted : existing;
+
+    const nextTurnaroundHours = preserved(turnaroundHours, currentPrivateData.turnaroundHours);
+    const nextCleaningFee = preserved(cleaningFee, currentPrivateData.cleaningFee);
+
+    // Only the keys this page owns are sent. Sharetribe merges top-level
+    // publicData/privateData keys, so re-sending the whole existing blob would
+    // only widen the lost-update window against a concurrent write.
+    const profile = {
+      publicData: {
+        laundryProfile: { studioName, address, origin, businessHours },
+        acceptedCategories: acceptedCategoriesArray,
+      },
+      privateData: {
+        turnaroundHours: nextTurnaroundHours,
+        cleaningFee: nextCleaningFee,
+      },
+    };
+
+    // Cache the values we just saved so the form doesn't revert to stale
+    // initialValues while the update request is in flight.
+    setState({
+      initialValues: {
+        studioName,
+        businessHours,
+        turnaroundHours: nextTurnaroundHours,
+        cleaningFee: nextCleaningFee,
+        acceptedCategories: acceptedCategoriesArray.join(', '),
+        location:
+          address && origin ? { search: address, selectedPlace: { address, origin } } : null,
+      },
+    });
+
+    onUpdateProfile(profile);
+  };
+
+  return (
+    <LaundryProfileForm
+      className={css.form}
+      initialValues={state.initialValues}
+      onSubmit={handleSubmit}
+      updateProfileError={updateProfileError}
+      updateInProgress={updateProfileInProgress}
+    />
+  );
+};
+
+/**
  * LaundryProfilePage
  *
  * Laundry-only settings page for the studio profile: studio name, address,
@@ -69,12 +169,6 @@ export const LaundryProfilePageComponent = props => {
     staticContext,
   } = props;
 
-  // FieldLocationAutocompleteInput doesn't keep internal state, so re-rendering
-  // with fresh initialValues from props during the update XHR would blow away
-  // what the user just typed — cache initialValues in local state instead,
-  // same approach as EditListingLocationPanel.
-  const [state, setState] = useState({ initialValues: getInitialValues(currentUser) });
-
   const currentUserLoaded = !!currentUser?.id;
 
   if (currentUserLoaded && !isLaundryUser(currentUser)) {
@@ -86,56 +180,6 @@ export const LaundryProfilePageComponent = props => {
     // flash of NotFoundPage before we know whether this user is a laundry.
     return null;
   }
-
-  const handleSubmit = values => {
-    const {
-      studioName,
-      businessHours,
-      turnaroundHours,
-      cleaningFee,
-      acceptedCategories,
-      location,
-    } = values;
-    const {
-      selectedPlace: { address, origin },
-    } = location;
-
-    const acceptedCategoriesArray = (acceptedCategories || '')
-      .split(',')
-      .map(category => category.trim())
-      .filter(category => category.length > 0);
-
-    const { publicData: currentPublicData = {}, privateData: currentPrivateData = {} } =
-      currentUser?.attributes?.profile || {};
-
-    const profile = {
-      publicData: {
-        ...currentPublicData,
-        laundryProfile: { studioName, address, origin, businessHours },
-        acceptedCategories: acceptedCategoriesArray,
-      },
-      privateData: {
-        ...currentPrivateData,
-        turnaroundHours,
-        cleaningFee,
-      },
-    };
-
-    // Cache the values we just saved so the form doesn't revert to stale
-    // initialValues while the update request is in flight.
-    setState({
-      initialValues: {
-        studioName,
-        businessHours,
-        turnaroundHours,
-        cleaningFee,
-        acceptedCategories: acceptedCategoriesArray.join(', '),
-        location: { search: address, selectedPlace: { address, origin } },
-      },
-    });
-
-    onUpdateProfile(profile);
-  };
 
   const title = intl.formatMessage({ id: 'LaundryProfilePage.title' });
 
@@ -160,12 +204,14 @@ export const LaundryProfilePageComponent = props => {
           <H3 as="h1">
             <FormattedMessage id="LaundryProfilePage.heading" />
           </H3>
-          <LaundryProfileForm
-            className={css.form}
-            initialValues={state.initialValues}
-            onSubmit={handleSubmit}
+          {/* key: remount (and re-snapshot initialValues) if the user
+              identity ever changes. currentUser is guaranteed loaded here. */}
+          <LaundryProfileFormSection
+            key={currentUser.id.uuid}
+            currentUser={currentUser}
+            onUpdateProfile={onUpdateProfile}
+            updateProfileInProgress={updateProfileInProgress}
             updateProfileError={updateProfileError}
-            updateInProgress={updateProfileInProgress}
           />
         </div>
       </LayoutSideNavigation>

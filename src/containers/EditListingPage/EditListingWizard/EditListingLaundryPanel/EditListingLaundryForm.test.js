@@ -10,31 +10,28 @@ const { screen, userEvent } = testingLibrary;
 
 const noop = () => null;
 
+// The flat, explicitly allowlisted record shape returned by /api/laundries -
+// see server/api-util/laundryDirectory.js. The endpoint no longer forwards the
+// raw publicData blob.
 const laundries = [
   {
     id: 'laundry-1',
     displayName: 'Studio Pigalle',
-    publicData: {
-      laundryProfile: {
-        studioName: 'Studio Pigalle',
-        address: '21 Rue Frochot, Paris',
-        businessHours: 'Mon–Sat · 11:00–21:00',
-      },
-      acceptedCategories: ['Eveningwear', 'Sequins', 'Embroidery'],
-    },
+    studioName: 'Studio Pigalle',
+    address: '21 Rue Frochot, Paris',
+    origin: { lat: 48.882, lng: 2.338 },
+    businessHours: 'Mon–Sat · 11:00–21:00',
+    acceptedCategories: ['Eveningwear', 'Sequins', 'Embroidery'],
     turnaroundHours: 48,
   },
   {
     id: 'laundry-2',
     displayName: 'Maison du Marais',
-    publicData: {
-      laundryProfile: {
-        studioName: 'Maison du Marais',
-        address: '5 Rue des Rosiers, Paris',
-        businessHours: 'Tue–Sun · 10:00–19:00',
-      },
-      acceptedCategories: ['Denim', 'Cotton', 'Leather goods'],
-    },
+    studioName: 'Maison du Marais',
+    address: '5 Rue des Rosiers, Paris',
+    origin: { lat: 48.857, lng: 2.359 },
+    businessHours: 'Tue–Sun · 10:00–19:00',
+    acceptedCategories: ['Denim', 'Cotton', 'Leather goods'],
     turnaroundHours: 36,
   },
 ];
@@ -127,5 +124,80 @@ describe('EditListingLaundryForm', () => {
     await user.click(radios[0]);
 
     expect(screen.getByText('EditListingLaundryForm.categoryWarning')).toBeInTheDocument();
+  });
+
+  // NEGATIVE CASE for the soft category validation. Without this, an
+  // implementation that ALWAYS shows the warning passes the test above - which
+  // is how the dead `listingCategory` wiring slipped through review.
+  it('does NOT show the category warning when the category IS accepted', async () => {
+    const user = userEvent.setup();
+
+    await act(async () => {
+      render(
+        <EditListingLaundryForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onSubmit={noop}
+          saveActionMsg="Save laundry assignment"
+          updated={false}
+          updateInProgress={false}
+          disabled={false}
+          ready={false}
+          laundries={laundries}
+          fetchLaundriesInProgress={false}
+          listingCategory="Eveningwear"
+        />
+      );
+    });
+
+    const radios = screen.getAllByRole('radio', {
+      name: 'EditListingLaundryForm.screenreader.chooseLaundry',
+    });
+    await user.click(radios[0]);
+
+    expect(screen.queryByText('EditListingLaundryForm.categoryWarning')).not.toBeInTheDocument();
+  });
+
+  it('does NOT show the category warning before any laundry is selected', async () => {
+    await act(async () => {
+      render(
+        <EditListingLaundryForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onSubmit={noop}
+          saveActionMsg="Save laundry assignment"
+          updated={false}
+          updateInProgress={false}
+          disabled={false}
+          ready={false}
+          laundries={laundries}
+          fetchLaundriesInProgress={false}
+          listingCategory="Outerwear"
+        />
+      );
+    });
+
+    expect(screen.queryByText('EditListingLaundryForm.categoryWarning')).not.toBeInTheDocument();
+  });
+
+  it('renders a laundry card without crashing when optional fields are missing', async () => {
+    await act(async () => {
+      render(
+        <EditListingLaundryForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onSubmit={noop}
+          saveActionMsg="Save laundry assignment"
+          updated={false}
+          updateInProgress={false}
+          disabled={false}
+          ready={false}
+          laundries={[{ id: 'sparse', displayName: 'Sparse Laundry' }]}
+          fetchLaundriesInProgress={false}
+        />
+      );
+    });
+
+    expect(screen.getByText('Sparse Laundry')).toBeInTheDocument();
   });
 });

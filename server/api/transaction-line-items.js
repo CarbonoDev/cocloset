@@ -1,9 +1,6 @@
-const { transactionLineItems } = require('../api-util/lineItems');
+const { buildLineItemsForListing } = require('../api-util/lineItems');
 const { getSdk, handleError, serialize, fetchCommission } = require('../api-util/sdk');
-const {
-  constructValidLineItems,
-  resolveCleaningFeeInSubunits,
-} = require('../api-util/lineItemHelpers');
+const { constructValidLineItems } = require('../api-util/lineItemHelpers');
 
 module.exports = (req, res) => {
   const { isOwnListing, listingId, orderData } = req.body || {};
@@ -23,18 +20,17 @@ module.exports = (req, res) => {
 
       const currency = listing.attributes.price?.currency || orderData?.currency;
 
-      // Cleaning fee is sourced from the assigned laundry's privateData (Integration
-      // API only - see lineItemHelpers.resolveCleaningFeeInSubunits), so it has to be
-      // resolved before we can build the (synchronous) line items array.
-      return resolveCleaningFeeInSubunits(listing, currency).then(cleaningFeeInSubunits => {
-        const lineItems = transactionLineItems(
-          listing,
-          orderData,
-          providerCommission,
-          customerCommission,
-          cleaningFeeInSubunits
-        );
-
+      // This is the PREVIEW path (ListingPage order breakdown). It must use the
+      // exact same builder as the two charge paths (initiate-privileged.js,
+      // transition-privileged.js) so what the customer is shown is what the
+      // customer is charged - see lineItems.buildLineItemsForListing.
+      return buildLineItemsForListing({
+        listing,
+        orderData,
+        providerCommission,
+        customerCommission,
+        currency,
+      }).then(lineItems => {
         // Because we are using returned lineItems directly in this template we need to use the helper function
         // to add some attributes like lineTotal and reversal that Marketplace API also adds to the response.
         const validLineItems = constructValidLineItems(lineItems);

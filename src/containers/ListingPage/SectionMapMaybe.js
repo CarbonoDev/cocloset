@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { FormattedMessage } from '../../util/reactIntl';
 import classNames from 'classnames';
 import { propTypes } from '../../util/types';
+import { getPickupLocation } from '../../util/listingLocation';
 import { obfuscatedCoordinates } from '../../util/maps';
 import { Heading, Map } from '../../components';
 
@@ -31,7 +32,9 @@ class SectionMapMaybe extends Component {
       return null;
     }
 
-    const address = publicData && publicData.location ? publicData.location.address : '';
+    // The mapped location is the assigned laundry's, not the owner's home
+    // address (see util/listingLocation.js).
+    const address = getPickupLocation(publicData).address || '';
     const classes = classNames(rootClassName || css.sectionMap, className);
     const cacheKey = listingId ? `${listingId.uuid}_${geolocation.lat}_${geolocation.lng}` : null;
 

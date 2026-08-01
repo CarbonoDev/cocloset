@@ -298,6 +298,7 @@
   "EditListingLaundryPanel.createListingTitle": "Laundry assignment",
   "EditListingLaundryPanel.description": "Pick the laundry partner that will hold, hand over and clean this garment. Renters pick up and return here. You can't publish without one.",
   "EditListingLaundryPanel.fetchLaundriesFailed": "Failed to load laundry partners. Please try again.",
+  "EditListingLaundryPanel.laundryUnavailable": "That laundry partner is no longer available. Please reload the page and choose another one.",
   "EditListingLaundryPanel.title": "Choose the laundry partner for {listingTitle}",
   "EditListingLocationForm.city": "City",
   "EditListingLocationForm.cityPlaceholder": "Paris",

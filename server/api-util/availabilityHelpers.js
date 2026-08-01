@@ -76,9 +76,7 @@ const computeAvailabilityBufferWindow = (bookingStart, bookingEnd, turnaroundHou
     throw new Error('computeAvailabilityBufferWindow: bookingEnd must be a valid Date');
   }
 
-  const { totalBufferDays, bufferBeforeDays, bufferAfterDays } = computeBufferDays(
-    turnaroundHours
-  );
+  const { totalBufferDays, bufferBeforeDays, bufferAfterDays } = computeBufferDays(turnaroundHours);
 
   const start = addDays(bookingStart, -bufferBeforeDays);
   const end = addDays(bookingEnd, bufferAfterDays);
@@ -103,6 +101,116 @@ const resolveTurnaroundHours = (laundryTurnaroundHours, envDefaultBufferHours) =
   return HARDCODED_DEFAULT_BUFFER_HOURS;
 };
 
+/**
+ * Subtract already-blocked ranges from a desired range, returning the
+ * sub-ranges that still need an availability exception created.
+ *
+ * WHY THIS IS NECESSARY: the Marketplace/Integration API **rejects
+ * overlapping availability exceptions** with
+ * `400 validation-invalid-value - "Availability exception range overlaps with
+ * existing availability exceptions."` (verified against Dev). Design §13
+ * explicitly wants garment owners to block weeks manually via the stock
+ * EditListingAvailabilityPanel, and back-to-back bookings produce abutting
+ * buffer windows — so overlap is the expected case, not the edge case.
+ * Blindly calling `availabilityExceptions.create` on the whole window 400s,
+ * and (before this fix) failed silently, leaving the listing double-bookable
+ * during the exact window the buffer was supposed to protect.
+ *
+ * Ranges are half-open `[start, end)`, matching Sharetribe's convention for
+ * both bookings and availability exceptions. Two ranges that merely *touch*
+ * (`a.end === b.start`) do not overlap and are treated as contiguous cover.
+ *
+ * NOTE ON `seats`: existing exceptions are subtracted regardless of their
+ * `seats` value, because the API's overlap rejection does not care about
+ * seats either. An overlapping exception with `seats > 0` therefore leaves a
+ * genuinely bookable hole inside the buffer window; the caller is responsible
+ * for surfacing that (see create-availability-buffer.js, which reports it as
+ * `unblockedOverlaps`). Silently creating nothing there would be the old bug
+ * in a new shape.
+ *
+ * @param {{ start: Date, end: Date }} desired - the full buffer window
+ * @param {Array<{ start: Date|string, end: Date|string, seats?: number }>} existing -
+ *   exceptions already present on the listing (any seats value)
+ * @returns {Array<{ start: Date, end: Date }>} zero or more sub-ranges to create,
+ *   in chronological order. An empty array means the window is already covered.
+ */
+const subtractBlockedRanges = (desired, existing) => {
+  const toMs = value => (value instanceof Date ? value.getTime() : new Date(value).getTime());
+
+  const desiredStart = toMs(desired?.start);
+  const desiredEnd = toMs(desired?.end);
+
+  if (!Number.isFinite(desiredStart) || !Number.isFinite(desiredEnd)) {
+    throw new Error('subtractBlockedRanges: desired range must have valid start and end dates');
+  }
+  if (desiredEnd <= desiredStart) {
+    throw new Error('subtractBlockedRanges: desired range end must be after start');
+  }
+
+  // Clip every *overlapping* existing range to the desired window. Ranges that
+  // only touch the window (end === desiredStart, or start === desiredEnd) are
+  // not overlaps and are dropped here.
+  const clipped = (Array.isArray(existing) ? existing : [])
+    .map(range => ({ start: toMs(range?.start), end: toMs(range?.end) }))
+    .filter(r => Number.isFinite(r.start) && Number.isFinite(r.end) && r.end > r.start)
+    .filter(r => r.start < desiredEnd && r.end > desiredStart)
+    .map(r => ({ start: Math.max(r.start, desiredStart), end: Math.min(r.end, desiredEnd) }))
+    .sort((a, b) => a.start - b.start);
+
+  // Merge overlapping AND touching ranges, so a chain of adjacent exceptions
+  // counts as one continuous block rather than producing zero-length gaps.
+  const merged = clipped.reduce((acc, range) => {
+    const last = acc[acc.length - 1];
+    if (last && range.start <= last.end) {
+      last.end = Math.max(last.end, range.end);
+      return acc;
+    }
+    return acc.concat({ ...range });
+  }, []);
+
+  // Walk the gaps between merged blocks.
+  const gaps = [];
+  let cursor = desiredStart;
+  merged.forEach(block => {
+    if (block.start > cursor) {
+      gaps.push({ start: new Date(cursor), end: new Date(block.start) });
+    }
+    cursor = Math.max(cursor, block.end);
+  });
+  if (cursor < desiredEnd) {
+    gaps.push({ start: new Date(cursor), end: new Date(desiredEnd) });
+  }
+
+  return gaps;
+};
+
+/**
+ * Of the existing exceptions overlapping the desired window, which ones leave
+ * the listing still bookable (`seats > 0`)?
+ *
+ * These are the dangerous case: the buffer window looks "already covered" to
+ * subtractBlockedRanges (so nothing is created, correctly — creating would
+ * 400) while the listing is in fact still bookable on those days. The caller
+ * must log/report these rather than treat the window as protected.
+ *
+ * @param {{ start: Date, end: Date }} desired
+ * @param {Array<{ start: Date|string, end: Date|string, seats?: number }>} existing
+ * @returns {Array} the overlapping existing entries with seats > 0
+ */
+const findBookableOverlaps = (desired, existing) => {
+  const toMs = value => (value instanceof Date ? value.getTime() : new Date(value).getTime());
+  const desiredStart = toMs(desired?.start);
+  const desiredEnd = toMs(desired?.end);
+
+  return (Array.isArray(existing) ? existing : []).filter(range => {
+    const start = toMs(range?.start);
+    const end = toMs(range?.end);
+    const overlaps =
+      Number.isFinite(start) && Number.isFinite(end) && start < desiredEnd && end > desiredStart;
+    return overlaps && typeof range?.seats === 'number' && range.seats > 0;
+  });
+};
+
 module.exports = {
   HOURS_IN_DAY,
   HARDCODED_DEFAULT_BUFFER_HOURS,
@@ -110,4 +218,6 @@ module.exports = {
   addDays,
   computeAvailabilityBufferWindow,
   resolveTurnaroundHours,
+  subtractBlockedRanges,
+  findBookableOverlaps,
 };

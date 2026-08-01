@@ -152,10 +152,19 @@ export const deleteUserAccount = body => {
   return post('/api/delete-account', body);
 };
 
-// Fetch the public list of laundries (users flagged with metadata.isLaundry),
-// used by the listing wizard's "Laundry Assignment" step.
+// Fetch the list of laundries (users flagged with metadata.isLaundry), used by
+// the listing wizard's "Laundry Assignment" step. Requires an authenticated
+// caller.
 //
-// See `server/api/laundries.js` for the response shape.
+// Returns `{ data: [ { id, displayName, studioName, address, origin,
+// businessHours, acceptedCategories, turnaroundHours } ], meta }` - a flat,
+// explicitly allowlisted record per laundry, NOT the raw user publicData blob.
+// Laundries with no usable address/origin are omitted (they can't be assigned:
+// no geolocation would be written and the listing could never be published);
+// `meta.incompleteProfileCount` says how many were dropped for that reason.
+//
+// See `server/api/laundries.js` for the full response shape and the reason the
+// filtering happens server-side in JS rather than in the API query.
 export const fetchLaundries = () => {
   return request('/api/laundries', { method: methods.GET });
 };

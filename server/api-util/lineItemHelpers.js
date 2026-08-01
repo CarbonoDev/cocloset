@@ -6,6 +6,8 @@ const { Money } = types;
 const { getAmountAsDecimalJS, convertDecimalJSToNumber, unitDivisor } = require('./currency');
 const { nightsBetween, daysBetween } = require('./dates');
 const { getIntegrationSdk } = require('./integrationSdk');
+const { isLaundryUserEntity } = require('./laundryDirectory');
+const log = require('../log');
 const LINE_ITEM_NIGHT = 'line-item/night';
 const LINE_ITEM_DAY = 'line-item/day';
 const LINE_ITEM_CLEANING_FEE = 'line-item/cleaning-fee';
@@ -486,6 +488,16 @@ const cleaningFeeToSubunits = (amountMajorUnits, currency) => {
  * Integration API lookup fails for any reason (e.g. the laundry user was removed) -
  * Phase 1 pricing should never fail booking creation over this.
  *
+ * SECURITY: `assignedLaundryId` lives in the *listing's* publicData, which the
+ * provider fully controls (through the wizard, or directly via
+ * ownListings.update). So the user it points at is NOT trustworthy: a provider
+ * could point it at their own account and set their own `privateData.cleaningFee`
+ * - to 0 to remove the fee, or to something enormous to inflate every customer's
+ * payin total without it ever showing up in the listing price. The fee is
+ * therefore only honoured when the referenced user is genuinely flagged
+ * `metadata.isLaundry === true` (operator/Integration-API-writable only); anyone
+ * else falls back to the env default.
+ *
  * @param {Object} listing
  * @param {string} currency
  * @returns {Promise<number>} cleaning fee amount in the currency's subunits
@@ -502,20 +514,44 @@ exports.resolveCleaningFeeInSubunits = (listing, currency) => {
   try {
     integrationSdk = getIntegrationSdk();
   } catch (e) {
+    log.error(e, 'resolve-cleaning-fee-no-integration-sdk', {});
     return Promise.resolve(cleaningFeeToSubunits(fallbackFeeMajorUnits, currency));
   }
 
   return integrationSdk.users
     .show({ id: assignedLaundryId }, { expand: true })
     .then(response => {
-      const laundryCleaningFee = response.data.data.attributes.profile.privateData?.cleaningFee;
+      const profile = response.data.data.attributes.profile;
+
+      if (!isLaundryUserEntity(response.data.data)) {
+        // The listing points at a user who is not a laundry. Never honour a
+        // fee from them - see the SECURITY note above.
+        log.error(
+          new Error('assignedLaundryId does not reference a user flagged isLaundry'),
+          'resolve-cleaning-fee-untrusted-laundry',
+          { listingId: listing?.id?.uuid, assignedLaundryId }
+        );
+        return cleaningFeeToSubunits(fallbackFeeMajorUnits, currency);
+      }
+
+      const laundryCleaningFee = profile.privateData?.cleaningFee;
       const feeMajorUnits =
         typeof laundryCleaningFee === 'number' && Number.isFinite(laundryCleaningFee)
           ? laundryCleaningFee
           : fallbackFeeMajorUnits;
       return cleaningFeeToSubunits(feeMajorUnits, currency);
     })
-    .catch(() => cleaningFeeToSubunits(fallbackFeeMajorUnits, currency));
+    .catch(e => {
+      // Previously this error was discarded entirely, which made a transient
+      // Integration API failure indistinguishable from "this laundry hasn't
+      // set a fee" - and silently repriced the booking. Still fall back
+      // (Phase 1: pricing must not fail booking creation) but make it visible.
+      log.error(e, 'resolve-cleaning-fee-lookup-failed', {
+        listingId: listing?.id?.uuid,
+        assignedLaundryId,
+      });
+      return cleaningFeeToSubunits(fallbackFeeMajorUnits, currency);
+    });
 };
 
 /**

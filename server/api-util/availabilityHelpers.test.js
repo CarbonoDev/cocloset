@@ -1,5 +1,7 @@
 const {
   HARDCODED_DEFAULT_BUFFER_HOURS,
+  subtractBlockedRanges,
+  findBookableOverlaps,
   computeBufferDays,
   addDays,
   computeAvailabilityBufferWindow,
@@ -168,5 +170,211 @@ describe('resolveTurnaroundHours()', () => {
     expect(resolveTurnaroundHours(0, '72')).toBe(72);
     expect(resolveTurnaroundHours(-1, undefined)).toBe(HARDCODED_DEFAULT_BUFFER_HOURS);
     expect(resolveTurnaroundHours(NaN, undefined)).toBe(HARDCODED_DEFAULT_BUFFER_HOURS);
+  });
+});
+
+describe('subtractBlockedRanges()', () => {
+  const d = iso => new Date(iso);
+  // Compact assertion helper: compare as ISO strings so failures are readable.
+  const iso = ranges => ranges.map(r => [r.start.toISOString(), r.end.toISOString()]);
+
+  const window = { start: d('2026-03-10T00:00:00.000Z'), end: d('2026-03-20T00:00:00.000Z') };
+
+  it('returns the whole window when nothing is blocked yet', () => {
+    expect(iso(subtractBlockedRanges(window, []))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('treats a missing/garbage existing list as "nothing blocked"', () => {
+    expect(iso(subtractBlockedRanges(window, undefined))).toHaveLength(1);
+    expect(iso(subtractBlockedRanges(window, null))).toHaveLength(1);
+  });
+
+  it('returns nothing when an existing exception fully covers the window', () => {
+    const existing = [{ start: d('2026-03-01T00:00:00.000Z'), end: d('2026-04-01T00:00:00.000Z') }];
+    expect(subtractBlockedRanges(window, existing)).toEqual([]);
+  });
+
+  it('returns nothing when an existing exception matches the window exactly', () => {
+    expect(subtractBlockedRanges(window, [{ ...window }])).toEqual([]);
+  });
+
+  // The multi-segment case: an owner-blocked week in the middle of the buffer.
+  it('splits the window into two segments around a block in the middle', () => {
+    const existing = [{ start: d('2026-03-13T00:00:00.000Z'), end: d('2026-03-16T00:00:00.000Z') }];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-13T00:00:00.000Z'],
+      ['2026-03-16T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('trims the leading edge when an existing block overlaps the start', () => {
+    const existing = [{ start: d('2026-03-05T00:00:00.000Z'), end: d('2026-03-12T00:00:00.000Z') }];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-12T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('trims the trailing edge when an existing block overlaps the end', () => {
+    const existing = [{ start: d('2026-03-18T00:00:00.000Z'), end: d('2026-03-25T00:00:00.000Z') }];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-18T00:00:00.000Z'],
+    ]);
+  });
+
+  it('handles several disjoint blocks, producing several segments', () => {
+    const existing = [
+      { start: d('2026-03-12T00:00:00.000Z'), end: d('2026-03-13T00:00:00.000Z') },
+      { start: d('2026-03-16T00:00:00.000Z'), end: d('2026-03-17T00:00:00.000Z') },
+    ];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-12T00:00:00.000Z'],
+      ['2026-03-13T00:00:00.000Z', '2026-03-16T00:00:00.000Z'],
+      ['2026-03-17T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('is order-independent (unsorted input gives the same segments)', () => {
+    const existing = [
+      { start: d('2026-03-16T00:00:00.000Z'), end: d('2026-03-17T00:00:00.000Z') },
+      { start: d('2026-03-12T00:00:00.000Z'), end: d('2026-03-13T00:00:00.000Z') },
+    ];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-12T00:00:00.000Z'],
+      ['2026-03-13T00:00:00.000Z', '2026-03-16T00:00:00.000Z'],
+      ['2026-03-17T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('merges overlapping existing blocks rather than double-counting them', () => {
+    const existing = [
+      { start: d('2026-03-12T00:00:00.000Z'), end: d('2026-03-15T00:00:00.000Z') },
+      { start: d('2026-03-14T00:00:00.000Z'), end: d('2026-03-17T00:00:00.000Z') },
+    ];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-12T00:00:00.000Z'],
+      ['2026-03-17T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('merges touching blocks without emitting a zero-length gap', () => {
+    // [12,14) and [14,16) are contiguous: the gap between them is empty and
+    // must not be emitted (a zero-length exception would be rejected).
+    const existing = [
+      { start: d('2026-03-12T00:00:00.000Z'), end: d('2026-03-14T00:00:00.000Z') },
+      { start: d('2026-03-14T00:00:00.000Z'), end: d('2026-03-16T00:00:00.000Z') },
+    ];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-12T00:00:00.000Z'],
+      ['2026-03-16T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('ignores blocks that merely abut the window (half-open ranges do not overlap)', () => {
+    const existing = [
+      { start: d('2026-03-01T00:00:00.000Z'), end: d('2026-03-10T00:00:00.000Z') },
+      { start: d('2026-03-20T00:00:00.000Z'), end: d('2026-03-25T00:00:00.000Z') },
+    ];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('ignores blocks entirely outside the window', () => {
+    const existing = [
+      { start: d('2026-01-01T00:00:00.000Z'), end: d('2026-01-05T00:00:00.000Z') },
+      { start: d('2026-06-01T00:00:00.000Z'), end: d('2026-06-05T00:00:00.000Z') },
+    ];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('accepts ISO strings as well as Dates (the API returns strings)', () => {
+    const existing = [{ start: '2026-03-13T00:00:00.000Z', end: '2026-03-16T00:00:00.000Z' }];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-13T00:00:00.000Z'],
+      ['2026-03-16T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('skips malformed or zero-length existing entries instead of throwing', () => {
+    const existing = [
+      { start: 'not-a-date', end: d('2026-03-16T00:00:00.000Z') },
+      { start: d('2026-03-14T00:00:00.000Z'), end: d('2026-03-14T00:00:00.000Z') },
+      null,
+      {},
+    ];
+    expect(iso(subtractBlockedRanges(window, existing))).toEqual([
+      ['2026-03-10T00:00:00.000Z', '2026-03-20T00:00:00.000Z'],
+    ]);
+  });
+
+  it('preserves sub-day precision (windows are not silently rounded to days)', () => {
+    const w = { start: d('2026-03-10T09:30:00.000Z'), end: d('2026-03-11T09:30:00.000Z') };
+    const existing = [{ start: d('2026-03-10T12:00:00.000Z'), end: d('2026-03-10T18:00:00.000Z') }];
+    expect(iso(subtractBlockedRanges(w, existing))).toEqual([
+      ['2026-03-10T09:30:00.000Z', '2026-03-10T12:00:00.000Z'],
+      ['2026-03-10T18:00:00.000Z', '2026-03-11T09:30:00.000Z'],
+    ]);
+  });
+
+  it('throws on an invalid or inverted desired range', () => {
+    expect(() => subtractBlockedRanges({ start: 'x', end: 'y' }, [])).toThrow(
+      /valid start and end dates/
+    );
+    expect(() =>
+      subtractBlockedRanges({ start: d('2026-03-20T00:00:00.000Z'), end: window.start }, [])
+    ).toThrow(/end must be after start/);
+    expect(() => subtractBlockedRanges({ start: window.start, end: window.start }, [])).toThrow(
+      /end must be after start/
+    );
+  });
+});
+
+describe('findBookableOverlaps()', () => {
+  const d = iso => new Date(iso);
+  const window = { start: d('2026-03-10T00:00:00.000Z'), end: d('2026-03-20T00:00:00.000Z') };
+
+  it('finds an overlapping exception that leaves the listing bookable', () => {
+    const existing = [
+      {
+        id: 'blocking',
+        start: d('2026-03-11T00:00:00.000Z'),
+        end: d('2026-03-12T00:00:00.000Z'),
+        seats: 0,
+      },
+      {
+        id: 'bookable',
+        start: d('2026-03-13T00:00:00.000Z'),
+        end: d('2026-03-14T00:00:00.000Z'),
+        seats: 3,
+      },
+    ];
+    expect(findBookableOverlaps(window, existing).map(e => e.id)).toEqual(['bookable']);
+  });
+
+  it('ignores seats>0 exceptions outside the window', () => {
+    const existing = [
+      {
+        id: 'far-away',
+        start: d('2026-05-01T00:00:00.000Z'),
+        end: d('2026-05-02T00:00:00.000Z'),
+        seats: 5,
+      },
+    ];
+    expect(findBookableOverlaps(window, existing)).toEqual([]);
+  });
+
+  it('returns an empty list when everything overlapping is seats: 0', () => {
+    const existing = [
+      { start: d('2026-03-11T00:00:00.000Z'), end: d('2026-03-15T00:00:00.000Z'), seats: 0 },
+    ];
+    expect(findBookableOverlaps(window, existing)).toEqual([]);
+  });
+
+  it('tolerates a missing existing list', () => {
+    expect(findBookableOverlaps(window, undefined)).toEqual([]);
   });
 });

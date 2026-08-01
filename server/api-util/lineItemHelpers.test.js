@@ -794,6 +794,7 @@ describe('resolveCleaningFeeInSubunits()', () => {
         data: {
           attributes: {
             profile: {
+              metadata: { isLaundry: true },
               privateData: { cleaningFee: 12.5 }, // EUR 12.50, major units
             },
           },
@@ -814,6 +815,7 @@ describe('resolveCleaningFeeInSubunits()', () => {
         data: {
           attributes: {
             profile: {
+              metadata: { isLaundry: true },
               privateData: {}, // no cleaningFee set
             },
           },
@@ -833,6 +835,7 @@ describe('resolveCleaningFeeInSubunits()', () => {
         data: {
           attributes: {
             profile: {
+              metadata: { isLaundry: true },
               privateData: { cleaningFee: 0 },
             },
           },
@@ -879,6 +882,7 @@ describe('resolveCleaningFeeInSubunits()', () => {
         data: {
           attributes: {
             profile: {
+              metadata: { isLaundry: true },
               privateData: {},
             },
           },
@@ -889,5 +893,62 @@ describe('resolveCleaningFeeInSubunits()', () => {
     const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-5'), 'EUR');
 
     expect(result).toBe(0);
+  });
+
+  // SECURITY REGRESSION TESTS. `assignedLaundryId` is provider-controlled
+  // publicData on the provider's own listing, so a provider can point it at
+  // any user - including themselves - and set that user's privateData.
+  // cleaningFee. Without the isLaundry check they could zero out the fee, or
+  // inflate every customer's payin total by an arbitrary amount that never
+  // appears in the listing price.
+  const nonLaundryUserWithFee = cleaningFee => ({
+    data: {
+      data: {
+        attributes: {
+          profile: {
+            privateData: { cleaningFee },
+          },
+        },
+      },
+    },
+  });
+
+  it('ignores a fee from a user who is NOT flagged isLaundry (fee inflation)', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '10';
+    mockUsersShow.mockResolvedValue(nonLaundryUserWithFee(5000));
+
+    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('rogue-user'), 'EUR');
+
+    // The env default, NOT the 5000 EUR the provider tried to inject.
+    expect(result).toBe(1000);
+  });
+
+  it('ignores a zeroed fee from a user who is NOT flagged isLaundry (fee evasion)', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '10';
+    mockUsersShow.mockResolvedValue(nonLaundryUserWithFee(0));
+
+    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('rogue-user'), 'EUR');
+
+    expect(result).toBe(1000);
+  });
+
+  it('ignores a fee from a user with isLaundry explicitly false', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '10';
+    mockUsersShow.mockResolvedValue({
+      data: {
+        data: {
+          attributes: {
+            profile: {
+              metadata: { isLaundry: false },
+              privateData: { cleaningFee: 999 },
+            },
+          },
+        },
+      },
+    });
+
+    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('rogue-user'), 'EUR');
+
+    expect(result).toBe(1000);
   });
 });
