@@ -63,10 +63,14 @@ const readEdnTransitions = () => {
     const name = chunk.match(/^([a-z0-9-]+)/)[1];
     const from = chunk.match(/:from :state\/([a-z0-9-]+)/);
     const to = chunk.match(/:to :state\/([a-z0-9-]+)/);
+    const actions = (chunk.match(/:name :action\/[a-z0-9-]+/g) || []).map(a =>
+      a.replace(':name :action/', '')
+    );
     return {
       transition: `transition/${name}`,
       from: from ? from[1] : 'initial',
       to: to[1],
+      actions,
     };
   });
 };
@@ -107,7 +111,7 @@ describe('the JS graph matches ext/transaction-processes/cocloset-booking/proces
   const ednTransitions = readEdnTransitions();
 
   it('reads a plausible number of transitions out of the EDN', () => {
-    expect(ednTransitions.length).toEqual(36);
+    expect(ednTransitions.length).toEqual(38);
   });
 
   it('declares exactly the transitions the EDN declares', () => {
@@ -234,6 +238,109 @@ describe('cocloset-booking graph shape', () => {
   });
 });
 
+// Sharetribe has no post-payout refund action, so the position of
+// :action/stripe-create-payout is what decides which rescues are possible.
+// These assertions are the safety property of the whole process: they are
+// read straight out of the EDN, so they fail if the payout ever moves without
+// the cancel topology moving with it.
+describe('cocloset-booking payout and cancel topology', () => {
+  const ednTransitions = readEdnTransitions();
+  const carrying = action =>
+    ednTransitions
+      .filter(t => t.actions.includes(action))
+      .map(t => t.transition)
+      .sort();
+
+  it('fires stripe-create-payout on exactly the transitions that end a rental', () => {
+    expect(carrying('stripe-create-payout')).toEqual(
+      [
+        transitions.COMPLETE,
+        transitions.OPERATOR_COMPLETE,
+        transitions.AUTO_COMPLETE_FROM_READY,
+        transitions.AUTO_COMPLETE_FROM_PICKED_UP,
+        transitions.AUTO_COMPLETE_FROM_OVERDUE,
+        // Payout is on the way OUT of 'returned', not on the way in: that is
+        // what leaves a window for a damage report to be refunded.
+        transitions.LAUNDRY_MARK_PENDING_CLEANING,
+        transitions.AUTO_COMPLETE_FROM_RETURNED,
+      ].sort()
+    );
+  });
+
+  it('never pays out on a return transition, so damage can still be refunded', () => {
+    [transitions.LAUNDRY_CONFIRM_RETURN, transitions.LAUNDRY_CONFIRM_RETURN_LATE].forEach(name => {
+      const t = ednTransitions.find(e => e.transition === name);
+      expect(t.actions).toEqual(['privileged-update-metadata']);
+    });
+  });
+
+  it('refunds on exactly the declines, expiries and cancels', () => {
+    expect(carrying('stripe-refund-payment')).toEqual(
+      [
+        transitions.EXPIRE_PAYMENT,
+        transitions.DECLINE,
+        transitions.OPERATOR_DECLINE,
+        transitions.EXPIRE,
+        transitions.CANCEL,
+        transitions.CANCEL_FROM_READY_FOR_PICKUP,
+        transitions.CANCEL_FROM_PICKED_UP,
+        transitions.CANCEL_FROM_OVERDUE,
+        transitions.CANCEL_FROM_RETURNED,
+      ].sort()
+    );
+  });
+
+  it('never refunds and pays out in the same transition', () => {
+    ednTransitions.forEach(t => {
+      expect(
+        t.actions.includes('stripe-refund-payment') && t.actions.includes('stripe-create-payout')
+      ).toEqual(false);
+    });
+  });
+
+  it('pays the owner exactly once on every path from initial to delivered', () => {
+    const paysOut = new Set(carrying('stripe-create-payout'));
+    const paths = [];
+
+    const walk = (state, seen, payouts) => {
+      if (state === states.DELIVERED) {
+        paths.push(payouts);
+        return;
+      }
+      Object.entries(graph.states[state]?.on || {}).forEach(([transition, next]) => {
+        if (seen.has(next)) {
+          // Self-transitions and already-visited states cannot add a payout
+          // that a simple path does not already account for.
+          return;
+        }
+        walk(next, new Set([...seen, next]), payouts + (paysOut.has(transition) ? 1 : 0));
+      });
+    };
+    walk(states.INITIAL, new Set([states.INITIAL]), 0);
+
+    expect(paths.length).toBeGreaterThan(0);
+    paths.forEach(count => expect(count).toEqual(1));
+  });
+
+  it('offers an operator cancel from every state that has not been paid out yet', () => {
+    const cancelFrom = {
+      [states.ACCEPTED]: transitions.CANCEL,
+      [states.READY_FOR_PICKUP]: transitions.CANCEL_FROM_READY_FOR_PICKUP,
+      [states.PICKED_UP]: transitions.CANCEL_FROM_PICKED_UP,
+      [states.OVERDUE]: transitions.CANCEL_FROM_OVERDUE,
+      [states.RETURNED]: transitions.CANCEL_FROM_RETURNED,
+    };
+    Object.entries(cancelFrom).forEach(([state, transition]) => {
+      expect(graph.states[state].on[transition]).toEqual(states.CANCELED);
+    });
+  });
+
+  it('offers no cancel from cleaning, where a refund is not expressible', () => {
+    const cleaningEdges = Object.values(graph.states[states.CLEANING].on);
+    expect(cleaningEdges).not.toContain(states.CANCELED);
+  });
+});
+
 describe('cocloset-booking predicates', () => {
   it('isPrivileged covers only the two payment transitions', () => {
     expect(isPrivileged(transitions.REQUEST_PAYMENT)).toEqual(true);
@@ -273,6 +380,8 @@ describe('cocloset-booking predicates', () => {
       transitions.CANCEL,
       transitions.CANCEL_FROM_READY_FOR_PICKUP,
       transitions.CANCEL_FROM_PICKED_UP,
+      transitions.CANCEL_FROM_OVERDUE,
+      transitions.CANCEL_FROM_RETURNED,
       transitions.DECLINE,
       transitions.OPERATOR_DECLINE,
     ].forEach(t => expect(isRefunded(t)).toEqual(true));
@@ -379,6 +488,48 @@ describe('cocloset-booking state resolution from a transaction entity', () => {
     expect(process.hasPassedState(states.RETURNED, tx)).toEqual(true);
     expect(process.hasPassedState(states.CLEANING, tx)).toEqual(false);
     expect(process.hasPassedState(states.DELIVERED, tx)).toEqual(false);
+  });
+});
+
+describe('cocloset-booking owner notifications', () => {
+  // The notifications the process attaches to a given transition, read out of
+  // the :notifications section of the EDN.
+  const notificationsOn = transition => {
+    const raw = fs.readFileSync(EDN_PATH, 'utf8');
+    const withoutComments = raw
+      .split('\n')
+      .map(line => line.replace(/;;.*$/, ''))
+      .join('\n');
+    const section = withoutComments.slice(withoutComments.indexOf('\n :notifications'));
+    return section
+      .split('{:name :notification/')
+      .slice(1)
+      .filter(chunk => chunk.includes(`:on :${transition},`))
+      .map(chunk => chunk.match(/^\s*([a-z0-9-]+)/)[1]);
+  };
+
+  it('sends nothing to the owner for the laundry-internal cleaning sub-phases', () => {
+    // "Quita los avisos que no le corresponden al vendedor" (Jonathan,
+    // 2026-08-01). The transitions stay - they are the audited timestamps -
+    // but the owner has nothing to act on, so no mail.
+    expect(notificationsOn(transitions.LAUNDRY_START_CLEANING)).toEqual([]);
+    expect(notificationsOn(transitions.LAUNDRY_START_QUALITY_INSPECTION)).toEqual([]);
+  });
+
+  it('tells the owner about the money on the transition that moves it', () => {
+    expect(notificationsOn(transitions.LAUNDRY_MARK_PENDING_CLEANING)).toContain(
+      'booking-money-paid-on-cleaning-start'
+    );
+    expect(notificationsOn(transitions.AUTO_COMPLETE_FROM_RETURNED)).toContain(
+      'booking-money-paid-auto-complete-from-returned'
+    );
+    // ...and not on the return transitions, which no longer pay out.
+    expect(notificationsOn(transitions.LAUNDRY_CONFIRM_RETURN)).toEqual([
+      'booking-return-completed',
+    ]);
+    expect(notificationsOn(transitions.LAUNDRY_CONFIRM_RETURN_LATE)).toEqual([
+      'booking-return-completed-late',
+    ]);
   });
 });
 

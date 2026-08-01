@@ -83,10 +83,15 @@ export const transitions = {
   AUTO_COMPLETE_FROM_RETURNED: 'transition/auto-complete-from-returned',
   AUTO_COMPLETE_FROM_CLEANING: 'transition/auto-complete-from-cleaning',
 
-  // Admin can also cancel the transition.
+  // Admin can also cancel the transition. There is one cancel per state that
+  // has not yet paid the owner out: payout fires on the way out of
+  // 'returned' (into 'cleaning'), and Sharetribe has no post-payout refund
+  // action, so 'cleaning' is the first state with no cancel.
   CANCEL: 'transition/cancel',
   CANCEL_FROM_READY_FOR_PICKUP: 'transition/cancel-from-ready-for-pickup',
   CANCEL_FROM_PICKED_UP: 'transition/cancel-from-picked-up',
+  CANCEL_FROM_OVERDUE: 'transition/cancel-from-overdue',
+  CANCEL_FROM_RETURNED: 'transition/cancel-from-returned',
 
   // The backend will mark the transaction completed.
   // Reachable only from 'accepted', i.e. the laundry never prepared the garment.
@@ -214,17 +219,20 @@ export const graph = {
     [states.OVERDUE]: {
       on: {
         [transitions.LAUNDRY_CONFIRM_RETURN_LATE]: states.RETURNED,
+        [transitions.CANCEL_FROM_OVERDUE]: states.CANCELED,
         [transitions.AUTO_COMPLETE_FROM_OVERDUE]: states.DELIVERED,
       },
     },
     [states.RETURNED]: {
       on: {
         [transitions.LAUNDRY_MARK_PENDING_CLEANING]: states.CLEANING,
+        [transitions.CANCEL_FROM_RETURNED]: states.CANCELED,
         [transitions.AUTO_COMPLETE_FROM_RETURNED]: states.DELIVERED,
       },
     },
     // The two cleaning sub-phase transitions are self-transitions: they leave
     // the transaction in 'cleaning' and only advance metadata.cleaningPhase.
+    // 'cleaning' has no cancel: the payout already fired on entering it.
     [states.CLEANING]: {
       on: {
         [transitions.LAUNDRY_START_CLEANING]: states.CLEANING,
@@ -269,6 +277,8 @@ export const isRelevantPastTransition = transition => {
     transitions.CANCEL,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,
+    transitions.CANCEL_FROM_OVERDUE,
+    transitions.CANCEL_FROM_RETURNED,
     transitions.COMPLETE,
     transitions.OPERATOR_COMPLETE,
     transitions.CONFIRM_PAYMENT,
@@ -364,6 +374,8 @@ export const isRefunded = transition => {
     transitions.CANCEL,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,
+    transitions.CANCEL_FROM_OVERDUE,
+    transitions.CANCEL_FROM_RETURNED,
     transitions.DECLINE,
     transitions.OPERATOR_DECLINE,
   ];
