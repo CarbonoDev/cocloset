@@ -198,3 +198,18 @@ export const updateLaundryTransactionStatus = body => {
 export const updateListingReadinessStatus = body => {
   return post('/api/listing-readiness-status', body);
 };
+
+// Fetch everything the laundry ops dashboard renders, for the calling laundry
+// user: the design doc §8 union of "transactions on listings assigned to me"
+// and "assigned listings with no transaction", plus a per-garment inventory
+// list. Takes no arguments - the caller's own user id is the laundry filter,
+// resolved server-side from their session.
+//
+// Rows come back already denormalized (customer/owner display names, listing
+// image url, rack, statuses), so the dashboard renders them directly with no
+// `included` resolution or follow-up lookups.
+//
+// See `server/api/laundry-orders.js` for the full response shape.
+export const fetchLaundryOrders = () => {
+  return request('/api/laundry-orders', { method: methods.GET });
+};
