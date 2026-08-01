@@ -18,6 +18,8 @@ const transitionPrivileged = require('./api/transition-privileged');
 const deleteAccount = require('./api/delete-account');
 const laundries = require('./api/laundries');
 const createAvailabilityBuffer = require('./api/create-availability-buffer');
+const laundryTransactionStatus = require('./api/laundry-transaction-status');
+const listingReadinessStatus = require('./api/listing-readiness-status');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -60,6 +62,8 @@ router.post('/transition-privileged', transitionPrivileged);
 router.post('/delete-account', deleteAccount);
 router.get('/laundries', laundries);
 router.post('/create-availability-buffer', createAvailabilityBuffer);
+router.post('/laundry-transaction-status', laundryTransactionStatus);
+router.post('/listing-readiness-status', listingReadinessStatus);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed

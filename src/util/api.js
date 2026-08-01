@@ -172,3 +172,29 @@ export const fetchLaundries = () => {
 export const createAvailabilityBuffer = body => {
   return post('/api/create-availability-buffer', body);
 };
+
+// Advance a transaction's granular laundry sub-phase
+// (`transaction.metadata.laundryStatus`), e.g. after a laundry scans a QR
+// code for pickup/return, or updates cleaning progress from the ops
+// dashboard. This is metadata layered on top of the existing, unmodified
+// transaction process - NOT a real Sharetribe process transition. `status`
+// must be one of the values exported as `LAUNDRY_STATUSES` in
+// `server/api-util/laundryStatusHelpers.js`.
+//
+// See `server/api/laundry-transaction-status.js` for the full request/
+// response shape, including the optional `damaged`/`damageNote` fields
+// (only meaningful when `status === 'returned'`).
+export const updateLaundryTransactionStatus = body => {
+  return post('/api/laundry-transaction-status', body);
+};
+
+// Update a listing's physical readiness state
+// (`listing.metadata.readinessStatus`, `listing.privateData.currentRack`),
+// independent of any specific booking - e.g. a garment just shipped in by
+// its owner and sitting in laundry inventory.
+//
+// See `server/api/listing-readiness-status.js` for the full request/
+// response shape and the `READINESS_STATUSES` enum.
+export const updateListingReadinessStatus = body => {
+  return post('/api/listing-readiness-status', body);
+};
