@@ -194,6 +194,20 @@ export const hasPermissionToViewData = currentUser => {
 export const isUserAuthorized = currentUser => currentUser?.attributes?.state === 'active';
 
 /**
+ * Check if currentUser has the Laundry Shop role.
+ *
+ * This is stored as user *metadata* rather than publicData/userType deliberately:
+ * metadata can only be written through the Integration API (see
+ * server/api-util/integrationSdk.js and scripts/set-laundry-role.js), so a user can
+ * never self-assign this role the way they could a publicData field.
+ *
+ * @param {Object} currentUser API entity
+ * @returns {Boolean} true if currentUser is flagged as a Laundry Shop
+ */
+export const isLaundryUser = currentUser =>
+  currentUser?.attributes?.profile?.metadata?.isLaundry === true;
+
+/**
  * Get the user type configuration for the current user's user type
  * @param {*} config marketplace configuration
  * @param {*} currentUser API entity

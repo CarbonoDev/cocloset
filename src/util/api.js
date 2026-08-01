@@ -151,3 +151,11 @@ export const createUserWithIdp = body => {
 export const deleteUserAccount = body => {
   return post('/api/delete-account', body);
 };
+
+// Fetch the public list of laundries (users flagged with metadata.isLaundry),
+// used by the listing wizard's "Laundry Assignment" step.
+//
+// See `server/api/laundries.js` for the response shape.
+export const fetchLaundries = () => {
+  return request('/api/laundries', { method: methods.GET });
+};
