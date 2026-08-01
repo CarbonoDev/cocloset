@@ -1,0 +1,84 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.error {
+  color: var(--colorFail);
+}
+
+.warning {
+  color: var(--colorAttention);
+}
+
+.loading,
+.empty {
+  color: var(--colorGrey700);
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+
+  @media (--viewportMedium) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: var(--borderRadius);
+  cursor: pointer;
+}
+
+.cardSelected {
+  border-color: var(--marketplaceColor);
+  box-shadow: 0 0 0 1px var(--marketplaceColor);
+}
+
+/* Visually hidden but still focusable/clickable native radio input */
+.cardInput {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+
+.cardName {
+  font-weight: var(--fontWeightSemiBold);
+}
+
+.cardDetail {
+  color: var(--colorGrey700);
+  font-size: 14px;
+}
+
+.cardCategories {
+  margin-top: 4px;
+  color: var(--colorGrey500);
+  font-size: 14px;
+}
+
+.submitButton {
+  margin-top: auto;
+  margin-bottom: 24px;
+
+  @media (--viewportLarge) {
+    display: inline-block;
+    width: 241px;
+    margin-top: 32px;
+  }
+}

@@ -1,0 +1,23 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  flex-grow: 1;
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.description {
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: var(--colorGrey700);
+}
+
+.error {
+  color: var(--colorFail);
+}
+
+.form {
+  flex-grow: 1;
+}

@@ -19,34 +19,7 @@
   color: var(--colorFail);
 }
 
-.locationAutocompleteInput {
-}
-
-.locationAutocompleteInputIcon {
-  display: none;
-}
-
-.predictionsRoot {
-  position: absolute;
-  width: 100%;
-  top: 36px;
-  left: 0;
-  background-color: var(--marketplaceColor);
-  border-bottom-left-radius: var(--borderRadius);
-  border-bottom-right-radius: var(--borderRadius);
-  box-shadow: var(--boxShadowPopup);
-  z-index: calc(var(--zIndexPopup) + 1);
-
-  @media (--viewportMedium) {
-    top: 40px;
-  }
-}
-
-.validLocation {
-}
-
-.locationAddress,
-.building {
+.field {
   flex-shrink: 0;
   margin-bottom: 24px;
 

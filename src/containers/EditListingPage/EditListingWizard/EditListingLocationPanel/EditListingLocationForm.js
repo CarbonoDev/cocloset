@@ -5,27 +5,23 @@ import classNames from 'classnames';
 // Import configs and util modules
 import { FormattedMessage, useIntl } from '../../../../util/reactIntl';
 import { propTypes } from '../../../../util/types';
-import {
-  autocompleteSearchRequired,
-  autocompletePlaceSelected,
-  composeValidators,
-} from '../../../../util/validators';
+import { required } from '../../../../util/validators';
 
 // Import shared components
-import {
-  Form,
-  FieldLocationAutocompleteInput,
-  Button,
-  FieldTextInput,
-} from '../../../../components';
+import { Form, Button, FieldTextInput } from '../../../../components';
 
 // Import modules from this directory
 import css from './EditListingLocationForm.module.css';
 
-const identity = v => v;
-
 /**
  * The EditListingLocationForm component.
+ *
+ * Captures the garment owner's own address - used only for shipping the
+ * garment to the assigned laundry. Plain text fields (no map/autocomplete,
+ * no lat/lng): this address is never shown to renters and never used as the
+ * listing's public geolocation. That comes from the Laundry Assignment step
+ * instead (EditListingLaundryForm), which copies the chosen laundry's own
+ * location onto the listing.
  *
  * @component
  * @param {Object} props
@@ -63,19 +59,17 @@ export const EditListingLocationForm = props => (
         updated,
         updateInProgress = false,
         fetchErrors,
-        values,
       } = formRenderProps;
 
       const intl = useIntl();
-      const addressRequiredMessage = intl.formatMessage({
-        id: 'EditListingLocationForm.addressRequired',
+      const streetRequiredMessage = intl.formatMessage({
+        id: 'EditListingLocationForm.streetRequired',
       });
-      const addressNotRecognizedMessage = intl.formatMessage({
-        id: 'EditListingLocationForm.addressNotRecognized',
+      const cityRequiredMessage = intl.formatMessage({
+        id: 'EditListingLocationForm.cityRequired',
       });
-
-      const optionalText = intl.formatMessage({
-        id: 'EditListingLocationForm.optionalText',
+      const postcodeRequiredMessage = intl.formatMessage({
+        id: 'EditListingLocationForm.postcodeRequired',
       });
 
       const { updateListingError, showListingsError } = fetchErrors || {};
@@ -99,37 +93,35 @@ export const EditListingLocationForm = props => (
             </p>
           ) : null}
 
-          <FieldLocationAutocompleteInput
-            rootClassName={css.locationAddress}
-            inputClassName={css.locationAutocompleteInput}
-            iconClassName={css.locationAutocompleteInputIcon}
-            predictionsClassName={css.predictionsRoot}
-            validClassName={css.validLocation}
+          <FieldTextInput
+            className={css.field}
+            type="text"
             autoFocus={autoFocus}
-            name="location"
-            id={`${formId}.location`}
-            label={intl.formatMessage({ id: 'EditListingLocationForm.address' })}
-            placeholder={intl.formatMessage({
-              id: 'EditListingLocationForm.addressPlaceholder',
-            })}
-            useDefaultPredictions={false}
-            format={identity}
-            valueFromForm={values.location}
-            validate={composeValidators(
-              autocompleteSearchRequired(addressRequiredMessage),
-              autocompletePlaceSelected(addressNotRecognizedMessage)
-            )}
+            id={`${formId}street`}
+            name="street"
+            label={intl.formatMessage({ id: 'EditListingLocationForm.street' })}
+            placeholder={intl.formatMessage({ id: 'EditListingLocationForm.streetPlaceholder' })}
+            validate={required(streetRequiredMessage)}
           />
 
           <FieldTextInput
-            className={css.building}
+            className={css.field}
             type="text"
-            name="building"
-            id={`${formId}building`}
-            label={intl.formatMessage({ id: 'EditListingLocationForm.building' }, { optionalText })}
-            placeholder={intl.formatMessage({
-              id: 'EditListingLocationForm.buildingPlaceholder',
-            })}
+            id={`${formId}city`}
+            name="city"
+            label={intl.formatMessage({ id: 'EditListingLocationForm.city' })}
+            placeholder={intl.formatMessage({ id: 'EditListingLocationForm.cityPlaceholder' })}
+            validate={required(cityRequiredMessage)}
+          />
+
+          <FieldTextInput
+            className={css.field}
+            type="text"
+            id={`${formId}postcode`}
+            name="postcode"
+            label={intl.formatMessage({ id: 'EditListingLocationForm.postcode' })}
+            placeholder={intl.formatMessage({ id: 'EditListingLocationForm.postcodePlaceholder' })}
+            validate={required(postcodeRequiredMessage)}
           />
 
           <Button

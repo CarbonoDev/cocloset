@@ -57,6 +57,7 @@ import EditListingWizardTab, {
   DELIVERY,
   FILES,
   LOCATION,
+  LAUNDRY,
   AVAILABILITY,
   PHOTOS,
   STYLE,
@@ -102,7 +103,14 @@ const tabsForListingType = (processName, listingTypeConfig) => {
   // Note 4: Ensure that the last panel contains the messaging for not-yet-verified files so
   //         that it is clear to the user why the 'publish' button is disabled during verification
   const tabs = {
-    ['default-booking']: [DETAILS, ...locationMaybe, PRICING, AVAILABILITY, ...styleOrPhotosTab],
+    ['default-booking']: [
+      DETAILS,
+      ...locationMaybe,
+      PRICING,
+      LAUNDRY,
+      AVAILABILITY,
+      ...styleOrPhotosTab,
+    ],
     ['default-purchase']: [DETAILS, PRICING_AND_STOCK, ...deliveryMaybe, ...styleOrPhotosTab],
     ['default-negotiation']: [DETAILS, ...locationMaybe, ...pricingMaybe, ...styleOrPhotosTab],
     ['default-inquiry']: [DETAILS, ...locationMaybe, ...pricingMaybe, ...styleOrPhotosTab],
@@ -147,6 +155,9 @@ const tabLabelAndSubmit = (intl, tab, isNewListingFlow, isPriceDisabled, process
       isPriceDisabled && isNewListingFlow
         ? `EditListingWizard.${processNameString}${newOrEdit}.saveLocationNoPricingTab`
         : `EditListingWizard.${processNameString}${newOrEdit}.saveLocation`;
+  } else if (tab === LAUNDRY) {
+    labelKey = 'EditListingWizard.tabLabelLaundry';
+    submitButtonKey = `EditListingWizard.${processNameString}${newOrEdit}.saveLaundry`;
   } else if (tab === AVAILABILITY) {
     labelKey = 'EditListingWizard.tabLabelAvailability';
     submitButtonKey = `EditListingWizard.${processNameString}${newOrEdit}.saveAvailability`;
@@ -278,7 +289,13 @@ const tabCompleted = (tab, listing, config, options = {}) => {
     case FILES:
       return filesRequired && hasAttachedFiles;
     case LOCATION:
-      return !!(geolocation && publicData?.location?.address);
+      return !!(
+        privateData?.ownerAddress?.street &&
+        privateData?.ownerAddress?.city &&
+        privateData?.ownerAddress?.postcode
+      );
+    case LAUNDRY:
+      return !!(geolocation && publicData?.assignedLaundryId);
     case AVAILABILITY:
       return !!availabilityPlan;
     case PHOTOS:
@@ -395,7 +412,7 @@ const getListingTypeConfig = (listing, selectedListingType, config) => {
  * @param {string} props.params.id - The id of the listing
  * @param {string} props.params.slug - The slug of the listing
  * @param {'new'|'draft'|'edit'} props.params.type - The type of the listing
- * @param {DETAILS | PRICING | PRICING_AND_STOCK | DELIVERY | FILES | LOCATION | AVAILABILITY | PHOTOS} props.params.tab - The name of the tab
+ * @param {DETAILS | PRICING | PRICING_AND_STOCK | DELIVERY | FILES | LOCATION | LAUNDRY | AVAILABILITY | PHOTOS} props.params.tab - The name of the tab
  * @param {propTypes.ownListing} props.listing - The listing object
  * @param {propTypes.error} [props.errors.createListingDraftError] - The error object for createListingDraft
  * @param {propTypes.error} [props.errors.publishListingError] - The error object for publishListing
