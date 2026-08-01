@@ -1,0 +1,1 @@
+{{set-translations (asset "content/email-texts.json")}}{{t "BookingQualityInspection.Subject" "{listingTitle} is in quality inspection" listingTitle=transaction.listing.title}}

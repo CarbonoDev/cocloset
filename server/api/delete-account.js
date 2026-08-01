@@ -6,6 +6,21 @@ const stripeRelatedStatesForBookings = [
   'state/accepted',
   'state/delivered',
 ];
+// cocloset-booking inserts the laundry custody chain between 'accepted' and
+// 'delivered'. Payout fires on entering 'returned', so every state from
+// 'pending-payment' through 'delivered' can still hold an incomplete Stripe
+// action and must block account deletion.
+const stripeRelatedStatesForCoclosetBookings = [
+  'state/pending-payment',
+  'state/preauthorized',
+  'state/accepted',
+  'state/ready-for-pickup',
+  'state/picked-up',
+  'state/overdue',
+  'state/returned',
+  'state/cleaning',
+  'state/delivered',
+];
 const stripeRelatedStatesForPurchases = [
   'state/pending-payment',
   'state/purchased',
@@ -41,6 +56,13 @@ module.exports = (req, res) => {
       states: stripeRelatedStatesForBookings.join(','),
     });
 
+  // Cocloset laundry-mediated booking states that contain Stripe payment processing
+  const ongoingCoclosetBookingsWithIncompletePaymentProcessing = () =>
+    sdk.transactions.query({
+      processNames: 'cocloset-booking',
+      states: stripeRelatedStatesForCoclosetBookings.join(','),
+    });
+
   // Purchase states that contain Stripe payment processing
   const ongoingPurchasesWithIncompletePaymentProcessing = () =>
     sdk.transactions.query({
@@ -64,6 +86,7 @@ module.exports = (req, res) => {
   // Check for any states that may contain incomplete Stripe actions
   Promise.all([
     ongoingBookingsWithIncompletePaymentProcessing(),
+    ongoingCoclosetBookingsWithIncompletePaymentProcessing(),
     ongoingPurchasesWithIncompletePaymentProcessing(),
     ongoingNegotiationsWithIncompletePaymentProcessing(),
     ongoingDigitalDownloadsWithIncompletePaymentProcessing(),
