@@ -20,6 +20,7 @@
  */
 
 const log = require('../log');
+const { sendMail } = require('./mailgun');
 
 // Max hours a laundry could plausibly claim as turnaround (30 days).
 const MAX_TURNAROUND_HOURS = 720;
@@ -142,69 +143,158 @@ const validateApplication = body => {
   return { valid: true, application };
 };
 
+// Human-readable labels for the notification email, in the order an operator would read
+// them. Keyed by the validated application's own field names.
+const EMAIL_FIELD_LABELS = [
+  ['studioName', 'Studio name'],
+  ['contactName', 'Contact name'],
+  ['email', 'Email'],
+  ['phone', 'Phone'],
+  ['address', 'Address'],
+  ['businessHours', 'Business hours'],
+  ['acceptedCategories', 'Garments accepted'],
+  ['turnaroundHours', 'Turnaround (hours)'],
+  ['notes', 'Notes'],
+];
+
+const escapeHtml = value =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+// The application is written by an anonymous member of the public, so every value here is
+// untrusted input landing in an operator's inbox — escape it for the HTML part.
+const buildApplicationEmail = application => {
+  const rows = EMAIL_FIELD_LABELS.filter(([key]) => {
+    const value = application[key];
+    return Array.isArray(value) ? value.length > 0 : value != null && value !== '';
+  }).map(([key, label]) => {
+    const raw = application[key];
+    return [label, Array.isArray(raw) ? raw.join(', ') : String(raw)];
+  });
+
+  const subject = `Cocloset: new laundry partner application — ${application.studioName ||
+    application.contactName ||
+    'unnamed'}`;
+
+  const text = [
+    'A new laundry partner application was submitted.',
+    '',
+    ...rows.map(([label, value]) => `${label}: ${value}`),
+    '',
+    'Reply directly to the applicant at the email address above.',
+  ].join('\n');
+
+  const html = [
+    '<p>A new laundry partner application was submitted.</p>',
+    '<ul>',
+    ...rows.map(
+      ([label, value]) => `<li><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</li>`
+    ),
+    '</ul>',
+    '<p>Reply directly to the applicant at the email address above.</p>',
+  ].join('');
+
+  return { subject, text, html };
+};
+
 /**
  * Deliver a validated application.
  *
- * WARNING — this marketplace has no CRM, no mail transport and no database of its own,
- * so there is no genuinely good destination for these yet. Until one is configured, the
- * sinks are, in order:
+ * Sinks, in order:
  *
  *   1. A structured stdout line prefixed with `[laundry-partner-application]`. On Railway
  *      this is retained in the platform log stream and is greppable. It is the baseline
- *      guarantee that an application is never simply discarded.
- *   2. An operator-configured outbound webhook (`SERVER_LAUNDRY_PARTNER_APPLICATION_WEBHOOK_URL`)
- *      — a Slack incoming webhook, a Zapier/Make catch hook, a form backend, anything that
- *      accepts a JSON POST. The URL comes from the environment, never from the request, so
- *      this is not an SSRF vector.
- *   3. If the webhook is configured but fails, the full application is escalated through
- *      `log.error`, which forwards it to Sentry as extras when a DSN is set. That way a
- *      delivery outage still leaves a durable, alertable copy.
+ *      guarantee that an application is never simply discarded, and it runs first so that
+ *      no downstream outage can lose a submission.
+ *   2. An email to `SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL` via Mailgun. This is the
+ *      intended destination — an operator reads applications in their inbox. Skipped
+ *      silently when either that address or the Mailgun credentials are unset, which is
+ *      what keeps local development and CI working without credentials.
+ *   3. An optional outbound webhook (`SERVER_LAUNDRY_PARTNER_APPLICATION_WEBHOOK_URL`) — a
+ *      Slack incoming webhook, a Zapier/Make catch hook, anything accepting a JSON POST.
+ *      The URL comes from the environment, never from the request, so this is not an SSRF
+ *      vector. Retained alongside email for operators who would rather route applications
+ *      into an existing tool.
  *
- * Configure the webhook before launching this page. See `.env-template`.
+ * A failure in either delivery channel is escalated through `log.error`, carrying the full
+ * application so it reaches Sentry as extras when a DSN is set — an outage still leaves a
+ * durable, alertable copy rather than a silently dropped applicant.
+ *
+ * Never rejects: a delivery problem must not turn into an error page for someone who just
+ * filled in a form correctly.
  *
  * @param {Object} application validated application from `validateApplication`
- * @returns {Promise<Object>} `{ loggedToStdout, webhookConfigured, webhookDelivered }`
+ * @returns {Promise<Object>} delivery outcome per sink
  */
 const deliverApplication = application => {
   const webhookUrl = process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_WEBHOOK_URL;
+  const recipient = process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL;
   const record = { receivedAt: new Date().toISOString(), application };
 
-  // Sink 1 — always, and always first, so a webhook outage cannot lose the submission.
+  // Sink 1 — always, and always first, so a delivery outage cannot lose the submission.
   console.log(`[laundry-partner-application] ${JSON.stringify(record)}`);
 
-  if (!webhookUrl) {
-    console.warn(
-      '[laundry-partner-application] SERVER_LAUNDRY_PARTNER_APPLICATION_WEBHOOK_URL is not set. ' +
-        'The application above exists only in this log stream — configure a webhook so applications reach a human.'
-    );
-    return Promise.resolve({
-      loggedToStdout: true,
-      webhookConfigured: false,
-      webhookDelivered: false,
-    });
-  }
+  // Sink 2 — email to the operator.
+  const emailPromise = !recipient
+    ? Promise.resolve({ configured: false, delivered: false, reason: 'no-recipient' })
+    : sendMail({ to: recipient, ...buildApplicationEmail(application) }).then(result => {
+        if (!result.sent && result.reason !== 'not-configured') {
+          log.error(
+            result.error || new Error(`Mailgun did not send: ${result.reason}`),
+            'laundry-partner-application-email-failed',
+            { record }
+          );
+        }
+        return {
+          configured: true,
+          delivered: !!result.sent,
+          reason: result.reason,
+        };
+      });
 
-  return fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(record),
-    signal: AbortSignal.timeout(10000),
-  })
-    .then(response => {
-      if (!response.ok) {
-        const error = new Error(
-          `Laundry partner application webhook responded with ${response.status}.`
-        );
-        error.status = response.status;
-        throw error;
-      }
-      return { loggedToStdout: true, webhookConfigured: true, webhookDelivered: true };
-    })
-    .catch(e => {
-      // Escalate so the payload lands in Sentry as well as stdout.
-      log.error(e, 'laundry-partner-application-delivery-failed', { record });
-      return { loggedToStdout: true, webhookConfigured: true, webhookDelivered: false };
-    });
+  // Sink 3 — optional webhook.
+  const webhookPromise = !webhookUrl
+    ? Promise.resolve({ configured: false, delivered: false })
+    : fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record),
+        signal: AbortSignal.timeout(10000),
+      })
+        .then(response => {
+          if (!response.ok) {
+            const error = new Error(
+              `Laundry partner application webhook responded with ${response.status}.`
+            );
+            error.status = response.status;
+            throw error;
+          }
+          return { configured: true, delivered: true };
+        })
+        .catch(e => {
+          log.error(e, 'laundry-partner-application-delivery-failed', { record });
+          return { configured: true, delivered: false };
+        });
+
+  return Promise.all([emailPromise, webhookPromise]).then(([email, webhook]) => {
+    if (!email.configured && !webhook.configured) {
+      console.warn(
+        '[laundry-partner-application] Neither SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL nor ' +
+          'SERVER_LAUNDRY_PARTNER_APPLICATION_WEBHOOK_URL is set. The application above exists ' +
+          'only in this log stream — configure one so applications reach a human.'
+      );
+    }
+    return {
+      loggedToStdout: true,
+      emailConfigured: email.configured,
+      emailDelivered: email.delivered,
+      webhookConfigured: webhook.configured,
+      webhookDelivered: webhook.delivered,
+    };
+  });
 };
 
 module.exports = {
