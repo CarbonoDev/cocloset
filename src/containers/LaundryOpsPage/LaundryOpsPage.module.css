@@ -1,0 +1,394 @@
+@import '../../styles/customMediaQueries.css';
+
+/* Deliberately plain styling. The client asked for "el diseño muy sencillo,
+   solo para cubrir la funcionalidad" - so this matches the mockups' structure
+   and information architecture (which screens, which columns, which filters)
+   without reproducing their visual polish. A designed skin can be dropped on
+   top of these class names later. */
+
+.content {
+  margin-top: 24px;
+
+  @media (--viewportMedium) {
+    margin: 32px auto 0 auto;
+  }
+
+  @media (--viewportLarge) {
+    margin: 0;
+  }
+}
+
+.desktopTopbar,
+.mobileTopbar {
+  box-shadow: none;
+}
+
+/* ================ Side nav ================ */
+
+.opsNav {
+  padding: 24px;
+}
+
+.opsNavHeader {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 24px;
+}
+
+.opsNavTitle {
+  font-weight: var(--fontWeightBold);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.opsNavStudio {
+  color: var(--colorGrey700);
+  font-size: 13px;
+}
+
+.opsNavList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.opsNavLink {
+  display: block;
+  padding: 6px 0;
+  color: var(--colorGrey700);
+  text-decoration: none;
+}
+
+.opsNavLinkActive {
+  color: var(--colorBlack);
+  font-weight: var(--fontWeightBold);
+}
+
+.opsNavHint {
+  margin-top: 24px;
+  padding: 12px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: 4px;
+  color: var(--colorGrey700);
+  font-size: 13px;
+}
+
+/* ================ Shared text ================ */
+
+.primaryText {
+  display: block;
+  color: var(--colorBlack);
+}
+
+.secondaryText {
+  display: block;
+  color: var(--colorGrey700);
+  font-size: 13px;
+}
+
+.emptyState {
+  color: var(--colorGrey700);
+}
+
+.error {
+  color: var(--colorFail);
+}
+
+.warning {
+  color: var(--colorAttention);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.flagBadge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--colorFail);
+  border-radius: 10px;
+  color: var(--colorFail);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ================ Orders table ================ */
+
+.tableWrapper {
+  margin-top: 24px;
+}
+
+.tableControls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  @media (--viewportMedium) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tab {
+  padding: 4px 12px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: 14px;
+  background-color: var(--colorWhite);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tabActive {
+  border-color: var(--colorBlack);
+  background-color: var(--colorBlack);
+  color: var(--colorWhite);
+}
+
+.search {
+  max-width: 280px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.th {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--colorGrey100);
+  color: var(--colorGrey700);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.row {
+  border-bottom: 1px solid var(--colorGrey100);
+}
+
+.cell {
+  padding: 10px 6px;
+  vertical-align: top;
+}
+
+.cellQr {
+  padding: 10px 6px;
+  vertical-align: top;
+  width: 56px;
+}
+
+.qrPlaceholder {
+  display: inline-block;
+  padding: 4px 6px;
+  border: 1px dashed var(--colorGrey100);
+  border-radius: 4px;
+  color: var(--colorGrey700);
+  font-size: 11px;
+}
+
+/* ================ Expanded row detail ================ */
+
+.detailCell {
+  padding: 0 6px 16px 6px;
+  border-bottom: 1px solid var(--colorGrey100);
+}
+
+.detailPanel {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: 4px;
+}
+
+.detailImage {
+  flex-shrink: 0;
+  width: 96px;
+}
+
+.thumb {
+  width: 100%;
+  border-radius: 4px;
+}
+
+.thumbPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 96px;
+  border: 1px dashed var(--colorGrey100);
+  border-radius: 4px;
+  color: var(--colorGrey700);
+  font-size: 12px;
+  text-align: center;
+}
+
+.detailInfo {
+  flex-grow: 1;
+}
+
+.detailLine {
+  margin: 0 0 8px 0;
+  color: var(--colorGrey700);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.detailDamage {
+  display: block;
+  margin: 0 0 8px 0;
+  color: var(--colorFail);
+  font-size: 13px;
+}
+
+.advance {
+  margin-top: 12px;
+}
+
+.damageFields {
+  margin-bottom: 12px;
+}
+
+.damageToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.damageNote {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* ================ Dashboard ================ */
+
+.dashboard {
+  margin-top: 24px;
+}
+
+.tiles {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+
+  @media (--viewportMedium) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: 4px;
+}
+
+.tileLabel {
+  color: var(--colorGrey700);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.tileValue {
+  font-size: 28px;
+  font-weight: var(--fontWeightBold);
+}
+
+.panels {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+
+  @media (--viewportMedium) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.panel {
+  padding: 16px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: 4px;
+}
+
+.panelTitle {
+  margin-top: 0;
+}
+
+.panelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.panelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--colorGrey100);
+}
+
+.panelRowMain {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboardLink {
+  display: inline-block;
+  margin-top: 24px;
+}
+
+/* ================ Inventory ================ */
+
+.inventoryGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+  list-style: none;
+  margin: 24px 0 0 0;
+  padding: 0;
+
+  @media (--viewportMedium) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.inventoryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: 4px;
+}
+
+.inventoryImage {
+  margin-bottom: 8px;
+}

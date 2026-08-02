@@ -20,6 +20,7 @@ const laundries = require('./api/laundries');
 const createAvailabilityBuffer = require('./api/create-availability-buffer');
 const laundryTransactionStatus = require('./api/laundry-transaction-status');
 const listingReadinessStatus = require('./api/listing-readiness-status');
+const laundryOrders = require('./api/laundry-orders');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -64,6 +65,7 @@ router.get('/laundries', laundries);
 router.post('/create-availability-buffer', createAvailabilityBuffer);
 router.post('/laundry-transaction-status', laundryTransactionStatus);
 router.post('/listing-readiness-status', listingReadinessStatus);
+router.get('/laundry-orders', laundryOrders);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed
