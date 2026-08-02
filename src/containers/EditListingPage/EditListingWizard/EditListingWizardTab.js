@@ -14,6 +14,7 @@ import EditListingAvailabilityPanel from './EditListingAvailabilityPanel/EditLis
 import EditListingDetailsPanel from './EditListingDetailsPanel/EditListingDetailsPanel';
 import EditListingDeliveryPanel from './EditListingDeliveryPanel/EditListingDeliveryPanel';
 import EditListingFilesPanel from './EditListingFilesPanel/EditListingFilesPanel';
+import EditListingLaundryPanel from './EditListingLaundryPanel/EditListingLaundryPanel';
 import EditListingLocationPanel from './EditListingLocationPanel/EditListingLocationPanel';
 import EditListingPhotosPanel from './EditListingPhotosPanel/EditListingPhotosPanel';
 import EditListingPricingPanel from './EditListingPricingPanel/EditListingPricingPanel';
@@ -28,6 +29,7 @@ export const PRICING_AND_STOCK = 'pricing-and-stock';
 export const DELIVERY = 'delivery';
 export const FILES = 'files';
 export const LOCATION = 'location';
+export const LAUNDRY = 'laundry';
 export const AVAILABILITY = 'availability';
 export const PHOTOS = 'photos';
 export const STYLE = 'style';
@@ -40,6 +42,7 @@ export const SUPPORTED_TABS = [
   DELIVERY,
   FILES,
   LOCATION,
+  LAUNDRY,
   AVAILABILITY,
   PHOTOS,
   STYLE,
@@ -260,6 +263,9 @@ const EditListingWizardTab = props => {
     }
     case LOCATION: {
       return <EditListingLocationPanel {...panelProps(LOCATION)} />;
+    }
+    case LAUNDRY: {
+      return <EditListingLaundryPanel {...panelProps(LAUNDRY)} />;
     }
     case AVAILABILITY: {
       return (

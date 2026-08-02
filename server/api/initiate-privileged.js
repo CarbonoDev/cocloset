@@ -1,5 +1,5 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
-const { transactionLineItems } = require('../api-util/lineItems');
+const { buildLineItemsForListing } = require('../api-util/lineItems');
 const { isIntentionToMakeOffer } = require('../api-util/negotiation');
 const {
   getSdk,
@@ -64,15 +64,25 @@ module.exports = (req, res) => {
       const { providerCommission, customerCommission } =
         commissionAsset?.type === 'jsonAsset' ? commissionAsset.attributes.data : {};
 
-      lineItems = transactionLineItems(
+      // This is the NORMAL booking path ("Request to book" from the listing
+      // page): both the speculative breakdown shown on CheckoutPage and the
+      // real charge come through here. The cleaning fee must be resolved here
+      // too, or the customer sees a fee on the listing page, sees it vanish at
+      // checkout, and the laundry never gets paid. Same shared builder as
+      // transition-privileged.js and transaction-line-items.js so preview and
+      // charge cannot drift apart again.
+      return buildLineItemsForListing({
         listing,
-        getFullOrderData(orderData, bodyParams, currency),
+        orderData: getFullOrderData(orderData, bodyParams, currency),
         providerCommission,
-        customerCommission
-      );
-      metadataMaybe = getMetadata(orderData, transitionName);
+        customerCommission,
+        currency,
+      }).then(builtLineItems => {
+        lineItems = builtLineItems;
+        metadataMaybe = getMetadata(orderData, transitionName);
 
-      return getTrustedSdk(req);
+        return getTrustedSdk(req);
+      });
     })
     .then(trustedSdk => {
       const { params } = bodyParams;

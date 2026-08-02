@@ -3,10 +3,14 @@ const moment = require('moment-timezone/builds/moment-timezone-with-data-10-year
 const { types } = require('sharetribe-flex-sdk');
 const { Money } = types;
 
-const { getAmountAsDecimalJS, convertDecimalJSToNumber } = require('./currency');
+const { getAmountAsDecimalJS, convertDecimalJSToNumber, unitDivisor } = require('./currency');
 const { nightsBetween, daysBetween } = require('./dates');
+const { getIntegrationSdk } = require('./integrationSdk');
+const { isLaundryUserEntity } = require('./laundryDirectory');
+const log = require('../log');
 const LINE_ITEM_NIGHT = 'line-item/night';
 const LINE_ITEM_DAY = 'line-item/day';
+const LINE_ITEM_CLEANING_FEE = 'line-item/cleaning-fee';
 
 /** Helper functions for constructing line items*/
 
@@ -440,4 +444,144 @@ exports.getCustomerCommissionMaybe = (customerCommission, order, currency) => {
           includeFor: ['customer'],
         },
       ];
+};
+
+// Parses process.env.DEFAULT_CLEANING_FEE (a plain, major-unit number, e.g. "12.5"
+// for €12.50 - same convention as the laundry's own privateData.cleaningFee, see
+// LaundryProfileForm). Returns 0 if it's unset or not a valid number, so that
+// pricing never breaks over a missing/invalid env var (Phase 1: degrade gracefully).
+const getDefaultCleaningFeeMajorUnits = () => {
+  const parsed = parseFloat(process.env.DEFAULT_CLEANING_FEE);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+// Converts a cleaning fee given in major currency units (e.g. euros) to the
+// currency's subunits (e.g. cents), the unit Money/line items expect.
+// Non-positive or invalid amounts collapse to 0 - a zero cleaning fee simply
+// means no cleaning-fee line item gets added (see getCleaningFeeLineItemMaybe).
+const cleaningFeeToSubunits = (amountMajorUnits, currency) => {
+  const isValidAmount =
+    typeof amountMajorUnits === 'number' &&
+    Number.isFinite(amountMajorUnits) &&
+    amountMajorUnits > 0;
+  if (!isValidAmount || !currency) {
+    return 0;
+  }
+  return new Decimal(amountMajorUnits)
+    .times(unitDivisor(currency))
+    .toNearest(1, Decimal.ROUND_HALF_UP)
+    .toNumber();
+};
+
+/**
+ * Resolves the cleaning fee for a listing's assigned laundry, in the given
+ * currency's subunits (ready to hand to getCleaningFeeLineItemMaybe).
+ *
+ * The cleaning fee is set by the laundry itself as privateData.cleaningFee on
+ * its own user profile (see LaundryProfilePage) - privateData is only visible
+ * to its owner and the operator, so it can't be read through the customer's or
+ * provider's own trusted Marketplace SDK token. This uses the Integration API
+ * instead (mirrors the lookup in server/api/laundries.js).
+ *
+ * Falls back to process.env.DEFAULT_CLEANING_FEE (also major units, server-only)
+ * when the listing has no assigned laundry, the laundry hasn't set a fee, or the
+ * Integration API lookup fails for any reason (e.g. the laundry user was removed) -
+ * Phase 1 pricing should never fail booking creation over this.
+ *
+ * SECURITY: `assignedLaundryId` lives in the *listing's* publicData, which the
+ * provider fully controls (through the wizard, or directly via
+ * ownListings.update). So the user it points at is NOT trustworthy: a provider
+ * could point it at their own account and set their own `privateData.cleaningFee`
+ * - to 0 to remove the fee, or to something enormous to inflate every customer's
+ * payin total without it ever showing up in the listing price. The fee is
+ * therefore only honoured when the referenced user is genuinely flagged
+ * `metadata.isLaundry === true` (operator/Integration-API-writable only); anyone
+ * else falls back to the env default.
+ *
+ * @param {Object} listing
+ * @param {string} currency
+ * @returns {Promise<number>} cleaning fee amount in the currency's subunits
+ */
+exports.resolveCleaningFeeInSubunits = (listing, currency) => {
+  const assignedLaundryId = listing?.attributes?.publicData?.assignedLaundryId;
+  const fallbackFeeMajorUnits = getDefaultCleaningFeeMajorUnits();
+
+  if (!assignedLaundryId) {
+    return Promise.resolve(cleaningFeeToSubunits(fallbackFeeMajorUnits, currency));
+  }
+
+  let integrationSdk;
+  try {
+    integrationSdk = getIntegrationSdk();
+  } catch (e) {
+    log.error(e, 'resolve-cleaning-fee-no-integration-sdk', {});
+    return Promise.resolve(cleaningFeeToSubunits(fallbackFeeMajorUnits, currency));
+  }
+
+  return integrationSdk.users
+    .show({ id: assignedLaundryId }, { expand: true })
+    .then(response => {
+      const profile = response.data.data.attributes.profile;
+
+      if (!isLaundryUserEntity(response.data.data)) {
+        // The listing points at a user who is not a laundry. Never honour a
+        // fee from them - see the SECURITY note above.
+        log.error(
+          new Error('assignedLaundryId does not reference a user flagged isLaundry'),
+          'resolve-cleaning-fee-untrusted-laundry',
+          { listingId: listing?.id?.uuid, assignedLaundryId }
+        );
+        return cleaningFeeToSubunits(fallbackFeeMajorUnits, currency);
+      }
+
+      const laundryCleaningFee = profile.privateData?.cleaningFee;
+      const feeMajorUnits =
+        typeof laundryCleaningFee === 'number' && Number.isFinite(laundryCleaningFee)
+          ? laundryCleaningFee
+          : fallbackFeeMajorUnits;
+      return cleaningFeeToSubunits(feeMajorUnits, currency);
+    })
+    .catch(e => {
+      // Previously this error was discarded entirely, which made a transient
+      // Integration API failure indistinguishable from "this laundry hasn't
+      // set a fee" - and silently repriced the booking. Still fall back
+      // (Phase 1: pricing must not fail booking creation) but make it visible.
+      log.error(e, 'resolve-cleaning-fee-lookup-failed', {
+        listingId: listing?.id?.uuid,
+        assignedLaundryId,
+      });
+      return cleaningFeeToSubunits(fallbackFeeMajorUnits, currency);
+    });
+};
+
+/**
+ * Builds the cleaning-fee line item, if applicable. It's a flat fee (quantity 1)
+ * paid entirely by the customer and added on top of the customer's total - it is
+ * NOT netted against the provider's payout, same pattern as customer-commission
+ * (`includeFor: ['customer']` only). A zero/invalid amount means no line item is
+ * added at all (mirrors how the item unit type skips its shipping-fee line item
+ * for free/pickup delivery).
+ *
+ * @param {number} cleaningFeeInSubunits
+ * @param {string} currency
+ * @returns {Array} cleaning fee line item, or [] if there's nothing to charge
+ */
+exports.getCleaningFeeLineItemMaybe = (cleaningFeeInSubunits, currency) => {
+  const isPositiveAmount =
+    typeof cleaningFeeInSubunits === 'number' &&
+    Number.isFinite(cleaningFeeInSubunits) &&
+    cleaningFeeInSubunits > 0;
+
+  if (!isPositiveAmount || !currency) {
+    return [];
+  }
+
+  return [
+    {
+      code: LINE_ITEM_CLEANING_FEE,
+      unitPrice: new Money(cleaningFeeInSubunits, currency),
+      quantity: 1,
+      includeFor: ['customer'],
+    },
+  ];
 };

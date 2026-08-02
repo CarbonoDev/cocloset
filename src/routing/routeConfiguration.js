@@ -19,6 +19,7 @@ const ContactDetailsPage = loadable(() => import(/* webpackChunkName: "ContactDe
 const EditListingPage = loadable(() => import(/* webpackChunkName: "EditListingPage" */ '../containers/EditListingPage/EditListingPage'));
 const EmailVerificationPage = loadable(() => import(/* webpackChunkName: "EmailVerificationPage" */ '../containers/EmailVerificationPage/EmailVerificationPage'));
 const InboxPage = loadable(() => import(/* webpackChunkName: "InboxPage" */ '../containers/InboxPage/InboxPage'));
+const LaundryProfilePage = loadable(() => import(/* webpackChunkName: "LaundryProfilePage" */ '../containers/LaundryProfilePage/LaundryProfilePage'));
 const MakeOfferPage = loadable(() => import(/* webpackChunkName: "MakeOfferPage" */ '../containers/MakeOfferPage/MakeOfferPage'));
 const LandingPage = loadable(() => import(/* webpackChunkName: "LandingPage" */ '../containers/LandingPage/LandingPage'));
 const ListingPageCoverPhoto = loadable(() => import(/* webpackChunkName: "ListingPageCoverPhoto" */ /* webpackPrefetch: true */ '../containers/ListingPage/ListingPageCoverPhoto'));
@@ -385,6 +386,16 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       auth: true,
       authPage: 'LoginPage',
       component: ManageAccountPage,
+    },
+    {
+      // Laundry-only studio profile settings. Gated inside LaundryProfilePage
+      // itself (renders NotFoundPage for non-laundry users) since permission
+      // here depends on user metadata, not just authentication.
+      path: '/laundry-profile',
+      name: 'LaundryProfilePage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: LaundryProfilePage,
     },
     {
       path: '/terms-of-service',

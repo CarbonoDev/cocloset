@@ -17,6 +17,7 @@ import {
 import { hasPermissionToInitiateTransactions, isUserAuthorized } from '../../util/userHelpers.js';
 import { displayPrice } from '../../util/configHelpers.js';
 import { pathByRouteName } from '../../util/routes.js';
+import { getPickupLocation } from '../../util/listingLocation.js';
 import {
   NEGOTIATION_PROCESS_NAME,
   resolveLatestProcessName,
@@ -154,7 +155,7 @@ const RequestQuotePageComponent = props => {
 
           <LocationDetails
             showLocation={true}
-            listingLocation={publicData?.location}
+            listingLocation={getPickupLocation(publicData)}
             intl={intl}
             sectionHeadingClassName={css.locationHeading}
           />
