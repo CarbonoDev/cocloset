@@ -1,0 +1,216 @@
+@import '../../styles/customMediaQueries.css';
+
+.layoutWrapperMain {
+  min-height: calc(100vh - var(--topbarHeight));
+
+  @media (--viewportMedium) {
+    min-height: calc(100vh - var(--topbarHeightDesktop));
+  }
+}
+
+/* Mobile-first single column. The content column is capped and centred from
+   --viewportMedium up so long-form copy stays readable on wide screens. */
+.root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 24px 72px 24px;
+
+  @media (--viewportMedium) {
+    padding: 40px 24px 96px 24px;
+  }
+
+  @media (--viewportLarge) {
+    padding: 56px 24px 120px 24px;
+  }
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+/* ================ Hero ================ */
+
+.hero {
+  padding-bottom: 12px;
+
+  @media (--viewportMedium) {
+    padding-bottom: 16px;
+  }
+}
+
+.heroTitle {
+  margin-top: 0;
+  margin-bottom: 12px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 16px;
+  }
+}
+
+.heroSubtitle {
+  composes: textLarge from global;
+
+  margin-top: 0;
+  margin-bottom: 18px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
+}
+
+.heroCta {
+  composes: buttonPrimary from global;
+
+  display: inline-flex;
+  width: auto;
+  min-height: 48px;
+  padding: 0 24px;
+  text-decoration: none;
+
+  @media (--viewportMedium) {
+    min-height: 56px;
+  }
+}
+
+/* ================ Sections ================ */
+
+.section,
+.applySection,
+.contactSection {
+  padding-top: 24px;
+
+  @media (--viewportMedium) {
+    padding-top: 32px;
+  }
+}
+
+.sectionTitle {
+  margin-top: 0;
+  margin-bottom: 6px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 8px;
+  }
+}
+
+.sectionIntro {
+  margin-top: 0;
+  margin-bottom: 12px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 16px;
+  }
+}
+
+.list {
+  margin: 0;
+  padding-left: 24px;
+  list-style: disc;
+}
+
+.listItem {
+  margin-bottom: 6px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 8px;
+  }
+}
+
+/* ================ How it works ================ */
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 12px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 16px;
+  }
+}
+
+.stepNumber {
+  composes: textSmall from global;
+
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 12px;
+  border-radius: 50%;
+  background-color: var(--marketplaceColor);
+  color: var(--colorWhite);
+}
+
+.stepText {
+  flex-grow: 1;
+}
+
+/* ================ FAQ ================ */
+
+.faqItem {
+  padding-top: 12px;
+
+  @media (--viewportMedium) {
+    padding-top: 16px;
+  }
+}
+
+.faqQuestion {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.faqAnswer {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* ================ Application + contact ================ */
+
+.submitted {
+  padding: 18px;
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorSuccessSubtle);
+
+  @media (--viewportMedium) {
+    padding: 24px;
+  }
+}
+
+.submittedTitle {
+  margin-top: 0;
+  margin-bottom: 6px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 8px;
+  }
+}
+
+.submittedMessage {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Marks copy that is a stand-in for information the business has not defined yet.
+   Every string it wraps is tagged [TBC] in the translation files. Remove both the
+   note and the tags once the real terms are known. */
+.placeholderNote {
+  composes: textSmall from global;
+
+  color: var(--colorGrey700);
+  margin-top: 0;
+  margin-bottom: 0;
+}

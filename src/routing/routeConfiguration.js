@@ -30,6 +30,7 @@ const ManageAccountPage = loadable(() => import(/* webpackChunkName: "ManageAcco
 const PasswordChangePage = loadable(() => import(/* webpackChunkName: "PasswordChangePage" */ '../containers/PasswordChangePage/PasswordChangePage'));
 const PasswordRecoveryPage = loadable(() => import(/* webpackChunkName: "PasswordRecoveryPage" */ '../containers/PasswordRecoveryPage/PasswordRecoveryPage'));
 const PasswordResetPage = loadable(() => import(/* webpackChunkName: "PasswordResetPage" */ '../containers/PasswordResetPage/PasswordResetPage'));
+const PartnerLandingPage = loadable(() => import(/* webpackChunkName: "PartnerLandingPage" */ '../containers/PartnerLandingPage/PartnerLandingPage'));
 const PaymentMethodsPage = loadable(() => import(/* webpackChunkName: "PaymentMethodsPage" */ '../containers/PaymentMethodsPage/PaymentMethodsPage'));
 const PrivacyPolicyPage = loadable(() => import(/* webpackChunkName: "PrivacyPolicyPage" */ '../containers/PrivacyPolicyPage/PrivacyPolicyPage'));
 const ProfilePage = loadable(() => import(/* webpackChunkName: "ProfilePage" */ '../containers/ProfilePage/ProfilePage'));
@@ -70,13 +71,13 @@ const RedirectToLandingPage = () => <NamedRedirect name="LandingPage" />;
 const routeConfiguration = (layoutConfig, accessControlConfig) => {
   const isSearchPageWithMap = layoutConfig.searchPage?.variantType === 'map';
   const SearchPage = isSearchPageWithMap ? SearchPageWithMap : SearchPageWithGrid;
-  const ListingPage = layoutConfig.listingPage?.variantType === 'carousel' 
-    ? ListingPageCarousel 
+  const ListingPage = layoutConfig.listingPage?.variantType === 'carousel'
+    ? ListingPageCarousel
     : ListingPageCoverPhoto;
 
   const isPrivateMarketplace = accessControlConfig?.marketplace?.private === true;
   const authForPrivateMarketplace = isPrivateMarketplace ? { auth: true } : {};
-  
+
   return [
     {
       path: '/',
@@ -387,6 +388,17 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       auth: true,
       authPage: 'LoginPage',
       component: ManageAccountPage,
+    },
+    {
+      // Public, unauthenticated marketing + application page for prospective
+      // laundry partners. Copy comes from the optional Console page
+      // `laundry-partners`; the application form is code. Not behind
+      // authForPrivateMarketplace on purpose: the whole point is that visitors
+      // without an account can find it.
+      path: '/become-a-partner',
+      name: 'PartnerLandingPage',
+      component: PartnerLandingPage,
+      loadData: pageDataLoadingAPI.PartnerLandingPage.loadData,
     },
     {
       // Laundry-only studio profile settings. Gated inside LaundryProfilePage
