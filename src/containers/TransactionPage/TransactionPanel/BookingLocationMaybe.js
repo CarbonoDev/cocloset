@@ -4,6 +4,8 @@ import classNames from 'classnames';
 import { FormattedMessage } from '../../../util/reactIntl';
 import { Heading } from '../../../components';
 
+import { getListingPickupLocation } from '../../../util/listingLocation';
+
 import AddressLinkMaybe from './AddressLinkMaybe';
 
 import css from './TransactionPanel.module.css';
@@ -14,7 +16,9 @@ const BookingLocationMaybe = props => {
   const classes = classNames(rootClassName || css.bookingLocationContainer, className);
 
   if (showBookingLocation) {
-    const location = listing?.attributes?.publicData?.location || {};
+    // Pickup/return happens at the assigned laundry, not the owner's home
+    // address (see util/listingLocation.js).
+    const location = getListingPickupLocation(listing);
     return (
       <div className={classes}>
         <Heading as="h3" rootClassName={css.sectionHeading}>

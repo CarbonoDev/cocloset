@@ -19,6 +19,8 @@ const ContactDetailsPage = loadable(() => import(/* webpackChunkName: "ContactDe
 const EditListingPage = loadable(() => import(/* webpackChunkName: "EditListingPage" */ '../containers/EditListingPage/EditListingPage'));
 const EmailVerificationPage = loadable(() => import(/* webpackChunkName: "EmailVerificationPage" */ '../containers/EmailVerificationPage/EmailVerificationPage'));
 const InboxPage = loadable(() => import(/* webpackChunkName: "InboxPage" */ '../containers/InboxPage/InboxPage'));
+const LaundryOpsPage = loadable(() => import(/* webpackChunkName: "LaundryOpsPage" */ '../containers/LaundryOpsPage/LaundryOpsPage'));
+const LaundryProfilePage = loadable(() => import(/* webpackChunkName: "LaundryProfilePage" */ '../containers/LaundryProfilePage/LaundryProfilePage'));
 const MakeOfferPage = loadable(() => import(/* webpackChunkName: "MakeOfferPage" */ '../containers/MakeOfferPage/MakeOfferPage'));
 const LandingPage = loadable(() => import(/* webpackChunkName: "LandingPage" */ '../containers/LandingPage/LandingPage'));
 const ListingPageCoverPhoto = loadable(() => import(/* webpackChunkName: "ListingPageCoverPhoto" */ /* webpackPrefetch: true */ '../containers/ListingPage/ListingPageCoverPhoto'));
@@ -69,13 +71,13 @@ const RedirectToLandingPage = () => <NamedRedirect name="LandingPage" />;
 const routeConfiguration = (layoutConfig, accessControlConfig) => {
   const isSearchPageWithMap = layoutConfig.searchPage?.variantType === 'map';
   const SearchPage = isSearchPageWithMap ? SearchPageWithMap : SearchPageWithGrid;
-  const ListingPage = layoutConfig.listingPage?.variantType === 'carousel' 
-    ? ListingPageCarousel 
+  const ListingPage = layoutConfig.listingPage?.variantType === 'carousel'
+    ? ListingPageCarousel
     : ListingPageCoverPhoto;
 
   const isPrivateMarketplace = accessControlConfig?.marketplace?.private === true;
   const authForPrivateMarketplace = isPrivateMarketplace ? { auth: true } : {};
-  
+
   return [
     {
       path: '/',
@@ -398,6 +400,33 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       component: PartnerLandingPage,
       loadData: pageDataLoadingAPI.PartnerLandingPage.loadData,
     },
+    {
+      // Laundry-only studio profile settings. Gated inside LaundryProfilePage
+      // itself (renders NotFoundPage for non-laundry users) since permission
+      // here depends on user metadata, not just authentication.
+      path: '/laundry-profile',
+      name: 'LaundryProfilePage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: LaundryProfilePage,
+    },
+    // Laundry ops dashboard (mockups 04-09.jpg). One container, six routes:
+    // the `tab` extraProp selects which screen it renders, and they all share
+    // a single loadData because they render one payload from
+    // GET /api/laundry-orders. Gated inside LaundryOpsPage itself (renders
+    // NotFoundPage for non-laundry users), same as LaundryProfilePage above,
+    // since permission depends on user metadata rather than authentication.
+    // "Settings" in the ops sidebar links to LaundryProfilePage rather than
+    // duplicating it here.
+    ...['dashboard', 'orders', 'pickups', 'returns', 'cleaning', 'inventory'].map(tab => ({
+      path: `/laundry/${tab}`,
+      name: `LaundryOps${tab.charAt(0).toUpperCase()}${tab.slice(1)}Page`,
+      auth: true,
+      authPage: 'LoginPage',
+      component: LaundryOpsPage,
+      extraProps: { tab },
+      loadData: pageDataLoadingAPI.LaundryOpsPage.loadData,
+    })),
     {
       path: '/terms-of-service',
       name: 'TermsOfServicePage',

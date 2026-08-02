@@ -1,5 +1,5 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
-const { transactionLineItems } = require('../api-util/lineItems');
+const { buildLineItemsForListing } = require('../api-util/lineItems');
 const {
   addOfferToMetadata,
   getAmountFromPreviousOffer,
@@ -142,16 +142,24 @@ module.exports = (req, res) => {
       const { providerCommission, customerCommission } =
         commissionAsset?.type === 'jsonAsset' ? commissionAsset.attributes.data : {};
 
-      lineItems = transactionLineItems(
+      // Cleaning fee is sourced from the assigned laundry's privateData
+      // (Integration API only), so it has to be resolved before the
+      // (synchronous) line items array can be built - see
+      // lineItems.buildLineItemsForListing, which all three line-item
+      // endpoints share so preview and charge cannot drift apart.
+      return buildLineItemsForListing({
         listing,
-        getFullOrderData(orderData, bodyParams, currency, existingOffers),
+        orderData: getFullOrderData(orderData, bodyParams, currency, existingOffers),
         providerCommission,
-        customerCommission
-      );
+        customerCommission,
+        currency,
+      }).then(builtLineItems => {
+        lineItems = builtLineItems;
 
-      metadataMaybe = getUpdatedMetadata(orderData, transitionName, existingMetadata);
+        metadataMaybe = getUpdatedMetadata(orderData, transitionName, existingMetadata);
 
-      return getTrustedSdk(req);
+        return getTrustedSdk(req);
+      });
     })
     .then(trustedSdk => {
       // Pass role based params to make sure that protectedData only contains protected data

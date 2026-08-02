@@ -10,6 +10,7 @@ import {
 import { propTypes } from '../../util/types';
 import { ensureTransaction } from '../../util/data';
 import { createSlug } from '../../util/urlHelpers';
+import { getListingPickupLocation } from '../../util/listingLocation';
 import { isTransactionInitiateListingNotFoundError } from '../../util/errors';
 import {
   getProcess,
@@ -543,7 +544,11 @@ export const CheckoutPageWithPayment = props => {
     orderData?.deliveryMethod === 'shipping' &&
     !hasTransactionPassedPendingPayment(existingTransaction, process);
 
-  const listingLocation = listing?.attributes?.publicData?.location;
+  // Pickup & return happen at the assigned laundry, not the owner's home
+  // address, which is private (see util/listingLocation.js). Reading
+  // publicData.location here made the whole location block vanish from
+  // checkout once the Location panel was repurposed.
+  const listingLocation = getListingPickupLocation(listing);
   const showPickUpLocation = isPurchase && orderData?.deliveryMethod === 'pickup';
   const showLocation = (isBooking || isNegotiation) && listingLocation?.address;
 

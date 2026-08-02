@@ -8,6 +8,12 @@
   flex-direction: column;
 }
 
+.description {
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: var(--colorGrey700);
+}
+
 .form {
   flex-grow: 1;
 }

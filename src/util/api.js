@@ -161,4 +161,75 @@ export const deleteUserAccount = body => {
 // See `server/api/laundry-partner-application.js` for the accepted fields and limits.
 export const submitLaundryPartnerApplication = body => {
   return post('/api/laundry-partner-application', body);
+}
+
+// Fetch the list of laundries (users flagged with metadata.isLaundry), used by
+// the listing wizard's "Laundry Assignment" step. Requires an authenticated
+// caller.
+//
+// Returns `{ data: [ { id, displayName, studioName, address, origin,
+// businessHours, acceptedCategories, turnaroundHours } ], meta }` - a flat,
+// explicitly allowlisted record per laundry, NOT the raw user publicData blob.
+// Laundries with no usable address/origin are omitted (they can't be assigned:
+// no geolocation would be written and the listing could never be published);
+// `meta.incompleteProfileCount` says how many were dropped for that reason.
+//
+// See `server/api/laundries.js` for the full response shape and the reason the
+// filtering happens server-side in JS rather than in the API query.
+export const fetchLaundries = () => {
+  return request('/api/laundries', { method: methods.GET });
+};
+
+// Best-effort call, fired after a booking's `accept` transition succeeds, to
+// create the availability-exception "buffer window" (pickup/cleaning/return
+// turnaround) around the booking's rental dates on the garment owner's
+// listing. Uses the Integration API server-side since it needs to act on a
+// listing regardless of which party (customer/operator) triggered `accept`.
+//
+// See `server/api/create-availability-buffer.js` for the request/response
+// shape. Callers should treat failures here as non-fatal (see the call site
+// in TransactionPage.duck.js) - the booking itself is not affected.
+export const createAvailabilityBuffer = body => {
+  return post('/api/create-availability-buffer', body);
+};
+
+// Advance a transaction's granular laundry sub-phase
+// (`transaction.metadata.laundryStatus`), e.g. after a laundry scans a QR
+// code for pickup/return, or updates cleaning progress from the ops
+// dashboard. This is metadata layered on top of the existing, unmodified
+// transaction process - NOT a real Sharetribe process transition. `status`
+// must be one of the values exported as `LAUNDRY_STATUSES` in
+// `server/api-util/laundryStatusHelpers.js`.
+//
+// See `server/api/laundry-transaction-status.js` for the full request/
+// response shape, including the optional `damaged`/`damageNote` fields
+// (only meaningful when `status === 'returned'`).
+export const updateLaundryTransactionStatus = body => {
+  return post('/api/laundry-transaction-status', body);
+};
+
+// Update a listing's physical readiness state
+// (`listing.metadata.readinessStatus`, `listing.privateData.currentRack`),
+// independent of any specific booking - e.g. a garment just shipped in by
+// its owner and sitting in laundry inventory.
+//
+// See `server/api/listing-readiness-status.js` for the full request/
+// response shape and the `READINESS_STATUSES` enum.
+export const updateListingReadinessStatus = body => {
+  return post('/api/listing-readiness-status', body);
+};
+
+// Fetch everything the laundry ops dashboard renders, for the calling laundry
+// user: the design doc §8 union of "transactions on listings assigned to me"
+// and "assigned listings with no transaction", plus a per-garment inventory
+// list. Takes no arguments - the caller's own user id is the laundry filter,
+// resolved server-side from their session.
+//
+// Rows come back already denormalized (customer/owner display names, listing
+// image url, rack, statuses), so the dashboard renders them directly with no
+// `included` resolution or follow-up lookups.
+//
+// See `server/api/laundry-orders.js` for the full response shape.
+export const fetchLaundryOrders = () => {
+  return request('/api/laundry-orders', { method: methods.GET });
 };

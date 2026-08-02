@@ -4,6 +4,8 @@ const {
   calculateShippingFee,
   getProviderCommissionMaybe,
   getCustomerCommissionMaybe,
+  getCleaningFeeLineItemMaybe,
+  resolveCleaningFeeInSubunits,
 } = require('./lineItemHelpers');
 const { types } = require('sharetribe-flex-sdk');
 const { Money } = types;
@@ -141,9 +143,18 @@ const getDateRangeQuantityAndLineItems = (orderData, code) => {
  * @param {Money} [orderData.offer] - The offer for the offer (if transition intent is "make-offer")
  * @param {Object} providerCommission
  * @param {Object} customerCommission
+ * @param {number} [cleaningFeeInSubunits] - Cleaning fee (customer-paid) in the listing's
+ * currency subunits, already resolved by the caller (see lineItemHelpers.resolveCleaningFeeInSubunits) -
+ * this function stays synchronous, so the Integration API lookup happens before it's called.
  * @returns {Array} lineItems
  */
-exports.transactionLineItems = (listing, orderData, providerCommission, customerCommission) => {
+exports.transactionLineItems = (
+  listing,
+  orderData,
+  providerCommission,
+  customerCommission,
+  cleaningFeeInSubunits
+) => {
   const publicData = listing.attributes.publicData;
   // Note: the unitType needs to be one of the following:
   // day, night, hour, fixed, or item (these are related to payment processes)
@@ -242,9 +253,51 @@ exports.transactionLineItems = (listing, orderData, providerCommission, customer
   const lineItems = [
     order,
     ...extraLineItems,
+    ...getCleaningFeeLineItemMaybe(cleaningFeeInSubunits, currency),
     ...getProviderCommissionMaybe(providerCommission, order, currency),
     ...getCustomerCommissionMaybe(customerCommission, order, currency),
   ];
 
   return lineItems;
 };
+
+/**
+ * Resolve the cleaning fee and build the full line-items array in one call.
+ *
+ * THIS IS THE ONLY WAY ANY ENDPOINT SHOULD BUILD LINE ITEMS. The cleaning fee
+ * was originally wired into transaction-line-items.js (the price preview) and
+ * transition-privileged.js (the inquiry-first charge) but NOT into
+ * initiate-privileged.js (the normal "Request to book" charge, and the
+ * speculative breakdown shown at checkout). The result: the customer saw a
+ * cleaning fee on the listing page, watched it vanish at checkout, and the
+ * laundry was never paid — on the main booking path. Three hand-maintained
+ * copies of "resolve the fee, then call transactionLineItems" is exactly how
+ * that happened, so there is now one copy and the endpoints call it.
+ *
+ * `transactionLineItems` stays synchronous; this wrapper owns the async
+ * Integration API lookup that has to happen first.
+ *
+ * @param {Object} params
+ * @param {Object} params.listing
+ * @param {Object} params.orderData
+ * @param {Object} params.providerCommission
+ * @param {Object} params.customerCommission
+ * @param {string} params.currency - currency the fee should be expressed in
+ * @returns {Promise<Array>} lineItems
+ */
+exports.buildLineItemsForListing = ({
+  listing,
+  orderData,
+  providerCommission,
+  customerCommission,
+  currency,
+}) =>
+  resolveCleaningFeeInSubunits(listing, currency).then(cleaningFeeInSubunits =>
+    exports.transactionLineItems(
+      listing,
+      orderData,
+      providerCommission,
+      customerCommission,
+      cleaningFeeInSubunits
+    )
+  );

@@ -23,6 +23,7 @@ import {
   requireListingImage,
 } from '../../util/configHelpers.js';
 import { pathByRouteName } from '../../util/routes.js';
+import { getPickupLocation } from '../../util/listingLocation.js';
 import {
   getProcess,
   NEGOTIATION_PROCESS_NAME,
@@ -244,7 +245,7 @@ const MakeOfferPageComponent = props => {
 
           <LocationDetails
             showLocation={showLocation}
-            listingLocation={publicData?.location}
+            listingLocation={getPickupLocation(publicData)}
             intl={intl}
             sectionHeadingClassName={css.locationHeading}
           />

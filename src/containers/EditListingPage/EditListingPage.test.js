@@ -1298,9 +1298,12 @@ describe('EditListingPage', () => {
         transactionProcessAlias: 'default-booking/release-1',
         unitType: 'day',
         amenities: ['dog_1'],
-        location: {
-          address: 'Main Street 123',
-          building: 'A 1',
+      },
+      privateData: {
+        ownerAddress: {
+          street: 'Main Street 123',
+          city: 'Springfield',
+          postcode: '12345',
         },
       },
     });
@@ -1332,13 +1335,13 @@ describe('EditListingPage', () => {
       // Tab: panel title
       expect(getByText('EditListingLocationPanel.title')).toBeInTheDocument();
 
-      // Tab/form: existing address
-      expect(getByPlaceholderText('EditListingLocationForm.addressPlaceholder')).toHaveValue(
+      // Tab/form: existing street address
+      expect(getByPlaceholderText('EditListingLocationForm.streetPlaceholder')).toHaveValue(
         'Main Street 123'
       );
 
-      // Tab/form: existing building
-      expect(getByLabelText('EditListingLocationForm.building')).toHaveValue('A 1');
+      // Tab/form: existing city
+      expect(getByLabelText('EditListingLocationForm.city')).toHaveValue('Springfield');
 
       expect(
         getByRole('button', { name: 'EditListingWizard.edit.saveLocation' })
@@ -1346,11 +1349,11 @@ describe('EditListingPage', () => {
     });
 
     // Test intercation
-    await user.clear(getByLabelText('EditListingLocationForm.building'));
-    await user.type(getByLabelText('EditListingLocationForm.building'), 'B 2');
+    await user.clear(getByLabelText('EditListingLocationForm.city'));
+    await user.type(getByLabelText('EditListingLocationForm.city'), 'Shelbyville');
 
-    // Tab/form: existing building
-    expect(getByLabelText('EditListingLocationForm.building')).toHaveValue('B 2');
+    // Tab/form: updated city
+    expect(getByLabelText('EditListingLocationForm.city')).toHaveValue('Shelbyville');
   });
 
   it('Booking (day): edit flow on pricing tab', async () => {
@@ -2694,9 +2697,12 @@ describe('EditListingPage', () => {
         transactionProcessAlias: 'default-inquiry/release-1',
         unitType: 'inquiry',
         category: 'cat_1',
-        location: {
-          address: 'Main Street 123',
-          building: 'A 1',
+      },
+      privateData: {
+        ownerAddress: {
+          street: 'Main Street 123',
+          city: 'Springfield',
+          postcode: '12345',
         },
       },
     });
@@ -2728,13 +2734,13 @@ describe('EditListingPage', () => {
       // Tab: panel title
       expect(getByText('EditListingLocationPanel.title')).toBeInTheDocument();
 
-      // Tab/form: existing address
-      expect(getByPlaceholderText('EditListingLocationForm.addressPlaceholder')).toHaveValue(
+      // Tab/form: existing street address
+      expect(getByPlaceholderText('EditListingLocationForm.streetPlaceholder')).toHaveValue(
         'Main Street 123'
       );
 
-      // Tab/form: existing building
-      expect(getByLabelText('EditListingLocationForm.building')).toHaveValue('A 1');
+      // Tab/form: existing city
+      expect(getByLabelText('EditListingLocationForm.city')).toHaveValue('Springfield');
 
       expect(
         getByRole('button', { name: 'EditListingWizard.edit.saveLocation' })
@@ -2742,11 +2748,11 @@ describe('EditListingPage', () => {
     });
 
     // Test intercation
-    await user.clear(getByLabelText('EditListingLocationForm.building'));
-    await user.type(getByLabelText('EditListingLocationForm.building'), 'B 2');
+    await user.clear(getByLabelText('EditListingLocationForm.city'));
+    await user.type(getByLabelText('EditListingLocationForm.city'), 'Shelbyville');
 
-    // Tab/form: existing building
-    expect(getByLabelText('EditListingLocationForm.building')).toHaveValue('B 2');
+    // Tab/form: updated city
+    expect(getByLabelText('EditListingLocationForm.city')).toHaveValue('Shelbyville');
   });
 
   it('Inquiry: edit flow on pricing tab', async () => {

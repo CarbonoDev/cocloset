@@ -2,6 +2,7 @@ import {
   pickUserFieldsData,
   initialValuesForUserFields,
   getPropsForCustomUserFieldInputs,
+  isLaundryUser,
 } from './userHelpers';
 
 import { fakeIntl } from './testData';
@@ -348,6 +349,38 @@ describe('userHelpers', () => {
       expect(inputConfig1).toEqual(filteredConfig1);
       const filteredConfig2 = expectedUserFieldInput(2, ['c', 'd']).filter(filterFn);
       expect(inputConfig2).toEqual(filteredConfig2);
+    });
+  });
+
+  describe('isLaundryUser', () => {
+    it('returns true when metadata.isLaundry is true', () => {
+      const currentUser = {
+        attributes: { profile: { metadata: { isLaundry: true } } },
+      };
+      expect(isLaundryUser(currentUser)).toBe(true);
+    });
+
+    it('returns false when metadata.isLaundry is false', () => {
+      const currentUser = {
+        attributes: { profile: { metadata: { isLaundry: false } } },
+      };
+      expect(isLaundryUser(currentUser)).toBe(false);
+    });
+
+    it('returns false when metadata is missing', () => {
+      const currentUser = { attributes: { profile: {} } };
+      expect(isLaundryUser(currentUser)).toBe(false);
+    });
+
+    it('returns false when currentUser is null', () => {
+      expect(isLaundryUser(null)).toBe(false);
+    });
+
+    it('ignores publicData.isLaundry (users cannot self-assign the role)', () => {
+      const currentUser = {
+        attributes: { profile: { publicData: { isLaundry: true }, metadata: {} } },
+      };
+      expect(isLaundryUser(currentUser)).toBe(false);
     });
   });
 });
