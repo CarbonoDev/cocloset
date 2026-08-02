@@ -11,8 +11,21 @@ const { getSdk } = require('./sdk');
 // A user's own `metadata` is visible via the ordinary Marketplace API (no
 // Integration API needed to *read* it - see `sdk.currentUser.show()` below),
 // so authorization is done with the caller's own request-scoped SDK
-// (`getSdk(req, res)`), not the Integration API. Only the actual metadata
-// *write* that each endpoint performs afterwards needs the Integration API.
+// (`getSdk(req, res)`), not the Integration API. Only the privileged write
+// that each endpoint performs afterwards needs the Integration API.
+//
+// WHY THIS FILE IS STILL LOAD-BEARING NOW THAT REAL TRANSITIONS ARE USED
+// An earlier version of this comment explained that the laundry endpoints
+// deliberately did NOT call `transactions.transition()`, because Sharetribe
+// has no "laundry" actor role. That is no longer the design:
+// laundry-transaction-status.js now fires real `cocloset-booking` transitions.
+// The reasoning has NOT been invalidated by that, it has been inverted. Those
+// transitions are all `:actor.role/operator` and run through the full-admin
+// Integration API, so the platform will happily let ANY caller who reaches
+// this server drive ANY transaction's custody chain - including the payout on
+// `laundry-mark-pending-cleaning` and the refund on `cancel-from-returned`.
+// Sharetribe now enforces the ORDERING of the chain; it has no concept of who
+// is entitled to drive it. That half is, and remains, ours.
 
 const forbiddenError = message => {
   const error = new Error(message);

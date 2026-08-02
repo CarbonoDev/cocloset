@@ -4,6 +4,11 @@
 // PIG-2032), generated once per transaction and stored in
 // transaction.metadata.ticketCode at accept time").
 //
+// The design doc says "at accept time"; it is actually generated one step
+// later, on transition/laundry-mark-ready, which is when the laundry
+// physically prepares and labels the garment. See the comment at the call site
+// in server/api/laundry-transaction-status.js.
+//
 // This is NOT what's encoded in the QR - per the design doc, the QR payload
 // is just the transaction id itself (already globally unique). This code
 // exists purely so a human can read/write it on a paper ticket, the way a

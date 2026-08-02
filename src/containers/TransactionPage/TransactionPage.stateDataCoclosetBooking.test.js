@@ -1,0 +1,183 @@
+/**
+ * `getStateData` returns `{}` for a process it does not recognise, and
+ * `stateDataShape` marks `processName`/`processState` as required - so the
+ * cheapest way for this wiring to break is silently, with a blank transaction
+ * page and a PropTypes warning. These tests walk every state the
+ * cocloset-booking graph can reach and assert it resolves, plus check that the
+ * translation keys each resolved state asks for actually exist.
+ */
+import messages from '../../translations/en.json';
+import { getProcess } from '../../transactions/transaction';
+
+import { getStateData } from './TransactionPage.stateData';
+
+const process = getProcess('cocloset-booking');
+const { transitions } = process;
+
+const intlStub = {
+  formatMessage: ({ id }) => id,
+};
+
+const transaction = lastTransition => ({
+  id: { uuid: 'tx-1' },
+  attributes: { processName: 'cocloset-booking', lastTransition },
+  customer: { id: { uuid: 'customer-1' } },
+  provider: { id: { uuid: 'provider-1' }, attributes: { banned: false } },
+});
+
+const stateDataFor = (lastTransition, transactionRole) =>
+  getStateData(
+    {
+      transaction: transaction(lastTransition),
+      transactionRole,
+      intl: intlStub,
+      transitionInProgress: null,
+      transitionError: null,
+      onTransition: () => null,
+      sendReviewInProgress: false,
+      sendReviewError: null,
+      onOpenReviewModal: () => null,
+      nextTransitions: [],
+    },
+    process
+  );
+
+// One transition into each state the graph can reach, so the sweep below is
+// derived from the process rather than from a hand-written list.
+const TRANSITION_PER_STATE = {
+  inquiry: transitions.INQUIRE,
+  'pending-payment': transitions.REQUEST_PAYMENT,
+  'payment-expired': transitions.EXPIRE_PAYMENT,
+  preauthorized: transitions.CONFIRM_PAYMENT,
+  accepted: transitions.ACCEPT,
+  declined: transitions.DECLINE,
+  expired: transitions.EXPIRE,
+  'ready-for-pickup': transitions.LAUNDRY_MARK_READY,
+  'picked-up': transitions.LAUNDRY_CONFIRM_PICKUP,
+  overdue: transitions.MARK_OVERDUE,
+  returned: transitions.LAUNDRY_CONFIRM_RETURN,
+  cleaning: transitions.LAUNDRY_MARK_PENDING_CLEANING,
+  canceled: transitions.CANCEL,
+  delivered: transitions.LAUNDRY_MARK_AVAILABLE,
+  'reviewed-by-customer': transitions.REVIEW_1_BY_CUSTOMER,
+  'reviewed-by-provider': transitions.REVIEW_1_BY_PROVIDER,
+  reviewed: transitions.EXPIRE_REVIEW_PERIOD,
+};
+
+const ROLES = ['customer', 'provider'];
+
+describe('TransactionPage state data for cocloset-booking', () => {
+  it('covers every state in the process graph', () => {
+    // Guards against the graph gaining a state that this file never sweeps.
+    const graphStates = Object.keys(process.graph.states).filter(s => s !== 'initial');
+    expect(Object.keys(TRANSITION_PER_STATE).sort()).toEqual(graphStates.sort());
+  });
+
+  it.each(
+    Object.entries(TRANSITION_PER_STATE).flatMap(([state, transition]) =>
+      ROLES.map(role => [state, role, transition])
+    )
+  )('resolves %s for the %s', (state, role, transition) => {
+    const stateData = stateDataFor(transition, role);
+
+    // The failure mode this exists to catch: an unrecognised process falls
+    // through to `return {}`.
+    expect(stateData).not.toEqual({});
+    expect(stateData.processName).toBe('cocloset-booking');
+    expect(stateData.processState).toBe(state);
+  });
+
+  it('has an en.json title for every state and role', () => {
+    const missing = [];
+    Object.entries(TRANSITION_PER_STATE).forEach(([state, transition]) => {
+      ROLES.forEach(role => {
+        const { processState } = stateDataFor(transition, role);
+        const key = `TransactionPage.cocloset-booking.${role}.${processState}.title`;
+        if (!messages[key]) {
+          missing.push(key);
+        }
+      });
+    });
+    expect(missing).toEqual([]);
+  });
+
+  it('has an en.json extraInfo wherever a state asks to show one', () => {
+    const missing = [];
+    Object.entries(TRANSITION_PER_STATE).forEach(([state, transition]) => {
+      ROLES.forEach(role => {
+        const stateData = stateDataFor(transition, role);
+        if (stateData.showExtraInfo) {
+          const key = `TransactionPage.cocloset-booking.${role}.${stateData.processState}.extraInfo`;
+          if (!messages[key]) {
+            missing.push(key);
+          }
+        }
+      });
+    });
+    expect(missing).toEqual([]);
+  });
+
+  it('has an en.json ActivityFeed message for every state, including the ones a transition message overrides', () => {
+    // ActivityFeed computes the state-keyed default EAGERLY, even when a
+    // transition-keyed message wins - so a missing state key is a react-intl
+    // error on every render, not dead weight.
+    const feedStates = Object.keys(TRANSITION_PER_STATE).filter(
+      // These are never rendered as feed entries by the stock component.
+      s => !['inquiry', 'pending-payment', 'payment-expired'].includes(s)
+    );
+    const missing = feedStates.filter(
+      s => !messages[`TransactionPage.ActivityFeed.cocloset-booking.${s}`]
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('has an en.json message for every transition-keyed ActivityFeed override', () => {
+    const { transitionMessages } = stateDataFor(transitions.ACCEPT, 'customer');
+    expect(transitionMessages.length).toBeGreaterThan(0);
+    const missing = transitionMessages
+      .filter(m => !messages[m.translationId])
+      .map(m => m.translationId);
+    expect(missing).toEqual([]);
+  });
+
+  it('distinguishes the two return transitions and the three cleaning sub-phases', () => {
+    // The whole reason transition-keyed messages exist here: these five
+    // transitions collapse into two states.
+    const { transitionMessages } = stateDataFor(transitions.ACCEPT, 'customer');
+    const covered = transitionMessages.map(m => m.transition);
+    [
+      transitions.LAUNDRY_CONFIRM_RETURN,
+      transitions.LAUNDRY_CONFIRM_RETURN_LATE,
+      transitions.LAUNDRY_MARK_PENDING_CLEANING,
+      transitions.LAUNDRY_START_CLEANING,
+      transitions.LAUNDRY_START_QUALITY_INSPECTION,
+    ].forEach(t => expect(covered).toContain(t));
+
+    const ids = transitionMessages.map(m => m.translationId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('offers no action buttons during the laundry custody chain', () => {
+    // Those steps are driven by the laundry through the ops dashboard, not by
+    // either party of the transaction.
+    ['ready-for-pickup', 'picked-up', 'overdue', 'returned', 'cleaning'].forEach(state => {
+      ROLES.forEach(role => {
+        const stateData = stateDataFor(TRANSITION_PER_STATE[state], role);
+        expect(stateData.showActionButtons).toBeFalsy();
+      });
+    });
+  });
+
+  it('still lets the provider accept or decline a request', () => {
+    const stateData = stateDataFor(transitions.CONFIRM_PAYMENT, 'provider');
+    expect(stateData.showActionButtons).toBe(true);
+    expect(messages[stateData.primaryButtonProps.buttonText]).toBeDefined();
+    expect(messages[stateData.secondaryButtonProps.buttonText]).toBeDefined();
+  });
+
+  it('opens the review window at delivered, as default-booking does', () => {
+    const stateData = stateDataFor(transitions.LAUNDRY_MARK_AVAILABLE, 'customer');
+    expect(stateData.showReviewAsFirstLink).toBe(true);
+    expect(stateData.showActionButtons).toBe(true);
+  });
+});

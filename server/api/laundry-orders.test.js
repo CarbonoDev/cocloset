@@ -15,6 +15,7 @@ const { requireLaundryCaller } = require('../api-util/laundryAuth');
 const { handleError } = require('../api-util/sdk');
 
 const laundryOrders = require('./laundry-orders');
+const { OPS_LAST_TRANSITIONS } = require('../api-util/coclosetBookingProcess');
 
 const LAUNDRY_ID = 'laundry-1';
 const OTHER_LAUNDRY_ID = 'laundry-2';
@@ -72,12 +73,12 @@ const listingIncluded = [
   },
 ];
 
-const transaction = (id, metadata = {}) => ({
+const transaction = (id, metadata = {}, lastTransition = 'transition/accept') => ({
   id: { uuid: id },
   type: 'transaction',
   attributes: {
-    processName: 'default-booking',
-    lastTransition: 'transition/accept',
+    processName: 'cocloset-booking',
+    lastTransition,
     metadata,
   },
   relationships: {
@@ -180,12 +181,14 @@ describe('laundry-orders', () => {
         'listing-mine': {
           data: {
             data: [
-              transaction('tx-1', {
-                ticketCode: 'PIG-2032',
-                laundryStatus: 'picked-up',
-                lateReturn: true,
-                damageReported: { flag: true, note: 'Small pull at left cuff.' },
-              }),
+              transaction(
+                'tx-1',
+                {
+                  ticketCode: 'PIG-2032',
+                  damageReported: { flag: true, note: 'Small pull at left cuff.' },
+                },
+                'transition/laundry-confirm-pickup'
+              ),
             ],
             included: txIncluded,
           },
@@ -209,10 +212,11 @@ describe('laundry-orders', () => {
       imageUrl: 'https://example.com/small.jpg',
       customerName: 'Jane Doe',
       ownerName: 'Ana Rivera',
-      laundryStatus: 'picked-up',
+      state: 'picked-up',
+      cleaningPhase: null,
       readinessStatus: 'stored',
       currentRack: 'Rack A-04',
-      lateReturn: true,
+      returnedLate: false,
       damageReported: { flag: true, note: 'Small pull at left cuff.' },
     });
     expect(row.bookingStart).toBe('2026-08-09T00:00:00.000Z');
@@ -236,9 +240,10 @@ describe('laundry-orders', () => {
       transactionId: null,
       ticketCode: null,
       customerName: null,
-      laundryStatus: null,
+      state: null,
+      cleaningPhase: null,
       readinessStatus: 'stored',
-      lateReturn: false,
+      returnedLate: false,
       damageReported: null,
     });
     expect(res.body.data.meta.transactionCount).toBe(0);
@@ -251,8 +256,8 @@ describe('laundry-orders', () => {
         'listing-busy': {
           data: {
             data: [
-              transaction('tx-1', { ticketCode: 'A-1', laundryStatus: 'returned' }),
-              transaction('tx-2', { ticketCode: 'A-2', laundryStatus: 'picked-up' }),
+              transaction('tx-1', { ticketCode: 'A-1' }, 'transition/laundry-confirm-return'),
+              transaction('tx-2', { ticketCode: 'A-2' }, 'transition/laundry-confirm-pickup'),
             ],
             included: txIncluded,
           },
@@ -267,7 +272,7 @@ describe('laundry-orders', () => {
     const { orders, inventory, meta } = res.body.data;
     expect(orders).toHaveLength(2);
     expect(inventory).toHaveLength(1);
-    expect(inventory[0].laundryStatus).toBe('returned');
+    expect(inventory[0].state).toBe('returned');
     expect(meta).toEqual({ listingCount: 1, transactionCount: 2, truncated: false });
   });
 
@@ -305,5 +310,99 @@ describe('laundry-orders', () => {
     await new Promise(setImmediate);
 
     expect(listingsQuery.mock.calls[0][0]).toMatchObject({ pub_assignedLaundryId: LAUNDRY_ID });
+  });
+
+  it('narrows the transaction query with the native lastTransitions filter', async () => {
+    // Unlike pub_*, this one really filters today (verified against the real
+    // Dev API). It is what keeps inquiry-stage transactions off the studio
+    // worklist.
+    const { transactionsQuery } = setupSdk({
+      listingPages: [page([listing('l-1')], listingIncluded)],
+      transactionsByListing: {},
+    });
+
+    const res = mockRes();
+    await laundryOrders({}, res);
+    await new Promise(setImmediate);
+
+    const { lastTransitions } = transactionsQuery.mock.calls[0][0];
+    expect(lastTransitions).toEqual(OPS_LAST_TRANSITIONS);
+    expect(lastTransitions).toContain('transition/accept');
+    expect(lastTransitions).toContain('transition/laundry-confirm-return-late');
+    // Everything before accept is noise on a studio worklist.
+    expect(lastTransitions).not.toContain('transition/inquire');
+  });
+
+  describe('derived state', () => {
+    const rowFor = async lastTransition => {
+      setupSdk({
+        listingPages: [page([listing('l-1')], listingIncluded)],
+        transactionsByListing: {
+          'l-1': {
+            data: {
+              data: [transaction('tx-1', {}, lastTransition)],
+              included: txIncluded,
+            },
+          },
+        },
+      });
+      const res = mockRes();
+      await laundryOrders({}, res);
+      await new Promise(setImmediate);
+      return res.body.data.orders[0];
+    };
+
+    it.each([
+      ['transition/accept', 'accepted'],
+      ['transition/laundry-mark-ready', 'ready-for-pickup'],
+      ['transition/laundry-confirm-pickup', 'picked-up'],
+      ['transition/mark-overdue', 'overdue'],
+      ['transition/laundry-confirm-return', 'returned'],
+      ['transition/laundry-confirm-return-late', 'returned'],
+      ['transition/laundry-mark-pending-cleaning', 'cleaning'],
+      ['transition/laundry-start-cleaning', 'cleaning'],
+      ['transition/laundry-start-quality-inspection', 'cleaning'],
+      ['transition/laundry-mark-available', 'delivered'],
+      ['transition/cancel-from-returned', 'canceled'],
+    ])('derives state %s -> %s', async (lastTransition, expected) => {
+      expect((await rowFor(lastTransition)).state).toBe(expected);
+    });
+
+    it('flags a garment that came back late, which its state no longer says', async () => {
+      const late = await rowFor('transition/laundry-confirm-return-late');
+      expect(late.state).toBe('returned');
+      expect(late.returnedLate).toBe(true);
+
+      const onTime = await rowFor('transition/laundry-confirm-return');
+      expect(onTime.returnedLate).toBe(false);
+    });
+
+    it('surfaces the cleaning sub-phase from metadata', async () => {
+      setupSdk({
+        listingPages: [page([listing('l-1')], listingIncluded)],
+        transactionsByListing: {
+          'l-1': {
+            data: {
+              data: [
+                transaction(
+                  'tx-1',
+                  { cleaningPhase: 'quality-inspection' },
+                  'transition/laundry-start-quality-inspection'
+                ),
+              ],
+              included: txIncluded,
+            },
+          },
+        },
+      });
+      const res = mockRes();
+      await laundryOrders({}, res);
+      await new Promise(setImmediate);
+
+      expect(res.body.data.orders[0]).toMatchObject({
+        state: 'cleaning',
+        cleaningPhase: 'quality-inspection',
+      });
+    });
   });
 });

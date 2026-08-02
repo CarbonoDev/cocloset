@@ -161,7 +161,7 @@ export const deleteUserAccount = body => {
 // See `server/api/laundry-partner-application.js` for the accepted fields and limits.
 export const submitLaundryPartnerApplication = body => {
   return post('/api/laundry-partner-application', body);
-}
+};
 
 // Fetch the list of laundries (users flagged with metadata.isLaundry), used by
 // the listing wizard's "Laundry Assignment" step. Requires an authenticated
@@ -193,13 +193,17 @@ export const createAvailabilityBuffer = body => {
   return post('/api/create-availability-buffer', body);
 };
 
-// Advance a transaction's granular laundry sub-phase
-// (`transaction.metadata.laundryStatus`), e.g. after a laundry scans a QR
-// code for pickup/return, or updates cleaning progress from the ops
-// dashboard. This is metadata layered on top of the existing, unmodified
-// transaction process - NOT a real Sharetribe process transition. `status`
-// must be one of the values exported as `LAUNDRY_STATUSES` in
-// `server/api-util/laundryStatusHelpers.js`.
+// Advance a transaction through the laundry custody chain, e.g. after a
+// laundry scans a QR code for pickup/return, or updates cleaning progress from
+// the ops dashboard.
+//
+// This fires a REAL `cocloset-booking` process transition server-side (it used
+// to write `transaction.metadata.laundryStatus` instead), so Sharetribe
+// enforces the ordering: an out-of-order request comes back 409 rather than
+// silently succeeding. `status` is the step to advance to - one of
+// `LAUNDRY_ACTION_STATUSES` in `src/util/laundryStatuses.js` - and the server
+// maps it to the right transition, which for `returned` depends on whether the
+// garment is currently `picked-up` or `overdue`.
 //
 // See `server/api/laundry-transaction-status.js` for the full request/
 // response shape, including the optional `damaged`/`damageNote` fields

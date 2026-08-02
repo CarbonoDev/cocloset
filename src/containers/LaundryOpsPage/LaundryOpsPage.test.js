@@ -37,10 +37,11 @@ const orderRow = (overrides = {}) => ({
   currentRack: 'Rack B-03',
   bookingStart: null,
   bookingEnd: null,
-  laundryStatus: 'picked-up',
+  state: 'picked-up',
+  cleaningPhase: null,
   readinessStatus: 'stored',
   damageReported: null,
-  lateReturn: false,
+  returnedLate: false,
   ...overrides,
 });
 
@@ -100,7 +101,7 @@ describe('LaundryOpsPage', () => {
 
     it('filters rows when a tab is selected', async () => {
       const rows = [
-        orderRow({ id: 'tx:1', transactionId: '1', ticketCode: 'KEEP-1', lateReturn: true }),
+        orderRow({ id: 'tx:1', transactionId: '1', ticketCode: 'KEEP-1', state: 'overdue' }),
         orderRow({ id: 'tx:2', transactionId: '2', ticketCode: 'DROP-1' }),
       ];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
@@ -134,13 +135,14 @@ describe('LaundryOpsPage', () => {
           id: 'tx:1',
           transactionId: '1',
           ticketCode: 'OUT-1',
-          laundryStatus: 'picked-up',
+          state: 'picked-up',
         }),
         orderRow({
           id: 'tx:2',
           transactionId: '2',
           ticketCode: 'CLEAN-1',
-          laundryStatus: 'cleaning-in-progress',
+          state: 'cleaning',
+          cleaningPhase: 'cleaning-in-progress',
         }),
       ];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="returns" />);
@@ -151,14 +153,15 @@ describe('LaundryOpsPage', () => {
   });
 
   describe('status advance', () => {
-    it('offers only the single legal next status', async () => {
+    it('offers only the action that is legal from the current state', async () => {
       render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
 
-      // Current status is 'picked-up', so the only legal move is 'returned'.
-      expect(screen.getByText('LaundryOpsPage.detail.advanceTo')).toBeInTheDocument();
+      // State is 'picked-up', so the only legal laundry move is confirming
+      // the return.
+      expect(screen.getByText('LaundryOpsPage.action.returned')).toBeInTheDocument();
       expect(
-        screen.queryByText('LaundryOpsPage.status.available-for-booking')
+        screen.queryByText('LaundryOpsPage.action.available-for-booking')
       ).not.toBeInTheDocument();
     });
 
@@ -168,11 +171,30 @@ describe('LaundryOpsPage', () => {
         <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
       );
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
-      await userEvent.click(screen.getByText('LaundryOpsPage.detail.advanceTo'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
         expect.objectContaining({ transactionId: 'tx-1', status: 'returned', damaged: false })
       );
+    });
+
+    it('offers the same "confirm return" action for an overdue garment', async () => {
+      // The two-way branch (laundry-confirm-return vs -return-late) is
+      // resolved server-side; the client sends the same status either way.
+      const onAdvanceStatus = jest.fn();
+      const rows = [orderRow({ state: 'overdue' })];
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          orders={rows}
+          tab="orders"
+          onAdvanceStatus={onAdvanceStatus}
+        />
+      );
+      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
+
+      expect(onAdvanceStatus).toHaveBeenCalledWith(expect.objectContaining({ status: 'returned' }));
     });
 
     it('offers the damage report only at the returned step', async () => {
@@ -185,7 +207,7 @@ describe('LaundryOpsPage', () => {
       const checkbox = screen.getByRole('checkbox');
       await userEvent.click(checkbox);
       await userEvent.type(screen.getByRole('textbox'), 'Small pull at left cuff.');
-      await userEvent.click(screen.getByText('LaundryOpsPage.detail.advanceTo'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith({
         transactionId: 'tx-1',
@@ -196,20 +218,39 @@ describe('LaundryOpsPage', () => {
     });
 
     it('does not offer a damage report at a non-returned step', async () => {
-      const rows = [orderRow({ laundryStatus: 'returned' })];
+      const rows = [orderRow({ state: 'returned' })];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
 
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
 
-    it('offers no advance action once the sequence is finished', async () => {
-      const rows = [orderRow({ laundryStatus: 'available-for-booking' })];
+    it('keeps confirm-return and start-cleaning as two separate actions', async () => {
+      // The gap between them is the only window in which an operator can
+      // cancel with a refund after a damage report, so a returned garment must
+      // offer "start cleaning" as its own step - and warn that it pays out.
+      const rows = [orderRow({ state: 'returned' })];
+      render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
+      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+
+      expect(screen.getByText('LaundryOpsPage.action.pending-cleaning')).toBeInTheDocument();
+      expect(screen.getByText('LaundryOpsPage.detail.payoutWarning')).toBeInTheDocument();
+    });
+
+    it('does not warn about payout on steps that do not pay out', async () => {
+      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+
+      expect(screen.queryByText('LaundryOpsPage.detail.payoutWarning')).not.toBeInTheDocument();
+    });
+
+    it('offers no advance action once the chain is finished', async () => {
+      const rows = [orderRow({ state: 'delivered' })];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
 
       expect(screen.getByText('LaundryOpsPage.detail.noAdvance')).toBeInTheDocument();
-      expect(screen.queryByText('LaundryOpsPage.detail.advanceTo')).not.toBeInTheDocument();
+      expect(screen.queryByText('LaundryOpsPage.action.returned')).not.toBeInTheDocument();
     });
 
     it('offers no advance action for a listing-only row', async () => {
@@ -219,7 +260,7 @@ describe('LaundryOpsPage', () => {
           rowType: 'listing',
           transactionId: null,
           ticketCode: null,
-          laundryStatus: null,
+          state: null,
         }),
       ];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
@@ -232,9 +273,9 @@ describe('LaundryOpsPage', () => {
   describe('dashboard', () => {
     it('renders a tile for every stat with its count', () => {
       const rows = [
-        orderRow({ id: 'tx:1', transactionId: '1', laundryStatus: 'ready-for-pickup' }),
-        orderRow({ id: 'tx:2', transactionId: '2', laundryStatus: 'picked-up' }),
-        orderRow({ id: 'tx:3', transactionId: '3', laundryStatus: 'picked-up' }),
+        orderRow({ id: 'tx:1', transactionId: '1', state: 'ready-for-pickup' }),
+        orderRow({ id: 'tx:2', transactionId: '2', state: 'picked-up' }),
+        orderRow({ id: 'tx:3', transactionId: '3', state: 'picked-up' }),
       ];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="dashboard" />);
 
@@ -266,7 +307,8 @@ describe('LaundryOpsPage', () => {
           title: 'Camel hair wrap coat',
           currentRack: 'Rack C-07',
           readinessStatus: 'stored',
-          laundryStatus: null,
+          state: null,
+          cleaningPhase: null,
           imageUrl: null,
         },
       ];

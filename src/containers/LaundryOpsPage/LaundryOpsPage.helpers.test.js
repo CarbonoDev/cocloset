@@ -31,12 +31,18 @@ const row = (overrides = {}) => ({
   currentRack: 'Rack B-03',
   bookingStart: null,
   bookingEnd: null,
-  laundryStatus: null,
+  state: null,
+  cleaningPhase: null,
   readinessStatus: null,
   damageReported: null,
-  lateReturn: false,
+  returnedLate: false,
   ...overrides,
 });
+
+// A row in one of the three cleaning sub-phases: they all share the
+// `cleaning` state and differ only by `cleaningPhase`.
+const cleaningRow = (cleaningPhase, overrides = {}) =>
+  row({ state: 'cleaning', cleaningPhase, ...overrides });
 
 describe('LaundryOpsPage.helpers', () => {
   describe('date predicates', () => {
@@ -67,13 +73,21 @@ describe('LaundryOpsPage.helpers', () => {
       expect(isDamaged(row())).toBe(false);
     });
 
-    it('isLate reads the late-return flag', () => {
-      expect(isLate(row({ lateReturn: true }))).toBe(true);
+    it('isLate reads the overdue state, not a metadata flag', () => {
+      expect(isLate(row({ state: 'overdue' }))).toBe(true);
+      expect(isLate(row({ state: 'picked-up' }))).toBe(false);
       expect(isLate(row())).toBe(false);
     });
 
+    it('isLate keeps flagging a garment that already came back late', () => {
+      // It leaves `overdue` for `returned` the moment it is scanned in; an
+      // ops screen that stopped flagging it there would hide the problem.
+      expect(isLate(row({ state: 'returned', returnedLate: true }))).toBe(true);
+      expect(isLate(row({ state: 'returned' }))).toBe(false);
+    });
+
     it('isAwaitingPickup covers both the transaction and the readiness side of the union', () => {
-      expect(isAwaitingPickup(row({ laundryStatus: 'ready-for-pickup' }))).toBe(true);
+      expect(isAwaitingPickup(row({ state: 'ready-for-pickup' }))).toBe(true);
       // Listing-only row: no transaction, readiness says it's in the studio.
       expect(isAwaitingPickup(row({ rowType: 'listing', readinessStatus: 'incoming' }))).toBe(true);
       expect(isAwaitingPickup(row({ rowType: 'listing', readinessStatus: 'stored' }))).toBe(true);
@@ -82,19 +96,17 @@ describe('LaundryOpsPage.helpers', () => {
       );
       // A transaction that has moved on shouldn't be pulled back by its
       // listing's stale readiness value.
-      expect(isAwaitingPickup(row({ laundryStatus: 'picked-up', readinessStatus: 'stored' }))).toBe(
-        false
-      );
+      expect(isAwaitingPickup(row({ state: 'picked-up', readinessStatus: 'stored' }))).toBe(false);
     });
   });
 
   describe('filterByTab', () => {
     const rows = [
-      row({ id: 'a', laundryStatus: 'ready-for-pickup' }),
-      row({ id: 'b', laundryStatus: 'pending-cleaning' }),
-      row({ id: 'c', laundryStatus: 'available-for-booking' }),
-      row({ id: 'd', laundryStatus: 'picked-up', lateReturn: true }),
-      row({ id: 'e', laundryStatus: 'returned', damageReported: { flag: true, note: 'n' } }),
+      row({ id: 'a', state: 'ready-for-pickup' }),
+      cleaningRow('pending-cleaning', { id: 'b' }),
+      row({ id: 'c', state: 'delivered' }),
+      row({ id: 'd', state: 'overdue' }),
+      row({ id: 'e', state: 'returned', damageReported: { flag: true, note: 'n' } }),
       row({ id: 'f', bookingStart: '2026-07-31T09:00:00.000Z' }),
       row({ id: 'g', bookingEnd: '2026-07-31T18:00:00.000Z' }),
     ];
@@ -124,10 +136,10 @@ describe('LaundryOpsPage.helpers', () => {
 
   describe('filterByView', () => {
     const rows = [
-      row({ id: 'a', laundryStatus: 'ready-for-pickup' }),
-      row({ id: 'b', laundryStatus: 'picked-up' }),
-      row({ id: 'c', laundryStatus: 'cleaning-in-progress' }),
-      row({ id: 'd', laundryStatus: 'quality-inspection' }),
+      row({ id: 'a', state: 'ready-for-pickup' }),
+      row({ id: 'b', state: 'picked-up' }),
+      cleaningRow('cleaning-in-progress', { id: 'c' }),
+      cleaningRow('quality-inspection', { id: 'd' }),
       row({ id: 'e', rowType: 'listing', readinessStatus: 'incoming' }),
     ];
 
@@ -135,13 +147,20 @@ describe('LaundryOpsPage.helpers', () => {
       expect(filterByView(rows, 'pickups').map(r => r.id)).toEqual(['a', 'e']);
     });
 
-    it('returns shows garments currently out with the customer', () => {
+    it('returns shows garments currently out with the customer, late or not', () => {
       expect(filterByView(rows, 'returns').map(r => r.id)).toEqual(['b']);
+      expect(
+        filterByView([row({ id: 'late', state: 'overdue' })], 'returns').map(r => r.id)
+      ).toEqual(['late']);
     });
 
     it('cleaning shows every cleaning sub-phase', () => {
       expect(filterByView(rows, 'cleaning').map(r => r.id)).toEqual(['c', 'd']);
       expect(CLEANING_STATUSES).toContain('pending-cleaning');
+      // 'returned' feeds the cleaning queue too (design §9).
+      expect(
+        filterByView([row({ id: 'r', state: 'returned' })], 'cleaning').map(r => r.id)
+      ).toEqual(['r']);
     });
 
     it('all is a pass-through', () => {
@@ -169,13 +188,14 @@ describe('LaundryOpsPage.helpers', () => {
 
   describe('dashboardCounts', () => {
     const rows = [
-      row({ id: 'a', laundryStatus: 'ready-for-pickup' }),
-      row({ id: 'b', laundryStatus: 'picked-up' }),
-      row({ id: 'c', laundryStatus: 'picked-up', lateReturn: true }),
-      row({ id: 'd', laundryStatus: 'pending-cleaning' }),
-      row({ id: 'e', laundryStatus: 'pending-cleaning' }),
-      row({ id: 'f', laundryStatus: 'quality-inspection' }),
-      row({ id: 'g', laundryStatus: 'returned', damageReported: { flag: true, note: 'n' } }),
+      row({ id: 'a', state: 'ready-for-pickup' }),
+      row({ id: 'b', state: 'picked-up' }),
+      // Overdue still counts as rented - the garment is out with the customer.
+      row({ id: 'c', state: 'overdue' }),
+      cleaningRow('pending-cleaning', { id: 'd' }),
+      cleaningRow('pending-cleaning', { id: 'e' }),
+      cleaningRow('quality-inspection', { id: 'f' }),
+      row({ id: 'g', state: 'returned', damageReported: { flag: true, note: 'n' } }),
       row({
         id: 'h',
         bookingStart: '2026-07-31T09:00:00.000Z',
@@ -204,7 +224,7 @@ describe('LaundryOpsPage.helpers', () => {
     });
 
     it('counts date-driven tiles as zero when no row has a booking', () => {
-      const undated = [row({ id: 'x', laundryStatus: 'picked-up' })];
+      const undated = [row({ id: 'x', state: 'picked-up' })];
       const counts = dashboardCounts(undated, NOW);
       expect(counts.pickupsToday).toBe(0);
       expect(counts.returnsExpectedToday).toBe(0);
@@ -233,19 +253,16 @@ describe('LaundryOpsPage.helpers', () => {
   describe('sortRows', () => {
     it('puts earlier laundry phases first and statusless rows before them', () => {
       const rows = [
-        row({ id: 'c', laundryStatus: 'available-for-booking' }),
-        row({ id: 'a', laundryStatus: 'ready-for-pickup' }),
-        row({ id: 'none', laundryStatus: null }),
-        row({ id: 'b', laundryStatus: 'returned' }),
+        row({ id: 'c', state: 'delivered' }),
+        row({ id: 'a', state: 'ready-for-pickup' }),
+        row({ id: 'none', state: null }),
+        row({ id: 'b', state: 'returned' }),
       ];
       expect(sortRows(rows).map(r => r.id)).toEqual(['none', 'a', 'b', 'c']);
     });
 
     it('does not mutate the input', () => {
-      const rows = [
-        row({ id: 'z', laundryStatus: 'returned' }),
-        row({ id: 'y', laundryStatus: null }),
-      ];
+      const rows = [row({ id: 'z', state: 'returned' }), row({ id: 'y', state: null })];
       const snapshot = rows.map(r => r.id);
       sortRows(rows);
       expect(rows.map(r => r.id)).toEqual(snapshot);

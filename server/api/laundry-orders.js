@@ -1,6 +1,11 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { requireLaundryCaller } = require('../api-util/laundryAuth');
+const {
+  TRANSITIONS,
+  OPS_LAST_TRANSITIONS,
+  stateFromLastTransition,
+} = require('../api-util/coclosetBookingProcess');
 
 // Read endpoint backing the laundry ops dashboard (design doc §8).
 //
@@ -52,6 +57,43 @@ const { requireLaundryCaller } = require('../api-util/laundryAuth');
 // marketplace and filter in JS, or (b) one query per assigned listing.
 // (b) is used: it scales with the calling laundry's own inventory rather than
 // with total marketplace volume, which is the right axis.
+//
+// ---------------------------------------------------------------------------
+// `lastTransitions` IS a real filter (unlike `pub_*`)
+// ---------------------------------------------------------------------------
+// The per-listing transaction query below narrows with `lastTransitions`. That
+// is a NATIVE `transactions.query` filter, not extended data, so - unlike
+// `pub_assignedLaundryId` above - it genuinely works today with no search
+// schema. Verified against the real Dev Integration API: the parameter is
+// accepted (HTTP 200) and filters.
+//
+// It matters here for more than tidiness. Every transaction in the marketplace
+// currently sits at `transition/inquire`; without the filter a studio's
+// worklist is mostly inquiries for garments nobody has committed to renting.
+// OPS_LAST_TRANSITIONS is the set from `accept` onwards - see
+// server/api-util/coclosetBookingProcess.js for what is in it and why.
+//
+// The tradeoff, stated plainly: this filter fails CLOSED. A transition name
+// that the marketplace does not recognise is not rejected, it simply matches
+// nothing (also verified). So a transaction on a process whose transitions are
+// not in that list - e.g. a legacy `default-booking` rental on a listing that
+// has since been assigned to a laundry - will not appear on the dashboard at
+// all. That is the intended scope (laundry listings are `garment-rental`,
+// which resolves to `cocloset-booking`), but it is a silent exclusion rather
+// than a loud one.
+//
+// ---------------------------------------------------------------------------
+// STATUS IS DERIVED, NOT STORED
+// ---------------------------------------------------------------------------
+// Rows no longer carry a `laundryStatus` metadata field. The transaction's
+// position in the custody chain is now its real process state, derived from
+// `attributes.lastTransition`, and the cleaning sub-phase is
+// `metadata.cleaningPhase`. `metadata.lateReturn` is gone too - lateness is
+// `state === 'overdue'`, maintained by the process itself.
+//
+// This endpoint emits the raw facts (`state`, `cleaningPhase`, `lastTransition`)
+// and leaves the display vocabulary to the client (src/util/laundryStatuses.js),
+// rather than inventing a third status enum here.
 const LISTINGS_PER_PAGE = 100;
 const TRANSACTIONS_PER_PAGE = 100;
 
@@ -163,12 +205,15 @@ const transactionRow = (transaction, txIncluded, listingBase) => {
   const provider = findIncluded(txIncluded, 'user', rels.provider?.data?.id?.uuid);
 
   const damage = metadata.damageReported;
+  const lastTransition = attrs.lastTransition || null;
 
   return {
     ...listingBase,
     id: `tx:${transaction.id.uuid}`,
     rowType: 'transaction',
     transactionId: transaction.id.uuid,
+    // The ticket code is written by transition/laundry-mark-ready, so it is
+    // null until the laundry has prepared the garment.
     ticketCode: metadata.ticketCode || null,
     customerName: displayNameOf(customer),
     // Prefer the transaction's own provider (always the listing author, but
@@ -178,10 +223,17 @@ const transactionRow = (transaction, txIncluded, listingBase) => {
       ? new Date(booking.attributes.start).toISOString()
       : null,
     bookingEnd: booking?.attributes?.end ? new Date(booking.attributes.end).toISOString() : null,
-    laundryStatus: metadata.laundryStatus || null,
+    // The real process state, derived from lastTransition (the API never sends
+    // a state name). Null for a transaction on some other process.
+    state: stateFromLastTransition(lastTransition),
+    cleaningPhase: metadata.cleaningPhase || null,
+    // A garment that came back late leaves `overdue` for `returned`, so
+    // `state` alone stops answering "was this late?" the moment it is
+    // resolved. The transition that resolved it still says so, and the ops
+    // screens want to keep flagging the row.
+    returnedLate: lastTransition === TRANSITIONS.LAUNDRY_CONFIRM_RETURN_LATE,
     damageReported: damage ? { flag: !!damage.flag, note: damage.note || '' } : null,
-    lateReturn: metadata.lateReturn === true,
-    lastTransition: attrs.lastTransition || null,
+    lastTransition,
     processName: attrs.processName || null,
   };
 };
@@ -195,9 +247,10 @@ const listingOnlyRow = listingBase => ({
   customerName: null,
   bookingStart: null,
   bookingEnd: null,
-  laundryStatus: null,
+  state: null,
+  cleaningPhase: null,
+  returnedLate: false,
   damageReported: null,
-  lateReturn: false,
   lastTransition: null,
   processName: null,
 });
@@ -227,6 +280,8 @@ module.exports = (req, res) => {
             integrationSdk.transactions
               .query({
                 listingId: listing.id.uuid,
+                // Native filter, genuinely effective - see the note at the top.
+                lastTransitions: OPS_LAST_TRANSITIONS,
                 perPage: TRANSACTIONS_PER_PAGE,
                 include: ['customer', 'provider', 'booking'],
               })
@@ -257,14 +312,15 @@ module.exports = (req, res) => {
         }
 
         // Inventory is per-garment, not per-booking: always exactly one row per
-        // assigned listing, annotated with its most recent laundry status so
-        // the card grid can show a status badge (mockup 04.jpg).
+        // assigned listing, annotated with its most recent transaction's state
+        // so the card grid can show a status badge (mockup 04.jpg).
         const latest = rows[0] || null;
         inventory.push({
           ...base,
           id: `listing:${base.listingId}`,
           ticketCode: latest?.ticketCode || null,
-          laundryStatus: latest?.laundryStatus || null,
+          state: latest?.state || null,
+          cleaningPhase: latest?.cleaningPhase || null,
           transactionId: latest?.transactionId || null,
         });
       });
