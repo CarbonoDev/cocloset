@@ -7,6 +7,7 @@ import CheckoutPage from './CheckoutPage/CheckoutPage.duck';
 import ContactDetailsPage from './ContactDetailsPage/ContactDetailsPage.duck';
 import EditListingPage from './EditListingPage/EditListingPage.duck';
 import InboxPage from './InboxPage/InboxPage.duck';
+import LaundryOpsPage from './LaundryOpsPage/LaundryOpsPage.duck';
 import LaundryProfilePage from './LaundryProfilePage/LaundryProfilePage.duck';
 import ListingPage from './ListingPage/ListingPage.duck';
 import MakeOfferPage from './MakeOfferPage/MakeOfferPage.duck';
@@ -14,6 +15,7 @@ import ManageListingsPage from './ManageListingsPage/ManageListingsPage.duck';
 import PasswordChangePage from './PasswordChangePage/PasswordChangePage.duck';
 import PasswordRecoveryPage from './PasswordRecoveryPage/PasswordRecoveryPage.duck';
 import PasswordResetPage from './PasswordResetPage/PasswordResetPage.duck';
+import PartnerLandingPage from './PartnerLandingPage/PartnerLandingPage.duck';
 import PaymentMethodsPage from './PaymentMethodsPage/PaymentMethodsPage.duck';
 import ManageAccountPage from './ManageAccountPage/ManageAccountPage.duck';
 import ProfilePage from './ProfilePage/ProfilePage.duck';
@@ -28,6 +30,7 @@ export {
   ContactDetailsPage,
   EditListingPage,
   InboxPage,
+  LaundryOpsPage,
   LaundryProfilePage,
   ListingPage,
   MakeOfferPage,
@@ -35,6 +38,7 @@ export {
   PasswordChangePage,
   PasswordRecoveryPage,
   PasswordResetPage,
+  PartnerLandingPage,
   PaymentMethodsPage,
   ManageAccountPage,
   ProfilePage,

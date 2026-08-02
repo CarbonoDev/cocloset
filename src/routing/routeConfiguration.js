@@ -19,6 +19,7 @@ const ContactDetailsPage = loadable(() => import(/* webpackChunkName: "ContactDe
 const EditListingPage = loadable(() => import(/* webpackChunkName: "EditListingPage" */ '../containers/EditListingPage/EditListingPage'));
 const EmailVerificationPage = loadable(() => import(/* webpackChunkName: "EmailVerificationPage" */ '../containers/EmailVerificationPage/EmailVerificationPage'));
 const InboxPage = loadable(() => import(/* webpackChunkName: "InboxPage" */ '../containers/InboxPage/InboxPage'));
+const LaundryOpsPage = loadable(() => import(/* webpackChunkName: "LaundryOpsPage" */ '../containers/LaundryOpsPage/LaundryOpsPage'));
 const LaundryProfilePage = loadable(() => import(/* webpackChunkName: "LaundryProfilePage" */ '../containers/LaundryProfilePage/LaundryProfilePage'));
 const MakeOfferPage = loadable(() => import(/* webpackChunkName: "MakeOfferPage" */ '../containers/MakeOfferPage/MakeOfferPage'));
 const LandingPage = loadable(() => import(/* webpackChunkName: "LandingPage" */ '../containers/LandingPage/LandingPage'));
@@ -29,6 +30,7 @@ const ManageAccountPage = loadable(() => import(/* webpackChunkName: "ManageAcco
 const PasswordChangePage = loadable(() => import(/* webpackChunkName: "PasswordChangePage" */ '../containers/PasswordChangePage/PasswordChangePage'));
 const PasswordRecoveryPage = loadable(() => import(/* webpackChunkName: "PasswordRecoveryPage" */ '../containers/PasswordRecoveryPage/PasswordRecoveryPage'));
 const PasswordResetPage = loadable(() => import(/* webpackChunkName: "PasswordResetPage" */ '../containers/PasswordResetPage/PasswordResetPage'));
+const PartnerLandingPage = loadable(() => import(/* webpackChunkName: "PartnerLandingPage" */ '../containers/PartnerLandingPage/PartnerLandingPage'));
 const PaymentMethodsPage = loadable(() => import(/* webpackChunkName: "PaymentMethodsPage" */ '../containers/PaymentMethodsPage/PaymentMethodsPage'));
 const PrivacyPolicyPage = loadable(() => import(/* webpackChunkName: "PrivacyPolicyPage" */ '../containers/PrivacyPolicyPage/PrivacyPolicyPage'));
 const ProfilePage = loadable(() => import(/* webpackChunkName: "ProfilePage" */ '../containers/ProfilePage/ProfilePage'));
@@ -69,13 +71,13 @@ const RedirectToLandingPage = () => <NamedRedirect name="LandingPage" />;
 const routeConfiguration = (layoutConfig, accessControlConfig) => {
   const isSearchPageWithMap = layoutConfig.searchPage?.variantType === 'map';
   const SearchPage = isSearchPageWithMap ? SearchPageWithMap : SearchPageWithGrid;
-  const ListingPage = layoutConfig.listingPage?.variantType === 'carousel' 
-    ? ListingPageCarousel 
+  const ListingPage = layoutConfig.listingPage?.variantType === 'carousel'
+    ? ListingPageCarousel
     : ListingPageCoverPhoto;
 
   const isPrivateMarketplace = accessControlConfig?.marketplace?.private === true;
   const authForPrivateMarketplace = isPrivateMarketplace ? { auth: true } : {};
-  
+
   return [
     {
       path: '/',
@@ -388,6 +390,17 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       component: ManageAccountPage,
     },
     {
+      // Public, unauthenticated marketing + application page for prospective
+      // laundry partners. Copy comes from the optional Console page
+      // `laundry-partners`; the application form is code. Not behind
+      // authForPrivateMarketplace on purpose: the whole point is that visitors
+      // without an account can find it.
+      path: '/become-a-partner',
+      name: 'PartnerLandingPage',
+      component: PartnerLandingPage,
+      loadData: pageDataLoadingAPI.PartnerLandingPage.loadData,
+    },
+    {
       // Laundry-only studio profile settings. Gated inside LaundryProfilePage
       // itself (renders NotFoundPage for non-laundry users) since permission
       // here depends on user metadata, not just authentication.
@@ -397,6 +410,23 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       authPage: 'LoginPage',
       component: LaundryProfilePage,
     },
+    // Laundry ops dashboard (mockups 04-09.jpg). One container, six routes:
+    // the `tab` extraProp selects which screen it renders, and they all share
+    // a single loadData because they render one payload from
+    // GET /api/laundry-orders. Gated inside LaundryOpsPage itself (renders
+    // NotFoundPage for non-laundry users), same as LaundryProfilePage above,
+    // since permission depends on user metadata rather than authentication.
+    // "Settings" in the ops sidebar links to LaundryProfilePage rather than
+    // duplicating it here.
+    ...['dashboard', 'orders', 'pickups', 'returns', 'cleaning', 'inventory'].map(tab => ({
+      path: `/laundry/${tab}`,
+      name: `LaundryOps${tab.charAt(0).toUpperCase()}${tab.slice(1)}Page`,
+      auth: true,
+      authPage: 'LoginPage',
+      component: LaundryOpsPage,
+      extraProps: { tab },
+      loadData: pageDataLoadingAPI.LaundryOpsPage.loadData,
+    })),
     {
       path: '/terms-of-service',
       name: 'TermsOfServicePage',

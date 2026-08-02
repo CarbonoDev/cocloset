@@ -9,9 +9,11 @@ import { loadData as ContactDetailsPageLoader } from './ContactDetailsPage/Conta
 import { loadData as EditListingPageLoader } from './EditListingPage/EditListingPage.duck';
 import { loadData as EmailVerificationPageLoader } from './EmailVerificationPage/EmailVerificationPage.duck';
 import { loadData as InboxPageLoader } from './InboxPage/InboxPage.duck';
+import { loadData as LaundryOpsPageLoader } from './LaundryOpsPage/LaundryOpsPage.duck';
 import { loadData as ListingPageLoader } from './ListingPage/ListingPage.duck';
 import { loadData as MakeOfferPageLoader } from './MakeOfferPage/MakeOfferPage.duck';
 import { loadData as ManageListingsPageLoader } from './ManageListingsPage/ManageListingsPage.duck';
+import { loadData as PartnerLandingPageLoader } from './PartnerLandingPage/PartnerLandingPage.duck';
 import { loadData as PaymentMethodsPageLoader } from './PaymentMethodsPage/PaymentMethodsPage.duck';
 import { loadData as PrivacyPolicyPageLoader } from './PrivacyPolicyPage/PrivacyPolicyPage.duck';
 import { loadData as ProfilePageLoader } from './ProfilePage/ProfilePage.duck';
@@ -50,6 +52,9 @@ const getPageDataLoadingAPI = () => {
     InboxPage: {
       loadData: InboxPageLoader,
     },
+    LaundryOpsPage: {
+      loadData: LaundryOpsPageLoader,
+    },
     ListingPage: {
       loadData: ListingPageLoader,
     },
@@ -58,6 +63,9 @@ const getPageDataLoadingAPI = () => {
     },
     ManageListingsPage: {
       loadData: ManageListingsPageLoader,
+    },
+    PartnerLandingPage: {
+      loadData: PartnerLandingPageLoader,
     },
     PaymentMethodsPage: {
       loadData: PaymentMethodsPageLoader,

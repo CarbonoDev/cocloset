@@ -152,6 +152,17 @@ export const deleteUserAccount = body => {
   return post('/api/delete-account', body);
 };
 
+// Submit a laundry-partner application from the public PartnerLandingPage.
+//
+// This endpoint is unauthenticated on purpose — prospective partners do not have an
+// account yet. It is also deliberately inert: the server only validates, length-caps
+// and forwards the application, it never touches marketplace data.
+//
+// See `server/api/laundry-partner-application.js` for the accepted fields and limits.
+export const submitLaundryPartnerApplication = body => {
+  return post('/api/laundry-partner-application', body);
+}
+
 // Fetch the list of laundries (users flagged with metadata.isLaundry), used by
 // the listing wizard's "Laundry Assignment" step. Requires an authenticated
 // caller.
@@ -206,4 +217,19 @@ export const updateLaundryTransactionStatus = body => {
 // response shape and the `READINESS_STATUSES` enum.
 export const updateListingReadinessStatus = body => {
   return post('/api/listing-readiness-status', body);
+};
+
+// Fetch everything the laundry ops dashboard renders, for the calling laundry
+// user: the design doc §8 union of "transactions on listings assigned to me"
+// and "assigned listings with no transaction", plus a per-garment inventory
+// list. Takes no arguments - the caller's own user id is the laundry filter,
+// resolved server-side from their session.
+//
+// Rows come back already denormalized (customer/owner display names, listing
+// image url, rack, statuses), so the dashboard renders them directly with no
+// `included` resolution or follow-up lookups.
+//
+// See `server/api/laundry-orders.js` for the full response shape.
+export const fetchLaundryOrders = () => {
+  return request('/api/laundry-orders', { method: methods.GET });
 };
