@@ -65,47 +65,51 @@ const LaundryOrdersTable = props => {
           <FormattedMessage id="LaundryOpsPage.table.empty" />
         </p>
       ) : (
-        <table className={css.table}>
-          <thead>
-            <tr>
-              <th className={css.th}>
-                <FormattedMessage id="LaundryOpsPage.table.qr" />
-              </th>
-              <th className={css.th}>
-                <FormattedMessage id="LaundryOpsPage.table.ticket" />
-              </th>
-              <th className={css.th}>
-                <FormattedMessage id="LaundryOpsPage.table.customerOwner" />
-              </th>
-              <th className={css.th}>
-                <FormattedMessage id="LaundryOpsPage.table.garment" />
-              </th>
-              <th className={css.th}>
-                <FormattedMessage id="LaundryOpsPage.table.pickupReturn" />
-              </th>
-              <th className={css.th}>
-                <FormattedMessage id="LaundryOpsPage.table.status" />
-              </th>
-              <th className={css.th}>
-                <span className={css.visuallyHidden}>
-                  <FormattedMessage id="LaundryOpsPage.table.actions" />
-                </span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map(row => (
-              <LaundryOrderRow
-                key={row.id}
-                row={row}
-                onAdvanceStatus={onAdvanceStatus}
-                advanceInProgress={
-                  !!row.transactionId && row.transactionId === advanceStatusTransactionId
-                }
-              />
-            ))}
-          </tbody>
-        </table>
+        // Seven columns can't compress to a phone width, so the table gets its
+        // own horizontal scroll container rather than being reflowed.
+        <div className={css.tableScroll}>
+          <table className={css.table}>
+            <thead>
+              <tr>
+                <th className={css.th}>
+                  <FormattedMessage id="LaundryOpsPage.table.qr" />
+                </th>
+                <th className={css.th}>
+                  <FormattedMessage id="LaundryOpsPage.table.ticket" />
+                </th>
+                <th className={css.th}>
+                  <FormattedMessage id="LaundryOpsPage.table.customerOwner" />
+                </th>
+                <th className={css.th}>
+                  <FormattedMessage id="LaundryOpsPage.table.garment" />
+                </th>
+                <th className={css.th}>
+                  <FormattedMessage id="LaundryOpsPage.table.pickupReturn" />
+                </th>
+                <th className={css.th}>
+                  <FormattedMessage id="LaundryOpsPage.table.status" />
+                </th>
+                <th className={css.th}>
+                  <span className={css.visuallyHidden}>
+                    <FormattedMessage id="LaundryOpsPage.table.actions" />
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map(row => (
+                <LaundryOrderRow
+                  key={row.id}
+                  row={row}
+                  onAdvanceStatus={onAdvanceStatus}
+                  advanceInProgress={
+                    !!row.transactionId && row.transactionId === advanceStatusTransactionId
+                  }
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

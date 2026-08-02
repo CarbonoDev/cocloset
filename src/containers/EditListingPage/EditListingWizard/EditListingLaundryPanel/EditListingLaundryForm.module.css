@@ -1,5 +1,7 @@
 @import '../../../../styles/customMediaQueries.css';
 
+/* Laundry assignment card picker - mockup 12.jpg. */
+
 .root {
   width: 100%;
   height: auto;
@@ -9,26 +11,40 @@
 }
 
 .error {
+  margin: 0 0 12px 0;
   color: var(--colorFail);
+  font-size: 14px;
 }
 
 .warning {
-  color: var(--colorAttention);
+  margin: 0 0 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--coclosetBorderStrong);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSubtle);
+  color: var(--colorAttentionDark);
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .loading,
 .empty {
-  color: var(--colorGrey700);
+  margin: 0;
+  padding: 24px 0;
+  color: var(--coclosetInkMuted);
+  font-size: 14px;
 }
 
 .cardGrid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 
   @media (--viewportMedium) {
     grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
   }
 }
 
@@ -38,14 +54,32 @@
   flex-direction: column;
   gap: 4px;
   padding: 16px;
-  border: 1px solid var(--colorGrey100);
-  border-radius: var(--borderRadius);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadius);
+  background-color: var(--coclosetSurface);
   cursor: pointer;
+  transition: var(--transitionStyle);
+
+  &:hover {
+    border-color: var(--coclosetBrandBorder);
+  }
+
+  /* The native radio is visually hidden, so the card itself has to carry the
+     keyboard focus ring - otherwise tabbing through the grid is invisible. */
+  &:focus-within {
+    outline: 2px solid var(--coclosetBrand);
+    outline-offset: 2px;
+  }
 }
 
 .cardSelected {
-  border-color: var(--marketplaceColor);
-  box-shadow: 0 0 0 1px var(--marketplaceColor);
+  border-color: var(--coclosetBrand);
+  background-color: var(--coclosetBrandSubtle);
+  box-shadow: 0 0 0 1px var(--coclosetBrand);
+
+  &:hover {
+    border-color: var(--coclosetBrand);
+  }
 }
 
 /* Visually hidden but still focusable/clickable native radio input */
@@ -57,19 +91,59 @@
   margin: 0;
 }
 
+/* Drawn with borders rather than a glyph so it needs no icon font and no new
+   component. Only revealed on the selected card. */
+.cardCheck {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: none;
+  width: 14px;
+  height: 8px;
+  border-left: 2px solid var(--coclosetBrand);
+  border-bottom: 2px solid var(--coclosetBrand);
+  transform: rotate(-45deg);
+}
+
+.cardSelected .cardCheck {
+  display: block;
+}
+
 .cardName {
+  padding-right: 28px;
+  color: var(--coclosetInk);
+  font-size: 15px;
   font-weight: var(--fontWeightSemiBold);
+  line-height: 22px;
 }
 
 .cardDetail {
-  color: var(--colorGrey700);
-  font-size: 14px;
+  color: var(--coclosetInkMuted);
+  font-size: 13px;
+  line-height: 19px;
 }
 
 .cardCategories {
-  margin-top: 4px;
-  color: var(--colorGrey500);
-  font-size: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cardCategory {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetToneNeutralBg);
+  color: var(--coclosetToneNeutralFg);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+/* Inside a selected (already cream) card the neutral chip disappears, so it
+   flips to the plain surface colour to keep its edge. */
+.cardSelected .cardCategory {
+  background-color: var(--coclosetSurface);
 }
 
 .submitButton {

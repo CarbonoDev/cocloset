@@ -40,6 +40,10 @@ const LaundryCard = props => {
           { name }
         )}
       />
+      {/* Selection is already exposed to assistive tech by the radio's checked
+          state; this tick is a redundant visual cue so selection doesn't rest
+          on the fill colour alone (mockup 12.jpg). */}
+      <span className={css.cardCheck} aria-hidden="true" />
       <span className={css.cardName}>{name}</span>
       {address ? <span className={css.cardDetail}>{address}</span> : null}
       {businessHours ? <span className={css.cardDetail}>{businessHours}</span> : null}
@@ -52,7 +56,13 @@ const LaundryCard = props => {
         </span>
       ) : null}
       {acceptedCategories?.length > 0 ? (
-        <span className={css.cardCategories}>{acceptedCategories.join(' · ')}</span>
+        <span className={css.cardCategories}>
+          {acceptedCategories.map(category => (
+            <span key={category} className={css.cardCategory}>
+              {category}
+            </span>
+          ))}
+        </span>
       ) : null}
     </label>
   );

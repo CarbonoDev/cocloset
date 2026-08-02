@@ -1,8 +1,10 @@
 import React from 'react';
+import classNames from 'classnames';
 
 import { FormattedMessage } from '../../util/reactIntl';
 import { statusLabelKey } from '../../util/laundryStatuses';
 
+import { statusTone } from './LaundryOpsPage.helpers';
 import css from './LaundryOpsPage.module.css';
 
 /**
@@ -48,7 +50,7 @@ const LaundryInventory = props => {
               {item.currentRack || <FormattedMessage id="LaundryOpsPage.inventory.noRack" />}
             </span>
             {labelKey ? (
-              <span className={css.statusBadge}>
+              <span className={classNames(css.statusBadge, css[`tone${statusTone(item)}`])}>
                 <FormattedMessage id={labelKey} />
               </span>
             ) : null}

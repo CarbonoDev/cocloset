@@ -21,10 +21,23 @@
 
 .field {
   flex-shrink: 0;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 
   @media (--viewportMedium) {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
+  }
+}
+
+/* City + postcode side by side from medium up (mockup 14.jpg). Stacks on
+   mobile so neither field gets too narrow to read its own value. */
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+
+  @media (--viewportMedium) {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
   }
 }
 

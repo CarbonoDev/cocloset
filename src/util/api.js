@@ -161,7 +161,7 @@ export const deleteUserAccount = body => {
 // See `server/api/laundry-partner-application.js` for the accepted fields and limits.
 export const submitLaundryPartnerApplication = body => {
   return post('/api/laundry-partner-application', body);
-}
+};
 
 // Fetch the list of laundries (users flagged with metadata.isLaundry), used by
 // the listing wizard's "Laundry Assignment" step. Requires an authenticated

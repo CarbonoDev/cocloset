@@ -8,10 +8,18 @@
   flex-direction: column;
 }
 
+/* Lede under the step heading - matches EditListingLaundryPanel so the two
+   custom wizard steps read as one set (mockups 12/14.jpg). */
 .description {
-  margin-top: 0;
-  margin-bottom: 24px;
-  color: var(--colorGrey700);
+  max-width: 62ch;
+  margin: 0 0 18px 0;
+  color: var(--coclosetInkMuted);
+  font-size: 14px;
+  line-height: 20px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
 }
 
 .form {

@@ -1,13 +1,45 @@
 @import '../../styles/customMediaQueries.css';
 
+/* Studio settings - mockup 03.jpg. Shares the ops shell's warm surfaces so the
+   Settings tab doesn't look like a different product from the other
+   /laundry/* screens. */
+
+.opsMain {
+  min-width: 0;
+  background-color: var(--coclosetCanvas);
+
+  @media (--viewportLarge) {
+    background-color: var(--coclosetCanvas);
+    border-left-color: var(--coclosetBorder);
+  }
+}
+
+.opsSideNav {
+  background-color: var(--coclosetSurfaceRaised);
+  border-top-color: var(--coclosetBorder);
+
+  @media (--viewportLarge) {
+    background-color: var(--coclosetSurfaceRaised);
+  }
+
+  /* Matches LaundryOpsPage.module.css .opsSideNav so the rail doesn't jump
+     position when the user moves between Settings and the other ops screens. */
+  @media (--viewportLargeWithPaddings) {
+    padding: 48px 0 82px 36px;
+  }
+}
+
 .content {
+  margin-top: 18px;
+
   @media (--viewportMedium) {
-    margin: 32px auto 0 auto;
+    margin: 24px auto 0 auto;
     max-width: 564px;
   }
 
   @media (--viewportLarge) {
     margin: 0;
+    max-width: 564px;
   }
 }
 
@@ -16,10 +48,27 @@
   box-shadow: none;
 }
 
-.form {
-  margin-top: 24px;
+.pageTitle {
+  margin: 0 0 18px 0;
+  color: var(--coclosetInk);
+  letter-spacing: -0.4px;
 
   @media (--viewportMedium) {
-    margin-top: 32px;
+    margin: 0 0 24px 0;
+  }
+}
+
+/* The form sits on its own paper card, matching the panel treatment used by
+   the dashboard and inventory screens. */
+.form {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadius);
+  background-color: var(--coclosetSurface);
+
+  @media (--viewportMedium) {
+    margin-top: 24px;
+    padding: 32px;
   }
 }
