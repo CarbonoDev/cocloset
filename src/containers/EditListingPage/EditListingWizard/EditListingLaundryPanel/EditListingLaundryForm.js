@@ -81,7 +81,7 @@ const LaundryCard = props => {
  * @param {Function} props.onSubmit - The submit function
  * @param {Array} props.laundries - The laundries fetched via fetchLaundries()
  * @param {boolean} props.fetchLaundriesInProgress - Whether laundries are still loading
- * @param {string} [props.listingCategory] - The listing's own publicData.category
+ * @param {Array<string>} [props.listingCategories] - The listing's own category values (categoryLevel1/2/3)
  * @param {Object} props.errors - The errors object
  * @param {propTypes.error} props.errors.showListingsError - The show listings error
  * @param {propTypes.error} props.errors.updateListingError - The update listing error
@@ -106,7 +106,7 @@ export const EditListingLaundryForm = props => (
         fetchErrors,
         laundries = [],
         fetchLaundriesInProgress,
-        listingCategory,
+        listingCategories,
         values,
       } = formRenderProps;
 
@@ -124,11 +124,21 @@ export const EditListingLaundryForm = props => (
 
       const selectedLaundry = laundries.find(l => l.id === values.assignedLaundryId);
       const selectedAcceptedCategories = selectedLaundry?.acceptedCategories || [];
+      // A listing can be categorised at up to three levels; treat it as accepted if the
+      // laundry lists any one of them. Compared case-insensitively and trimmed because the
+      // laundry types its own list as free text while categories come from Console ids -
+      // an exact === would make the warning fire on nothing but luck.
+      const normalise = value =>
+        String(value)
+          .trim()
+          .toLowerCase();
+      const acceptedSet = new Set(selectedAcceptedCategories.map(normalise));
+      const categories = listingCategories || [];
       const showCategoryWarning =
         !!selectedLaundry &&
-        !!listingCategory &&
+        categories.length > 0 &&
         selectedAcceptedCategories.length > 0 &&
-        !selectedAcceptedCategories.includes(listingCategory);
+        !categories.some(category => acceptedSet.has(normalise(category)));
 
       return (
         <Form className={classes} onSubmit={handleSubmit}>
@@ -180,7 +190,7 @@ export const EditListingLaundryForm = props => (
             <p className={css.warning}>
               <FormattedMessage
                 id="EditListingLaundryForm.categoryWarning"
-                values={{ category: listingCategory }}
+                values={{ category: categories.join(' / ') }}
               />
             </p>
           ) : null}

@@ -130,6 +130,27 @@ export const pickCategoryFields = (data, prefix, level, categoryLevelOptions = [
     : {};
 };
 
+// Console writes a listing's category into fixed, numbered keys — categoryLevel1,
+// categoryLevel2, categoryLevel3 — never a single `category` key. See the
+// "Don't change!" note on the category configuration above: the search schema is
+// pinned to these names.
+const CATEGORY_LEVEL_KEYS = ['categoryLevel1', 'categoryLevel2', 'categoryLevel3'];
+
+/**
+ * Read a listing's selected category values out of its public data, most general first.
+ *
+ * A listing can carry up to three nested levels (e.g. `dresses` > `maxi_dress`), and code
+ * comparing a listing against a category list generally wants to match any of them rather
+ * than guess a level.
+ *
+ * @param {Object} publicData a listing's publicData (may be undefined)
+ * @returns {Array<String>} the set category values, in level order, with gaps removed
+ */
+export const getListingCategoryValues = publicData =>
+  CATEGORY_LEVEL_KEYS.map(key => publicData?.[key]).filter(
+    value => typeof value === 'string' && value !== ''
+  );
+
 /**
  * Pick props for SectionMultiEnum and SectionText display components.
  *

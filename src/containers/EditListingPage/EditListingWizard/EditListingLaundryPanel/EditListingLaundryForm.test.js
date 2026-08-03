@@ -113,7 +113,7 @@ describe('EditListingLaundryForm', () => {
           ready={false}
           laundries={laundries}
           fetchLaundriesInProgress={false}
-          listingCategory="Outerwear"
+          listingCategories={['Outerwear']}
         />
       );
     });
@@ -128,7 +128,7 @@ describe('EditListingLaundryForm', () => {
 
   // NEGATIVE CASE for the soft category validation. Without this, an
   // implementation that ALWAYS shows the warning passes the test above - which
-  // is how the dead `listingCategory` wiring slipped through review.
+  // is how the dead `publicData.category` read slipped through review.
   it('does NOT show the category warning when the category IS accepted', async () => {
     const user = userEvent.setup();
 
@@ -145,7 +145,7 @@ describe('EditListingLaundryForm', () => {
           ready={false}
           laundries={laundries}
           fetchLaundriesInProgress={false}
-          listingCategory="Eveningwear"
+          listingCategories={['Eveningwear']}
         />
       );
     });
@@ -172,7 +172,7 @@ describe('EditListingLaundryForm', () => {
           ready={false}
           laundries={laundries}
           fetchLaundriesInProgress={false}
-          listingCategory="Outerwear"
+          listingCategories={['Outerwear']}
         />
       );
     });

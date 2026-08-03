@@ -5,6 +5,7 @@ import classNames from 'classnames';
 import { FormattedMessage } from '../../../../util/reactIntl';
 import { LISTING_STATE_DRAFT } from '../../../../util/types';
 import { fetchLaundries } from '../../../../util/api';
+import { getListingCategoryValues } from '../../../../util/fieldHelpers';
 
 // Import shared components
 import { H3, ListingLink } from '../../../../components';
@@ -91,7 +92,11 @@ const EditListingLaundryPanel = props => {
 
   const classes = classNames(rootClassName || css.root, className);
   const isPublished = listing?.id && listing?.attributes.state !== LISTING_STATE_DRAFT;
-  const listingCategory = listing?.attributes?.publicData?.category;
+  // Console stores categories as categoryLevel1/2/3, never a single `category` key — reading
+  // `publicData.category` meant this was always undefined and the accepted-category check
+  // below could never fire. A listing may be categorised at several levels, so compare against
+  // all of them.
+  const listingCategories = getListingCategoryValues(listing?.attributes?.publicData);
 
   const panelHeadingProps = isPublished
     ? {
@@ -137,7 +142,7 @@ const EditListingLaundryPanel = props => {
         initialValues={getInitialValues(props)}
         laundries={laundries}
         fetchLaundriesInProgress={fetchLaundriesInProgress}
-        listingCategory={listingCategory}
+        listingCategories={listingCategories}
         onSubmit={values => {
           const { assignedLaundryId } = values;
           const selectedLaundry = laundries.find(l => l.id === assignedLaundryId);
