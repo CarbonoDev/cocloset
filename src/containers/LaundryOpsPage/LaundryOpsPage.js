@@ -134,7 +134,9 @@ export const LaundryOpsPageComponent = props => {
               desktopClassName={css.desktopTopbar}
               mobileClassName={css.mobileTopbar}
             />
-            <UserNav currentPage={ROUTE_NAME_BY_TAB[tab]} />
+            {/* This page already renders NotFoundPage for anyone who isn't a laundry, so
+                reaching here is itself the isLaundryUser check. */}
+            <UserNav currentPage={ROUTE_NAME_BY_TAB[tab]} showLaundryProfileLink />
           </>
         }
         sideNav={<LaundryOpsNav currentPage={ROUTE_NAME_BY_TAB[tab]} studioName={studioName} />}

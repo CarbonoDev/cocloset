@@ -4,6 +4,7 @@ import { connect } from 'react-redux';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { isLaundryUser } from '../../util/userHelpers';
+import { types as sdkTypes } from '../../util/sdkLoader';
 
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 
@@ -20,6 +21,28 @@ import LaundryProfileForm from './LaundryProfileForm/LaundryProfileForm';
 import { updateProfile } from './LaundryProfilePage.duck';
 import css from './LaundryProfilePage.module.css';
 
+const { LatLng } = sdkTypes;
+
+// The address field's validator (autocompletePlaceSelected) requires
+// `origin instanceof LatLng` — a plain { lat, lng } fails it.
+//
+// Which origin you get back depends on who wrote the profile. A save through this form
+// sends a real LatLng, and the SDK's transit codec round-trips it as one. A profile
+// seeded through the Integration API or a script (scripts/set-laundry-role.js) stores
+// plain JSON, and publicData is opaque to the codec, so it reads back as a bare object.
+// Those laundries then hit a form that is permanently `invalid`: every field looks
+// correct, no error is shown anywhere, and "Save changes" simply never enables — there
+// is no way for them to configure their studio at all.
+//
+// Rehydrating here costs nothing and makes both origins behave identically.
+const toLatLng = origin => {
+  if (origin instanceof LatLng) {
+    return origin;
+  }
+  const { lat, lng } = origin || {};
+  return Number.isFinite(lat) && Number.isFinite(lng) ? new LatLng(lat, lng) : null;
+};
+
 // Build the form's initialValues from the currentUser entity.
 // Mirrors EditListingLocationPanel's getInitialValues: the address field is
 // reconstructed as { search, selectedPlace: { address, origin } } so it round-trips
@@ -27,7 +50,8 @@ import css from './LaundryProfilePage.module.css';
 const getInitialValues = currentUser => {
   const { publicData = {}, privateData = {} } = currentUser?.attributes?.profile || {};
   const { laundryProfile = {}, acceptedCategories = [] } = publicData;
-  const { studioName, address, origin, businessHours } = laundryProfile;
+  const { studioName, address, businessHours } = laundryProfile;
+  const origin = toLatLng(laundryProfile.origin);
   const { turnaroundHours, cleaningFee } = privateData;
 
   return {
@@ -35,7 +59,11 @@ const getInitialValues = currentUser => {
     businessHours,
     turnaroundHours,
     cleaningFee,
-    acceptedCategories: (acceptedCategories || []).join(', '),
+    // Array in, array out. The stored list can mix Console category ids (what the
+    // picker writes) with free text saved before the picker existed; the form keeps
+    // both in this one field so a save can never drop the legacy half. See
+    // LaundryProfileForm's docblock.
+    acceptedCategories: Array.isArray(acceptedCategories) ? acceptedCategories : [],
     location: address && origin ? { search: address, selectedPlace: { address, origin } } : null,
   };
 };
@@ -80,10 +108,17 @@ const LaundryProfileFormSection = props => {
     } = values;
     const { address, origin } = location?.selectedPlace || {};
 
-    const acceptedCategoriesArray = (acceptedCategories || '')
-      .split(',')
-      .map(category => category.trim())
-      .filter(category => category.length > 0);
+    // FieldCheckboxGroup hands back an array of Console category ids, plus any legacy
+    // free-text values that were already stored and haven't been removed. Normalised
+    // here (dedupe, drop blanks) so publicData never picks up empties from either side.
+    const acceptedCategoriesArray = [
+      ...new Set(
+        (Array.isArray(acceptedCategories) ? acceptedCategories : [])
+          .filter(category => typeof category === 'string')
+          .map(category => category.trim())
+          .filter(category => category.length > 0)
+      ),
+    ];
 
     const { privateData: currentPrivateData = {} } = currentUser?.attributes?.profile || {};
 
@@ -120,7 +155,7 @@ const LaundryProfileFormSection = props => {
         businessHours,
         turnaroundHours: nextTurnaroundHours,
         cleaningFee: nextCleaningFee,
-        acceptedCategories: acceptedCategoriesArray.join(', '),
+        acceptedCategories: acceptedCategoriesArray,
         location:
           address && origin ? { search: address, selectedPlace: { address, origin } } : null,
       },
@@ -200,7 +235,7 @@ export const LaundryProfilePageComponent = props => {
               desktopClassName={css.desktopTopbar}
               mobileClassName={css.mobileTopbar}
             />
-            <UserNav currentPage="LaundryProfilePage" />
+            <UserNav currentPage="LaundryProfilePage" showLaundryProfileLink />
           </>
         }
         sideNav={<LaundryOpsNav currentPage="LaundryProfilePage" studioName={studioName} />}

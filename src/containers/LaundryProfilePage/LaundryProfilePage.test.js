@@ -3,7 +3,11 @@ import '@testing-library/jest-dom';
 
 import { types as sdkTypes } from '../../util/sdkLoader';
 import { fakeIntl } from '../../util/testData';
-import { renderWithProviders as render, testingLibrary } from '../../util/testHelpers';
+import {
+  getHostedConfiguration,
+  renderWithProviders as render,
+  testingLibrary,
+} from '../../util/testHelpers';
 
 import { LaundryProfilePageComponent } from './LaundryProfilePage';
 
@@ -16,6 +20,26 @@ const ORIGIN = new LatLng(48.882, 2.338);
 
 const noop = () => null;
 
+// A Console-shaped category tree covering the three shapes the hosted asset actually
+// produces: a branch with children, a child with no `subcategories` key at all, and a
+// top-level category with no children.
+const CATEGORIES = [
+  {
+    name: 'Dresses',
+    id: 'dresses',
+    subcategories: [
+      { name: 'Maxi Dress', id: 'maxi_dress' },
+      { name: 'Midi Dress', id: 'midi_dress' },
+    ],
+  },
+  { name: 'Pants', id: 'pants' },
+];
+
+const configWithCategories = {
+  ...getHostedConfiguration(),
+  categories: { categories: CATEGORIES },
+};
+
 beforeAll(() => {
   window.mapboxgl = { accessToken: 'test' };
   window.mapboxSdk = () => ({
@@ -27,6 +51,9 @@ beforeAll(() => {
 
 // A laundry user with a fully configured profile — in particular a saved
 // cleaningFee, which is the value B6 silently destroyed.
+//
+// `acceptedCategories` is deliberately the OLD free-text shape. Real laundries have
+// exactly this stored, and the multi-select migration must not lose it.
 const laundryUser = {
   id: { uuid: 'laundry-user-id' },
   type: 'currentUser',
@@ -49,16 +76,28 @@ const laundryUser = {
   },
 };
 
-const renderPage = currentUser =>
+const withAcceptedCategories = acceptedCategories => ({
+  ...laundryUser,
+  attributes: {
+    ...laundryUser.attributes,
+    profile: {
+      ...laundryUser.attributes.profile,
+      publicData: { ...laundryUser.attributes.profile.publicData, acceptedCategories },
+    },
+  },
+});
+
+const renderPage = (currentUser, onUpdateProfile = noop) =>
   render(
     <LaundryProfilePageComponent
       intl={fakeIntl}
       currentUser={currentUser}
       scrollingDisabled={false}
-      onUpdateProfile={noop}
+      onUpdateProfile={onUpdateProfile}
       updateProfileInProgress={false}
       updateProfileError={null}
-    />
+    />,
+    { config: configWithCategories }
   );
 
 describe('LaundryProfilePage', () => {
@@ -96,7 +135,10 @@ describe('LaundryProfilePage', () => {
     expect(screen.getByDisplayValue('36')).toBeInTheDocument();
     // The value the old code destroyed.
     expect(screen.getByDisplayValue('12.5')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Eveningwear, Sequins')).toBeInTheDocument();
+    // Accepted categories are no longer a comma-joined text input: the stored
+    // free-text values now surface as legacy chips (see the legacy tests below).
+    expect(screen.getByText('Eveningwear')).toBeInTheDocument();
+    expect(screen.getByText('Sequins')).toBeInTheDocument();
   });
 
   it('shows the saved profile when currentUser is already loaded on first render', async () => {
@@ -120,7 +162,8 @@ describe('LaundryProfilePage', () => {
           onUpdateProfile={onUpdateProfile}
           updateProfileInProgress={false}
           updateProfileError={null}
-        />
+        />,
+        { config: configWithCategories }
       );
     });
     await act(async () => {
@@ -162,16 +205,7 @@ describe('LaundryProfilePage', () => {
   it('never writes a null over a saved cleaningFee if the field is emptied', async () => {
     const onUpdateProfile = jest.fn();
     await act(async () => {
-      render(
-        <LaundryProfilePageComponent
-          intl={fakeIntl}
-          currentUser={laundryUser}
-          scrollingDisabled={false}
-          onUpdateProfile={onUpdateProfile}
-          updateProfileInProgress={false}
-          updateProfileError={null}
-        />
-      );
+      renderPage(laundryUser, onUpdateProfile);
     });
 
     await act(async () => {
@@ -184,6 +218,48 @@ describe('LaundryProfilePage', () => {
 
     expect(onUpdateProfile).toHaveBeenCalledTimes(1);
     expect(onUpdateProfile.mock.calls[0][0].privateData.cleaningFee).toBe(12.5);
+  });
+
+  // Profiles seeded through the Integration API / scripts store `origin` as plain JSON,
+  // not as a LatLng. The address validator requires `origin instanceof LatLng`, so those
+  // laundries used to face a form that was silently, permanently invalid: no error shown
+  // anywhere, "Save changes" never enabling, and no way to configure the studio at all.
+  it('can be saved when the stored origin is plain JSON rather than a LatLng', async () => {
+    const onUpdateProfile = jest.fn();
+    const seededUser = {
+      ...laundryUser,
+      attributes: {
+        ...laundryUser.attributes,
+        profile: {
+          ...laundryUser.attributes.profile,
+          publicData: {
+            ...laundryUser.attributes.profile.publicData,
+            laundryProfile: {
+              ...laundryUser.attributes.profile.publicData.laundryProfile,
+              origin: { lat: 48.882, lng: 2.338 },
+            },
+          },
+        },
+      },
+    };
+
+    await act(async () => {
+      renderPage(seededUser, onUpdateProfile);
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Pants' }));
+    });
+
+    const saveButton = screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' });
+    expect(saveButton).toBeEnabled();
+
+    await act(async () => {
+      await userEvent.click(saveButton);
+    });
+
+    expect(onUpdateProfile).toHaveBeenCalledTimes(1);
+    expect(onUpdateProfile.mock.calls[0][0].publicData.laundryProfile.origin).toEqual(ORIGIN);
   });
 
   it('renders NotFoundPage for a non-laundry user', async () => {
@@ -200,5 +276,89 @@ describe('LaundryProfilePage', () => {
     });
 
     expect(screen.queryByDisplayValue('Studio Pigalle')).not.toBeInTheDocument();
+  });
+
+  // ================ Accepted categories: Console ids, not free text ================
+
+  it('saves Console category IDs — not labels — when categories are ticked', async () => {
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(withAcceptedCategories([]), onUpdateProfile);
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Dresses' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Pants' }));
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    // The whole point of the migration: what lands in publicData is the same
+    // vocabulary the listing wizard compares against.
+    expect(onUpdateProfile.mock.calls[0][0].publicData.acceptedCategories).toEqual([
+      'dresses',
+      'pants',
+    ]);
+  });
+
+  it('pre-ticks the boxes for already-saved category ids, including subcategories', async () => {
+    await act(async () => {
+      renderPage(withAcceptedCategories(['dresses', 'midi_dress']));
+    });
+
+    expect(screen.getByRole('checkbox', { name: 'Dresses' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Midi Dress' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Maxi Dress' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Pants' })).not.toBeChecked();
+  });
+
+  // THE DATA-LOSS GUARD. Every laundry in the marketplace currently has free-text
+  // values stored. Saving after this migration must not drop them just because they
+  // aren't in Console's tree.
+  it('keeps unrecognised legacy free-text values when the picker is used', async () => {
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(laundryUser, onUpdateProfile);
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Dresses' }));
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    const saved = onUpdateProfile.mock.calls[0][0].publicData.acceptedCategories;
+    expect(saved).toContain('Eveningwear');
+    expect(saved).toContain('Sequins');
+    expect(saved).toContain('dresses');
+  });
+
+  it('lets the laundry remove a legacy value deliberately', async () => {
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(laundryUser, onUpdateProfile);
+    });
+
+    // fakeIntl/test messages don't interpolate {category}, so both chips' remove buttons
+    // carry the same accessible name — index 0 is "Eveningwear".
+    await act(async () => {
+      const removeButtons = screen.getAllByRole('button', {
+        name: 'LaundryProfileForm.acceptedCategoriesLegacyRemove',
+      });
+      expect(removeButtons).toHaveLength(2);
+      await userEvent.click(removeButtons[0]);
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    const saved = onUpdateProfile.mock.calls[0][0].publicData.acceptedCategories;
+    expect(saved).not.toContain('Eveningwear');
+    expect(saved).toEqual(['Sequins']);
   });
 });

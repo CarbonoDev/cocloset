@@ -19,6 +19,8 @@ const FieldCheckboxRenderer = props => {
     className,
     rootClassName,
     label,
+    labelClassName,
+    listClassName,
     helpText,
     optionLabelClassName,
     twoColumns,
@@ -29,12 +31,14 @@ const FieldCheckboxRenderer = props => {
   } = props;
 
   const classes = classNames(rootClassName || css.root, className);
-  const listClasses = twoColumns ? classNames(css.list, css.twoColumns) : css.list;
+  const listClasses = classNames(css.list, { [css.twoColumns]: twoColumns }, listClassName);
   const Tag = label ? 'fieldset' : 'div';
 
   return (
     <Tag className={classes}>
-      {label ? <legend>{label}</legend> : null}
+      {/* The legend is what names the group for assistive tech, so callers that want a
+          different label style get a class hook rather than having to drop the label. */}
+      {label ? <legend className={labelClassName}>{label}</legend> : null}
       <ul className={listClasses}>
         {options.map((option, index) => {
           const fieldId = `${id}.${option.key}`;
@@ -84,6 +88,9 @@ const FieldCheckboxRenderer = props => {
  * @param {string?} props.optionLabelClassName given to each option
  * @param {string} props.id givent to input
  * @param {ReactNode} props.label the label for the checkbox group
+ * @param {string?} props.labelClassName given to the <legend> that renders the label
+ * @param {string?} props.listClassName given to the <ul> of options, so a caller can
+ *   constrain/scroll the options without also moving the label out of view
  * @param {Array<CheckboxGroupOption>} props.options E.g. [{ key, label }]
  * @param {boolean} props.twoColumns
  * @returns {JSX.Element} Final Form Field containing multiple checkbox inputs
