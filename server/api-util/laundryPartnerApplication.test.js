@@ -197,6 +197,7 @@ describe('deliverApplication', () => {
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     delete process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_WEBHOOK_URL;
+    delete process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL;
     global.fetch = jest.fn();
   });
 
@@ -263,5 +264,132 @@ describe('deliverApplication', () => {
 
     expect(result.webhookDelivered).toBe(false);
     expect(log.error).toHaveBeenCalled();
+  });
+});
+
+describe('deliverApplication — email sink', () => {
+  const application = {
+    studioName: 'Studio Pigalle',
+    contactName: 'Ana Rivera',
+    email: 'ana@example.com',
+    acceptedCategories: ['Eveningwear', 'Silk'],
+    turnaroundHours: 48,
+  };
+  let logSpy;
+  let warnSpy;
+
+  const mailgunEnv = () => {
+    process.env.MAILGUN_API_KEY = 'key-test';
+    process.env.MAILGUN_DOMAIN = 'mg.test';
+    process.env.MAILGUN_FROM_EMAIL = 'Cocloset <no-reply@mg.test>';
+  };
+
+  beforeEach(() => {
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    delete process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_WEBHOOK_URL;
+    delete process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL;
+    delete process.env.MAILGUN_API_KEY;
+    delete process.env.MAILGUN_DOMAIN;
+    delete process.env.MAILGUN_FROM_EMAIL;
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+    delete global.fetch;
+  });
+
+  it('emails the configured operator address', async () => {
+    mailgunEnv();
+    process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL = 'partners@example.com';
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: '<msg@mg.test>' }),
+    });
+
+    const result = await deliverApplication(application);
+
+    expect(result.emailConfigured).toBe(true);
+    expect(result.emailDelivered).toBe(true);
+
+    const [, options] = global.fetch.mock.calls[0];
+    const params = new URLSearchParams(options.body.toString());
+    expect(params.get('to')).toEqual('partners@example.com');
+    expect(params.get('subject')).toContain('Studio Pigalle');
+    expect(params.get('text')).toContain('Contact name: Ana Rivera');
+    // Arrays render as a readable list rather than "[object Object]" or raw JSON.
+    expect(params.get('text')).toContain('Garments accepted: Eveningwear, Silk');
+  });
+
+  it('escapes applicant-supplied values in the HTML part', async () => {
+    // The form is public and unauthenticated, so every value is untrusted input landing
+    // in an operator's inbox.
+    mailgunEnv();
+    process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL = 'partners@example.com';
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: '<msg@mg.test>' }),
+    });
+
+    await deliverApplication({ ...application, notes: '<script>alert(1)</script>' });
+
+    const [, options] = global.fetch.mock.calls[0];
+    const html = new URLSearchParams(options.body.toString()).get('html');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('skips email when no recipient is configured, without sending', async () => {
+    mailgunEnv();
+
+    const result = await deliverApplication(application);
+
+    expect(result.emailConfigured).toBe(false);
+    expect(result.emailDelivered).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not reject when Mailgun itself is unconfigured', async () => {
+    // Local dev and CI run without credentials; a missing key must not break a submission.
+    process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL = 'partners@example.com';
+
+    const result = await deliverApplication(application);
+
+    expect(result.loggedToStdout).toBe(true);
+    expect(result.emailDelivered).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('escalates a send failure to the logs and still resolves', async () => {
+    mailgunEnv();
+    process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL = 'partners@example.com';
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve('boom'),
+    });
+
+    const result = await deliverApplication(application);
+
+    expect(result.emailDelivered).toBe(false);
+    expect(log.error).toHaveBeenCalled();
+  });
+
+  it('warns only when neither email nor webhook is configured', async () => {
+    mailgunEnv();
+    process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL = 'partners@example.com';
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: '<msg@mg.test>' }),
+    });
+
+    await deliverApplication(application);
+
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });

@@ -22,6 +22,7 @@ const createAvailabilityBuffer = require('./api/create-availability-buffer');
 const laundryTransactionStatus = require('./api/laundry-transaction-status');
 const listingReadinessStatus = require('./api/listing-readiness-status');
 const laundryOrders = require('./api/laundry-orders');
+const initUserRole = require('./api/init-user-role');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -67,6 +68,12 @@ router.post('/create-availability-buffer', createAvailabilityBuffer);
 router.post('/laundry-transaction-status', laundryTransactionStatus);
 router.post('/listing-readiness-status', listingReadinessStatus);
 router.get('/laundry-orders', laundryOrders);
+
+// Applies the `metadata.isLaundry = false` default to the CALLING user, right
+// after signup. Takes no request parameters at all - the target is the
+// caller's own session and the value is hard-coded. See
+// server/api/init-user-role.js.
+router.post('/init-user-role', initUserRole);
 
 // Public, unauthenticated: laundry-partner applications from PartnerLandingPage.
 // The handler never builds a Marketplace or Integration API SDK, so it cannot touch

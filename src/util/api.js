@@ -161,7 +161,7 @@ export const deleteUserAccount = body => {
 // See `server/api/laundry-partner-application.js` for the accepted fields and limits.
 export const submitLaundryPartnerApplication = body => {
   return post('/api/laundry-partner-application', body);
-}
+};
 
 // Fetch the list of laundries (users flagged with metadata.isLaundry), used by
 // the listing wizard's "Laundry Assignment" step. Requires an authenticated
@@ -191,6 +191,25 @@ export const fetchLaundries = () => {
 // in TransactionPage.duck.js) - the booking itself is not affected.
 export const createAvailabilityBuffer = body => {
   return post('/api/create-availability-buffer', body);
+};
+
+// Best-effort call, fired right after a successful email/password signup (once
+// the follow-up login has authenticated the new user), to stamp the explicit
+// `metadata.isLaundry = false` default onto them. An administrator flips it to
+// `true` from Console; a user can never write their own metadata, so this has
+// to be a server-side Integration API write.
+//
+// Takes NO arguments on purpose: the server derives the target user from the
+// caller's own session and hard-codes the value, so there is nothing a client
+// can influence. It is idempotent and will never overwrite an existing value
+// (it cannot demote a user an admin has already promoted).
+//
+// Callers must treat failures as non-fatal - see the call site in
+// src/ducks/auth.duck.js and `server/api/init-user-role.js` for the response
+// shape. The IdP signup path does not need this: it is handled server-side in
+// server/api/auth/createUserWithIdp.js.
+export const initUserRole = () => {
+  return post('/api/init-user-role', {});
 };
 
 // Advance a transaction's granular laundry sub-phase
