@@ -53,28 +53,6 @@ const EditListingLaundryPanel = props => {
   // the guard in onSubmit below). Without it the failure is silent.
   const [selectionError, setSelectionError] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    setFetchLaundriesInProgress(true);
-    fetchLaundries()
-      .then(response => {
-        if (isMounted) {
-          setLaundries(response?.data || []);
-          setFetchLaundriesInProgress(false);
-        }
-      })
-      .catch(e => {
-        if (isMounted) {
-          setFetchLaundriesError(e);
-          setFetchLaundriesInProgress(false);
-        }
-      });
-    return () => {
-      isMounted = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const {
     className,
     rootClassName,
@@ -97,6 +75,35 @@ const EditListingLaundryPanel = props => {
   // below could never fire. A listing may be categorised at several levels, so compare against
   // all of them.
   const listingCategories = getListingCategoryValues(listing?.attributes?.publicData);
+  // The array identity changes on every render, so the effect below keys off the joined
+  // string instead — otherwise passing it as a dependency would refetch the whole
+  // directory on each keystroke elsewhere in the wizard.
+  const listingCategoriesKey = listingCategories.join(',');
+
+  useEffect(() => {
+    let isMounted = true;
+    setFetchLaundriesInProgress(true);
+    // Send the garment's category chain so each card can show the turnaround this
+    // laundry set for THIS kind of garment ("por categoría grande") rather than a
+    // studio-wide number that may be wrong for what is actually being cleaned.
+    fetchLaundries(listingCategoriesKey ? listingCategoriesKey.split(',') : [])
+      .then(response => {
+        if (isMounted) {
+          setLaundries(response?.data || []);
+          setFetchLaundriesInProgress(false);
+        }
+      })
+      .catch(e => {
+        if (isMounted) {
+          setFetchLaundriesError(e);
+          setFetchLaundriesInProgress(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingCategoriesKey]);
 
   const panelHeadingProps = isPublished
     ? {

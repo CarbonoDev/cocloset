@@ -23,6 +23,21 @@
 // on purpose — the picker cards (mockup 12.jpg) show it to garment owners
 // before any relationship exists. `cleaningFee`, the other privateData field
 // on the laundry profile, is NOT exposed: it is a server-side pricing input.
+//
+// PER-CATEGORY TURNAROUND. A laundry now sets hours per top-level category, so a
+// single studio-wide "Turnaround: 48h" on a card is the wrong number as often as it is
+// the right one — the owner is choosing a laundry for ONE specific garment. When the
+// caller passes that garment's category chain, `turnaroundHours` is the value resolved
+// for THAT category (see api-util/categoryPricing.js) and
+// `turnaroundHoursIsCategorySpecific` says so, letting the card label it honestly
+// instead of implying a studio-wide promise. With no chain passed, the response is
+// exactly what it was before: the studio-wide value.
+//
+// The resolution happens HERE, server-side, rather than shipping the whole
+// `categoryPricing` table to the client: that table also holds per-category cleaning
+// FEES, which are a pricing input and must not leave the server. Sending one resolved
+// number leaks nothing that the old single `turnaroundHours` field did not.
+const { resolveTurnaroundHoursEntry } = require('./categoryPricing');
 
 // A laundry's `origin` has to be a real coordinate pair, because the listing
 // wizard copies it onto the listing's own `geolocation` (see
@@ -62,15 +77,30 @@ const isLaundryUserEntity = user => user?.attributes?.profile?.metadata?.isLaund
  * Map a user API entity onto the allowlisted directory record.
  *
  * @param {Object} user - a `user` API entity
+ * @param {Array<string>} [listingCategoryValues] - the category chain of the garment
+ *   the owner is picking a laundry FOR, general -> specific. When given,
+ *   `turnaroundHours` is resolved for that garment rather than studio-wide.
  * @returns {Object} flat record: id, displayName, studioName, address, origin,
- *   businessHours, acceptedCategories, turnaroundHours
+ *   businessHours, acceptedCategories, turnaroundHours,
+ *   turnaroundHoursIsCategorySpecific
  */
-const toLaundryDirectoryEntry = user => {
+const toLaundryDirectoryEntry = (user, listingCategoryValues = []) => {
   const profile = user?.attributes?.profile || {};
   const publicData = profile.publicData || {};
   const privateData = profile.privateData || {};
   const laundryProfile = publicData.laundryProfile || {};
   const acceptedCategories = publicData.acceptedCategories;
+
+  const chain = Array.isArray(listingCategoryValues) ? listingCategoryValues : [];
+  // With a garment in hand, resolve for it (its top-level category, then studio-wide).
+  // When that finds nothing — and always when no garment was passed — fall through to
+  // the pre-existing lenient studio-wide read: `parseTurnaroundHours` also coerces the
+  // raw strings Console / set-laundry-role.js can write, which the pure resolver
+  // deliberately does not, and a card showing no turnaround at all would be a
+  // regression for those profiles.
+  const resolved = chain.length > 0 ? resolveTurnaroundHoursEntry(privateData, chain) : null;
+  const turnaroundHours =
+    resolved !== null ? resolved.value : parseTurnaroundHours(privateData.turnaroundHours);
 
   return {
     id: user?.id?.uuid || null,
@@ -80,7 +110,11 @@ const toLaundryDirectoryEntry = user => {
     origin: parseOrigin(laundryProfile.origin),
     businessHours: laundryProfile.businessHours || null,
     acceptedCategories: Array.isArray(acceptedCategories) ? acceptedCategories : [],
-    turnaroundHours: parseTurnaroundHours(privateData.turnaroundHours),
+    turnaroundHours,
+    // True only when the number above came from an entry for this garment's own
+    // top-level category. A studio-wide value reads as `false`, so the card never
+    // claims a category-specific promise the laundry did not make.
+    turnaroundHoursIsCategorySpecific: resolved?.source === 'category',
   };
 };
 
@@ -107,13 +141,18 @@ const hasUsableLaundryProfile = entry => !!(entry?.id && entry?.address && entry
  *      profile", instead of both looking like an empty picker.
  *
  * @param {Array} users - user API entities (possibly the whole marketplace)
+ * @param {Array<string>} [listingCategoryValues] - the category chain of the garment
+ *   being assigned, general -> specific. Passed straight through to
+ *   toLaundryDirectoryEntry so each card can show the turnaround for THAT garment.
  * @returns {{ laundries: Array, meta: { totalUsersScanned: number,
  *   laundryUserCount: number, incompleteProfileCount: number } }}
  */
-const buildLaundryDirectory = users => {
+const buildLaundryDirectory = (users, listingCategoryValues = []) => {
   const allUsers = Array.isArray(users) ? users : [];
   const laundryUsers = allUsers.filter(isLaundryUserEntity);
-  const entries = laundryUsers.map(toLaundryDirectoryEntry);
+  // NB: `.map(toLaundryDirectoryEntry)` would hand Array#map's index as the second
+  // argument, so the category chain has to be forwarded explicitly.
+  const entries = laundryUsers.map(user => toLaundryDirectoryEntry(user, listingCategoryValues));
   const laundries = entries.filter(hasUsableLaundryProfile);
 
   return {

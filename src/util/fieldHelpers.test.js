@@ -1,7 +1,12 @@
 import {
+  categoryPricingFieldName,
+  categoryPricingFromFormValues,
+  categoryPricingToFormValues,
   flattenCategoryTree,
   getCategoryLabels,
+  getCategoryPricingGroups,
   getListingCategoryValues,
+  getOrphanedPricingCategories,
   isCategoryAcceptedByLaundry,
   splitAcceptedCategories,
 } from './fieldHelpers';
@@ -203,5 +208,195 @@ describe('isCategoryAcceptedByLaundry', () => {
     expect(isCategoryAcceptedByLaundry([], ['dresses'])).toBe(true);
     expect(isCategoryAcceptedByLaundry(['dresses'], [])).toBe(true);
     expect(isCategoryAcceptedByLaundry()).toBe(true);
+  });
+});
+
+/* ================ Per-category laundry pricing ================ */
+
+describe('categoryPricingFieldName', () => {
+  it('builds a FLAT field name, with no dots for final-form to parse as a path', () => {
+    // React Final Form reads `a.b` as a path into the values object. Console category
+    // ids are operator input, so an id containing a dot in a nested field name would
+    // write somewhere else entirely: the studio types a price, sees it accepted, and
+    // saves nothing. The name must stay flat.
+    const name = categoryPricingFieldName('cleaningFee', 'midi_dress');
+    expect(name).toBe('categoryPricing__cleaningFee__midi_dress');
+    expect(name).not.toContain('.');
+    expect(name).not.toContain('[');
+  });
+});
+
+describe('categoryPricingToFormValues', () => {
+  it('flattens the stored table into form fields', () => {
+    expect(
+      categoryPricingToFormValues({
+        dresses: { turnaroundHours: 72, cleaningFee: 15 },
+        midi_dress: { cleaningFee: 22 },
+      })
+    ).toEqual({
+      categoryPricing__turnaroundHours__dresses: 72,
+      categoryPricing__cleaningFee__dresses: 15,
+      categoryPricing__cleaningFee__midi_dress: 22,
+    });
+  });
+
+  it('omits blanks rather than prefilling boxes with nulls', () => {
+    expect(
+      categoryPricingToFormValues({
+        dresses: { turnaroundHours: null, cleaningFee: 15 },
+        pants: { cleaningFee: 'nope' },
+      })
+    ).toEqual({ categoryPricing__cleaningFee__dresses: 15 });
+  });
+
+  it('tolerates a missing or malformed table', () => {
+    expect(categoryPricingToFormValues(undefined)).toEqual({});
+    expect(categoryPricingToFormValues(null)).toEqual({});
+    expect(categoryPricingToFormValues([])).toEqual({});
+    expect(categoryPricingToFormValues({ dresses: 'not-an-object' })).toEqual({});
+  });
+
+  it('round-trips through categoryPricingFromFormValues', () => {
+    const stored = { dresses: { turnaroundHours: 72, cleaningFee: 15 }, silk: { cleaningFee: 30 } };
+    expect(categoryPricingFromFormValues(categoryPricingToFormValues(stored))).toEqual(stored);
+  });
+});
+
+describe('categoryPricingFromFormValues', () => {
+  it('rebuilds the nested table and ignores every other form field', () => {
+    expect(
+      categoryPricingFromFormValues({
+        studioName: 'Studio Pigalle',
+        turnaroundHours: 48,
+        cleaningFee: 10,
+        acceptedCategories: ['dresses'],
+        categoryPricing__turnaroundHours__dresses: 72,
+        categoryPricing__cleaningFee__dresses: 15,
+        categoryPricing__cleaningFee__midi_dress: 22,
+      })
+    ).toEqual({
+      dresses: { turnaroundHours: 72, cleaningFee: 15 },
+      midi_dress: { cleaningFee: 22 },
+    });
+  });
+
+  it('DROPS a cleared input instead of storing a null', () => {
+    // An empty box means "no specific value, use the studio-wide one", which is
+    // expressed by the key being absent. Storing null would fill the table with rows
+    // that mean nothing and have to be skipped on every read.
+    expect(
+      categoryPricingFromFormValues({
+        categoryPricing__cleaningFee__dresses: null,
+        categoryPricing__turnaroundHours__dresses: 72,
+      })
+    ).toEqual({ dresses: { turnaroundHours: 72 } });
+  });
+
+  it('emits no entry at all for a category whose every input was cleared', () => {
+    expect(
+      categoryPricingFromFormValues({
+        categoryPricing__cleaningFee__dresses: null,
+        categoryPricing__turnaroundHours__dresses: undefined,
+      })
+    ).toEqual({});
+  });
+
+  it('keeps an explicit zero, which is a real price ("free"), not a blank', () => {
+    expect(categoryPricingFromFormValues({ categoryPricing__cleaningFee__dresses: 0 })).toEqual({
+      dresses: { cleaningFee: 0 },
+    });
+  });
+
+  it('ignores a field name that looks close but is not one of ours', () => {
+    expect(
+      categoryPricingFromFormValues({
+        categoryPricing__depositAmount__dresses: 5,
+        categoryPricing__cleaningFee__: 5,
+        categoryPricing__cleaningFee: 5,
+      })
+    ).toEqual({});
+  });
+
+  it('tolerates missing values', () => {
+    expect(categoryPricingFromFormValues(undefined)).toEqual({});
+    expect(categoryPricingFromFormValues({})).toEqual({});
+  });
+});
+
+describe('getCategoryPricingGroups', () => {
+  it('groups accepted categories under their top-level branch', () => {
+    expect(getCategoryPricingGroups(CATEGORY_TREE, ['dresses', 'midi_dress', 'pants'])).toEqual([
+      {
+        id: 'dresses',
+        name: 'Dresses',
+        priceCategories: [
+          { id: 'dresses', name: 'Dresses', level: 1, path: ['Dresses'] },
+          { id: 'midi_dress', name: 'Midi Dress', level: 2, path: ['Dresses', 'Midi Dress'] },
+        ],
+      },
+      {
+        id: 'pants',
+        name: 'Pants',
+        priceCategories: [{ id: 'pants', name: 'Pants', level: 1, path: ['Pants'] }],
+      },
+    ]);
+  });
+
+  it('still emits the top-level group when ONLY a subcategory is accepted', () => {
+    // Hours are configured per top-level category, and a midi-dress listing resolves
+    // its turnaround from `dresses` whether or not the studio ticked `dresses`. Without
+    // the group there would be no input for the value the buffer actually reads.
+    const groups = getCategoryPricingGroups(CATEGORY_TREE, ['silk']);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].id).toBe('dresses');
+    expect(groups[0].priceCategories).toEqual([
+      { id: 'silk', name: 'Silk', level: 3, path: ['Dresses', 'Maxi Dress', 'Silk'] },
+    ]);
+  });
+
+  it('omits branches the studio accepts nothing in', () => {
+    expect(getCategoryPricingGroups(CATEGORY_TREE, ['pants']).map(g => g.id)).toEqual(['pants']);
+  });
+
+  it('ignores pre-migration free text, which matches no category', () => {
+    expect(getCategoryPricingGroups(CATEGORY_TREE, ['Eveningwear', 'Sequins'])).toEqual([]);
+  });
+
+  it('tolerates a missing tree or an empty accepted list', () => {
+    expect(getCategoryPricingGroups(CATEGORY_TREE, [])).toEqual([]);
+    expect(getCategoryPricingGroups(CATEGORY_TREE)).toEqual([]);
+    expect(getCategoryPricingGroups(undefined, ['dresses'])).toEqual([]);
+    expect(getCategoryPricingGroups(null, null)).toEqual([]);
+  });
+});
+
+describe('getOrphanedPricingCategories', () => {
+  it('reports stored pricing the studio can no longer see or edit', () => {
+    // Values are retained, never pruned, when a category is un-ticked or leaves
+    // Console. Retained-but-invisible money is how a "why are we charging that?" bug
+    // survives for months, so the form has to surface it.
+    expect(
+      getOrphanedPricingCategories(
+        { dresses: { cleaningFee: 15 }, retired_category: { cleaningFee: 40 } },
+        ['dresses']
+      )
+    ).toEqual(['retired_category']);
+  });
+
+  it('reports nothing when every stored entry has a visible row', () => {
+    expect(
+      getOrphanedPricingCategories({ dresses: { cleaningFee: 15 } }, ['dresses', 'pants'])
+    ).toEqual([]);
+  });
+
+  it('ignores debris that holds no actual number', () => {
+    expect(
+      getOrphanedPricingCategories({ empty: {}, junk: 'nope', blank: { cleaningFee: null } }, [])
+    ).toEqual([]);
+  });
+
+  it('tolerates missing input', () => {
+    expect(getOrphanedPricingCategories(undefined, ['dresses'])).toEqual([]);
+    expect(getOrphanedPricingCategories({ dresses: { cleaningFee: 1 } })).toEqual(['dresses']);
   });
 });

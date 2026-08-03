@@ -278,6 +278,205 @@ export const isCategoryAcceptedByLaundry = (
   return listingValues.some(value => acceptedSet.has(value));
 };
 
+/* ================ Per-category laundry pricing (form plumbing) ================ */
+
+// A laundry's per-category configuration is stored as an OBJECT keyed by Console
+// category id, on its own profile privateData:
+//
+//   privateData.categoryPricing = {
+//     dresses:    { turnaroundHours: 72, cleaningFee: 15 },
+//     midi_dress: { cleaningFee: 22 },
+//   }
+//
+// The RESOLUTION rule (which of those applies to a given listing) lives server-side in
+// server/api-util/categoryPricing.js and is deliberately NOT duplicated here — the
+// helpers below are only about getting values in and out of the form. In short:
+// cleaningFee is settable at any level and the HIGHEST match on the listing's chain
+// wins; turnaroundHours is settable on TOP-LEVEL categories only.
+
+export const CATEGORY_PRICING_FIELDS = ['turnaroundHours', 'cleaningFee'];
+
+// Form field names are FLAT, not `categoryPricing.dresses.cleaningFee`.
+//
+// React Final Form parses dots and brackets in a field name as a path into the values
+// object. A Console category id is free-form operator input, so an id containing `.`
+// or `[` would silently write to the wrong place — the studio would type a price, see
+// it accepted, and save nothing. A flat name with a separator final-form treats as
+// ordinary text sidesteps that entirely; the nested object is assembled at submit time
+// by categoryPricingFromFormValues.
+const CATEGORY_PRICING_SEPARATOR = '__';
+const CATEGORY_PRICING_PREFIX = `categoryPricing${CATEGORY_PRICING_SEPARATOR}`;
+
+/**
+ * Build the form field name holding one field of one category's pricing.
+ *
+ * @param {String} field 'turnaroundHours' or 'cleaningFee'
+ * @param {String} categoryId Console category id
+ * @returns {String} a flat form field name
+ */
+export const categoryPricingFieldName = (field, categoryId) =>
+  `${CATEGORY_PRICING_PREFIX}${field}${CATEGORY_PRICING_SEPARATOR}${categoryId}`;
+
+// Parse a flat field name back into { field, categoryId }, or null if it isn't one.
+// The id is everything after the SECOND separator, so an id that itself contains the
+// separator round-trips unharmed.
+const parseCategoryPricingFieldName = name => {
+  if (typeof name !== 'string' || !name.startsWith(CATEGORY_PRICING_PREFIX)) {
+    return null;
+  }
+  const rest = name.slice(CATEGORY_PRICING_PREFIX.length);
+  const field = CATEGORY_PRICING_FIELDS.find(
+    candidate => rest === candidate || rest.startsWith(`${candidate}${CATEGORY_PRICING_SEPARATOR}`)
+  );
+  if (!field) {
+    return null;
+  }
+  const categoryId = rest.slice(field.length + CATEGORY_PRICING_SEPARATOR.length);
+  return categoryId ? { field, categoryId } : null;
+};
+
+/**
+ * Turn a stored `categoryPricing` object into flat form initialValues.
+ *
+ * @param {Object} categoryPricing stored table, keyed by category id
+ * @returns {Object} flat field-name -> number pairs, blanks omitted
+ */
+export const categoryPricingToFormValues = categoryPricing => {
+  const table =
+    categoryPricing && typeof categoryPricing === 'object' && !Array.isArray(categoryPricing)
+      ? categoryPricing
+      : {};
+
+  return Object.entries(table).reduce((values, [categoryId, entry]) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return values;
+    }
+    return CATEGORY_PRICING_FIELDS.reduce((acc, field) => {
+      const value = entry[field];
+      return typeof value === 'number' && Number.isFinite(value)
+        ? { ...acc, [categoryPricingFieldName(field, categoryId)]: value }
+        : acc;
+    }, values);
+  }, {});
+};
+
+/**
+ * Collect the flat per-category fields out of a form's submitted values and rebuild
+ * the nested `categoryPricing` object to store.
+ *
+ * Blank inputs are DROPPED rather than stored as null: an empty box means "no specific
+ * value, use the studio-wide one", and that is expressed by the key's absence. Storing
+ * nulls would fill the table with rows that mean nothing and have to be skipped on
+ * every read. A category left with no usable value at all contributes no entry.
+ *
+ * @param {Object} values the form's submitted values
+ * @returns {Object} `categoryPricing`, keyed by category id
+ */
+export const categoryPricingFromFormValues = values => {
+  return Object.entries(values || {}).reduce((table, [name, value]) => {
+    const parsed = parseCategoryPricingFieldName(name);
+    if (!parsed || typeof value !== 'number' || !Number.isFinite(value)) {
+      return table;
+    }
+    const { field, categoryId } = parsed;
+    return { ...table, [categoryId]: { ...table[categoryId], [field]: value } };
+  }, {});
+};
+
+/**
+ * Which categories does this studio have a stored per-category value for that it can
+ * no longer see or edit — because it un-ticked the category, or Console dropped it?
+ *
+ * Stored entries are retained rather than pruned (an entry for a category no listing
+ * can be filed under is unreachable, while pruning on a hosted-asset fetch that came
+ * back empty would destroy a whole fee table). Retained-but-invisible is the part that
+ * needs surfacing: money the studio configured and can no longer find is exactly how a
+ * "why are we charging that?" bug survives for months.
+ *
+ * @param {Object} categoryPricing stored table, keyed by category id
+ * @param {Array<String>} visibleCategoryIds ids the form is currently rendering rows for
+ * @returns {Array<String>} ids with stored values but no visible row, in stored order
+ */
+export const getOrphanedPricingCategories = (categoryPricing, visibleCategoryIds = []) => {
+  const table =
+    categoryPricing && typeof categoryPricing === 'object' && !Array.isArray(categoryPricing)
+      ? categoryPricing
+      : {};
+  const visible = new Set(Array.isArray(visibleCategoryIds) ? visibleCategoryIds : []);
+
+  return Object.keys(table).filter(categoryId => {
+    if (visible.has(categoryId)) {
+      return false;
+    }
+    const entry = table[categoryId];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return false;
+    }
+    // Only entries that actually hold a number are worth reporting; an empty `{}` is
+    // debris, not configuration.
+    return CATEGORY_PRICING_FIELDS.some(
+      field => typeof entry[field] === 'number' && Number.isFinite(entry[field])
+    );
+  });
+};
+
+// Walk one branch of the category tree depth-first, recording each node's depth and
+// the chain of ancestor names. Kept local (rather than reusing flattenCategoryTree)
+// because the grouping below needs to know which TOP-LEVEL branch a node belongs to,
+// and flattenCategoryTree's `path` records ancestor names, not ids.
+const collectBranchNodes = (subcategories, level, ancestorNames) =>
+  (Array.isArray(subcategories) ? subcategories : []).reduce((nodes, node) => {
+    const { id, name, subcategories: children } = node || {};
+    const label = typeof name === 'string' && name !== '' ? name : id;
+    // A node with no id can't be stored against or matched, so it is not editable —
+    // but its children still can be, so keep walking rather than pruning the branch.
+    const isUsable = typeof id === 'string' && id !== '';
+    const path = isUsable ? [...ancestorNames, label] : ancestorNames;
+    const selfMaybe = isUsable ? [{ id, name: label, level, path }] : [];
+    return [...nodes, ...selfMaybe, ...collectBranchNodes(children, level + 1, path)];
+  }, []);
+
+/**
+ * Group a laundry's accepted categories into the rows its pricing form should render.
+ *
+ * The two fields are configured at different granularities, which is what shapes this:
+ *   - turnaroundHours is set on the TOP-LEVEL category only ("las horas estan bien por
+ *     categoría grande"), so it belongs to the group header.
+ *   - cleaningFee is set on any accepted node, so it belongs to the rows inside.
+ *
+ * A group is emitted whenever the studio accepts anything in that branch — including
+ * when it accepts only a subcategory. Accepting `midi_dress` but not `dresses` still
+ * needs a `Dresses` hours input, because a midi-dress listing resolves its turnaround
+ * from its top-level category regardless of which level the studio ticked.
+ *
+ * @param {Array<Object>} categories nested category configuration from Console
+ * @param {Array<String>} acceptedCategories the laundry's stored accepted values
+ * @returns {Array<{id: String, name: String, priceCategories: Array<{id, name, level, path}>}>}
+ *   one entry per relevant top-level category, in Console's own order
+ */
+export const getCategoryPricingGroups = (categories, acceptedCategories = []) => {
+  const accepted = new Set(
+    (Array.isArray(acceptedCategories) ? acceptedCategories : []).filter(
+      value => typeof value === 'string' && value !== ''
+    )
+  );
+
+  return (Array.isArray(categories) ? categories : []).reduce((groups, topLevel) => {
+    const { id, name, subcategories } = topLevel || {};
+    if (typeof id !== 'string' || id === '') {
+      return groups;
+    }
+    const label = typeof name === 'string' && name !== '' ? name : id;
+
+    const priceCategories = [
+      ...(accepted.has(id) ? [{ id, name: label, level: 1, path: [label] }] : []),
+      ...collectBranchNodes(subcategories, 2, [label]).filter(node => accepted.has(node.id)),
+    ];
+
+    return priceCategories.length > 0 ? [...groups, { id, name: label, priceCategories }] : groups;
+  }, []);
+};
+
 /**
  * Pick props for SectionMultiEnum and SectionText display components.
  *

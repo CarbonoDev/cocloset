@@ -168,16 +168,29 @@ export const submitLaundryPartnerApplication = body => {
 // caller.
 //
 // Returns `{ data: [ { id, displayName, studioName, address, origin,
-// businessHours, acceptedCategories, turnaroundHours } ], meta }` - a flat,
-// explicitly allowlisted record per laundry, NOT the raw user publicData blob.
+// businessHours, acceptedCategories, turnaroundHours,
+// turnaroundHoursIsCategorySpecific } ], meta }` - a flat, explicitly allowlisted
+// record per laundry, NOT the raw user publicData blob.
 // Laundries with no usable address/origin are omitted (they can't be assigned:
 // no geolocation would be written and the listing could never be published);
 // `meta.incompleteProfileCount` says how many were dropped for that reason.
 //
+// `listingCategoryValues` is the category chain of the garment being assigned
+// (categoryLevel1/2/3, general -> specific). It is optional. Passing it makes each
+// card's `turnaroundHours` the value that laundry set for THAT garment's top-level
+// category rather than a studio-wide average, with
+// `turnaroundHoursIsCategorySpecific` telling the card which it got. The resolution
+// deliberately happens server-side: the same privateData table also holds per-category
+// cleaning FEES, which must never reach the browser.
+//
 // See `server/api/laundries.js` for the full response shape and the reason the
 // filtering happens server-side in JS rather than in the API query.
-export const fetchLaundries = () => {
-  return request('/api/laundries', { method: methods.GET });
+export const fetchLaundries = (listingCategoryValues = []) => {
+  const categories = (Array.isArray(listingCategoryValues) ? listingCategoryValues : [])
+    .filter(value => typeof value === 'string' && value !== '')
+    .join(',');
+  const query = categories ? `?categories=${encodeURIComponent(categories)}` : '';
+  return request(`/api/laundries${query}`, { method: methods.GET });
 };
 
 // Best-effort call, fired after a booking's `accept` transition succeeds, to

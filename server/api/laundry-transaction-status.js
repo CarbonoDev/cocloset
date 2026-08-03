@@ -15,6 +15,10 @@ const {
   resolveTurnaroundHours,
 } = require('../api-util/availabilityHelpers');
 const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
+const {
+  getListingCategoryValues,
+  resolveCategoryTurnaroundHours,
+} = require('../api-util/categoryPricing');
 const { notifyReturnScheduled, notifyCleaningRequired } = require('../api-util/laundryMailer');
 const log = require('../log');
 
@@ -275,8 +279,14 @@ module.exports = (req, res) => {
         const laundry = {
           email: currentUser?.attributes?.email,
           studioName: profile.publicData?.laundryProfile?.studioName,
+          // Per-category turnaround, selected by this listing's own top-level
+          // category, so the return/cleaning window matches the garment in hand.
+          // See api-util/categoryPricing.js for the fallback chain.
           turnaroundHours: resolveTurnaroundHours(
-            profile.privateData?.turnaroundHours,
+            resolveCategoryTurnaroundHours(
+              profile.privateData,
+              getListingCategoryValues(listing.attributes?.publicData)
+            ),
             process.env.DEFAULT_LAUNDRY_BUFFER_HOURS
           ),
         };

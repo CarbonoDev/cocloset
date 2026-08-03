@@ -196,3 +196,131 @@
     margin-top: 8px;
   }
 }
+
+/* ================ Per-category pricing ================ */
+
+/* Studio-wide turnaround/fee are the FALLBACK; the real numbers are set here, per
+   category. The layout follows the two different granularities the values are
+   configured at: turnaround belongs to the top-level category (the group header),
+   price belongs to each accepted node (the rows). */
+
+.pricingHelp {
+  composes: h5 from global;
+  margin: 0 0 12px 0;
+  color: var(--coclosetInkMuted);
+}
+
+.pricingGroupList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pricingGroup {
+  padding: 12px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurface);
+}
+
+/* Header stacks on a phone (a 90px number input next to a long category name would
+   wrap into two cramped columns) and sits on one row once there's width for it. */
+.pricingGroupHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  @media (--viewportMedium) {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+}
+
+.pricingGroupName {
+  composes: h4 from global;
+  margin: 0;
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+}
+
+.pricingRowList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 0 0;
+  padding: 12px 0 0 0;
+  border-top: 1px solid var(--coclosetBorder);
+  list-style: none;
+
+  @media (--viewportMedium) {
+    gap: 8px;
+  }
+}
+
+.pricingRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  @media (--viewportMedium) {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+}
+
+/* Carries the shared .categoryLevel* indent classes as well, so a subcategory price
+   row lines up under its parent exactly as it does in the checkbox list above. */
+.pricingRowName {
+  composes: h5 from global;
+  margin: 0;
+  padding-top: 6px;
+  color: var(--coclosetInk);
+}
+
+.pricingControl {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+
+  @media (--viewportMedium) {
+    width: 200px;
+  }
+}
+
+.pricingInput {
+}
+
+/* Number inputs sized for 2-4 digits rather than the full-width default: a row of
+   full-bleed boxes makes a long category list read as a wall of inputs. */
+.pricingInputRoot {
+  max-width: 120px;
+}
+
+.pricingInputLabel {
+  display: block;
+  margin: 0 0 2px 0;
+  padding: 0;
+  color: var(--coclosetInkMuted);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemiBold);
+  line-height: 14px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+/* Shown ONLY while the input is empty — the answer to "which of these is using my
+   studio default, and what is that number?". Once the studio fills the box in, the
+   hint disappears rather than becoming permanent chrome. */
+.pricingFallback {
+  composes: h5 from global;
+  margin: 2px 0 0 0;
+  color: var(--coclosetInkMuted);
+  font-style: italic;
+}

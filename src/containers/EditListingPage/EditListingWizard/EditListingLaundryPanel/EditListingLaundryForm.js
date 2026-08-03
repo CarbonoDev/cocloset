@@ -61,10 +61,19 @@ const LaundryCard = props => {
       <span className={css.cardName}>{name}</span>
       {address ? <span className={css.cardDetail}>{address}</span> : null}
       {businessHours ? <span className={css.cardDetail}>{businessHours}</span> : null}
+      {/* A laundry sets turnaround per top-level category, so /api/laundries resolves
+          it for the garment being assigned and flags whether the number it returned is
+          specific to that category. Say which: "48h for this garment" is a promise
+          about this booking, a studio-wide 48h is not, and showing the same string for
+          both would quietly overstate one of them. */}
       {typeof laundry.turnaroundHours === 'number' ? (
         <span className={css.cardDetail}>
           <FormattedMessage
-            id="EditListingLaundryForm.turnaround"
+            id={
+              laundry.turnaroundHoursIsCategorySpecific
+                ? 'EditListingLaundryForm.turnaroundForCategory'
+                : 'EditListingLaundryForm.turnaround'
+            }
             values={{ hours: laundry.turnaroundHours }}
           />
         </span>

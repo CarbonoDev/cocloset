@@ -350,4 +350,33 @@ describe('EditListingLaundryForm', () => {
     await selectFirstLaundry(user);
     expect(screen.getByText('EditListingLaundryForm.categoryWarning')).toBeInTheDocument();
   });
+  // The turnaround on a card is now resolved for the garment being assigned (a laundry
+  // sets hours per top-level category), so the card has to say WHICH kind of number it
+  // is showing. Labelling a studio-wide average as if it were a promise about this
+  // garment is the failure mode being guarded here.
+  it('labels a category-specific turnaround differently from a studio-wide one', async () => {
+    await act(async () => {
+      renderForm({
+        laundries: [{ ...idBasedLaundries[0], turnaroundHoursIsCategorySpecific: true }],
+        listingCategories: ['dresses'],
+      });
+    });
+
+    expect(screen.getByText('EditListingLaundryForm.turnaroundForCategory')).toBeInTheDocument();
+    expect(screen.queryByText('EditListingLaundryForm.turnaround')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the plain turnaround label when the number is studio-wide', async () => {
+    await act(async () => {
+      renderForm({
+        laundries: [{ ...idBasedLaundries[0], turnaroundHoursIsCategorySpecific: false }],
+        listingCategories: ['dresses'],
+      });
+    });
+
+    expect(screen.getByText('EditListingLaundryForm.turnaround')).toBeInTheDocument();
+    expect(
+      screen.queryByText('EditListingLaundryForm.turnaroundForCategory')
+    ).not.toBeInTheDocument();
+  });
 });
