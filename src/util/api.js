@@ -204,6 +204,32 @@ export const createAvailabilityBuffer = body => {
 // `LAUNDRY_ACTION_STATUSES` in `src/util/laundryStatuses.js` - and the server
 // maps it to the right transition, which for `returned` depends on whether the
 // garment is currently `picked-up` or `overdue`.
+// Best-effort call, fired right after a successful email/password signup (once
+// the follow-up login has authenticated the new user), to stamp the explicit
+// `metadata.isLaundry = false` default onto them. An administrator flips it to
+// `true` from Console; a user can never write their own metadata, so this has
+// to be a server-side Integration API write.
+//
+// Takes NO arguments on purpose: the server derives the target user from the
+// caller's own session and hard-codes the value, so there is nothing a client
+// can influence. It is idempotent and will never overwrite an existing value
+// (it cannot demote a user an admin has already promoted).
+//
+// Callers must treat failures as non-fatal - see the call site in
+// src/ducks/auth.duck.js and `server/api/init-user-role.js` for the response
+// shape. The IdP signup path does not need this: it is handled server-side in
+// server/api/auth/createUserWithIdp.js.
+export const initUserRole = () => {
+  return post('/api/init-user-role', {});
+};
+
+// Advance a transaction's granular laundry sub-phase
+// (`transaction.metadata.laundryStatus`), e.g. after a laundry scans a QR
+// code for pickup/return, or updates cleaning progress from the ops
+// dashboard. This is metadata layered on top of the existing, unmodified
+// transaction process - NOT a real Sharetribe process transition. `status`
+// must be one of the values exported as `LAUNDRY_STATUSES` in
+// `server/api-util/laundryStatusHelpers.js`.
 //
 // See `server/api/laundry-transaction-status.js` for the full request/
 // response shape, including the optional `damaged`/`damageNote` fields
