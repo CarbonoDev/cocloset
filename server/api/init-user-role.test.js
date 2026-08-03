@@ -38,11 +38,21 @@ const mockRes = () => ({
 
 // The caller's own cookie-scoped Marketplace SDK: this is the ONLY place the
 // handler is allowed to learn who it is acting on.
-const mockCallerSdk = (userId = CALLER_ID, { authFails = false } = {}) => ({
+const unauthorizedError = () => {
+  // Shape of a real Marketplace API rejection: the handler now distinguishes a genuine
+  // 401 from any other failure, so a status-less Error would not exercise that path.
+  const error = new Error('Unauthorized');
+  error.status = 401;
+  return error;
+};
+
+const mockCallerSdk = (userId = CALLER_ID, { authFails = false, failWith = null } = {}) => ({
   currentUser: {
     show: jest.fn(() =>
-      authFails
-        ? Promise.reject(new Error('401 unauthorized'))
+      failWith
+        ? Promise.reject(failWith)
+        : authFails
+        ? Promise.reject(unauthorizedError())
         : Promise.resolve({ data: { data: { id: { uuid: userId } } } })
     ),
   },
@@ -184,6 +194,27 @@ describe('POST /api/init-user-role', () => {
       expect(integrationSdk.users.updateProfile).not.toHaveBeenCalled();
       expect(handleError).toHaveBeenCalledTimes(1);
       expect(handleError.mock.calls[0][1].status).toBe(401);
+    });
+  });
+
+  it('preserves a non-401 failure instead of relabelling it as an auth problem', () => {
+    // Relabelling every currentUser.show() failure as 401 sent whoever was debugging
+    // straight down the wrong path: a proxy error, an unreachable API and a malformed
+    // cookie all reported as "not signed in", and the real cause never reached the log.
+    const integrationSdk = mockIntegrationSdk({});
+    const upstream = new Error('Service unavailable');
+    upstream.status = 503;
+    getSdk.mockReturnValue(mockCallerSdk(CALLER_ID, { failWith: upstream }));
+    getIntegrationSdk.mockReturnValue(integrationSdk);
+
+    const res = mockRes();
+    initUserRole({ body: {} }, res);
+
+    return flush().then(() => {
+      expect(integrationSdk.users.updateProfile).not.toHaveBeenCalled();
+      expect(handleError).toHaveBeenCalledTimes(1);
+      expect(handleError.mock.calls[0][1].status).toBe(503);
+      expect(handleError.mock.calls[0][1]).toBe(upstream);
     });
   });
 

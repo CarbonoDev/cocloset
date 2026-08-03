@@ -3,6 +3,10 @@ const { getSdk, handleError } = require('../api-util/sdk');
 const { ensureLaundryRoleDefault } = require('../api-util/laundryRoleDefaults');
 const log = require('../log');
 
+// Same cookie key the SDK's own cookie stores derive (`st-<clientId>-token`), used only
+// to tell a missing session apart from a rejected one when reporting a failure.
+const CLIENT_ID = process.env.REACT_APP_SHARETRIBE_SDK_CLIENT_ID;
+
 // Gives the CALLING user an explicit `metadata.isLaundry = false`, if they
 // don't have the key yet.
 //
@@ -61,12 +65,37 @@ module.exports = (req, res) => {
 
   // Identity comes from the session, never from the request. Note there is
   // deliberately no `req.body` read anywhere in this handler.
+  const hasSessionCookie = !!req.cookies?.[`st-${CLIENT_ID}-token`];
+
   sdk.currentUser
     .show()
-    .catch(() => {
-      const error = new Error('Authentication required.');
+    .catch(e => {
+      // Only a genuine 401 from the Marketplace API means "not signed in". Relabelling
+      // every failure as an auth problem sends whoever is debugging this straight down
+      // the wrong path — a proxy error, an unreachable API, or a malformed cookie all
+      // look identical to a missing session, and the real cause never reaches the log.
+      const isUnauthorized = e?.status === 401;
+
+      if (!isUnauthorized) {
+        log.error(e, 'init-user-role-currentuser-failed', {
+          status: e?.status,
+          // Distinguishes "the browser sent no session" from "the session was rejected",
+          // which is the first thing you want to know and cannot otherwise tell apart.
+          hasSessionCookie,
+        });
+        throw e;
+      }
+
+      const error = new Error(
+        hasSessionCookie
+          ? 'Session cookie was present but rejected by the Marketplace API.'
+          : 'No session cookie reached the server. In development the app runs on a ' +
+            'different port to the API server, so this usually means the request was ' +
+            'sent without credentials, or REACT_APP_MARKETPLACE_ROOT_URL does not match ' +
+            'the origin the browser is actually on (CORS is pinned to that value).'
+      );
       error.status = 401;
-      error.statusText = 'Authentication required.';
+      error.statusText = error.message;
       error.data = {};
       throw error;
     })
