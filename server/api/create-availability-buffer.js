@@ -4,10 +4,10 @@ const log = require('../log');
 const {
   computeAvailabilityBufferWindow,
   resolveTurnaroundHours,
-  subtractBlockedRanges,
-  findBookableOverlaps,
 } = require('../api-util/availabilityHelpers');
-const { buildTicketCode } = require('../api-util/ticketCodeHelpers');
+const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
+const { ACCEPT_TRANSITIONS } = require('../api-util/coclosetBookingProcess');
+const { notifyPickupScheduled } = require('../api-util/laundryMailer');
 
 // Creates the "buffer window" availability exception (seats: 0, i.e.
 // unavailable) around a booking once it's been accepted, so the listing
@@ -88,15 +88,34 @@ const { buildTicketCode } = require('../api-util/ticketCodeHelpers');
 // endpoint idempotent: re-running it after a partial failure creates only
 // what is still missing, instead of 400ing forever.
 //
-// While it's here, this endpoint also generates and stores the cosmetic,
-// human-readable ticket code (design doc §11, `transaction.metadata.
-// ticketCode`, e.g. "PIG-A3F91C") shown to laundry staff on paper/ops
-// screens - NOT the QR payload, which is just the transaction id itself.
+// ---------------------------------------------------------------------------
+// WHAT MOVED OUT OF HERE
+// ---------------------------------------------------------------------------
+// This endpoint used to also generate the cosmetic ticket code (design §11).
+// It now lives on `transition/laundry-mark-ready` in
+// server/api/laundry-transaction-status.js, where it rides an existing
+// privileged-update-metadata instead of costing its own write, cannot be
+// skipped by the client-hook gap above, and is generated at the moment the
+// laundry actually prepares and labels the garment rather than at `accept`.
+// The full argument is in that file, next to the code.
+//
+// ---------------------------------------------------------------------------
+// PICKUP SCHEDULED NOTIFICATION
+// ---------------------------------------------------------------------------
+// This is also where the §3.12 "Pickup Scheduled" laundry email fires. It is a
+// natural home rather than an afterthought: this is the only place in the
+// codebase that already resolves the assigned laundry's user record at the
+// moment a booking is confirmed. Sending is fire-and-continue - a mail failure
+// must never fail the availability write - and is skipped silently when
+// Mailgun is unconfigured.
+//
+// Note the notification carries no ticket code any more (see above); the
+// template drops that row when it is absent.
 //
 // Request body: { transactionId } (a transaction UUID, transit-encoded).
 // Success response (200): { data: { exceptionIds, listingId, start, end,
 //   segmentsCreated, alreadyBlocked, unblockedOverlaps, bufferBeforeDays,
-//   bufferAfterDays, totalBufferDays, ticketCode } }
+//   bufferAfterDays, totalBufferDays } }
 //   - `alreadyBlocked: true` means the window was already fully covered.
 //   - `unblockedOverlaps` lists ids of overlapping exceptions with seats > 0,
 //     which leave the listing bookable inside the buffer window. Non-empty
@@ -104,8 +123,13 @@ const { buildTicketCode } = require('../api-util/ticketCodeHelpers');
 // "Nothing to do" response (200): { data: null, reason: '<why-skipped>' }
 //   - used for expected-but-unconfigured states (no assigned laundry).
 // Failure response: standard handleError() shape (see api-util/sdk.js).
-
-const ACCEPT_TRANSITIONS = ['transition/accept', 'transition/operator-accept'];
+//
+// ACCEPT_TRANSITIONS comes from the cocloset-booking process mirror. Worth
+// stating explicitly because it looks like a no-op: `cocloset-booking` is a
+// fork of `default-booking` and did NOT rename `transition/accept` or
+// `transition/operator-accept`, so the same two strings gate both processes.
+// Sourcing them from the process module rather than inlining them means a
+// future rename is caught in one place.
 
 const httpError = (status, message) => {
   const error = new Error(message);
@@ -211,18 +235,18 @@ module.exports = (req, res) => {
         return { skipped: true, reason: 'no-laundry-assigned' };
       }
 
+      const customerRef = data.relationships?.customer?.data;
+      const customer = customerRef
+        ? included.find(i => i.type === 'user' && i.id.uuid === customerRef.id.uuid)
+        : null;
+
       return integrationSdk.users.show({ id: assignedLaundryId }).then(userResponse => {
-        const laundry = userResponse.data.data;
-        const laundryTurnaroundHours = laundry.attributes?.profile?.privateData?.turnaroundHours;
+        const laundryUser = userResponse.data.data;
+        const laundryProfile = laundryUser.attributes?.profile || {};
         const turnaroundHours = resolveTurnaroundHours(
-          laundryTurnaroundHours,
+          laundryProfile.privateData?.turnaroundHours,
           process.env.DEFAULT_LAUNDRY_BUFFER_HOURS
         );
-        const studioName = laundry.attributes?.profile?.publicData?.laundryProfile?.studioName;
-        // Idempotency: `accept` could in theory fire more than once (e.g.
-        // `operator-accept` after `accept` was somehow already processed, or
-        // a retried request) - only ever generate the ticket code once.
-        const existingTicketCode = data.attributes?.metadata?.ticketCode;
 
         return {
           skipped: false,
@@ -230,8 +254,13 @@ module.exports = (req, res) => {
           bookingStart,
           bookingEnd,
           turnaroundHours,
-          studioName,
-          existingTicketCode,
+          laundry: {
+            // `users.show` on the Integration API returns the account email,
+            // which the Marketplace API would not expose for a third party.
+            email: laundryUser.attributes?.email,
+            studioName: laundryProfile.publicData?.laundryProfile?.studioName,
+          },
+          customerName: customer?.attributes?.profile?.displayName,
         };
       });
     })
@@ -245,14 +274,7 @@ module.exports = (req, res) => {
         return null;
       }
 
-      const {
-        listing,
-        bookingStart,
-        bookingEnd,
-        turnaroundHours,
-        studioName,
-        existingTicketCode,
-      } = result;
+      const { listing, bookingStart, bookingEnd, turnaroundHours, laundry, customerName } = result;
       const {
         start,
         end,
@@ -261,87 +283,45 @@ module.exports = (req, res) => {
         totalBufferDays,
       } = computeAvailabilityBufferWindow(bookingStart, bookingEnd, turnaroundHours);
 
+      // §3.12 Pickup Scheduled. Fired before the calendar work rather than
+      // after it, and never awaited: the laundry needs to know a rental is
+      // confirmed regardless of whether an exception write succeeds, and this
+      // promise cannot reject (see api-util/laundryMailer.js).
+      notifyPickupScheduled({
+        to: laundry.email,
+        laundryName: laundry.studioName,
+        garmentTitle: listing.attributes?.title,
+        customerName,
+        pickupDate: bookingStart,
+        rack: listing.attributes?.privateData?.currentRack,
+        transactionId: txIdForLog,
+      });
+
       // Reconcile against what is already blocked, rather than blindly
       // creating (which 400s on any overlap - see the header comment).
-      const exceptionsPromise = integrationSdk.availabilityExceptions
-        .query({ listingId: listing.id, start, end })
-        .then(existingResponse => {
-          const existing = (existingResponse.data.data || []).map(e => ({
-            id: e.id.uuid,
-            start: e.attributes.start,
-            end: e.attributes.end,
-            seats: e.attributes.seats,
-          }));
-
-          const segments = subtractBlockedRanges({ start, end }, existing);
-          const unblockedOverlaps = findBookableOverlaps({ start, end }, existing).map(e => e.id);
-
-          if (unblockedOverlaps.length > 0) {
-            // The window looks covered but the listing is still bookable on
-            // those days. Creating an overlapping exception would 400, so
-            // this needs a human - make it unmissable.
-            log.error(
-              new Error('Buffer window overlaps availability exceptions with seats > 0'),
-              'create-availability-buffer-bookable-overlap',
-              { txId: txIdForLog, listingId: listing.id.uuid, unblockedOverlaps }
-            );
-          }
-
-          // Sequential rather than Promise.all: two concurrent creates on the
-          // same listing can race into an overlap rejection against each other.
-          return segments
-            .reduce(
-              (chain, segment) =>
-                chain.then(ids =>
-                  integrationSdk.availabilityExceptions
-                    .create(
-                      { listingId: listing.id, seats: 0, start: segment.start, end: segment.end },
-                      { expand: true }
-                    )
-                    .then(response => ids.concat(response.data.data.id.uuid))
-                ),
-              Promise.resolve([])
-            )
-            .then(exceptionIds => ({
-              exceptionIds,
-              segmentsCreated: segments.length,
-              alreadyBlocked: segments.length === 0,
-              unblockedOverlaps,
-            }));
-        });
-
-      const ticketCodePromise = existingTicketCode
-        ? Promise.resolve(existingTicketCode)
-        : integrationSdk.transactions
-            .updateMetadata(
-              {
-                id: transactionId,
-                metadata: { ticketCode: buildTicketCode(studioName, txIdForLog) },
-              },
-              { expand: true }
-            )
-            .then(updateResponse => updateResponse.data.data.attributes.metadata.ticketCode);
-
-      return Promise.all([exceptionsPromise, ticketCodePromise]).then(
-        ([exceptionResult, ticketCode]) => {
-          res
-            .status(200)
-            .set('Content-Type', 'application/json')
-            .send({
-              data: {
-                ...exceptionResult,
-                listingId: listing.id.uuid,
-                start,
-                end,
-                bufferBeforeDays,
-                bufferAfterDays,
-                totalBufferDays,
-                ticketCode,
-              },
-            })
-            .end();
-        }
-      );
+      return reconcileBufferWindow({
+        integrationSdk,
+        listingId: listing.id,
+        start,
+        end,
+        txIdForLog,
+      }).then(exceptionResult => {
+        res
+          .status(200)
+          .set('Content-Type', 'application/json')
+          .send({
+            data: {
+              ...exceptionResult,
+              listingId: listing.id.uuid,
+              start,
+              end,
+              bufferBeforeDays,
+              bufferAfterDays,
+              totalBufferDays,
+            },
+          })
+          .end();
+      });
     })
     .catch(e => {
       // A failure here means the listing may be double-bookable during the

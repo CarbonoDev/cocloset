@@ -1,6 +1,7 @@
 import * as log from '../util/log';
 import * as purchaseProcess from './transactionProcessPurchase';
 import * as bookingProcess from './transactionProcessBooking';
+import * as coclosetBookingProcess from './transactionProcessCoclosetBooking';
 import * as inquiryProcess from './transactionProcessInquiry';
 import * as negotiationProcess from './transactionProcessNegotiation';
 import * as downloadProcess from './transactionProcessDownload';
@@ -23,6 +24,10 @@ export const FILE = 'file';
 // preventing users from deleting their account if a payment is in process.
 export const PURCHASE_PROCESS_NAME = 'default-purchase';
 export const BOOKING_PROCESS_NAME = 'default-booking';
+// Cocloset's laundry-mediated booking process. Same payment/Stripe machinery as
+// default-booking, plus the laundry custody chain between 'accepted' and
+// 'delivered'. Mirrors ext/transaction-processes/cocloset-booking/process.edn.
+export const COCLOSET_BOOKING_PROCESS_NAME = 'cocloset-booking';
 export const INQUIRY_PROCESS_NAME = 'default-inquiry';
 export const NEGOTIATION_PROCESS_NAME = 'default-negotiation';
 export const DOWNLOAD_PROCESS_NAME = 'default-download';
@@ -51,6 +56,16 @@ const PROCESSES = [
     name: BOOKING_PROCESS_NAME,
     alias: `${BOOKING_PROCESS_NAME}/release-1`,
     process: bookingProcess,
+    unitTypes: [DAY, NIGHT, HOUR, FIXED],
+  },
+  {
+    // The alias is derived from the process name, so it resolves to
+    // 'cocloset-booking/release-1'. The Console listing type (garment-rental)
+    // must point at that same alias - see
+    // "Runbook - Process Migration (flex-cli)" in the project vault.
+    name: COCLOSET_BOOKING_PROCESS_NAME,
+    alias: `${COCLOSET_BOOKING_PROCESS_NAME}/release-1`,
+    process: coclosetBookingProcess,
     unitTypes: [DAY, NIGHT, HOUR, FIXED],
   },
   {
@@ -236,6 +251,12 @@ export const resolveLatestProcessName = processName => {
     case 'flex-booking-default-process':
     case BOOKING_PROCESS_NAME:
       return BOOKING_PROCESS_NAME;
+    // Note: cocloset-booking must NOT be folded into default-booking here.
+    // resolveLatestProcessName may only merge process names that share a graph,
+    // and these two do not. It also feeds the translation-key namespace
+    // (TransactionPage.<processName>.*), which is separate for the two.
+    case COCLOSET_BOOKING_PROCESS_NAME:
+      return COCLOSET_BOOKING_PROCESS_NAME;
     case INQUIRY_PROCESS_NAME:
       return INQUIRY_PROCESS_NAME;
     case NEGOTIATION_PROCESS_NAME:
@@ -311,12 +332,18 @@ export const isPurchaseProcessAlias = processAlias => {
 /**
  * Check if the process is booking process
  *
+ * Note: cocloset-booking counts as a booking process. It uses the same booking
+ * entity, unit types and OrderPanel forms as default-booking, and this
+ * predicate gates booking-vs-purchase UI (OrderPanel, ListingCard,
+ * ManageListingCard, InboxPage). Leaving it out would render Cocloset listings
+ * as non-bookable.
+ *
  * @param {String} processName
  */
 export const isBookingProcess = processName => {
   const latestProcessName = resolveLatestProcessName(processName);
   const processInfo = PROCESSES.find(process => process.name === latestProcessName);
-  return [BOOKING_PROCESS_NAME].includes(processInfo?.name);
+  return [BOOKING_PROCESS_NAME, COCLOSET_BOOKING_PROCESS_NAME].includes(processInfo?.name);
 };
 
 /**

@@ -1,4 +1,4 @@
-import { LAUNDRY_STATUSES } from '../../util/laundryStatuses';
+import { LAUNDRY_STATES, opsStatus, isOverdue, wasReturnedLate } from '../../util/laundryStatuses';
 
 // Pure row-filtering / counting logic shared by every laundry ops screen.
 // Kept out of the components so the filter definitions have exactly one home
@@ -71,7 +71,17 @@ export const isWithinNextHours = (isoString, now, hours) => {
 
 export const isDamaged = row => row?.damageReported?.flag === true;
 
-export const isLate = row => row?.lateReturn === true;
+/**
+ * Is this row late?
+ *
+ * Reads the real process state (`overdue`, entered automatically by
+ * transition/mark-overdue) rather than the `metadata.lateReturn` flag we used
+ * to maintain by hand. A garment that has already come back late is included
+ * too - it leaves `overdue` for `returned` the instant it is scanned in, and
+ * an ops screen that stopped flagging it at that moment would hide the thing
+ * the operator most wants to see.
+ */
+export const isLate = row => isOverdue(row) || wasReturnedLate(row);
 
 // The three cleaning sub-phases plus the 'returned' hand-off that feeds them
 // (design doc §9: all of these map to the single customer-facing "Cleaning"
@@ -87,8 +97,8 @@ export const CLEANING_STATUSES = [
 // transaction says so, or - for a garment with no transaction at all - because
 // its listing readiness says so (design doc §8's union).
 export const isAwaitingPickup = row =>
-  row?.laundryStatus === 'ready-for-pickup' ||
-  (!row?.laundryStatus && ['incoming', 'stored'].includes(row?.readinessStatus));
+  opsStatus(row) === 'ready-for-pickup' ||
+  (!opsStatus(row) && ['incoming', 'stored'].includes(row?.readinessStatus));
 
 /**
  * Filter rows for one of the Orders filter tabs.
@@ -104,15 +114,17 @@ export const filterByTab = (rows, tab, now = new Date()) => {
     case 'returns-today':
       return rows.filter(r => isSameDayAs(r.bookingEnd, now));
     case 'pending-cleaning':
-      return rows.filter(r => r.laundryStatus === 'pending-cleaning');
+      return rows.filter(r => opsStatus(r) === 'pending-cleaning');
     case 'ready-for-pickup':
-      return rows.filter(r => r.laundryStatus === 'ready-for-pickup');
+      return rows.filter(r => opsStatus(r) === 'ready-for-pickup');
     case 'late-returns':
       return rows.filter(isLate);
     case 'damaged':
       return rows.filter(isDamaged);
     case 'completed':
-      return rows.filter(r => r.laundryStatus === 'available-for-booking');
+      // 'delivered' is where the laundry chain ends: cleaning is finished and
+      // the garment is back in inventory (transition/laundry-mark-available).
+      return rows.filter(r => opsStatus(r) === 'delivered');
     case 'all':
     default:
       return rows;
@@ -130,9 +142,10 @@ export const filterByView = (rows, view) => {
     case 'pickups':
       return rows.filter(isAwaitingPickup);
     case 'returns':
-      return rows.filter(r => r.laundryStatus === 'picked-up');
+      // Out with the customer - on time or already late.
+      return rows.filter(r => ['picked-up', 'overdue'].includes(opsStatus(r)));
     case 'cleaning':
-      return rows.filter(r => CLEANING_STATUSES.includes(r.laundryStatus));
+      return rows.filter(r => CLEANING_STATUSES.includes(opsStatus(r)));
     case 'all':
     default:
       return rows;
@@ -181,12 +194,14 @@ export const DASHBOARD_TILES = [
  * @param {Date} now
  */
 export const dashboardCounts = (rows, now = new Date()) => ({
-  readyForPickup: rows.filter(r => r.laundryStatus === 'ready-for-pickup').length,
+  readyForPickup: rows.filter(r => opsStatus(r) === 'ready-for-pickup').length,
   pickupsToday: rows.filter(r => isSameDayAs(r.bookingStart, now)).length,
   returnsExpectedToday: rows.filter(r => isSameDayAs(r.bookingEnd, now)).length,
-  currentlyRented: rows.filter(r => r.laundryStatus === 'picked-up').length,
-  pendingCleaning: rows.filter(r => r.laundryStatus === 'pending-cleaning').length,
-  qualityInspection: rows.filter(r => r.laundryStatus === 'quality-inspection').length,
+  // "Currently rented" is the garment being out with the customer, which stays
+  // true after it goes overdue.
+  currentlyRented: rows.filter(r => ['picked-up', 'overdue'].includes(opsStatus(r))).length,
+  pendingCleaning: rows.filter(r => opsStatus(r) === 'pending-cleaning').length,
+  qualityInspection: rows.filter(r => opsStatus(r) === 'quality-inspection').length,
   lateReturns: rows.filter(isLate).length,
   damaged: rows.filter(isDamaged).length,
 });
@@ -214,12 +229,18 @@ export const needsAttention = rows => rows.filter(isDamaged);
 // ================ Sorting ================ //
 
 // Default table order: furthest along the laundry sequence last, so the things
-// needing action float to the top. Rows with no laundry status (inventory-only
+// needing action float to the top. Rows with no process state (inventory-only
 // garments) sort first since they're usually awaiting intake.
+//
+// Sorts on the STATE rather than the display status: the three cleaning
+// sub-phases are one position in the operational sequence, and ordering by
+// them would interleave cleaning rows with returned ones.
+const stateRank = row => (row?.state ? LAUNDRY_STATES.indexOf(row.state) : -1);
+
 export const sortRows = rows =>
   [...rows].sort((a, b) => {
-    const ai = a.laundryStatus ? LAUNDRY_STATUSES.indexOf(a.laundryStatus) : -1;
-    const bi = b.laundryStatus ? LAUNDRY_STATUSES.indexOf(b.laundryStatus) : -1;
+    const ai = stateRank(a);
+    const bi = stateRank(b);
     if (ai !== bi) {
       return ai - bi;
     }

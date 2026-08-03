@@ -1127,22 +1127,59 @@ export const allowProviderUpdateOffer = listingTypeConfig => {
 // Restructure hosted listing config //
 ///////////////////////////////////////
 
-const restructureListingTypes = hostedListingTypes => {
+/**
+ * Listing types whose transaction process is overridden in code rather than in Console.
+ *
+ * WHY THIS EXISTS: Sharetribe Console only offers Sharetribe's own built-in processes when
+ * you edit a listing type. A custom process pushed with `flex-cli process push` cannot be
+ * selected there, so the hosted listing-type asset permanently reports the built-in process
+ * even though we want our own. This map is the only way to point a listing type at a custom
+ * process.
+ *
+ * Keyed by the hosted listing type id, valued with the process name and alias to use instead.
+ *
+ * Note the direction of the override: everywhere else in this template, hosted Console config
+ * wins over local config (see mergeListingConfig below, where local listing types are used
+ * only when debugging). This is the deliberate exception, which is why it lives here at the
+ * point hosted config is read, rather than somewhere it could be mistaken for a default.
+ *
+ * When changing this, remember the alias is copied onto each listing's `publicData` at
+ * creation time (see EditListingDetailsPanel) and read back from there when a transaction
+ * starts (see CheckoutPage). Existing listings therefore keep whichever alias they were
+ * created with — they are not retroactively migrated by editing this map.
+ */
+export const LISTING_TYPE_PROCESS_OVERRIDES = {
+  'garment-rental': {
+    process: 'cocloset-booking',
+    alias: 'cocloset-booking/release-1',
+  },
+};
+
+// Exported for testing: this is where LISTING_TYPE_PROCESS_OVERRIDES is applied, and it is
+// worth guarding directly rather than only through mergeConfig, which needs a complete set
+// of hosted assets to run.
+export const restructureListingTypes = hostedListingTypes => {
   return (
     hostedListingTypes?.map(listingType => {
       const { id, label, transactionProcess, unitType, ...rest } = listingType;
-      return transactionProcess
-        ? {
-            listingType: id,
-            label,
-            transactionType: {
-              process: transactionProcess.name,
-              alias: transactionProcess.alias,
-              unitType,
-            },
-            ...rest,
-          }
-        : null;
+      if (!transactionProcess) {
+        return null;
+      }
+
+      // See LISTING_TYPE_PROCESS_OVERRIDES above: Console cannot point a listing type at a
+      // custom process, so we substitute it here.
+      const override = LISTING_TYPE_PROCESS_OVERRIDES[id];
+
+      return {
+        listingType: id,
+        label,
+        transactionType: {
+          process: override?.process || transactionProcess.name,
+          alias: override?.alias || transactionProcess.alias,
+          unitType,
+        },
+        ...rest,
+      };
     }) || []
   );
 };
@@ -1382,9 +1419,13 @@ const mergeListingConfig = (hostedConfig, defaultConfigs, categoriesInUse) => {
   // When debugging, include default configs by passing 'true' here.
   // Otherwise, use listing types and fields from hosted assets.
   const shouldMerge = mergeDefaultTypesAndFieldsForDebugging(false);
-  const listingTypes = shouldMerge
+  // restructureListingTypes yields null for a hosted listing type that has no transaction
+  // process. Without filtering those out, the listingTypesInUse map below dereferences null
+  // and takes down config parsing (and with it the whole app) over one malformed entry.
+  const listingTypes = (shouldMerge
     ? union(hostedListingTypes, defaultListingTypes, 'listingType')
-    : hostedListingTypes;
+    : hostedListingTypes
+  ).filter(Boolean);
   const listingFields = shouldMerge
     ? union(hostedListingFields, defaultListingFields, 'key')
     : hostedListingFields;

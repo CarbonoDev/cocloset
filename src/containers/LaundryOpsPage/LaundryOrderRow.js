@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
-import {
-  nextLaundryStatus,
-  statusLabelKey,
-  DAMAGE_REPORT_STATUS,
-} from '../../util/laundryStatuses';
+import { laundryActionsFor, statusLabelKey } from '../../util/laundryStatuses';
+import { isLate } from './LaundryOpsPage.helpers';
 import { InlineTextButton, PrimaryButton } from '../../components';
 
 import css from './LaundryOpsPage.module.css';
@@ -17,12 +14,14 @@ const formatBookingDate = (isoString, intl) =>
 
 /**
  * One row of the laundry ops orders table (mockups 05-08.jpg), plus the
- * expandable detail panel that carries the status-advance action.
+ * expandable detail panel that carries the advance action.
  *
- * The advance action deliberately offers exactly ONE target - the immediate
- * next status from `nextLaundryStatus` - because the server rejects any other
- * move with a 409. Offering a dropdown of all statuses here would just build a
- * UI for requests that always fail.
+ * The action offered is whatever `laundryActionsFor` says is legal from the
+ * transaction's REAL process state - Sharetribe now enforces the ordering, so
+ * offering anything else would just build a UI for requests that come back
+ * 409. In particular "confirm return" and "start cleaning" are two separate
+ * actions and must stay that way; see laundryActionsFor's comment for why
+ * chaining them would quietly destroy the damage-refund window.
  *
  * @param {Object} props
  * @param {Object} props.row - a row from the /api/laundry-orders response
@@ -42,17 +41,16 @@ const LaundryOrderRow = props => {
   const start = formatBookingDate(row.bookingStart, intl);
   const end = formatBookingDate(row.bookingEnd, intl);
 
-  // Only transaction rows have a laundry status to advance. Inventory-only
+  // Only transaction rows have a process state to advance. Inventory-only
   // rows (§8's listings with no booking) move via the readiness endpoint on
   // the Inventory screen instead.
-  const nextStatus = row.rowType === 'transaction' ? nextLaundryStatus(row.laundryStatus) : null;
-  const isDamageStep = nextStatus === DAMAGE_REPORT_STATUS;
+  const action = laundryActionsFor(row)[0] || null;
 
   const handleAdvance = () => {
     onAdvanceStatus({
       transactionId: row.transactionId,
-      status: nextStatus,
-      ...(isDamageStep ? { damaged, damageNote: damaged ? damageNote : '' } : {}),
+      status: action.status,
+      ...(action.needsDamageReport ? { damaged, damageNote: damaged ? damageNote : '' } : {}),
     });
   };
 
@@ -106,7 +104,7 @@ const LaundryOrderRow = props => {
           ) : (
             '—'
           )}
-          {row.lateReturn ? (
+          {isLate(row) ? (
             <span className={css.flagBadge}>
               <FormattedMessage id="LaundryOpsPage.flag.late" />
             </span>
@@ -158,9 +156,9 @@ const LaundryOrderRow = props => {
                   </p>
                 ) : null}
 
-                {nextStatus ? (
+                {action ? (
                   <div className={css.advance}>
-                    {isDamageStep ? (
+                    {action.needsDamageReport ? (
                       <div className={css.damageFields}>
                         <label className={css.damageToggle}>
                           <input
@@ -182,20 +180,22 @@ const LaundryOrderRow = props => {
                         ) : null}
                       </div>
                     ) : null}
+                    {/* The owner is paid the moment cleaning starts, and
+                        Sharetribe has no post-payout refund, so this is the
+                        last screen on which a damaged garment can still be
+                        cancelled with a refund. Say so. */}
+                    {action.firesPayout ? (
+                      <p className={css.detailLine}>
+                        <FormattedMessage id="LaundryOpsPage.detail.payoutWarning" />
+                      </p>
+                    ) : null}
                     <PrimaryButton
                       type="button"
                       inProgress={advanceInProgress}
                       disabled={advanceInProgress}
                       onClick={handleAdvance}
                     >
-                      <FormattedMessage
-                        id="LaundryOpsPage.detail.advanceTo"
-                        values={{
-                          status: intl.formatMessage({
-                            id: `LaundryOpsPage.status.${nextStatus}`,
-                          }),
-                        }}
-                      />
+                      <FormattedMessage id={action.labelKey} />
                     </PrimaryButton>
                   </div>
                 ) : (

@@ -1,0 +1,212 @@
+import {
+  TX_TRANSITION_ACTOR_CUSTOMER as CUSTOMER,
+  TX_TRANSITION_ACTOR_PROVIDER as PROVIDER,
+  CONDITIONAL_RESOLVER_WILDCARD,
+  ConditionalResolver,
+} from '../../transactions/transaction';
+
+/**
+ * State data for the `cocloset-booking` process on the TransactionPage.
+ *
+ * WHY THIS IS A SEPARATE FILE RATHER THAN A BRANCH IN THE BOOKING ONE
+ * `getStateData` dispatches on process name and returns `{}` for anything it
+ * does not recognise, while `stateDataShape` marks `processName` and
+ * `processState` as required. So without this file every Cocloset booking
+ * renders a transaction page with no title, no headings and a PropTypes
+ * failure - it is a prerequisite, not a refinement. And it cannot reuse
+ * TransactionPage.stateDataBooking.js, because the graphs genuinely differ:
+ * `cocloset-booking` inserts five states between `accepted` and `delivered`.
+ *
+ * NEITHER PARTY ACTS DURING THE LAUNDRY CHAIN
+ * `ready-for-pickup` / `picked-up` / `overdue` / `returned` / `cleaning` are
+ * driven by the laundry through the ops dashboard and the Integration API, not
+ * by the customer or the provider. So none of them gets an action button here;
+ * they are informational states whose job is to tell each party where the
+ * garment is. That matches `statesNeedingProviderAttention` in
+ * src/transactions/transactionProcessCoclosetBooking.js, which deliberately
+ * stayed at `[PREAUTHORIZED]`.
+ *
+ * @param {*} txInfo details about the transaction
+ * @param {*} processInfo details about the process
+ */
+export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
+  const { transaction, transactionRole, nextTransitions } = txInfo;
+  const isProviderBanned = transaction?.provider?.attributes?.banned;
+  const isCustomerBanned = transaction?.provider?.attributes?.banned;
+  const _ = CONDITIONAL_RESOLVER_WILDCARD;
+
+  const {
+    processName,
+    processState,
+    states,
+    transitions,
+    actionButtonProps,
+    leaveReviewProps,
+  } = processInfo;
+
+  // ActivityFeed messages default to being keyed on the state a transition
+  // leads TO (`TransactionPage.ActivityFeed.<process>.<state>`). That is not
+  // expressive enough for this process, for two reasons:
+  //
+  //   1. `laundry-confirm-return` and `laundry-confirm-return-late` both lead
+  //      to `returned`, and the whole point of the second one is that the
+  //      garment came back late - which the feed should say.
+  //   2. The three cleaning sub-phases are self-transitions on `cleaning`, so
+  //      a state-keyed message would print the same sentence three times.
+  //
+  // Naming follows the template's own convention for this
+  // (TransactionPage.stateDataNegotiation.js): a `.transition.` segment, which
+  // also keeps transition keys from colliding with state keys in the same
+  // namespace.
+  const transitionMessages = [
+    {
+      transition: transitions.LAUNDRY_MARK_READY,
+      translationId: 'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-mark-ready',
+    },
+    {
+      transition: transitions.LAUNDRY_CONFIRM_PICKUP,
+      translationId:
+        'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-confirm-pickup',
+    },
+    {
+      transition: transitions.LAUNDRY_CONFIRM_RETURN,
+      translationId:
+        'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-confirm-return',
+    },
+    {
+      transition: transitions.LAUNDRY_CONFIRM_RETURN_LATE,
+      translationId:
+        'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-confirm-return-late',
+    },
+    {
+      transition: transitions.LAUNDRY_MARK_PENDING_CLEANING,
+      translationId:
+        'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-mark-pending-cleaning',
+    },
+    {
+      transition: transitions.LAUNDRY_START_CLEANING,
+      translationId:
+        'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-start-cleaning',
+    },
+    {
+      transition: transitions.LAUNDRY_START_QUALITY_INSPECTION,
+      translationId:
+        'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-start-quality-inspection',
+    },
+    {
+      transition: transitions.LAUNDRY_MARK_AVAILABLE,
+      translationId:
+        'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-mark-available',
+    },
+    {
+      transition: transitions.MARK_OVERDUE,
+      translationId: 'TransactionPage.ActivityFeed.cocloset-booking.transition.mark-overdue',
+    },
+  ];
+
+  const shared = { processName, processState, transitionMessages };
+
+  return (
+    new ConditionalResolver([processState, transactionRole])
+      .cond([states.INQUIRY, CUSTOMER], () => {
+        const transitionNames = Array.isArray(nextTransitions)
+          ? nextTransitions.map(t => t.attributes.name)
+          : [];
+        const requestAfterInquiry = transitions.REQUEST_PAYMENT_AFTER_INQUIRY;
+        const hasCorrectNextTransition = transitionNames.includes(requestAfterInquiry);
+        const showOrderPanel = !isProviderBanned && hasCorrectNextTransition;
+        return { ...shared, showOrderPanel, showDetailCardHeadings: true };
+      })
+      .cond([states.INQUIRY, PROVIDER], () => {
+        return { ...shared, showDetailCardHeadings: true };
+      })
+      .cond([states.PREAUTHORIZED, CUSTOMER], () => {
+        return { ...shared, showDetailCardHeadings: true, showExtraInfo: true };
+      })
+      .cond([states.PREAUTHORIZED, PROVIDER], () => {
+        const primary = isCustomerBanned ? null : actionButtonProps(transitions.ACCEPT, PROVIDER);
+        const secondary = isCustomerBanned
+          ? null
+          : actionButtonProps(transitions.DECLINE, PROVIDER);
+        return {
+          ...shared,
+          showDetailCardHeadings: true,
+          showActionButtons: true,
+          primaryButtonProps: primary,
+          secondaryButtonProps: secondary,
+        };
+      })
+
+      // ---- The laundry custody chain -------------------------------------
+      // Informational for both parties. `showExtraInfo` is on for the customer
+      // wherever the customer is the one who has to physically do something
+      // (collect the garment, bring it back), so the page can carry a line of
+      // guidance under the title.
+      .cond([states.ACCEPTED, _], () => {
+        return { ...shared, showDetailCardHeadings: true };
+      })
+      .cond([states.READY_FOR_PICKUP, CUSTOMER], () => {
+        return { ...shared, showDetailCardHeadings: true, showExtraInfo: true };
+      })
+      .cond([states.READY_FOR_PICKUP, PROVIDER], () => {
+        return { ...shared, showDetailCardHeadings: true };
+      })
+      .cond([states.PICKED_UP, CUSTOMER], () => {
+        return { ...shared, showDetailCardHeadings: true, showExtraInfo: true };
+      })
+      .cond([states.PICKED_UP, PROVIDER], () => {
+        return { ...shared, showDetailCardHeadings: true };
+      })
+      .cond([states.OVERDUE, CUSTOMER], () => {
+        return { ...shared, showDetailCardHeadings: true, showExtraInfo: true };
+      })
+      .cond([states.OVERDUE, PROVIDER], () => {
+        return { ...shared, showDetailCardHeadings: true };
+      })
+      .cond([states.RETURNED, _], () => {
+        return { ...shared, showDetailCardHeadings: true };
+      })
+      .cond([states.CLEANING, _], () => {
+        return { ...shared, showDetailCardHeadings: true };
+      })
+
+      // ---- Completion and reviews ----------------------------------------
+      // Reaching `delivered` is what opens the review window, exactly as in
+      // default-booking - it just happens later here, when cleaning finishes.
+      .cond([states.DELIVERED, _], () => {
+        return {
+          ...shared,
+          showDetailCardHeadings: true,
+          showReviewAsFirstLink: true,
+          showActionButtons: true,
+          primaryButtonProps: leaveReviewProps,
+        };
+      })
+      .cond([states.REVIEWED_BY_PROVIDER, CUSTOMER], () => {
+        return {
+          ...shared,
+          showDetailCardHeadings: true,
+          showReviewAsSecondLink: true,
+          showActionButtons: true,
+          primaryButtonProps: leaveReviewProps,
+        };
+      })
+      .cond([states.REVIEWED_BY_CUSTOMER, PROVIDER], () => {
+        return {
+          ...shared,
+          showDetailCardHeadings: true,
+          showReviewAsSecondLink: true,
+          showActionButtons: true,
+          primaryButtonProps: leaveReviewProps,
+        };
+      })
+      .cond([states.REVIEWED, _], () => {
+        return { ...shared, showDetailCardHeadings: true, showReviews: true };
+      })
+      .default(() => {
+        // Default values for other states
+        return { ...shared, showDetailCardHeadings: true };
+      })
+      .resolve()
+  );
+};

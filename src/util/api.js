@@ -193,6 +193,17 @@ export const createAvailabilityBuffer = body => {
   return post('/api/create-availability-buffer', body);
 };
 
+// Advance a transaction through the laundry custody chain, e.g. after a
+// laundry scans a QR code for pickup/return, or updates cleaning progress from
+// the ops dashboard.
+//
+// This fires a REAL `cocloset-booking` process transition server-side (it used
+// to write `transaction.metadata.laundryStatus` instead), so Sharetribe
+// enforces the ordering: an out-of-order request comes back 409 rather than
+// silently succeeding. `status` is the step to advance to - one of
+// `LAUNDRY_ACTION_STATUSES` in `src/util/laundryStatuses.js` - and the server
+// maps it to the right transition, which for `returned` depends on whether the
+// garment is currently `picked-up` or `overdue`.
 // Best-effort call, fired right after a successful email/password signup (once
 // the follow-up login has authenticated the new user), to stamp the explicit
 // `metadata.isLaundry = false` default onto them. An administrator flips it to
