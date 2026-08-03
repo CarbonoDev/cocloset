@@ -37,7 +37,11 @@ import {
 } from '../../../util/fieldHelpers';
 import { ensureCurrentUser, ensureListing } from '../../../util/data';
 import { getDisplayAccountType } from '../../../util/stripeConnect';
-import { INQUIRY_PROCESS_NAME, resolveLatestProcessName } from '../../../transactions/transaction';
+import {
+  COCLOSET_BOOKING_PROCESS_NAME,
+  INQUIRY_PROCESS_NAME,
+  resolveLatestProcessName,
+} from '../../../transactions/transaction';
 
 // Import shared components
 import {
@@ -85,7 +89,7 @@ const STRIPE_ONBOARDING_RETURN_URL_FAILURE = 'failure';
  * @param {Object} listingTypeConfig - The listing type configuration
  * @returns {Array<string>} - The allowed tabs for the given process and listing type configuration
  */
-const tabsForListingType = (processName, listingTypeConfig) => {
+export const tabsForListingType = (processName, listingTypeConfig) => {
   const locationMaybe = displayLocation(listingTypeConfig) ? [LOCATION] : [];
   const pricingMaybe = displayPrice(listingTypeConfig) ? [PRICING] : [];
   const deliveryMaybe =
@@ -104,6 +108,19 @@ const tabsForListingType = (processName, listingTypeConfig) => {
   //         that it is clear to the user why the 'publish' button is disabled during verification
   const tabs = {
     ['default-booking']: [
+      DETAILS,
+      ...locationMaybe,
+      PRICING,
+      LAUNDRY,
+      AVAILABILITY,
+      ...styleOrPhotosTab,
+    ],
+    // Cocloset's own booking process. Without its own entry it fell through to
+    // the `default-inquiry` fallback below, which silently dropped the LAUNDRY
+    // and AVAILABILITY steps from the live wizard even though both panels were
+    // already built and wired. Mirrors `default-booking`; the six steps are the
+    // order the mockups (10-15.jpg) specify.
+    [COCLOSET_BOOKING_PROCESS_NAME]: [
       DETAILS,
       ...locationMaybe,
       PRICING,
@@ -173,6 +190,44 @@ const tabLabelAndSubmit = (intl, tab, isNewListingFlow, isPriceDisabled, process
     label: intl.formatMessage({ id: labelKey }),
     submitButton: intl.formatMessage({ id: submitButtonKey }),
   };
+};
+
+/**
+ * The contents of a single step in the wizard's step rail (mockups 10-15.jpg):
+ * a numbered badge that flips to a tick once the step's data is saved, followed
+ * by the step label.
+ *
+ * `Tabs` passes a child's `tabLabel` straight through to `TabNav` as the link's
+ * contents and never treats it as a string, so a node is safe here.
+ *
+ * The completed/current distinction is carried by the badge *shape* (tick vs.
+ * number) and by visually hidden status text, not by the fill colour alone.
+ *
+ * @param {Object} props
+ * @param {string} props.label - The translated step label
+ * @param {number} props.stepNumber - 1-based position of the step in the rail
+ * @param {boolean} props.completed - Whether the step's data has been saved
+ * @param {Object} props.intl
+ */
+const WizardStepLabel = props => {
+  const { label, stepNumber, completed, intl } = props;
+  const badgeClasses = classNames(css.stepBadge, { [css.stepBadgeDone]: completed });
+
+  return (
+    <>
+      <span className={badgeClasses} aria-hidden="true">
+        {completed ? <span className={css.stepBadgeCheck} /> : stepNumber}
+      </span>
+      <span className={css.stepLabel}>{label}</span>
+      <span className={css.stepStatus}>
+        {intl.formatMessage({
+          id: completed
+            ? 'EditListingWizard.stepStatusCompleted'
+            : 'EditListingWizard.stepStatusIncomplete',
+        })}
+      </span>
+    </>
+  );
 };
 
 /**
@@ -616,6 +671,14 @@ class EditListingWizard extends Component {
     // When creating a new listing, we don't allow users to access next tab until the current one is completed.
     const tabsStatus = tabsActive(isNewListingFlow, currentListing, tabs, config);
 
+    // Per-tab completion, used only to draw the tick in the step rail.
+    // tabsActive() already calls tabCompleted() for the *previous* tab; this
+    // asks the same question about every tab so the rail can show its state.
+    const tabsCompleted = tabs.reduce(
+      (acc, tab) => ({ ...acc, [tab]: tabCompleted(tab, currentListing, config) }),
+      {}
+    );
+
     // Redirect user to first tab when encoutering outdated draft listings.
     if (invalidExistingListingType && isNewListingFlow && selectedTab !== tabs[0]) {
       return <NamedRedirect name="EditListingPage" params={{ ...params, tab: tabs[0] }} />;
@@ -726,9 +789,27 @@ class EditListingWizard extends Component {
           rootClassName={css.tabsContainer}
           navRootClassName={css.nav}
           tabRootClassName={css.tab}
+          tabLinkClassName={css.tabLink}
+          tabSelectedLinkClassName={css.tabLinkSelected}
+          navHeader={
+            <div className={css.navHeader}>
+              <span className={css.navEyebrow}>
+                <FormattedMessage id="EditListingWizard.navEyebrow" />
+              </span>
+              <span className={css.navTitle}>
+                <FormattedMessage
+                  id={
+                    isNewListingFlow
+                      ? 'EditListingWizard.navTitleNew'
+                      : 'EditListingWizard.navTitleEdit'
+                  }
+                />
+              </span>
+            </div>
+          }
           ariaLabel={intl.formatMessage({ id: 'EditListingWizard.screenreader.tabNavigation' })}
         >
-          {tabs.map(tab => {
+          {tabs.map((tab, tabIndex) => {
             const tabTranslations = tabLabelAndSubmit(
               intl,
               tab,
@@ -741,7 +822,14 @@ class EditListingWizard extends Component {
                 {...rest}
                 key={tab}
                 tabId={`${id}_${tab}`}
-                tabLabel={tabTranslations.label}
+                tabLabel={
+                  <WizardStepLabel
+                    label={tabTranslations.label}
+                    stepNumber={tabIndex + 1}
+                    completed={!!tabsCompleted[tab]}
+                    intl={intl}
+                  />
+                }
                 tabSubmitButtonText={tabTranslations.submitButton}
                 tabLinkProps={tabLink(tab)}
                 selected={selectedTab === tab}

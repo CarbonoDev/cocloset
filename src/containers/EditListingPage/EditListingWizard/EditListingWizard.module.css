@@ -7,6 +7,11 @@
   display: flex;
   flex-direction: column;
 
+  /* The mockups (10-15.jpg) put the rail and the form on one continuous warm
+     canvas, separated only by a hairline rule, rather than the template's
+     grey-nav / white-panel split. */
+  background-color: var(--coclosetCanvas);
+
   /* Content of EditListingWizard should have smaller z-index than Topbar */
   z-index: 0;
 }
@@ -26,45 +31,83 @@
   }
 }
 
+/**
+ * Step rail - mockups 10-15.jpg.
+ *
+ * On large viewports this is the vertical list of six numbered steps that the
+ * client asked us to match. Below --viewportLarge the mockups say nothing, so
+ * the template's horizontally scrolling strip is kept and the same badge +
+ * label treatment is simply laid out in a row.
+ */
 .nav {
   /* Layout */
   display: flex;
   flex-direction: row;
-  padding: 0;
+  align-items: center;
+  padding: 6px 0;
   flex-shrink: 0;
-  background-color: var(--colorWhite);
-  box-shadow: var(--boxShadowLight);
-  border-top: 1px solid var(--colorGrey100);
-  overflow-x: scroll;
+  background-color: var(--coclosetCanvas);
+  box-shadow: none;
+  border-bottom: 1px solid var(--coclosetBorder);
+  overflow-x: auto;
 
   @media (--viewportLarge) {
-    padding: 72px 0 82px 36px;
+    padding: 72px 24px 82px 36px;
     flex-direction: column;
+    align-items: stretch;
     overflow-x: auto;
-    background-color: var(--colorGrey50);
-    box-shadow: none;
-    border-top: none;
+    border-bottom: none;
   }
 
   @media (--viewportLargeWithPaddings) {
-    padding: 72px 0 82px calc((100% - 1056px) / 2);
+    padding: 72px 24px 82px calc((100% - 1056px) / 2);
   }
 }
 
+/* "LIST A PIECE / New garment" above the steps. Hidden on the mobile strip,
+   where the rail collapses to a scrolling row and there is no space for it. */
+.navHeader {
+  display: none;
+
+  @media (--viewportLarge) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 24px;
+    padding-left: 10px;
+  }
+}
+
+.navEyebrow {
+  color: var(--coclosetInkMuted);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemiBold);
+  line-height: 16px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.navTitle {
+  color: var(--coclosetInk);
+  font-size: 22px;
+  font-weight: var(--fontWeightBold);
+  line-height: 28px;
+}
+
 .tab {
-  margin-left: 16px;
+  margin-left: 4px;
   white-space: nowrap;
 
   &:first-child {
     margin-left: 0;
 
     /* Padding added to tab so that it will be visible after call to scrollToTab */
-    padding-left: 24px;
+    padding-left: 16px;
   }
 
   &:last-child {
     /* Padding added to tab so that it will be visible after call to scrollToTab */
-    padding-right: 24px;
+    padding-right: 16px;
   }
 
   @media (--viewportLarge) {
@@ -78,6 +121,107 @@
       padding-right: 0;
     }
   }
+}
+
+/* Overrides TabNav's default link styling (passed in via tabLinkClassName) so
+   the rail can be a badge + label row instead of the template's large
+   bar-marked heading. */
+.tabLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--coclosetRadiusSmall);
+  transition: var(--transitionStyleButton);
+
+  &:hover {
+    text-decoration: none;
+    background-color: var(--coclosetSurfaceRaised);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coclosetBrand);
+    outline-offset: 2px;
+  }
+
+  @media (--viewportLarge) {
+    padding: 7px 10px;
+  }
+}
+
+.tabLinkSelected {
+  background-color: var(--coclosetSubtle);
+
+  &:hover {
+    background-color: var(--coclosetSubtle);
+  }
+}
+
+/* Numbered badge. Turns into a filled tick once the step's data is saved -
+   the shape changes, so completion is never signalled by colour alone (the
+   link text also carries a visually hidden status, see .stepStatus). */
+.stepBadge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--coclosetBorderStrong);
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetSurface);
+  color: var(--coclosetInkMuted);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemiBold);
+  line-height: 1;
+}
+
+.stepBadgeDone {
+  border-color: var(--coclosetBrand);
+  background-color: var(--coclosetBrand);
+}
+
+/* Drawn with borders rather than a glyph so it needs no icon font and no new
+   component (same approach as the laundry card's tick). */
+.stepBadgeCheck {
+  width: 8px;
+  height: 4px;
+  margin-top: -2px;
+  border-left: 1.5px solid var(--coclosetSurface);
+  border-bottom: 1.5px solid var(--coclosetSurface);
+  transform: rotate(-45deg);
+}
+
+.stepLabel {
+  color: var(--coclosetInkMuted);
+  font-size: 14px;
+  font-weight: var(--fontWeightMedium);
+  line-height: 20px;
+}
+
+/* A finished step reads as "done" rather than "still to do", so it gets full
+   ink even when it is not the step currently open. */
+.stepBadgeDone + .stepLabel {
+  color: var(--coclosetInk);
+}
+
+.tabLinkSelected .stepLabel {
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+}
+
+/* Visually hidden: gives assistive tech the completed/not-completed state that
+   the badge conveys visually. */
+.stepStatus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .modalTitle {
