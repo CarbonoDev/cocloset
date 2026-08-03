@@ -6,6 +6,8 @@ import classNames from 'classnames';
 import { FormattedMessage, useIntl } from '../../../../util/reactIntl';
 import { propTypes } from '../../../../util/types';
 import { required } from '../../../../util/validators';
+import { getCategoryLabels, isCategoryAcceptedByLaundry } from '../../../../util/fieldHelpers';
+import { useConfiguration } from '../../../../context/configurationContext';
 
 // Import shared components
 import { Form, Button } from '../../../../components';
@@ -18,13 +20,25 @@ import css from './EditListingLaundryForm.module.css';
 // categories. The radio input itself is visually hidden - the whole card is
 // the clickable/label target.
 const LaundryCard = props => {
-  const { formId, laundry, selected } = props;
+  const { categoryTree, formId, laundry, selected } = props;
   const intl = useIntl();
   // /api/laundries returns a flat, explicitly allowlisted record (see
   // server/api-util/laundryDirectory.js) rather than the raw publicData blob.
   const { studioName, address, businessHours, acceptedCategories = [] } = laundry || {};
   const name = laundry.displayName || studioName;
   const inputId = `${formId}.assignedLaundryId.${laundry.id}`;
+
+  // Stored accepted categories are Console category IDs (`midi_dress`), which are not
+  // words. Show the configured name instead, with the full branch on hover so two
+  // similarly-named leaves under different parents stay distinguishable. Values that
+  // predate the picker are free text already and pass through unchanged.
+  const labels = getCategoryLabels(categoryTree, acceptedCategories);
+  const paths = getCategoryLabels(categoryTree, acceptedCategories, { withPath: true });
+  const categoryChips = acceptedCategories.map((value, index) => ({
+    value,
+    label: labels[index],
+    path: paths[index],
+  }));
 
   return (
     <label htmlFor={inputId} className={classNames(css.card, { [css.cardSelected]: selected })}>
@@ -55,11 +69,11 @@ const LaundryCard = props => {
           />
         </span>
       ) : null}
-      {acceptedCategories?.length > 0 ? (
+      {categoryChips.length > 0 ? (
         <span className={css.cardCategories}>
-          {acceptedCategories.map(category => (
-            <span key={category} className={css.cardCategory}>
-              {category}
+          {categoryChips.map(category => (
+            <span key={category.value} className={css.cardCategory} title={category.path}>
+              {category.label}
             </span>
           ))}
         </span>
@@ -121,6 +135,8 @@ export const EditListingLaundryForm = props => (
       } = formRenderProps;
 
       const intl = useIntl();
+      const config = useConfiguration();
+      const categoryTree = config?.categoryConfiguration?.categories || [];
       const laundryRequiredMessage = intl.formatMessage({
         id: 'EditListingLaundryForm.laundryRequired',
       });
@@ -134,21 +150,16 @@ export const EditListingLaundryForm = props => (
 
       const selectedLaundry = laundries.find(l => l.id === values.assignedLaundryId);
       const selectedAcceptedCategories = selectedLaundry?.acceptedCategories || [];
-      // A listing can be categorised at up to three levels; treat it as accepted if the
-      // laundry lists any one of them. Compared case-insensitively and trimmed because the
-      // laundry types its own list as free text while categories come from Console ids -
-      // an exact === would make the warning fire on nothing but luck.
-      const normalise = value =>
-        String(value)
-          .trim()
-          .toLowerCase();
-      const acceptedSet = new Set(selectedAcceptedCategories.map(normalise));
       const categories = listingCategories || [];
+      // Both sides now speak Console category ids, so this is an exact-id comparison.
+      // A listing carries every level of its chain (`dresses`, then `midi_dress`), and a
+      // match on ANY level counts - so a laundry that ticks the parent accepts the whole
+      // branch. See isCategoryAcceptedByLaundry for the rule and why it used to misfire.
       const showCategoryWarning =
-        !!selectedLaundry &&
-        categories.length > 0 &&
-        selectedAcceptedCategories.length > 0 &&
-        !categories.some(category => acceptedSet.has(normalise(category)));
+        !!selectedLaundry && !isCategoryAcceptedByLaundry(categories, selectedAcceptedCategories);
+      // The warning is read by a garment owner, so it names the listing's category the way
+      // Console names it ("Dresses > Midi Dress"), never the raw id chain.
+      const listingCategoryLabel = getCategoryLabels(categoryTree, categories).join(' › ');
 
       return (
         <Form className={classes} onSubmit={handleSubmit}>
@@ -177,6 +188,7 @@ export const EditListingLaundryForm = props => (
               {laundries.map(laundry => (
                 <LaundryCard
                   key={laundry.id}
+                  categoryTree={categoryTree}
                   formId={formId}
                   laundry={laundry}
                   selected={values.assignedLaundryId === laundry.id}
@@ -200,7 +212,7 @@ export const EditListingLaundryForm = props => (
             <p className={css.warning}>
               <FormattedMessage
                 id="EditListingLaundryForm.categoryWarning"
-                values={{ category: categories.join(' / ') }}
+                values={{ category: listingCategoryLabel }}
               />
             </p>
           ) : null}

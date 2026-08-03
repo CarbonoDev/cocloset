@@ -12,6 +12,7 @@ import {
   isUserAuthorized,
   pickUserFieldsData,
   showCreateListingLinkForUser,
+  isLaundryUser,
 } from '../../util/userHelpers';
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 
@@ -167,6 +168,7 @@ export const ProfileSettingsPageComponent = props => {
             <TopbarContainer />
             <UserNav
               currentPage="ProfileSettingsPage"
+              showLaundryProfileLink={isLaundryUser(currentUser)}
               showManageListingsLink={showManageListingsLink}
             />
           </>

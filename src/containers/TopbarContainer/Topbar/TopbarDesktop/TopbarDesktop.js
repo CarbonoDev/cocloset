@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../../../util/reactIntl';
+import { isLaundryUser } from '../../../../util/userHelpers';
 import { ACCOUNT_SETTINGS_PAGES } from '../../../../routing/routeConfiguration';
 import {
   Avatar,
@@ -63,6 +64,13 @@ const ProfileMenu = ({ currentPage, currentUser, onLogout, showManageListingsLin
     return currentPage === page || isAccountSettingsPage ? css.currentPage : null;
   };
 
+  // Studio ops is reachable only for users the Integration API has flagged as a laundry
+  // (metadata.isLaundry - see isLaundryUser). Without this entry the ops shell had no
+  // link anywhere in the app and could only be reached by typing the URL. The target is
+  // LaundryProfilePage because it renders the ops rail, so this one link opens the whole
+  // /laundry/* section. LaundryProfilePage gates itself again server-side of this check.
+  const showLaundryProfileLink = isLaundryUser(currentUser);
+
   return (
     <Menu skipFocusOnNavigation={true}>
       <MenuLabel
@@ -74,6 +82,17 @@ const ProfileMenu = ({ currentPage, currentUser, onLogout, showManageListingsLin
         <Avatar className={css.avatar} user={currentUser} disableProfileLink />
       </MenuLabel>
       <MenuContent className={css.profileMenuContent}>
+        {showLaundryProfileLink ? (
+          <MenuItem key="LaundryProfilePage">
+            <NamedLink
+              className={classNames(css.menuLink, currentPageClass('LaundryProfilePage'))}
+              name="LaundryProfilePage"
+            >
+              <span className={css.menuItemBorder} />
+              <FormattedMessage id="TopbarDesktop.laundryProfileLink" />
+            </NamedLink>
+          </MenuItem>
+        ) : null}
         {showManageListingsLink ? (
           <MenuItem key="ManageListingsPage">
             <NamedLink

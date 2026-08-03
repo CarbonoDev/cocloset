@@ -152,6 +152,133 @@ export const getListingCategoryValues = publicData =>
   );
 
 /**
+ * Flatten Console's nested category tree into a depth-first list, keeping each node's
+ * depth and its chain of ancestor names.
+ *
+ * The tree from `config.categoryConfiguration.categories` nests via `subcategories`, which
+ * may be absent, empty, or populated (up to three levels). Anything that renders the whole
+ * tree as a flat control — a checkbox group, a `<select>` — needs it in this shape, plus
+ * enough context to show the hierarchy ("Dresses › Maxi Dress" or an indent per level).
+ *
+ * @param {Array<Object>} categories nested category configuration
+ * @param {number} [level] 1-based nesting level of `categories` (used by the recursion)
+ * @param {Array<String>} [ancestorNames] names of the nodes above `categories`
+ * @returns {Array<{id: String, name: String, level: Number, path: Array<String>, hasSubcategories: Boolean}>}
+ */
+export const flattenCategoryTree = (categories = [], level = 1, ancestorNames = []) => {
+  if (!Array.isArray(categories)) {
+    return [];
+  }
+  return categories.reduce((flattened, category) => {
+    const { id, name, subcategories } = category || {};
+    // A node without an id can't be stored or matched against, so it is not an option.
+    // Its children still can be, so keep walking rather than pruning the branch.
+    const label = typeof name === 'string' && name !== '' ? name : id;
+    const path = typeof id === 'string' && id !== '' ? [...ancestorNames, label] : ancestorNames;
+    const children = Array.isArray(subcategories) ? subcategories : [];
+    const selfMaybe =
+      typeof id === 'string' && id !== ''
+        ? [{ id, name: label, level, path, hasSubcategories: children.length > 0 }]
+        : [];
+
+    return [...flattened, ...selfMaybe, ...flattenCategoryTree(children, level + 1, path)];
+  }, []);
+};
+
+/**
+ * Build an id -> node lookup over the flattened category tree.
+ *
+ * @param {Array<Object>} categories nested category configuration
+ * @returns {Map<String, Object>} keyed by category id
+ */
+export const buildCategoryIndex = (categories = []) =>
+  new Map(flattenCategoryTree(categories).map(entry => [entry.id, entry]));
+
+/**
+ * Turn stored category values into something a human can read.
+ *
+ * Console category ids (`midi_dress`) are what we store and match on, but they are not
+ * words — showing them raw in a warning or on a laundry card tells the reader nothing.
+ * Values that aren't known ids are passed through unchanged: they are the free-text
+ * entries laundries typed before the picker existed ("Eveningwear"), and those already
+ * read as labels.
+ *
+ * @param {Array<Object>} categories nested category configuration
+ * @param {Array<String>} values stored values (category ids and/or legacy free text)
+ * @param {Object} [options]
+ * @param {boolean} [options.withPath] render the full branch, e.g. "Dresses › Maxi Dress"
+ * @returns {Array<String>} labels, one per input value, in input order
+ */
+export const getCategoryLabels = (categories, values = [], options = {}) => {
+  const { withPath = false } = options;
+  const index = buildCategoryIndex(categories);
+  return (Array.isArray(values) ? values : []).map(value => {
+    const entry = index.get(value);
+    if (!entry) {
+      return value;
+    }
+    return withPath ? entry.path.join(' › ') : entry.name;
+  });
+};
+
+/**
+ * Split a laundry's stored `acceptedCategories` into values the current Console
+ * configuration recognises and values it doesn't.
+ *
+ * The second bucket is not junk to be thrown away: it is what a laundry typed into the
+ * old free-text field. Callers keep it so a migration never silently narrows which
+ * garments a studio says it takes.
+ *
+ * @param {Array<Object>} categories nested category configuration
+ * @param {Array<String>} values stored `acceptedCategories`
+ * @returns {{known: Array<String>, legacy: Array<String>}}
+ */
+export const splitAcceptedCategories = (categories, values = []) => {
+  const index = buildCategoryIndex(categories);
+  return (Array.isArray(values) ? values : [])
+    .filter(value => typeof value === 'string' && value.trim() !== '')
+    .reduce(
+      (split, value) => {
+        const bucket = index.has(value) ? 'known' : 'legacy';
+        return { ...split, [bucket]: [...split[bucket], value] };
+      },
+      { known: [], legacy: [] }
+    );
+};
+
+/**
+ * Decide whether a laundry accepts a listing, given both sides' category values.
+ *
+ * HIERARCHY RULE: a listing is accepted if ANY level of its category chain is accepted.
+ * A listing filed under `dresses` > `midi_dress` carries both ids (see
+ * getListingCategoryValues), so a laundry that ticks the parent `dresses` accepts the
+ * whole branch without ticking every child, and a laundry that ticks only `midi_dress`
+ * accepts just that leaf. Both directions fall out of a single `some`.
+ *
+ * Comparison is by exact id. It used to be a case-insensitive string compare, which was
+ * the only thing that could be done while the laundry side was free text — and it matched
+ * nothing, because the two sides never shared a vocabulary.
+ *
+ * @param {Array<String>} listingCategoryValues the listing's ids, general -> specific
+ * @param {Array<String>} acceptedCategories the laundry's stored accepted values
+ * @returns {boolean} true if accepted (also true when either side says nothing)
+ */
+export const isCategoryAcceptedByLaundry = (
+  listingCategoryValues = [],
+  acceptedCategories = []
+) => {
+  const listingValues = Array.isArray(listingCategoryValues) ? listingCategoryValues : [];
+  const accepted = Array.isArray(acceptedCategories) ? acceptedCategories : [];
+  // No opinion from either side is not a mismatch — an uncategorised listing or a laundry
+  // that hasn't configured its list yet must not be flagged.
+  if (listingValues.length === 0 || accepted.length === 0) {
+    return true;
+  }
+  const acceptedSet = new Set(accepted);
+  return listingValues.some(value => acceptedSet.has(value));
+};
+
+/**
  * Pick props for SectionMultiEnum and SectionText display components.
  *
  * @param {*} extendedData the different entity extended data containing the value(s) to be displayed:

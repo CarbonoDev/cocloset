@@ -8,6 +8,7 @@ import classNames from 'classnames';
 import { ACCOUNT_SETTINGS_PAGES } from '../../../../routing/routeConfiguration';
 import { FormattedMessage } from '../../../../util/reactIntl';
 import { ensureCurrentUser } from '../../../../util/data';
+import { isLaundryUser } from '../../../../util/userHelpers';
 
 import {
   AvatarLarge,
@@ -162,6 +163,17 @@ const TopbarMobileMenu = props => {
     </li>
   ) : null;
 
+  // Mobile twin of the desktop profile menu's studio entry - see TopbarDesktop's
+  // ProfileMenu for why this link exists and why it points at LaundryProfilePage.
+  // Only rendered for users flagged isLaundry; everyone else never sees it.
+  const laundryProfileLinkMaybe = isLaundryUser(currentUser) ? (
+    <li className={classNames(css.navigationLink, currentPageClass('LaundryProfilePage'))}>
+      <NamedLink name="LaundryProfilePage">
+        <FormattedMessage id="TopbarMobileMenu.laundryProfileLink" />
+      </NamedLink>
+    </li>
+  ) : null;
+
   return (
     <div className={css.root}>
       <AvatarLarge className={css.avatar} user={currentUser} />
@@ -180,6 +192,7 @@ const TopbarMobileMenu = props => {
               {notificationCountBadge}
             </NamedLink>
           </li>
+          {laundryProfileLinkMaybe}
           {manageListingsLinkMaybe}
           <li className={classNames(css.navigationLink, currentPageClass('ProfileSettingsPage'))}>
             <NamedLink name="ProfileSettingsPage">
