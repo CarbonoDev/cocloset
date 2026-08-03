@@ -246,3 +246,53 @@ export const sortRows = rows =>
     }
     return (a.ticketCode || '').localeCompare(b.ticketCode || '');
   });
+
+// ================ Presentation ================ //
+
+/**
+ * Visual tone per status badge (mockups 04-09.jpg tint each status differently).
+ *
+ * This is presentation only - it never affects which rows are shown or what
+ * they mean. Tone is always a SECONDARY cue: every badge also renders its
+ * translated text label, so nothing here is conveyed by colour alone.
+ *
+ * Keys cover both vocabularies the badges draw from (`LAUNDRY_STATUSES` for
+ * transaction rows, `READINESS_STATUSES` for inventory-only rows).
+ */
+export const STATUS_TONES = {
+  // Transaction laundry statuses
+  'ready-for-pickup': 'Green',
+  'picked-up': 'Rose',
+  returned: 'Amber',
+  'pending-cleaning': 'Blue',
+  'cleaning-in-progress': 'Blue',
+  'quality-inspection': 'Violet',
+  'available-for-booking': 'Green',
+  // Listing readiness statuses
+  incoming: 'Amber',
+  stored: 'Neutral',
+  available: 'Green',
+};
+
+/**
+ * Tone name for a row's status badge. Mirrors `statusLabelKey`'s precedence
+ * (transaction status wins over readiness) so the badge's colour and its text
+ * can never describe different things.
+ *
+ * @param {Object} row - a row from the /api/laundry-orders response
+ * @returns {string} one of the tone suffixes used by LaundryOpsPage.module.css
+ */
+export const statusTone = row =>
+  STATUS_TONES[(row?.laundryStatus)] || STATUS_TONES[(row?.readinessStatus)] || 'Neutral';
+
+/**
+ * Tones for the dashboard stat tile values (mockup 09.jpg): work-in-progress
+ * counts are tinted, problem counts are red, everything else stays ink-black.
+ * Tiles without an entry render in the default colour.
+ */
+export const TILE_TONES = {
+  pendingCleaning: 'Blue',
+  qualityInspection: 'Violet',
+  lateReturns: 'Critical',
+  damaged: 'Critical',
+};

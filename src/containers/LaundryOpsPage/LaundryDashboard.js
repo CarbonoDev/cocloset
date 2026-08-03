@@ -1,4 +1,5 @@
 import React from 'react';
+import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { statusLabelKey } from '../../util/laundryStatuses';
@@ -6,9 +7,11 @@ import { H4, NamedLink } from '../../components';
 
 import {
   DASHBOARD_TILES,
+  TILE_TONES,
   dashboardCounts,
   incomingNext48h,
   needsAttention,
+  statusTone,
 } from './LaundryOpsPage.helpers';
 import css from './LaundryOpsPage.module.css';
 
@@ -33,7 +36,7 @@ const PanelRow = props => {
         </span>
       </div>
       {labelKey ? (
-        <span className={css.statusBadge}>
+        <span className={classNames(css.statusBadge, css[`tone${statusTone(row)}`])}>
           <FormattedMessage id={labelKey} />
         </span>
       ) : null}
@@ -64,7 +67,13 @@ const LaundryDashboard = props => {
             <span className={css.tileLabel}>
               <FormattedMessage id={`LaundryOpsPage.tile.${tile}`} />
             </span>
-            <span className={css.tileValue}>{counts[tile]}</span>
+            <span
+              className={classNames(css.tileValue, {
+                [css[`tileValue${TILE_TONES[tile]}`]]: !!TILE_TONES[tile],
+              })}
+            >
+              {counts[tile]}
+            </span>
           </div>
         ))}
       </div>

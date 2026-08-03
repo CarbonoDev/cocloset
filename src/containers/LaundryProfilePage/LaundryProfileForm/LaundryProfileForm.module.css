@@ -13,10 +13,10 @@
 }
 
 .field {
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 
   @media (--viewportMedium) {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
   }
 }
 
@@ -46,7 +46,12 @@
 .validLocation {
 }
 
+/* The form now sits inside a card (LaundryProfilePage.module.css .form), which
+   supplies the bottom padding the old 56px margin was faking. */
 .submitButton {
-  margin-top: 24px;
-  margin-bottom: 56px;
+  margin-top: 6px;
+
+  @media (--viewportMedium) {
+    margin-top: 8px;
+  }
 }

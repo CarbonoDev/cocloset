@@ -13,6 +13,8 @@ import TopbarContainer from '../TopbarContainer/TopbarContainer';
 import FooterContainer from '../FooterContainer/FooterContainer';
 import NotFoundPage from '../NotFoundPage/NotFoundPage';
 
+import LaundryOpsNav from '../LaundryOpsPage/LaundryOpsNav';
+
 import LaundryProfileForm from './LaundryProfileForm/LaundryProfileForm';
 
 import { updateProfile } from './LaundryProfilePage.duck';
@@ -183,6 +185,12 @@ export const LaundryProfilePageComponent = props => {
 
   const title = intl.formatMessage({ id: 'LaundryProfilePage.title' });
 
+  // Mockup 03.jpg shows Studio settings inside the ops shell, with the same
+  // sidebar as every other /laundry/* screen. The sidebar's own "Settings"
+  // entry already links here, so rendering it keeps the ops navigation
+  // reachable instead of dead-ending on this page.
+  const studioName = currentUser?.attributes?.profile?.publicData?.laundryProfile?.studioName;
+
   return (
     <Page title={title} scrollingDisabled={scrollingDisabled}>
       <LayoutSideNavigation
@@ -195,13 +203,15 @@ export const LaundryProfilePageComponent = props => {
             <UserNav currentPage="LaundryProfilePage" />
           </>
         }
-        sideNav={null}
+        sideNav={<LaundryOpsNav currentPage="LaundryProfilePage" studioName={studioName} />}
         useAccountSettingsNav={false}
         footer={<FooterContainer />}
+        mainColumnClassName={css.opsMain}
+        sideNavClassName={css.opsSideNav}
         intl={intl}
       >
         <div className={css.content}>
-          <H3 as="h1">
+          <H3 as="h1" className={css.pageTitle}>
             <FormattedMessage id="LaundryProfilePage.heading" />
           </H3>
           {/* key: remount (and re-snapshot initialValues) if the user

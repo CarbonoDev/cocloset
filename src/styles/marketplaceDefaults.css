@@ -201,6 +201,76 @@
   /* ================ PageBuilder ================ */
   /* --carouselWidth will be updated dynamically through JS */
   --carouselWidth: 100vw;
+
+  /* ================ Cocloset design tokens ================ */
+  /**
+   * Sampled from the Cocloset UI mockups (vault: Projects/Cocloset/design-mockups).
+   * These are additive - nothing above is overridden - so the stock template
+   * surfaces keep their existing look and only Cocloset's own screens opt in.
+   *
+   * Surfaces are warm/paper-toned rather than the template's neutral greys.
+   */
+  --coclosetCanvas: #f7f4ef;
+  --coclosetSurface: #ffffff;
+  --coclosetSurfaceRaised: #fbf9f6;
+  --coclosetSubtle: #f3eee6;
+  --coclosetBorder: #e8e1d7;
+  --coclosetBorderStrong: #d9cfc0;
+
+  --coclosetInk: #1f1b17;
+  --coclosetInkMuted: #6f6960;
+
+  /**
+   * Terracotta accent.
+   * The mockups fill buttons with #af7458, which reaches only 3.8:1 against
+   * white - under the 4.5:1 WCAG AA threshold for a button label. The
+   * interactive token is therefore darkened to #a3654a (4.7:1) and the mockup
+   * value is kept as --coclosetBrandTint for decorative fills/borders, where
+   * no text sits on top of it.
+   */
+  --coclosetBrand: #a3654a;
+  --coclosetBrandDark: #834f39;
+  --coclosetBrandTint: #af7458;
+  --coclosetBrandSubtle: #f3eee6;
+  --coclosetBrandBorder: #d7b7a2;
+
+  /**
+   * Status tones for laundry ops badges, stat tiles and flags.
+   * Every pairing below clears 6:1 against its own background. Colour is never
+   * the only signal - each tone is always rendered behind a text label.
+   */
+  --coclosetToneAmberBg: #f6ead6;
+  --coclosetToneAmberFg: #6b4a12;
+  --coclosetToneAmberDot: #b3812a;
+
+  --coclosetToneGreenBg: #d3f8e5;
+  --coclosetToneGreenFg: #12603b;
+  --coclosetToneGreenDot: #1a8a55;
+
+  --coclosetToneRoseBg: #f0e2dc;
+  --coclosetToneRoseFg: #7a4132;
+  --coclosetToneRoseDot: #a5705a;
+
+  --coclosetToneBlueBg: #d9eaff;
+  --coclosetToneBlueFg: #1f3c96;
+  --coclosetToneBlueDot: #2f5bd0;
+
+  --coclosetToneVioletBg: #eeeaff;
+  --coclosetToneVioletFg: #4c229c;
+  --coclosetToneVioletDot: #6b3fd4;
+
+  --coclosetToneNeutralBg: #f2ede5;
+  --coclosetToneNeutralFg: #4a443c;
+  --coclosetToneNeutralDot: #7a7268;
+
+  --coclosetToneCriticalBg: #fde8e6;
+  --coclosetToneCriticalFg: #9c2b22;
+  --coclosetToneCriticalDot: #c8392e;
+
+  /* Radii - the mockups use a softer corner than the template's 2px default. */
+  --coclosetRadius: 8px;
+  --coclosetRadiusSmall: 6px;
+  --coclosetRadiusPill: 999px;
 }
 
 /* ================ Global element styles ================ */

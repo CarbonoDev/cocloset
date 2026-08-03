@@ -140,10 +140,12 @@ export const LaundryOpsPageComponent = props => {
         sideNav={<LaundryOpsNav currentPage={ROUTE_NAME_BY_TAB[tab]} studioName={studioName} />}
         useAccountSettingsNav={false}
         footer={<FooterContainer />}
+        mainColumnClassName={css.opsMain}
+        sideNavClassName={css.opsSideNav}
         intl={intl}
       >
         <div className={css.content}>
-          <H3 as="h1">
+          <H3 as="h1" className={css.pageTitle}>
             <FormattedMessage id={`LaundryOpsPage.heading.${tab}`} />
           </H3>
 

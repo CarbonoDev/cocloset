@@ -104,25 +104,32 @@ export const EditListingLocationForm = props => (
             validate={required(streetRequiredMessage)}
           />
 
-          <FieldTextInput
-            className={css.field}
-            type="text"
-            id={`${formId}city`}
-            name="city"
-            label={intl.formatMessage({ id: 'EditListingLocationForm.city' })}
-            placeholder={intl.formatMessage({ id: 'EditListingLocationForm.cityPlaceholder' })}
-            validate={required(cityRequiredMessage)}
-          />
+          {/* City and postcode share a row from --viewportMedium up, as in
+              mockup 14.jpg. Purely a layout wrapper - the fields, their names
+              and their validators are unchanged. */}
+          <div className={css.fieldRow}>
+            <FieldTextInput
+              className={css.field}
+              type="text"
+              id={`${formId}city`}
+              name="city"
+              label={intl.formatMessage({ id: 'EditListingLocationForm.city' })}
+              placeholder={intl.formatMessage({ id: 'EditListingLocationForm.cityPlaceholder' })}
+              validate={required(cityRequiredMessage)}
+            />
 
-          <FieldTextInput
-            className={css.field}
-            type="text"
-            id={`${formId}postcode`}
-            name="postcode"
-            label={intl.formatMessage({ id: 'EditListingLocationForm.postcode' })}
-            placeholder={intl.formatMessage({ id: 'EditListingLocationForm.postcodePlaceholder' })}
-            validate={required(postcodeRequiredMessage)}
-          />
+            <FieldTextInput
+              className={css.field}
+              type="text"
+              id={`${formId}postcode`}
+              name="postcode"
+              label={intl.formatMessage({ id: 'EditListingLocationForm.postcode' })}
+              placeholder={intl.formatMessage({
+                id: 'EditListingLocationForm.postcodePlaceholder',
+              })}
+              validate={required(postcodeRequiredMessage)}
+            />
+          </div>
 
           <Button
             className={css.submitButton}

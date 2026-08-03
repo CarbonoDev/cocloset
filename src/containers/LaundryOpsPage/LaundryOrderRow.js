@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { laundryActionsFor, statusLabelKey } from '../../util/laundryStatuses';
 import { isLate } from './LaundryOpsPage.helpers';
 import { InlineTextButton, PrimaryButton } from '../../components';
 
+import { statusTone } from './LaundryOpsPage.helpers';
 import css from './LaundryOpsPage.module.css';
 
 const formatBookingDate = (isoString, intl) =>
@@ -65,7 +67,7 @@ const LaundryOrderRow = props => {
             <FormattedMessage id="LaundryOpsPage.table.qrPlaceholder" />
           </span>
         </td>
-        <td className={css.cell}>
+        <td className={css.cellNoWrap}>
           <span className={css.primaryText}>{row.ticketCode || '—'}</span>
           <span className={css.secondaryText}>{row.currentRack || '—'}</span>
         </td>
@@ -84,7 +86,7 @@ const LaundryOrderRow = props => {
             {[row.brand, row.size].filter(Boolean).join(' · ') || '—'}
           </span>
         </td>
-        <td className={css.cell}>
+        <td className={css.cellNoWrap}>
           {start || end ? (
             <>
               <span className={css.primaryText}>{start || '—'}</span>
@@ -98,7 +100,7 @@ const LaundryOrderRow = props => {
         </td>
         <td className={css.cell}>
           {labelKey ? (
-            <span className={css.statusBadge}>
+            <span className={classNames(css.statusBadge, css[`tone${statusTone(row)}`])}>
               <FormattedMessage id={labelKey} />
             </span>
           ) : (
@@ -115,7 +117,7 @@ const LaundryOrderRow = props => {
             </span>
           ) : null}
         </td>
-        <td className={css.cell}>
+        <td className={css.cellNoWrap}>
           <InlineTextButton type="button" onClick={() => setIsOpen(!isOpen)}>
             <FormattedMessage
               id={isOpen ? 'LaundryOpsPage.table.close' : 'LaundryOpsPage.table.open'}
@@ -190,6 +192,7 @@ const LaundryOrderRow = props => {
                       </p>
                     ) : null}
                     <PrimaryButton
+                      className={css.advanceButton}
                       type="button"
                       inProgress={advanceInProgress}
                       disabled={advanceInProgress}
