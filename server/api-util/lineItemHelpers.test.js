@@ -781,11 +781,16 @@ describe('resolveCleaningFeeInSubunits()', () => {
     process.env.DEFAULT_CLEANING_FEE = originalEnv;
   });
 
-  const listingWithLaundry = laundryId => ({
-    attributes: { publicData: { assignedLaundryId: laundryId } },
+  const listingWithLaundry = (laundryId, categoryLevels = {}) => ({
+    attributes: { publicData: { assignedLaundryId: laundryId, ...categoryLevels } },
   });
 
   const listingWithoutLaundry = { attributes: { publicData: {} } };
+
+  // A laundry user flagged isLaundry, with whatever privateData the test needs.
+  const laundryUserWith = privateData => ({
+    data: { data: { attributes: { profile: { metadata: { isLaundry: true }, privateData } } } },
+  });
 
   it("should use the assigned laundry's own privateData.cleaningFee when set", async () => {
     delete process.env.DEFAULT_CLEANING_FEE;
@@ -950,5 +955,101 @@ describe('resolveCleaningFeeInSubunits()', () => {
     const result = await resolveCleaningFeeInSubunits(listingWithLaundry('rogue-user'), 'EUR');
 
     expect(result).toBe(1000);
+  });
+
+  // ── PER-CATEGORY PRICING ───────────────────────────────────────────────────
+  // This is the money path: the number these tests pin is what lands on a customer's
+  // invoice. The resolution rule itself is unit-tested exhaustively in
+  // categoryPricing.test.js; these check that resolveCleaningFeeInSubunits actually
+  // feeds it the LISTING's own category chain, and that every failure still degrades
+  // to the same fallback it always did rather than throwing.
+
+  it("charges the fee the laundry set for THIS garment's category", async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    mockUsersShow.mockResolvedValue(
+      laundryUserWith({ cleaningFee: 10, categoryPricing: { midi_dress: { cleaningFee: 22 } } })
+    );
+
+    const listing = listingWithLaundry('laundry-1', {
+      categoryLevel1: 'dresses',
+      categoryLevel2: 'midi_dress',
+    });
+
+    // 22.00 EUR, not the studio-wide 10 and not the env default 8.
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(2200);
+  });
+
+  it('charges the HIGHEST matching category price, not the most specific one', async () => {
+    // The rule the client asked for: "utilizaría el precio mas alto". The subcategory
+    // is CHEAPER here, which is the case that separates highest-wins from
+    // deepest-wins — a most-specific implementation charges 800 and fails.
+    delete process.env.DEFAULT_CLEANING_FEE;
+    mockUsersShow.mockResolvedValue(
+      laundryUserWith({
+        cleaningFee: 4,
+        categoryPricing: { dresses: { cleaningFee: 10 }, midi_dress: { cleaningFee: 8 } },
+      })
+    );
+
+    const listing = listingWithLaundry('laundry-1', {
+      categoryLevel1: 'dresses',
+      categoryLevel2: 'midi_dress',
+    });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1000);
+  });
+
+  it("falls back to the studio-wide fee for a category the laundry hasn't priced", async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    mockUsersShow.mockResolvedValue(
+      laundryUserWith({ cleaningFee: 10, categoryPricing: { dresses: { cleaningFee: 22 } } })
+    );
+
+    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'pants' });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1000);
+  });
+
+  it('falls back to the env default when neither the category nor the studio has a fee', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    mockUsersShow.mockResolvedValue(
+      laundryUserWith({ categoryPricing: { dresses: { turnaroundHours: 72 } } })
+    );
+
+    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(800);
+  });
+
+  it('degrades to the fallback instead of throwing on a malformed pricing table', async () => {
+    // A hand-edited or half-written privateData blob must never be able to fail a
+    // booking. Same contract as every other failure mode in this function.
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    mockUsersShow.mockResolvedValue(
+      laundryUserWith({ cleaningFee: 10, categoryPricing: 'not-a-table' })
+    );
+
+    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1000);
+  });
+
+  it('ignores a per-category fee from a user who is NOT flagged isLaundry', async () => {
+    // The isLaundry check runs BEFORE resolution, so per-category pricing gives a
+    // provider no new way to inject a fee by pointing assignedLaundryId at themselves.
+    process.env.DEFAULT_CLEANING_FEE = '10';
+    mockUsersShow.mockResolvedValue({
+      data: {
+        data: {
+          attributes: {
+            profile: { privateData: { categoryPricing: { dresses: { cleaningFee: 5000 } } } },
+          },
+        },
+      },
+    });
+
+    const listing = listingWithLaundry('rogue-user', { categoryLevel1: 'dresses' });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1000);
   });
 });

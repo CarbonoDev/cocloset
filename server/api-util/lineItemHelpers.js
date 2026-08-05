@@ -7,6 +7,7 @@ const { getAmountAsDecimalJS, convertDecimalJSToNumber, unitDivisor } = require(
 const { nightsBetween, daysBetween } = require('./dates');
 const { getIntegrationSdk } = require('./integrationSdk');
 const { isLaundryUserEntity } = require('./laundryDirectory');
+const { getListingCategoryValues, resolveCategoryCleaningFee } = require('./categoryPricing');
 const log = require('../log');
 const LINE_ITEM_NIGHT = 'line-item/night';
 const LINE_ITEM_DAY = 'line-item/day';
@@ -483,10 +484,25 @@ const cleaningFeeToSubunits = (amountMajorUnits, currency) => {
  * provider's own trusted Marketplace SDK token. This uses the Integration API
  * instead (mirrors the lookup in server/api/laundries.js).
  *
+ * PER-CATEGORY PRICING: the fee charged is the one the laundry configured for THIS
+ * garment's category, not one flat studio-wide number. A laundry sets a fee per
+ * accepted category/subcategory in privateData.categoryPricing, and of every level of
+ * the listing's own category chain that carries a fee, the HIGHEST wins. If no level
+ * of the chain is priced, the studio-wide privateData.cleaningFee applies as the
+ * deliberate fallback (it is not a competitor in the max). See
+ * api-util/categoryPricing.js for the full rule and why it is a separate pure module.
+ *
  * Falls back to process.env.DEFAULT_CLEANING_FEE (also major units, server-only)
- * when the listing has no assigned laundry, the laundry hasn't set a fee, or the
- * Integration API lookup fails for any reason (e.g. the laundry user was removed) -
- * Phase 1 pricing should never fail booking creation over this.
+ * when the listing has no assigned laundry, the laundry hasn't set a fee at any
+ * level, or the Integration API lookup fails for any reason (e.g. the laundry user
+ * was removed) - Phase 1 pricing should never fail booking creation over this.
+ *
+ * PREVIEW AND CHARGE AGREE BY CONSTRUCTION: this is called only from
+ * lineItems.buildLineItemsForListing, which is the single entry point used by
+ * /api/transaction-line-items (the preview the customer sees),
+ * /api/initiate-privileged and /api/transition-privileged (what is actually charged).
+ * The category chain is read from the same stored listing entity in all three, so the
+ * resolved fee cannot differ between the quote and the charge.
  *
  * SECURITY: `assignedLaundryId` lives in the *listing's* publicData, which the
  * provider fully controls (through the wizard, or directly via
@@ -534,11 +550,17 @@ exports.resolveCleaningFeeInSubunits = (listing, currency) => {
         return cleaningFeeToSubunits(fallbackFeeMajorUnits, currency);
       }
 
-      const laundryCleaningFee = profile.privateData?.cleaningFee;
+      // Resolve against the LISTING's category chain: highest matching per-category
+      // fee -> studio-wide scalar -> null. Null means "configured nowhere", which is
+      // when the env default applies. resolveCategoryCleaningFee is pure and never
+      // throws, so a malformed pricing table degrades to the fallback rather than
+      // failing the booking.
+      const laundryCleaningFee = resolveCategoryCleaningFee(
+        profile.privateData,
+        getListingCategoryValues(listing?.attributes?.publicData)
+      );
       const feeMajorUnits =
-        typeof laundryCleaningFee === 'number' && Number.isFinite(laundryCleaningFee)
-          ? laundryCleaningFee
-          : fallbackFeeMajorUnits;
+        laundryCleaningFee !== null ? laundryCleaningFee : fallbackFeeMajorUnits;
       return cleaningFeeToSubunits(feeMajorUnits, currency);
     })
     .catch(e => {

@@ -362,3 +362,140 @@ describe('LaundryProfilePage', () => {
     expect(saved).toEqual(['Sequins']);
   });
 });
+
+// ── PER-CATEGORY PRICING: STORAGE ROUND-TRIP ─────────────────────────────────
+// The form holds these as FLAT fields (`categoryPricing__cleaningFee__midi_dress`)
+// because React Final Form reads dots in a field name as a path and Console category
+// ids are free-form operator input. The nested `privateData.categoryPricing` object is
+// assembled on submit — these tests pin both directions.
+describe('LaundryProfilePage per-category pricing', () => {
+  const priceInput = categoryId =>
+    document.getElementById(`LaundryProfileForm.categoryPricing__cleaningFee__${categoryId}`);
+  const hoursInput = categoryId =>
+    document.getElementById(`LaundryProfileForm.categoryPricing__turnaroundHours__${categoryId}`);
+
+  const withPricing = (acceptedCategories, categoryPricing) => ({
+    ...laundryUser,
+    attributes: {
+      ...laundryUser.attributes,
+      profile: {
+        ...laundryUser.attributes.profile,
+        publicData: { ...laundryUser.attributes.profile.publicData, acceptedCategories },
+        privateData: { ...laundryUser.attributes.profile.privateData, categoryPricing },
+      },
+    },
+  });
+
+  it('prefills the boxes from the stored table', async () => {
+    await act(async () => {
+      renderPage(
+        withPricing(['dresses', 'midi_dress'], {
+          dresses: { turnaroundHours: 72, cleaningFee: 15 },
+          midi_dress: { cleaningFee: 22 },
+        })
+      );
+    });
+
+    expect(hoursInput('dresses')).toHaveValue(72);
+    expect(priceInput('dresses')).toHaveValue(15);
+    expect(priceInput('midi_dress')).toHaveValue(22);
+  });
+
+  it('saves what was typed as a nested categoryPricing object', async () => {
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(withPricing(['dresses', 'midi_dress'], undefined), onUpdateProfile);
+    });
+
+    await act(async () => {
+      await userEvent.type(hoursInput('dresses'), '72');
+      await userEvent.type(priceInput('midi_dress'), '22');
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile).toHaveBeenCalledTimes(1);
+    expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({
+      dresses: { turnaroundHours: 72 },
+      midi_dress: { cleaningFee: 22 },
+    });
+    // The studio-wide values are untouched — they are the fallback, not a duplicate.
+    expect(onUpdateProfile.mock.calls[0][0].privateData.cleaningFee).toBe(12.5);
+    expect(onUpdateProfile.mock.calls[0][0].privateData.turnaroundHours).toBe(36);
+  });
+
+  it('RETAINS a stored price for a category the studio no longer accepts', async () => {
+    // The form renders no input for `pants` here, and a form that rebuilds the table
+    // only from what it rendered would silently delete a price the studio negotiated.
+    // Un-ticking a category is not a request to destroy its pricing.
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(
+        withPricing(['dresses'], {
+          dresses: { cleaningFee: 15 },
+          pants: { turnaroundHours: 24, cleaningFee: 6 },
+        }),
+        onUpdateProfile
+      );
+    });
+
+    await act(async () => {
+      await userEvent.type(priceInput('dresses'), '9');
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({
+      dresses: { cleaningFee: 159 },
+      pants: { turnaroundHours: 24, cleaningFee: 6 },
+    });
+  });
+
+  it('lets the studio clear a retained value on purpose', async () => {
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(
+        withPricing(['dresses'], {
+          dresses: { cleaningFee: 15 },
+          pants: { cleaningFee: 6 },
+        }),
+        onUpdateProfile
+      );
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByTitle('LaundryProfileForm.categoryPricingOrphanedRemove'));
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({
+      dresses: { cleaningFee: 15 },
+    });
+  });
+
+  it('drops a cleared box rather than storing a null over it', async () => {
+    // An empty box means "use the studio-wide value", which is the key being absent.
+    // A stored null would be a row that means nothing and has to be skipped on read.
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(withPricing(['dresses'], { dresses: { cleaningFee: 15 } }), onUpdateProfile);
+    });
+
+    await act(async () => {
+      await userEvent.clear(priceInput('dresses'));
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({});
+  });
+});

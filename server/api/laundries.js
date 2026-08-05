@@ -26,8 +26,23 @@ const { buildLaundryDirectory } = require('../api-util/laundryDirectory');
 // from the listing wizard, which is behind auth anyway, and without this an
 // anonymous request enumerated every user in the marketplace.
 //
+// Request: GET /api/laundries[?categories=dresses,midi_dress]
+//
+// `categories` is the category chain (general -> specific) of the garment the owner is
+// picking a laundry for — i.e. the listing's categoryLevel1/2/3. It is OPTIONAL and
+// purely presentational: when given, each entry's `turnaroundHours` is resolved for
+// THAT garment (a laundry sets hours per top-level category) instead of being the
+// studio-wide number, and `turnaroundHoursIsCategorySpecific` marks which it is.
+// Omitting it returns exactly what this endpoint returned before.
+//
+// Nothing security-relevant hangs off the parameter: it selects between numbers the
+// laundry has already agreed to publish on its own card, and it cannot widen the set
+// of users returned. It is length-capped anyway so a caller can't turn one request
+// into unbounded per-user work.
+//
 // Response (200): { data: [ { id, displayName, studioName, address, origin,
-//   businessHours, acceptedCategories, turnaroundHours } ], meta: {
+//   businessHours, acceptedCategories, turnaroundHours,
+//   turnaroundHoursIsCategorySpecific } ], meta: {
 //   totalUsersScanned, laundryUserCount, incompleteProfileCount, truncated } }
 //
 // Laundries with no usable profile (no address/origin) are omitted from `data`
@@ -55,8 +70,21 @@ const fetchUsersPage = (integrationSdk, page, collected) =>
     return { users, truncated: page < totalPages };
   });
 
+// Console supports three category levels, so a legitimate chain is never longer than
+// that. Cap rather than reject: an over-long or malformed `categories` param is a
+// client bug, and degrading to "resolve from the levels that make sense" keeps the
+// picker working instead of 400-ing an owner out of the wizard.
+const MAX_CATEGORY_LEVELS = 3;
+
+const parseCategoriesParam = value =>
+  (typeof value === 'string' ? value.split(',') : [])
+    .map(entry => entry.trim())
+    .filter(entry => entry !== '')
+    .slice(0, MAX_CATEGORY_LEVELS);
+
 module.exports = (req, res) => {
   const sdk = getSdk(req, res);
+  const listingCategoryValues = parseCategoriesParam(req.query?.categories);
 
   // Authenticated callers only. currentUser.show() rejects for anonymous
   // sessions, which handleError turns into the SDK's own 401/403 response.
@@ -64,7 +92,7 @@ module.exports = (req, res) => {
     .show()
     .then(() => fetchUsersPage(getIntegrationSdk(), 1, []))
     .then(({ users, truncated }) => {
-      const { laundries, meta } = buildLaundryDirectory(users);
+      const { laundries, meta } = buildLaundryDirectory(users, listingCategoryValues);
 
       res
         .status(200)

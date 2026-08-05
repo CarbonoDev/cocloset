@@ -6,6 +6,10 @@ const {
   resolveTurnaroundHours,
 } = require('../api-util/availabilityHelpers');
 const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
+const {
+  getListingCategoryValues,
+  resolveCategoryTurnaroundHours,
+} = require('../api-util/categoryPricing');
 const { ACCEPT_TRANSITIONS } = require('../api-util/coclosetBookingProcess');
 const { notifyPickupScheduled } = require('../api-util/laundryMailer');
 
@@ -243,8 +247,16 @@ module.exports = (req, res) => {
       return integrationSdk.users.show({ id: assignedLaundryId }).then(userResponse => {
         const laundryUser = userResponse.data.data;
         const laundryProfile = laundryUser.attributes?.profile || {};
+        // Size the buffer from the turnaround for the garment ACTUALLY being cleaned,
+        // not a studio-wide average: a laundry sets hours per top-level category
+        // (privateData.categoryPricing), and the listing's own top-level category
+        // selects one. Falls back to the studio-wide privateData.turnaroundHours, and
+        // then (inside resolveTurnaroundHours) to DEFAULT_LAUNDRY_BUFFER_HOURS.
         const turnaroundHours = resolveTurnaroundHours(
-          laundryProfile.privateData?.turnaroundHours,
+          resolveCategoryTurnaroundHours(
+            laundryProfile.privateData,
+            getListingCategoryValues(listing.attributes?.publicData)
+          ),
           process.env.DEFAULT_LAUNDRY_BUFFER_HOURS
         );
 

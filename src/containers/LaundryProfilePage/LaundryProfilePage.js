@@ -4,6 +4,10 @@ import { connect } from 'react-redux';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { isLaundryUser } from '../../util/userHelpers';
+import {
+  categoryPricingFromFormValues,
+  categoryPricingToFormValues,
+} from '../../util/fieldHelpers';
 import { types as sdkTypes } from '../../util/sdkLoader';
 
 import { isScrollingDisabled } from '../../ducks/ui.duck';
@@ -59,6 +63,17 @@ const getInitialValues = currentUser => {
     businessHours,
     turnaroundHours,
     cleaningFee,
+    // The per-category table is flattened into one form field per value
+    // (`categoryPricing__cleaningFee__midi_dress`). Flat, not nested, because React
+    // Final Form reads dots in a field name as a path and Console category ids are
+    // free-form operator input — see categoryPricingFieldName.
+    //
+    // EVERY stored entry is seeded, including categories the studio no longer accepts.
+    // Those render no input, but final-form keeps unbound initialValues in `values`,
+    // so they survive a save instead of being silently pruned by a form that simply
+    // wasn't showing them. The form surfaces them separately so they can be cleared on
+    // purpose.
+    ...categoryPricingToFormValues(privateData.categoryPricing),
     // Array in, array out. The stored list can mix Console category ids (what the
     // picker writes) with free text saved before the picker existed; the form keeps
     // both in this one field so a save can never drop the legacy half. See
@@ -133,6 +148,11 @@ const LaundryProfileFormSection = props => {
     const nextTurnaroundHours = preserved(turnaroundHours, currentPrivateData.turnaroundHours);
     const nextCleaningFee = preserved(cleaningFee, currentPrivateData.cleaningFee);
 
+    // Rebuild the nested table from the flat fields. Cleared inputs drop out entirely
+    // rather than being stored as null: an empty box means "use the studio-wide value",
+    // and that is expressed by the key's absence, not by a row full of nulls.
+    const nextCategoryPricing = categoryPricingFromFormValues(values);
+
     // Only the keys this page owns are sent. Sharetribe merges top-level
     // publicData/privateData keys, so re-sending the whole existing blob would
     // only widen the lost-update window against a concurrent write.
@@ -144,6 +164,7 @@ const LaundryProfileFormSection = props => {
       privateData: {
         turnaroundHours: nextTurnaroundHours,
         cleaningFee: nextCleaningFee,
+        categoryPricing: nextCategoryPricing,
       },
     };
 
@@ -156,6 +177,7 @@ const LaundryProfileFormSection = props => {
         turnaroundHours: nextTurnaroundHours,
         cleaningFee: nextCleaningFee,
         acceptedCategories: acceptedCategoriesArray,
+        ...categoryPricingToFormValues(nextCategoryPricing),
         location:
           address && origin ? { search: address, selectedPlace: { address, origin } } : null,
       },
@@ -179,11 +201,14 @@ const LaundryProfileFormSection = props => {
  * LaundryProfilePage
  *
  * Laundry-only settings page for the studio profile: studio name, address,
- * business hours, default turnaround hours, cleaning fee, and accepted garment
- * categories. Writes to publicData.laundryProfile, publicData.acceptedCategories
- * and privateData (turnaroundHours, cleaningFee) on the laundry's own user profile
+ * business hours, studio-wide turnaround hours and cleaning fee, accepted garment
+ * categories, and a turnaround/price per accepted category. Writes to
+ * publicData.laundryProfile, publicData.acceptedCategories and privateData
+ * (turnaroundHours, cleaningFee, categoryPricing) on the laundry's own user profile
  * via the ordinary Marketplace API (sdk.currentUser.updateProfile) — no Integration
- * API involved. Access is gated to users flagged via isLaundryUser (see
+ * API involved. The per-category table is privateData rather than publicData because
+ * it is a commercial pricing input: the laundry and the operator see it, nobody else.
+ * Access is gated to users flagged via isLaundryUser (see
  * src/util/userHelpers.js); everyone else sees NotFoundPage, matching the pattern
  * used by other role-gated pages in this template (e.g. ProfilePage, InboxPage).
  *
