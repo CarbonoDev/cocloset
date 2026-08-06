@@ -332,6 +332,7 @@
 .tableWrapper {
   min-width: 0;
   margin-top: 18px;
+  max-width: 90vw;
 
   @media (--viewportMedium) {
     margin-top: 24px;
@@ -509,8 +510,8 @@
 /* ================ Expanded row detail ================ */
 
 .detailCell {
-  padding: 0 10px 16px 10px;
-  border-bottom: 1px solid var(--coclosetBorder);
+  padding: 0;
+  border-bottom: 2px solid var(--coclosetBorder);
   background-color: var(--coclosetSurfaceRaised);
 }
 
@@ -519,8 +520,6 @@
   flex-direction: column;
   gap: 16px;
   padding: 16px;
-  border: 1px solid var(--coclosetBorder);
-  border-radius: var(--coclosetRadius);
   background-color: var(--coclosetSurface);
 
   @media (--viewportMedium) {
@@ -604,10 +603,23 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  width: fit-content;
   color: var(--coclosetInk);
   cursor: pointer;
   font-size: 14px;
   line-height: 20px;
+  margin: 5px 0 20px 0;
+
+  @media (--viewportMedium) {
+    margin: 0;
+  }
+}
+
+.damageToggle input[type='checkbox'] {
+  margin: 0;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
 }
 
 .damageNote {

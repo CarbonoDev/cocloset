@@ -1880,5 +1880,6 @@
   "UserNav.laundryProfile": "Studio ops",
   "UserNav.profileSettings": "Profile settings",
   "UserNav.screenreader.userNav": "User profile navigation",
-  "UserNav.yourListings": "Your listings"
+  "UserNav.yourListings": "Your listings",
+  "LaundryOpsPage.status.reviewed": "Completed"
 }
