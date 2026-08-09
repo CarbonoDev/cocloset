@@ -275,17 +275,25 @@ export const updateListingCustodyStatus = body => {
   return post('/api/listing-custody-status', body);
 };
 
-// Ask the server whether this listing's assigned laundry may be changed right
-// now. Answers 200 when it may, 409 when the garment is still at the laundry
-// (`metadata.onLaundry === true`).
+// Assign a laundry to a listing. THIS IS THE WRITE, not a precondition check.
 //
-// This is a PRECONDITION CHECK, not a write: the wizard still writes
-// `publicData.assignedLaundryId` through `sdk.ownListings.update()`. The header of
-// `server/api/listing-laundry-assignment.js` states exactly what that does and
-// does not enforce - read it before treating a 200 here as a guarantee.
+// `assignedLaundryId` lives in the listing's `metadata`, which the Marketplace API
+// refuses to let an owner write (400 `validation-disallowed-key`), so the browser
+// cannot do this itself - by design. The server validates that the caller owns the
+// listing, that it has no active transaction, and that `metadata.onLaundry !== true`,
+// then writes the id together with the three fields derived from the chosen laundry
+// (`publicData.assignedLaundryName`, `publicData.pickupAddress` and the listing's
+// top-level `geolocation`) in one Integration API call.
+//
+// So the wizard must NOT also write those fields through `ownListings.update()`.
+// Read the header of `server/api/listing-laundry-assignment.js` before changing
+// this call or what the panel does with its result.
+//
+// Rejects with 409 when the garment is at the laundry or a transaction is in
+// flight, and 422 when the chosen laundry is unusable.
 //
 // Body: { listingId, assignedLaundryId }
-export const checkListingLaundryAssignment = body => {
+export const assignListingLaundry = body => {
   return post('/api/listing-laundry-assignment', body);
 };
 

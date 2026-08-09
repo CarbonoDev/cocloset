@@ -10,10 +10,10 @@ import {
 
 jest.mock('../../../../util/api', () => ({
   fetchLaundries: jest.fn(),
-  checkListingLaundryAssignment: jest.fn(),
+  assignListingLaundry: jest.fn(),
 }));
 
-import { checkListingLaundryAssignment, fetchLaundries } from '../../../../util/api';
+import { assignListingLaundry, fetchLaundries } from '../../../../util/api';
 
 import EditListingLaundryPanel from './EditListingLaundryPanel';
 
@@ -21,15 +21,20 @@ const { screen, userEvent } = testingLibrary;
 
 // The assigned-laundry guard, from the owner's side.
 //
-//   > "No se debe cambiar la laundry seleccionada por el provider para un listing a
-//   >  menos que ya se haya devuelto la prenda onLaundry = false"
+//   > "se puede editar la laundry mientras que no este en una transaction activa y
+//   >  que onLaundry sea false"
 //
-// The behaviour worth pinning is NOT the notice - it is that the panel never
-// writes `publicData.assignedLaundryId` without first getting a 200 from the
-// server-side check. The check re-reads `metadata.onLaundry` from the API, so it
-// is the only part of this that a client cannot talk its way past. (What it still
-// does not stop is a caller who skips the panel entirely - see the header of
-// server/api/listing-laundry-assignment.js.)
+// The behaviour worth pinning is NOT the notice. It is that this panel does not
+// write the assignment AT ALL any more: it POSTs to /api/listing-laundry-assignment
+// and the server performs the write. The field lives in `metadata`, which the
+// Marketplace API refuses to let an owner write (400 `validation-disallowed-key`),
+// so the guard is no longer a question a client may decline to ask - which is
+// exactly what the previous version of this file could only document as a gap.
+//
+// So the assertions below are, in order of importance: nothing about the
+// assignment goes through `onSubmit` (i.e. through `ownListings.update`), a
+// refusal is never treated as a success, and a refusal says which of the two
+// conditions caused it.
 
 const SAVE = 'Save laundry assignment';
 
@@ -54,14 +59,17 @@ const LAUNDRIES = [
   },
 ];
 
+// The saved assignment is in `metadata`, alongside `onLaundry`. A fixture that
+// still put it in `publicData` would render an empty picker and pass for the
+// wrong reason.
 const listingWith = ({ metadata = {}, assignedLaundryId = 'laundry-1' } = {}) => ({
   id: { uuid: 'listing-1' },
   type: 'ownListing',
   attributes: {
     title: 'Draped jersey gown, crimson',
     state: 'published',
-    publicData: { assignedLaundryId, categoryLevel1: 'dresses' },
-    metadata,
+    publicData: { categoryLevel1: 'dresses' },
+    metadata: { assignedLaundryId, ...metadata },
   },
 });
 
@@ -95,9 +103,13 @@ const pickSecondLaundry = async user => {
   await user.click(radios[1]);
 };
 
-const conflict = () => {
-  const error = new Error('at the laundry');
+// A 409 as api-util/sdk.js's handleError actually shapes it: `data.reason` names
+// which condition refused the change, and the panel picks a translated string off
+// it rather than printing the server's English `statusText`.
+const conflict = (reason = 'on-laundry') => {
+  const error = new Error('refused');
   error.status = 409;
+  error.data = { reason };
   return error;
 };
 
@@ -105,10 +117,10 @@ describe('EditListingLaundryPanel', () => {
   beforeEach(() => {
     // The shared jest config sets `resetMocks: true`.
     fetchLaundries.mockResolvedValue({ data: LAUNDRIES });
-    checkListingLaundryAssignment.mockResolvedValue({ data: { allowed: true } });
+    assignListingLaundry.mockResolvedValue({ data: { allowed: true } });
   });
 
-  it('asks the server before writing the new assignment', async () => {
+  it('sends the new assignment to the server, which does the write', async () => {
     const user = userEvent.setup();
     const { onSubmit } = await renderPanel();
 
@@ -117,22 +129,36 @@ describe('EditListingLaundryPanel', () => {
       await user.click(screen.getByRole('button', { name: SAVE }));
     });
 
-    expect(checkListingLaundryAssignment).toHaveBeenCalledWith({
+    expect(assignListingLaundry).toHaveBeenCalledWith({
       listingId: 'listing-1',
       assignedLaundryId: 'laundry-2',
     });
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        publicData: expect.objectContaining({ assignedLaundryId: 'laundry-2' }),
-      })
-    );
   });
 
-  it('DOES NOT write when the server refuses with 409', async () => {
-    // The load-bearing assertion of this file. A silent pass here would write the
-    // reassignment of a garment that is physically in another studio.
+  it('sends NO listing attributes through onSubmit', async () => {
+    // The load-bearing assertion of the relocation. `onSubmit` reaches
+    // `ownListings.update` from the browser, so anything passed here is a
+    // client-controlled write. The assignment, the pickup address and the
+    // geolocation are all the server's to write now; this call exists only as a
+    // read-back that refreshes the Redux entity and lets the wizard mark the tab
+    // updated. Passing `geolocation`/`publicData` here would reopen exactly the
+    // owner-writable path this change closed.
     const user = userEvent.setup();
-    checkListingLaundryAssignment.mockRejectedValue(conflict());
+    const { onSubmit } = await renderPanel();
+
+    await pickSecondLaundry(user);
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: SAVE }));
+    });
+
+    expect(onSubmit).toHaveBeenCalledWith({});
+  });
+
+  it('does not pass the tab when the server refuses with 409', async () => {
+    // A silent pass here would mark the LAUNDRY tab complete and walk the owner
+    // forward as though the reassignment had happened, when the server refused it.
+    const user = userEvent.setup();
+    assignListingLaundry.mockRejectedValue(conflict());
     const { onSubmit } = await renderPanel();
 
     await pickSecondLaundry(user);
@@ -144,10 +170,47 @@ describe('EditListingLaundryPanel', () => {
     expect(screen.getByText('EditListingLaundryPanel.laundryLockedError')).toBeInTheDocument();
   });
 
-  it('DOES NOT write when the check fails for any other reason', async () => {
-    // Fails closed. A dropped request is not permission.
+  it('says which condition refused it: an active rental is not the same news', async () => {
+    // Two different facts about the owner's own garment. Telling someone with a
+    // live rental that their garment is sitting in a studio sends them to check a
+    // shelf instead of waiting for a renter.
     const user = userEvent.setup();
-    checkListingLaundryAssignment.mockRejectedValue(new Error('Network down'));
+    assignListingLaundry.mockRejectedValue(conflict('active-transaction'));
+    await renderPanel();
+
+    await pickSecondLaundry(user);
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: SAVE }));
+    });
+
+    expect(screen.getByText('EditListingLaundryPanel.activeTransactionError')).toBeInTheDocument();
+    expect(
+      screen.queryByText('EditListingLaundryPanel.laundryLockedError')
+    ).not.toBeInTheDocument();
+  });
+
+  it('falls back to the locked message on a 409 with no reason', async () => {
+    // An older server build, or a proxy that ate the body. Still a refusal, and
+    // still has to say so - a blank would read as a silent failure.
+    const user = userEvent.setup();
+    const bare = new Error('refused');
+    bare.status = 409;
+    assignListingLaundry.mockRejectedValue(bare);
+    const { onSubmit } = await renderPanel();
+
+    await pickSecondLaundry(user);
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: SAVE }));
+    });
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('EditListingLaundryPanel.laundryLockedError')).toBeInTheDocument();
+  });
+
+  it('does not pass the tab when the save fails for any other reason', async () => {
+    // Fails closed. A dropped request is not a save.
+    const user = userEvent.setup();
+    assignListingLaundry.mockRejectedValue(new Error('Network down'));
     const { onSubmit } = await renderPanel();
 
     await pickSecondLaundry(user);
@@ -157,7 +220,7 @@ describe('EditListingLaundryPanel', () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
     // ...and says so honestly, rather than blaming the laundry for a network fault.
-    expect(screen.getByText('EditListingLaundryPanel.assignmentCheckFailed')).toBeInTheDocument();
+    expect(screen.getByText('EditListingLaundryPanel.assignmentFailed')).toBeInTheDocument();
     expect(
       screen.queryByText('EditListingLaundryPanel.laundryLockedError')
     ).not.toBeInTheDocument();
@@ -189,10 +252,12 @@ describe('EditListingLaundryPanel', () => {
     expect(screen.queryByText('EditListingLaundryForm.laundryLocked')).not.toBeInTheDocument();
   });
 
-  it('still checks with the server on an unchanged re-save', async () => {
+  it('still calls the server on an unchanged re-save', async () => {
     // The panel does not try to decide locally whether this counts as a change -
     // `evaluateLaundryAssignment` on the server owns that rule, and duplicating it
-    // here is how the two would drift.
+    // here is how the two would drift. It also cannot skip the call: the server is
+    // the only party that can write, so skipping it would leave the derived fields
+    // unrefreshed and the tab unmarked.
     const user = userEvent.setup();
     const { onSubmit } = await renderPanel();
 
@@ -200,10 +265,23 @@ describe('EditListingLaundryPanel', () => {
       await user.click(screen.getByRole('button', { name: SAVE }));
     });
 
-    expect(checkListingLaundryAssignment).toHaveBeenCalledWith({
+    expect(assignListingLaundry).toHaveBeenCalledWith({
       listingId: 'listing-1',
       assignedLaundryId: 'laundry-1',
     });
     expect(onSubmit).toHaveBeenCalled();
+  });
+
+  it('reads the saved laundry from metadata, not publicData', async () => {
+    // If this regressed, the picker would render with nothing selected for every
+    // listing that already has a laundry, and an owner walking back through the
+    // wizard would be asked to choose again from scratch.
+    await renderPanel({ listing: listingWith({ assignedLaundryId: 'laundry-2' }) });
+
+    const radios = screen.getAllByRole('radio', {
+      name: 'EditListingLaundryForm.screenreader.chooseLaundry',
+    });
+    expect(radios[1]).toBeChecked();
+    expect(radios[0]).not.toBeChecked();
   });
 });

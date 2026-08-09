@@ -44,8 +44,7 @@ const listing = {
   type: 'listing',
   attributes: {
     title: 'Draped jersey gown, crimson',
-    publicData: { assignedLaundryId: LAUNDRY_ID },
-    metadata: { onLaundry: true },
+    metadata: { assignedLaundryId: LAUNDRY_ID, onLaundry: true },
   },
   relationships: { author: { data: { id: { uuid: OWNER_ID }, type: 'user' } } },
 };

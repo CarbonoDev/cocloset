@@ -22,10 +22,13 @@ const LAUNDRY_ID = 'laundry-1';
 const OTHER_LAUNDRY_ID = 'laundry-2';
 const STRANGER_ID = 'stranger-1';
 
+// `assignedLaundryId` lives in `metadata` - the Marketplace API refuses an
+// owner's write to it, which is what makes it safe to authorize a laundry against
+// (see server/api-util/laundryAssignment.js).
 const listingEntity = ({ authorId = OWNER_ID, assignedLaundryId = LAUNDRY_ID } = {}) => ({
   id: { uuid: 'listing-1' },
   type: 'listing',
-  attributes: { publicData: { assignedLaundryId } },
+  attributes: { metadata: { assignedLaundryId } },
   relationships: { author: { data: { id: { uuid: authorId }, type: 'user' } } },
 });
 
@@ -74,10 +77,15 @@ describe('isListingAuthor', () => {
 
   it('does not consult publicData, which the owner can write', () => {
     // A listing whose publicData claims the stranger owns it. The relationship
-    // says otherwise, and the relationship is the only thing that counts.
+    // says otherwise, and the relationship is the only thing that counts. Note the
+    // claim is in publicData precisely because that is the scope an owner CAN
+    // write - which is the whole reason authorization never reads from it.
     const listing = {
       ...listingEntity(),
-      attributes: { publicData: { assignedLaundryId: LAUNDRY_ID, authorId: STRANGER_ID } },
+      attributes: {
+        metadata: { assignedLaundryId: LAUNDRY_ID },
+        publicData: { authorId: STRANGER_ID },
+      },
     };
     expect(isListingAuthor(userEntity({ id: STRANGER_ID }), listing)).toBe(false);
   });

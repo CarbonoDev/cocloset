@@ -42,7 +42,7 @@ const mockRes = () => ({
 const listing = {
   id: LISTING_ID,
   type: 'listing',
-  attributes: { publicData: { assignedLaundryId: LAUNDRY_ID } },
+  attributes: { metadata: { assignedLaundryId: LAUNDRY_ID } },
 };
 
 const setupSdk = () => {

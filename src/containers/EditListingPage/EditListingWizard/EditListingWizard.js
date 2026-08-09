@@ -292,7 +292,10 @@ const hasValidListingFieldsInExtendedData = (publicData, privateData, config) =>
  *
  * @return true if tab / step is completed.
  */
-const tabCompleted = (tab, listing, config, options = {}) => {
+// Exported for tests. The LAUNDRY case in particular reads a field that recently
+// changed scope, and a regression there does not throw - it silently marks the tab
+// incomplete, which shows up as an owner being bounced back with no message.
+export const tabCompleted = (tab, listing, config, options = {}) => {
   const {
     availabilityPlan,
     description,
@@ -301,6 +304,7 @@ const tabCompleted = (tab, listing, config, options = {}) => {
     title,
     publicData,
     privateData,
+    metadata,
   } = listing.attributes;
   const images = listing.images;
   const {
@@ -350,7 +354,18 @@ const tabCompleted = (tab, listing, config, options = {}) => {
         privateData?.ownerAddress?.postcode
       );
     case LAUNDRY:
-      return !!(geolocation && publicData?.assignedLaundryId);
+      // The assignment now lives in `metadata` (only the Integration API can write
+      // it - see server/api-util/laundryAssignment.js), so this reads metadata, not
+      // publicData. Reading the old key here would leave the tab permanently
+      // incomplete for every newly assigned listing: the owner saves successfully,
+      // is redirected forward, and is bounced straight back with nothing shown.
+      //
+      // The value IS visible by the time this runs. `metadata` is publicly
+      // readable even though it is operator-write-only, and the panel's save
+      // finishes with an `ownListings.update` whose expanded response carries the
+      // metadata the server has just written (verified against Dev), which is what
+      // refreshes the Redux entity this check reads.
+      return !!(geolocation && metadata?.assignedLaundryId);
     case AVAILABILITY:
       return !!availabilityPlan;
     case PHOTOS:

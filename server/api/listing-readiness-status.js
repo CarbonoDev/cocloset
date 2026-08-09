@@ -1,6 +1,7 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
+const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
 
 // Values for `listing.metadata.readinessStatus` (design doc §8). Tracks the
 // physical garment's state independent of any specific booking - e.g. a
@@ -36,7 +37,7 @@ const READINESS_IMPLIES_ON_LAUNDRY = ['stored', 'available'];
 //
 // Behavior:
 //   - Fetches the listing (Integration API) to find its
-//     `publicData.assignedLaundryId`.
+//     `metadata.assignedLaundryId`.
 //   - Authorizes the caller: must be flagged `metadata.isLaundry` AND be the
 //     listing's assigned laundry.
 //   - Writes via the Integration API's `listings.update`. Extended-data
@@ -82,7 +83,7 @@ module.exports = (req, res) => {
     .show({ id: listingId })
     .then(listingResponse => {
       const listing = listingResponse.data.data;
-      const assignedLaundryId = listing.attributes?.publicData?.assignedLaundryId;
+      const assignedLaundryId = readAssignedLaundryId(listing);
 
       return authorizeLaundryCaller(req, res, assignedLaundryId).then(() => {
         const claimsCustody = READINESS_IMPLIES_ON_LAUNDRY.includes(readinessStatus);

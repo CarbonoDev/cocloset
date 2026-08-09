@@ -781,8 +781,13 @@ describe('resolveCleaningFeeInSubunits()', () => {
     process.env.DEFAULT_CLEANING_FEE = originalEnv;
   });
 
+  // The laundry id is in `metadata` (Integration-API-only); the category chain
+  // stays in `publicData`, which is where Console writes it.
   const listingWithLaundry = (laundryId, categoryLevels = {}) => ({
-    attributes: { publicData: { assignedLaundryId: laundryId, ...categoryLevels } },
+    attributes: {
+      metadata: { assignedLaundryId: laundryId },
+      publicData: { ...categoryLevels },
+    },
   });
 
   const listingWithoutLaundry = { attributes: { publicData: {} } };
@@ -900,12 +905,19 @@ describe('resolveCleaningFeeInSubunits()', () => {
     expect(result).toBe(0);
   });
 
-  // SECURITY REGRESSION TESTS. `assignedLaundryId` is provider-controlled
-  // publicData on the provider's own listing, so a provider can point it at
-  // any user - including themselves - and set that user's privateData.
-  // cleaningFee. Without the isLaundry check they could zero out the fee, or
-  // inflate every customer's payin total by an arbitrary amount that never
-  // appears in the listing price.
+  // SECURITY REGRESSION TESTS. These predate `assignedLaundryId` moving to
+  // `metadata`, and they stay exactly as they were - the isLaundry check they pin
+  // is still load-bearing for three reasons the relocation does not touch: the
+  // migration relocates old values verbatim without auditing them, a laundry can
+  // be de-flagged after being assigned, and this value sets a customer's payin
+  // total so it deserves two independent checks. See the SECURITY note on
+  // resolveCleaningFeeInSubunits.
+  //
+  // The original reason, for the record: the id used to be provider-controlled
+  // publicData on the provider's own listing, so a provider could point it at any
+  // user - including themselves - and set that user's privateData.cleaningFee,
+  // zeroing the fee or inflating every customer's payin total by an amount that
+  // never appears in the listing price.
   const nonLaundryUserWithFee = cleaningFee => ({
     data: {
       data: {
@@ -1036,7 +1048,8 @@ describe('resolveCleaningFeeInSubunits()', () => {
 
   it('ignores a per-category fee from a user who is NOT flagged isLaundry', async () => {
     // The isLaundry check runs BEFORE resolution, so per-category pricing gives a
-    // provider no new way to inject a fee by pointing assignedLaundryId at themselves.
+    // provider no new way to inject a fee by pointing assignedLaundryId at a user
+    // of their choosing.
     process.env.DEFAULT_CLEANING_FEE = '10';
     mockUsersShow.mockResolvedValue({
       data: {
