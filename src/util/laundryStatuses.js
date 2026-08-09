@@ -81,6 +81,24 @@ export const LAUNDRY_ACTION_STATUSES = [
 // Both return transitions accept one.
 export const DAMAGE_REPORT_STATUS = 'returned';
 
+// The step at which the laundry may say how long cleaning will take.
+//
+//   > "Al momento en que una laundry recibe una prenda (cuando el cliente la
+//   >  devuelve) puede determinar cuantos días va a tardar en lavar para habilitar
+//   >  la disponibilidad, por default son los días que establece en su
+//   >  configuración de la laundry"
+//
+// Same step as the damage report, and for the same reason: confirming the return
+// is the one moment a human is holding the garment and looking at it. Kept as its
+// own constant rather than reusing DAMAGE_REPORT_STATUS, because they are two
+// unrelated facts that happen to be collected together - if the damage report
+// ever moves, this must not follow it by accident.
+//
+// The field is OPTIONAL. Sending nothing means "use the turnaround I configured",
+// which is the documented default and is resolved server-side from the laundry's
+// per-category settings - the client neither knows nor guesses it.
+export const CLEANING_DAYS_STATUS = 'returned';
+
 // The action that fires the owner's payout. Called out separately because the
 // UI has to warn about it: it is the point of no return for a refund.
 export const PAYOUT_ACTION_STATUS = 'pending-cleaning';
@@ -123,7 +141,7 @@ export const opsStatus = row => {
  *
  * @param {Object} row - a row from the /api/laundry-orders response
  * @returns {Array<{status: string, labelKey: string, needsDamageReport: boolean,
- *   firesPayout: boolean}>}
+ *   needsCleaningDays: boolean, firesPayout: boolean}>}
  */
 export const laundryActionsFor = row => {
   // Inventory-only rows (§8's listings with no transaction) have no process
@@ -171,6 +189,7 @@ export const laundryActionsFor = row => {
       status: nextStatus,
       labelKey: `LaundryOpsPage.action.${nextStatus}`,
       needsDamageReport: nextStatus === DAMAGE_REPORT_STATUS,
+      needsCleaningDays: nextStatus === CLEANING_DAYS_STATUS,
       firesPayout: nextStatus === PAYOUT_ACTION_STATUS,
     },
   ];

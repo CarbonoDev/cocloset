@@ -4,7 +4,7 @@ import classNames from 'classnames';
 // Import configs and util modules
 import { FormattedMessage } from '../../../../util/reactIntl';
 import { LISTING_STATE_DRAFT } from '../../../../util/types';
-import { fetchLaundries } from '../../../../util/api';
+import { checkListingLaundryAssignment, fetchLaundries } from '../../../../util/api';
 import { getListingCategoryValues } from '../../../../util/fieldHelpers';
 
 // Import shared components
@@ -31,6 +31,23 @@ const getInitialValues = props => {
  * the laundry's location rather than the owner's own address (that address is
  * captured separately, privately, in EditListingLocationPanel).
  *
+ * THE PICKER LOCKS WHILE THE GARMENT IS AT THE LAUNDRY
+ *   > "No se debe cambiar la laundry seleccionada por el provider para un listing
+ *   >  a menos que ya se haya devuelto la prenda onLaundry = false"
+ *
+ * `listing.metadata.onLaundry` is written only by the server (it is metadata, so
+ * an owner cannot forge it - see server/api-util/listingCustody.js), which is what
+ * makes it safe to read here. When it is true the cards stop being selectable and
+ * a notice says why; re-saving the SAME laundry is still allowed so the wizard tab
+ * never dead-ends.
+ *
+ * The lock in this file is a courtesy, not the enforcement. Submitting first asks
+ * /api/listing-laundry-assignment, which re-reads `onLaundry` server-side, so a
+ * page that was loaded while the garment was home and submitted after it came back
+ * is refused. Read the header of server/api/listing-laundry-assignment.js for what
+ * that does and does NOT stop - the wizard's write goes browser -> Marketplace API
+ * and our server is not in that path.
+ *
  * @component
  * @param {Object} props
  * @param {string} [props.className] - Custom class that extends the default class for the root element
@@ -52,6 +69,13 @@ const EditListingLaundryPanel = props => {
   // Set when the picked laundry turns out to be unusable at submit time (see
   // the guard in onSubmit below). Without it the failure is silent.
   const [selectionError, setSelectionError] = useState(false);
+  // 409 from /api/listing-laundry-assignment: the garment went back to the
+  // laundry after this page was rendered, so the picker should have been locked.
+  const [lockError, setLockError] = useState(false);
+  // Any other failure of that same check. Kept distinct from lockError on
+  // purpose: telling an owner "the garment is at the laundry" because their wifi
+  // dropped would be a lie about their own garment.
+  const [checkError, setCheckError] = useState(false);
 
   const {
     className,
@@ -70,6 +94,8 @@ const EditListingLaundryPanel = props => {
 
   const classes = classNames(rootClassName || css.root, className);
   const isPublished = listing?.id && listing?.attributes.state !== LISTING_STATE_DRAFT;
+  // Physical custody. Server-written metadata; see the docblock above.
+  const isOnLaundry = listing?.attributes?.metadata?.onLaundry === true;
   // Console stores categories as categoryLevel1/2/3, never a single `category` key — reading
   // `publicData.category` meant this was always undefined and the accepted-category check
   // below could never fire. A listing may be categorised at several levels, so compare against
@@ -144,12 +170,25 @@ const EditListingLaundryPanel = props => {
         </p>
       ) : null}
 
+      {lockError ? (
+        <p className={css.error}>
+          <FormattedMessage id="EditListingLaundryPanel.laundryLockedError" />
+        </p>
+      ) : null}
+
+      {checkError ? (
+        <p className={css.error}>
+          <FormattedMessage id="EditListingLaundryPanel.assignmentCheckFailed" />
+        </p>
+      ) : null}
+
       <EditListingLaundryForm
         className={css.form}
         initialValues={getInitialValues(props)}
         laundries={laundries}
         fetchLaundriesInProgress={fetchLaundriesInProgress}
         listingCategories={listingCategories}
+        laundryLocked={isOnLaundry}
         onSubmit={values => {
           const { assignedLaundryId } = values;
           const selectedLaundry = laundries.find(l => l.id === assignedLaundryId);
@@ -170,6 +209,8 @@ const EditListingLaundryPanel = props => {
             return;
           }
           setSelectionError(false);
+          setLockError(false);
+          setCheckError(false);
 
           // New values for listing attributes. The listing's own geolocation
           // and pickup address now come from the assigned laundry, not the
@@ -182,7 +223,31 @@ const EditListingLaundryPanel = props => {
               pickupAddress: selectedLaundry.address,
             },
           };
-          onSubmit(updateValues);
+
+          // No listing yet means the create flow's very first tab, which this is
+          // not (LAUNDRY always follows DETAILS). Guard anyway rather than POST
+          // an undefined id - and a listing that does not exist cannot have a
+          // garment sitting in a studio, so there is nothing to check.
+          const listingId = listing?.id?.uuid;
+          if (!listingId) {
+            return onSubmit(updateValues);
+          }
+
+          // Re-read `onLaundry` server-side before writing. This is what catches
+          // the stale page the client-side lock cannot: rendered while the
+          // garment was home, submitted after it came back.
+          return checkListingLaundryAssignment({
+            listingId,
+            assignedLaundryId: selectedLaundry.id,
+          })
+            .then(() => onSubmit(updateValues))
+            .catch(e => {
+              if (e?.status === 409) {
+                setLockError(true);
+              } else {
+                setCheckError(true);
+              }
+            });
         }}
         saveActionMsg={submitButtonText}
         disabled={disabled}

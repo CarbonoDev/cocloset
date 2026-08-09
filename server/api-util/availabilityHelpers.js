@@ -53,6 +53,27 @@ const addDays = (date, days) => {
   return result;
 };
 
+// Midnight (UTC) of the day a Date falls in, and the next midnight at or after
+// it. Availability exceptions are arbitrary time ranges, but a DAY-unit listing
+// is unbookable for any day an exception touches - so snapping a window outwards
+// to whole UTC days is what makes "blocked until the garment is ready" mean the
+// same thing to the calendar as it does to a human.
+//
+// The buffer window computed at `accept` never needed this: its inputs are
+// booking dates, which Sharetribe already stores on UTC day boundaries for daily
+// bookings. The window computed at a REAL return does: its input is the moment
+// the laundry pressed the button, which is 14:37 on a Tuesday.
+const floorToUtcDay = date =>
+  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+
+// Ceiling, not "floor + 1": a timestamp already exactly at midnight is its own
+// day boundary, and rounding it up would over-block by a full day every time a
+// turnaround lands cleanly.
+const ceilToUtcDay = date => {
+  const floored = floorToUtcDay(date);
+  return floored.getTime() === date.getTime() ? floored : addDays(floored, 1);
+};
+
 /**
  * Compute the full availability-exception window (buffer-before + the
  * booking's own rental dates + buffer-after) for a booking, given the
@@ -216,6 +237,8 @@ module.exports = {
   HARDCODED_DEFAULT_BUFFER_HOURS,
   computeBufferDays,
   addDays,
+  floorToUtcDay,
+  ceilToUtcDay,
   computeAvailabilityBufferWindow,
   resolveTurnaroundHours,
   subtractBlockedRanges,

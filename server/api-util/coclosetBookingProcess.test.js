@@ -12,6 +12,9 @@ const {
   transitionForStatus,
   OPS_LAST_TRANSITIONS,
   ACCEPT_TRANSITIONS,
+  ACTIVE_STATES,
+  ACTIVE_LAST_TRANSITIONS,
+  isActiveLastTransition,
   isInvalidTransitionError,
 } = require('./coclosetBookingProcess');
 
@@ -241,6 +244,106 @@ describe('coclosetBookingProcess', () => {
       expect(isInvalidTransitionError(new Error('network down'))).toBe(false);
       expect(isInvalidTransitionError(undefined)).toBe(false);
       expect(isInvalidTransitionError({ data: {} })).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // "Active transaction" - the definition the custody guards depend on.
+  //
+  // A transaction wrongly judged INACTIVE lets a garment be reassigned or handed
+  // back on paper while it is physically out on rental, and nothing anywhere
+  // reports an error. So this is checked against the EDN, not against a list.
+  // -------------------------------------------------------------------------
+  describe('ACTIVE_STATES / ACTIVE_LAST_TRANSITIONS', () => {
+    it('is exactly "accepted, and not yet in a terminal state"', () => {
+      expect(ACTIVE_STATES.slice().sort()).toEqual(
+        ['accepted', 'cleaning', 'overdue', 'picked-up', 'ready-for-pickup', 'returned'].sort()
+      );
+    });
+
+    it('excludes every pre-accept state', () => {
+      // Every transaction in Dev sits at `inquire`. Counting an inquiry as active
+      // would freeze every listing in the marketplace.
+      [
+        STATES.INQUIRY,
+        STATES.PENDING_PAYMENT,
+        STATES.PAYMENT_EXPIRED,
+        STATES.PREAUTHORIZED,
+      ].forEach(state => expect(ACTIVE_STATES).not.toContain(state));
+    });
+
+    it('excludes every terminal state', () => {
+      [
+        STATES.DECLINED,
+        STATES.EXPIRED,
+        STATES.CANCELED,
+        STATES.DELIVERED,
+        STATES.REVIEWED,
+        STATES.REVIEWED_BY_CUSTOMER,
+        STATES.REVIEWED_BY_PROVIDER,
+      ].forEach(state => expect(ACTIVE_STATES).not.toContain(state));
+    });
+
+    it('lists EVERY transition in the EDN that lands in an active state', () => {
+      // The load-bearing assertion. `lastTransitions` fails closed - an omitted or
+      // misspelled name matches nothing rather than erroring - so a missing entry
+      // here is an invisible active transaction, i.e. a garment that can be
+      // reassigned mid-rental with no error anywhere.
+      const expected = ednTransitions
+        .filter(t => ACTIVE_STATES.includes(normaliseEdnState(t.to)))
+        .map(t => t.transition);
+
+      expect(expected.length).toBeGreaterThan(0);
+      expect(ACTIVE_LAST_TRANSITIONS.slice().sort()).toEqual(expected.slice().sort());
+    });
+
+    it('lists no transition that lands anywhere else', () => {
+      ACTIVE_LAST_TRANSITIONS.forEach(transition => {
+        expect(ACTIVE_STATES).toContain(TRANSITION_TO_STATE[transition]);
+      });
+    });
+
+    it('is a subset of the ops worklist, which starts at the same point', () => {
+      ACTIVE_LAST_TRANSITIONS.forEach(transition => {
+        expect(OPS_LAST_TRANSITIONS).toContain(transition);
+      });
+    });
+
+    it('counts both accept transitions', () => {
+      ACCEPT_TRANSITIONS.forEach(transition => {
+        expect(ACTIVE_LAST_TRANSITIONS).toContain(transition);
+      });
+    });
+
+    describe('isActiveLastTransition', () => {
+      it.each([
+        ['transition/accept', true],
+        ['transition/operator-accept', true],
+        ['transition/laundry-mark-ready', true],
+        ['transition/laundry-confirm-pickup', true],
+        ['transition/mark-overdue', true],
+        ['transition/laundry-confirm-return', true],
+        ['transition/laundry-confirm-return-late', true],
+        ['transition/laundry-start-cleaning', true],
+        ['transition/inquire', false],
+        ['transition/confirm-payment', false],
+        ['transition/decline', false],
+        ['transition/expire', false],
+        ['transition/laundry-mark-available', false],
+        ['transition/complete', false],
+        ['transition/cancel-from-picked-up', false],
+        ['transition/review-1-by-customer', false],
+      ])('judges %s as %s', (transition, expected) => {
+        expect(isActiveLastTransition(transition)).toBe(expected);
+      });
+
+      it('is false for an absent or unknown transition', () => {
+        // Not "assume active": this predicate answers a question about a
+        // transition it recognises. The fail-closed decision belongs to the
+        // caller, where the consequences are - see api-util/listingCustody.js.
+        expect(isActiveLastTransition(undefined)).toBe(false);
+        expect(isActiveLastTransition('transition/teleport')).toBe(false);
+      });
     });
   });
 });

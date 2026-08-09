@@ -4,6 +4,8 @@ const {
   findBookableOverlaps,
   computeBufferDays,
   addDays,
+  floorToUtcDay,
+  ceilToUtcDay,
   computeAvailabilityBufferWindow,
   resolveTurnaroundHours,
 } = require('./availabilityHelpers');
@@ -96,6 +98,43 @@ describe('addDays()', () => {
     const date = new Date('2026-08-10T00:00:00.000Z');
     addDays(date, 5);
     expect(date.toISOString()).toBe('2026-08-10T00:00:00.000Z');
+  });
+});
+
+describe('floorToUtcDay() / ceilToUtcDay()', () => {
+  it('floors a mid-day timestamp to that UTC midnight', () => {
+    expect(floorToUtcDay(new Date('2026-08-08T14:37:12.345Z')).toISOString()).toBe(
+      '2026-08-08T00:00:00.000Z'
+    );
+  });
+
+  it('leaves a timestamp already at UTC midnight alone, both ways', () => {
+    // The reason ceilToUtcDay is a ceiling rather than floor + 1: rounding an
+    // exact boundary up would over-block a full day every time a turnaround
+    // divides cleanly.
+    const midnight = new Date('2026-08-08T00:00:00.000Z');
+    expect(floorToUtcDay(midnight).toISOString()).toBe('2026-08-08T00:00:00.000Z');
+    expect(ceilToUtcDay(midnight).toISOString()).toBe('2026-08-08T00:00:00.000Z');
+  });
+
+  it('ceils a mid-day timestamp to the NEXT UTC midnight', () => {
+    expect(ceilToUtcDay(new Date('2026-08-08T00:00:00.001Z')).toISOString()).toBe(
+      '2026-08-09T00:00:00.000Z'
+    );
+    expect(ceilToUtcDay(new Date('2026-08-08T23:59:59.999Z')).toISOString()).toBe(
+      '2026-08-09T00:00:00.000Z'
+    );
+  });
+
+  it('does not shift across a local DST boundary', () => {
+    // Europe/Madrid springs forward on 2026-03-29. Using local date fields here
+    // would move the boundary by an hour and mis-snap the window.
+    expect(floorToUtcDay(new Date('2026-03-29T00:30:00.000Z')).toISOString()).toBe(
+      '2026-03-29T00:00:00.000Z'
+    );
+    expect(ceilToUtcDay(new Date('2026-03-29T00:30:00.000Z')).toISOString()).toBe(
+      '2026-03-30T00:00:00.000Z'
+    );
   });
 });
 

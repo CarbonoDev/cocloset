@@ -294,6 +294,65 @@ const OPS_LAST_TRANSITIONS = [
 const ACCEPT_TRANSITIONS = [TRANSITIONS.ACCEPT, TRANSITIONS.OPERATOR_ACCEPT];
 
 // ---------------------------------------------------------------------------
+// "Active transaction"
+// ---------------------------------------------------------------------------
+//
+// THE DEFINITION: a transaction is ACTIVE when it has been accepted and has not
+// yet reached a terminal state. Concretely, the six states below - everything
+// from `accept` up to (but not including) the states nothing can leave:
+//
+//   accepted, ready-for-pickup, picked-up, overdue, returned, cleaning
+//
+// Read off the EDN, that is exactly "someone has committed a real garment to a
+// real booking, and the booking is not finished". Its complement, deliberately:
+//
+//   * inquiry / pending-payment / payment-expired / preauthorized - PRE-accept.
+//     No garment is committed; a provider has not agreed to anything. Treating
+//     an inquiry as active would freeze a listing on the strength of a stranger
+//     asking a question, and every transaction in Dev is at `inquire`.
+//   * declined / expired - the booking never happened.
+//   * delivered / reviewed / reviewed-by-* - the rental is over. Reviews are
+//     bookkeeping between two humans; they do not hold a garment.
+//   * canceled - over, by definition.
+//
+// WHERE IT IS USED, AND WHICH WAY IT FAILS
+// server/api-util/listingCustody.js gates the custody/assignment writes on
+// "this listing has no active transaction". That check must fail CLOSED: a
+// transaction we cannot see is a transaction we must assume exists.
+//
+// That matters here because `lastTransitions` (the native, genuinely-working
+// transactions.query filter) fails closed in the OPPOSITE sense: an unrecognised
+// transition name is not rejected, it just matches nothing (verified against Dev
+// - see OPS_LAST_TRANSITIONS above). So a typo in this list would make an active
+// transaction INVISIBLE and would let a garment be reassigned mid-rental. Which
+// is why the list is DERIVED from TRANSITION_TO_STATE rather than typed out: a
+// transition can only be omitted by being absent from the transcription above,
+// where it would already be breaking stateFromLastTransition().
+const ACTIVE_STATES = [
+  STATES.ACCEPTED,
+  STATES.READY_FOR_PICKUP,
+  STATES.PICKED_UP,
+  STATES.OVERDUE,
+  STATES.RETURNED,
+  STATES.CLEANING,
+];
+
+// Every transition whose `:to` is one of ACTIVE_STATES, for narrowing
+// `transactions.query({ lastTransitions })`. Derived, never hand-listed.
+const ACTIVE_LAST_TRANSITIONS = Object.keys(TRANSITION_TO_STATE).filter(transition =>
+  ACTIVE_STATES.includes(TRANSITION_TO_STATE[transition])
+);
+
+/**
+ * Is a transaction in one of the ACTIVE_STATES, judged from its last transition?
+ *
+ * @param {string} [lastTransition] - `transaction.attributes.lastTransition`
+ * @returns {boolean} false for an unknown/absent transition
+ */
+const isActiveLastTransition = lastTransition =>
+  ACTIVE_STATES.includes(stateFromLastTransition(lastTransition));
+
+// ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
 
@@ -333,6 +392,9 @@ module.exports = {
   transitionForStatus,
   OPS_LAST_TRANSITIONS,
   ACCEPT_TRANSITIONS,
+  ACTIVE_STATES,
+  ACTIVE_LAST_TRANSITIONS,
+  isActiveLastTransition,
   INVALID_TRANSITION_CODES,
   isInvalidTransitionError,
 };

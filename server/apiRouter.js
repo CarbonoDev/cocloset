@@ -21,6 +21,8 @@ const laundries = require('./api/laundries');
 const createAvailabilityBuffer = require('./api/create-availability-buffer');
 const laundryTransactionStatus = require('./api/laundry-transaction-status');
 const listingReadinessStatus = require('./api/listing-readiness-status');
+const listingCustodyStatus = require('./api/listing-custody-status');
+const listingLaundryAssignment = require('./api/listing-laundry-assignment');
 const laundryOrders = require('./api/laundry-orders');
 const initUserRole = require('./api/init-user-role');
 
@@ -67,6 +69,14 @@ router.get('/laundries', laundries);
 router.post('/create-availability-buffer', createAvailabilityBuffer);
 router.post('/laundry-transaction-status', laundryTransactionStatus);
 router.post('/listing-readiness-status', listingReadinessStatus);
+// Garment custody (`listing.metadata.onLaundry`) - writable by the assigned
+// laundry OR the listing's owner, and only while the listing has no active
+// transaction. See server/api/listing-custody-status.js.
+router.post('/listing-custody-status', listingCustodyStatus);
+// The assigned-laundry guard: may this owner change the listing's laundry right
+// now? Read the header of server/api/listing-laundry-assignment.js before relying
+// on it - it is a server-side DECISION, not a write gate.
+router.post('/listing-laundry-assignment', listingLaundryAssignment);
 router.get('/laundry-orders', laundryOrders);
 
 // Applies the `metadata.isLaundry = false` default to the CALLING user, right
