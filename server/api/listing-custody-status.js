@@ -90,7 +90,10 @@ module.exports = (req, res) => {
   const integrationSdk = getIntegrationSdk();
 
   integrationSdk.listings
-    .show({ id: listingId })
+    // include: ['author'] is REQUIRED, not decorative: without it the response
+    // carries no `relationships` at all, so every ownership check below reads
+    // undefined and rejects the real owner. See api-util/listingOwnerAuth.js.
+    .show({ id: listingId, include: ['author'] })
     .then(listingResponse => {
       const listing = listingResponse.data.data;
 

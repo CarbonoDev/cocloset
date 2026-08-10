@@ -205,3 +205,63 @@ describe('authorizeLaundryOrOwnerCaller', () => {
     expect(show).toHaveBeenCalledTimes(1);
   });
 });
+
+// THE REGRESSION THAT SHIPPED
+// Every fixture above hands these functions a listing that already carries
+// `relationships.author`, so the suite was greener than production: the real
+// `integrationSdk.listings.show({ id })` returns NO `relationships` key at all
+// unless the call passes `include: ['author']`. Verified against the Dev
+// Integration API - the bare call yields `relationships: undefined`.
+//
+// The consequence was not a crash but a lie: `isListingAuthor` compared the
+// caller's id against undefined, returned false, and every garment owner was told
+// "Caller is not the owner of this listing." while assigning their own garment to
+// a laundry.
+//
+// So these tests assert the fetch bug is reported AS a fetch bug. A 403 here would
+// mean the defect had come back wearing the same costume, which is why the
+// assertion is on the status and not merely on rejection.
+describe('a listing fetched without include: ["author"]', () => {
+  // What the API actually returns for `listings.show({ id })`: attributes, no
+  // relationships. Deliberately NOT the same shape as `listingEntity` above.
+  const listingWithoutAuthor = () => ({
+    id: { uuid: 'listing-1' },
+    type: 'listing',
+    attributes: { metadata: { assignedLaundryId: LAUNDRY_ID } },
+  });
+
+  it('requireListingAuthorCaller reports our own fetch bug (500), not "not the owner" (403)', () => {
+    mockCaller(userEntity({ id: OWNER_ID }));
+    return requireListingAuthorCaller(req, res, listingWithoutAuthor()).then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      error => {
+        expect(error.status).toBe(500);
+        expect(error.status).not.toBe(403);
+      }
+    );
+  });
+
+  it('authorizeLaundryOrOwnerCaller refuses the owner branch rather than falling through to the laundry one', () => {
+    // The owner here is not a laundry at all, so without the assertion this would
+    // fail the author check and then be refused as "neither laundry nor owner" -
+    // a 403 blaming the owner for our missing include.
+    mockCaller(userEntity({ id: OWNER_ID, isLaundry: false }));
+    return authorizeLaundryOrOwnerCaller(req, res, listingWithoutAuthor()).then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      error => {
+        expect(error.status).toBe(500);
+      }
+    );
+  });
+
+  it('does not consult the caller session at all - the request is unanswerable before identity matters', () => {
+    const show = mockCaller(userEntity({ id: OWNER_ID }));
+    return requireListingAuthorCaller(req, res, listingWithoutAuthor()).catch(() => {
+      expect(show).not.toHaveBeenCalled();
+    });
+  });
+});
