@@ -35,6 +35,20 @@ const forbiddenError = message => {
   return error;
 };
 
+// Is this user a laundry?
+//
+// The flag lives in the user's own profile `metadata`, which only the operator /
+// Integration API can write - a user cannot promote themselves. Extracted as a
+// pure predicate (rather than inlined below, where it used to live) so
+// api-util/listingOwnerAuth.js's laundry-OR-owner composition can ask the same
+// question off a currentUser it has already fetched, instead of re-deriving the
+// rule and drifting from it. Strictly additive: requireLaundryCaller's own
+// behaviour is unchanged.
+//
+// @param {Object} [currentUser] - a currentUser API entity
+// @returns {boolean}
+const isLaundryUser = currentUser => currentUser?.attributes?.profile?.metadata?.isLaundry === true;
+
 // Fetch the caller's own currentUser via the ordinary (cookie-based)
 // Marketplace SDK and confirm they're flagged `metadata.isLaundry === true`.
 //
@@ -45,9 +59,8 @@ const requireLaundryCaller = (req, res) => {
 
   return sdk.currentUser.show().then(response => {
     const currentUser = response.data.data;
-    const isLaundry = currentUser?.attributes?.profile?.metadata?.isLaundry === true;
 
-    if (!isLaundry) {
+    if (!isLaundryUser(currentUser)) {
       throw forbiddenError('Caller is not a laundry user.');
     }
 
@@ -81,6 +94,7 @@ const authorizeLaundryCaller = (req, res, assignedLaundryId) =>
   });
 
 module.exports = {
+  isLaundryUser,
   requireLaundryCaller,
   assertIsAssignedLaundry,
   authorizeLaundryCaller,

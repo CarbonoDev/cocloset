@@ -7,6 +7,24 @@ const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
 // garment can be "incoming" or "stored" with no active transaction at all.
 const READINESS_STATUSES = ['incoming', 'stored', 'available'];
 
+// Readiness states that mean the garment is PHYSICALLY IN THE STUDIO, and so
+// imply `metadata.onLaundry = true` (api-util/listingCustody.js).
+//
+//   > "Al momento en que una laundry recibe una prenda..."
+//
+// A laundry marking an incoming garment `stored` IS the moment it takes custody -
+// making it say so twice, on two endpoints, would guarantee the two drift.
+//
+// `incoming` is not in this list, and does NOT set onLaundry to false either.
+// `incoming` means the owner has shipped it and it has not arrived, so it is not
+// evidence of custody in either direction; and §8 has readiness cycling per
+// rental, so a re-entry into `incoming` on a garment the studio is holding must
+// not release custody. This mapping is therefore MONOTONE - readiness can only
+// ever assert custody, never revoke it. Revoking is a deliberate handover to the
+// owner, which is server/api/listing-custody-status.js's job and is gated on
+// there being no active transaction.
+const READINESS_IMPLIES_ON_LAUNDRY = ['stored', 'available'];
+
 // Lets an authenticated laundry user update a listing's physical readiness
 // state: `listing.metadata.readinessStatus` (enum, see READINESS_STATUSES)
 // and `listing.privateData.currentRack` (free text, e.g. "Rack A-04").
@@ -30,7 +48,11 @@ const READINESS_STATUSES = ['incoming', 'stored', 'available'];
 //     verification run). `currentRack` is only included in the update when
 //     supplied, so omitting it never touches the existing value.
 //
-// Success response (200): { data: { readinessStatus, currentRack? } }
+//   - A readiness state that means the garment is in the studio also stamps
+//     `metadata.onLaundry = true` (see READINESS_IMPLIES_ON_LAUNDRY above).
+//
+// Success response (200): { data: { readinessStatus, currentRack?, onLaundry? } }
+//   `onLaundry` is present only when this call asserted it.
 // Failure response: standard handleError() shape (see api-util/sdk.js).
 module.exports = (req, res) => {
   const { listingId, readinessStatus, currentRack } = req.body || {};
@@ -63,18 +85,19 @@ module.exports = (req, res) => {
       const assignedLaundryId = listing.attributes?.publicData?.assignedLaundryId;
 
       return authorizeLaundryCaller(req, res, assignedLaundryId).then(() => {
+        const claimsCustody = READINESS_IMPLIES_ON_LAUNDRY.includes(readinessStatus);
         const updateParams = {
           id: listingId,
-          metadata: { readinessStatus },
+          metadata: { readinessStatus, ...(claimsCustody ? { onLaundry: true } : {}) },
           ...(currentRack !== undefined ? { privateData: { currentRack } } : {}),
         };
 
         return integrationSdk.listings
           .update(updateParams, { expand: true })
-          .then(() => ({ readinessStatus, currentRack }));
+          .then(() => ({ readinessStatus, currentRack, claimsCustody }));
       });
     })
-    .then(({ readinessStatus: updatedStatus, currentRack: updatedRack }) => {
+    .then(({ readinessStatus: updatedStatus, currentRack: updatedRack, claimsCustody }) => {
       res
         .status(200)
         .set('Content-Type', 'application/json')
@@ -82,6 +105,7 @@ module.exports = (req, res) => {
           data: {
             readinessStatus: updatedStatus,
             ...(updatedRack !== undefined ? { currentRack: updatedRack } : {}),
+            ...(claimsCustody ? { onLaundry: true } : {}),
           },
         })
         .end();
@@ -92,3 +116,4 @@ module.exports = (req, res) => {
 };
 
 module.exports.READINESS_STATUSES = READINESS_STATUSES;
+module.exports.READINESS_IMPLIES_ON_LAUNDRY = READINESS_IMPLIES_ON_LAUNDRY;

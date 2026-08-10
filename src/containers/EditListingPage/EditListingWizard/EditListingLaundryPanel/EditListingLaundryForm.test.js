@@ -379,4 +379,82 @@ describe('EditListingLaundryForm', () => {
       screen.queryByText('EditListingLaundryForm.turnaroundForCategory')
     ).not.toBeInTheDocument();
   });
+
+  // The picker lock. This is the visible half of the assigned-laundry guard: the
+  // enforcement is server-side (see EditListingLaundryPanel's docblock and
+  // server/api/listing-laundry-assignment.js), and this is what stops an owner
+  // running into it blind.
+  describe('when the garment is at the laundry (laundryLocked)', () => {
+    it('is unlocked by default', async () => {
+      await act(async () => {
+        renderForm();
+      });
+
+      expect(
+        screen.getByRole('radio', { name: 'EditListingLaundryForm.screenreader.chooseLaundry' })
+      ).toBeEnabled();
+      expect(screen.queryByText('EditListingLaundryForm.laundryLocked')).not.toBeInTheDocument();
+    });
+
+    it('disables every card and explains why', async () => {
+      await act(async () => {
+        renderForm({ laundries, laundryLocked: true });
+      });
+
+      const radios = screen.getAllByRole('radio', {
+        name: 'EditListingLaundryForm.screenreader.chooseLaundry',
+      });
+      expect(radios).toHaveLength(2);
+      radios.forEach(radio => expect(radio).toBeDisabled());
+
+      expect(screen.getByText('EditListingLaundryForm.laundryLocked')).toBeInTheDocument();
+    });
+
+    it('still shows which laundry has the garment', async () => {
+      // Disabled, not hidden: the one thing an owner opens this tab for while the
+      // garment is out is "who has it".
+      await act(async () => {
+        renderForm({ laundries, laundryLocked: true });
+      });
+
+      expect(screen.getByText('Studio Pigalle')).toBeInTheDocument();
+      expect(screen.getByText('21 Rue Frochot, Paris')).toBeInTheDocument();
+    });
+
+    it('leaves Save usable, so re-saving the same laundry does not dead-end the tab', async () => {
+      const saveActionMsg = 'Save laundry assignment';
+      await act(async () => {
+        renderForm({
+          laundries,
+          laundryLocked: true,
+          saveActionMsg,
+          initialValues: { assignedLaundryId: 'laundry-1' },
+        });
+      });
+
+      // The server allows a no-op re-save (evaluateLaundryAssignment: changed
+      // false); disabling submit here would make the wizard tab impassable rather
+      // than making the assignment immutable.
+      expect(screen.getByRole('button', { name: saveActionMsg })).toBeEnabled();
+    });
+
+    it('does not let a click change the selection', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        renderForm({
+          laundries,
+          laundryLocked: true,
+          initialValues: { assignedLaundryId: 'laundry-1' },
+        });
+      });
+
+      const radios = screen.getAllByRole('radio', {
+        name: 'EditListingLaundryForm.screenreader.chooseLaundry',
+      });
+      await user.click(radios[1]);
+
+      expect(radios[0]).toBeChecked();
+      expect(radios[1]).not.toBeChecked();
+    });
+  });
 });

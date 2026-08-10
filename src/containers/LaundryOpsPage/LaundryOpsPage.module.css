@@ -639,6 +639,47 @@
   }
 }
 
+/* How many days this garment will take to clean, collected at the return step.
+   Drives listing.metadata.readyAt and the availability block - see
+   server/api/laundry-transaction-status.js. */
+.cleaningDaysField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.cleaningDaysLabel {
+  color: var(--coclosetInk);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cleaningDaysInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurface);
+  font-size: 14px;
+
+  &:hover,
+  &:focus {
+    border-color: var(--coclosetBrand);
+    box-shadow: none;
+  }
+
+  @media (--viewportMedium) {
+    max-width: 160px;
+  }
+}
+
+.cleaningDaysHint {
+  color: var(--coclosetInkMuted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
 /* ================ Dashboard ================ */
 
 .dashboard {

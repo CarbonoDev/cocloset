@@ -192,6 +192,12 @@ const listingFields = (listing, included) => {
     ownerName: displayNameOf(author),
     readinessStatus: attrs.metadata?.readinessStatus || null,
     currentRack: attrs.privateData?.currentRack || null,
+    // Physical custody and the readiness moment a real return produced. Emitted
+    // on BOTH row kinds because both questions are about the garment, not about
+    // a booking: a listing-only row (§8's no-transaction case) is exactly where
+    // "this garment is still in the studio" matters most.
+    onLaundry: attrs.metadata?.onLaundry === true,
+    readyAt: attrs.metadata?.readyAt || null,
   };
 };
 

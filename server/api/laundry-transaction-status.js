@@ -10,15 +10,19 @@ const {
   isInvalidTransitionError,
 } = require('../api-util/coclosetBookingProcess');
 const { buildTicketCode } = require('../api-util/ticketCodeHelpers');
-const {
-  computeAvailabilityBufferWindow,
-  resolveTurnaroundHours,
-} = require('../api-util/availabilityHelpers');
+const { resolveTurnaroundHours } = require('../api-util/availabilityHelpers');
 const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
 const {
   getListingCategoryValues,
-  resolveCategoryTurnaroundHours,
+  resolveTurnaroundHoursEntry,
 } = require('../api-util/categoryPricing');
+const {
+  MAX_CLEANING_DAYS,
+  validateCleaningDays,
+  resolveCleaningDays,
+  computeReadiness,
+  writeCustodyMetadata,
+} = require('../api-util/listingCustody');
 const { notifyReturnScheduled, notifyCleaningRequired } = require('../api-util/laundryMailer');
 const log = require('../log');
 
@@ -58,6 +62,9 @@ const log = require('../log');
 //   status,                  // one of LAUNDRY_STATUSES - the step to advance to
 //   damaged,                 // optional boolean - only read at status 'returned'
 //   damageNote,              // optional string  - only read at status 'returned'
+//   cleaningDays,            // optional integer - only read at status 'returned';
+//                            //   defaults to the laundry's configured turnaround
+//                            //   for this garment's category
 // }
 //
 // `status` rather than a transition name is deliberate. It is what makes the
@@ -69,10 +76,13 @@ const log = require('../log');
 // server/api-util/coclosetBookingProcess.js.
 //
 // Success response (200): {
-//   data: { status, transition, state, ticketCode?, damageReported? }
+//   data: { status, transition, state, ticketCode?, damageReported?, custody? }
 // }
+//   `custody` is present only on the two return transitions, and reports what the
+//   real return produced: { onLaundry, readyAt, cleaningDays, cleaningDaysSource,
+//   turnaroundSource?, buffer }. See handleRealReturn below.
 // Failure responses:
-//   400 - missing/unknown transactionId or status
+//   400 - missing/unknown transactionId or status, or an unusable cleaningDays
 //   403 - caller is not the assigned laundry (laundryAuth.js)
 //   409 - Sharetribe refused the transition as illegal from the current state.
 //         Same status code the hand-rolled pre-check used to return, so client
@@ -167,61 +177,116 @@ const buildTransitionMetadata = ({
 // transition the platform would then answer 409 for.
 // ---------------------------------------------------------------------------
 
-// design §6: "does the blocked window just extend dynamically (recompute
-// exceptions) when the laundry marks it returned late?"
+// THE REAL RETURN. Everything downstream of "the garment is physically back".
 //
-// Until now that was undetectable without polling. `laundry-confirm-return-late`
-// makes it a single unambiguous event, so the extension is implemented here:
-// recompute the buffer window from the ACTUAL return date (now) instead of the
-// booking end, and block whatever part of it is not blocked already.
+// This replaces an earlier, narrower `extendBufferForLateReturn` that fired only
+// on `laundry-confirm-return-late` and recomputed the design §6 window from the
+// booking dates. It now fires on BOTH return transitions, and computes from the
+// return moment instead. The reason is not tidiness:
 //
-// It is additive and idempotent by construction: reconcileBufferWindow only
-// creates the sub-ranges that are not yet blocked, so the original exception
-// (bookingStart-buffer .. bookingEnd+buffer) is left alone and only the tail
-// beyond it is created. A return that is late by less than the buffer-after
-// period produces zero segments and does nothing at all.
+//   The window blocked at `accept` was a FORECAST - bookingStart - bufferBefore
+//   .. bookingEnd + bufferAfter, sized from a turnaround guess, made before the
+//   garment had left the studio. This is the first moment anybody knows the two
+//   facts that actually determine when the listing is bookable again: when the
+//   garment came back, and how long this laundry says THIS garment will take to
+//   clean. So the block that matters is [returned .. ready], and it is computed
+//   here, not there.
 //
-// What this does NOT do is late fees. Design §6's other two questions were
-// never answered, and inventing a fee is not this change's job.
-const extendBufferForLateReturn = ({
+// A late return is now just the case where `returnedAt` happens to be past
+// bookingEnd; it needs no separate branch, and the design §6 "does the window
+// extend dynamically?" behaviour falls out of the same arithmetic.
+//
+// STILL ADDITIVE, STILL NEVER DELETES. reconcileBufferWindow only creates the
+// sub-ranges that are not blocked yet, so this extends the forecast where the
+// real turnaround runs longer and is a no-op where the forecast already covers
+// it. It does NOT shorten an over-long forecast, and that is deliberate rather
+// than unfinished: availability exceptions carry no reason/type field we can rely
+// on (design §13 says so explicitly, which is why the calendar derives
+// "Cleaning" vs "Booked" client-side), so nothing here can tell OUR forecast
+// exception apart from a week the owner blocked by hand. Deleting on a guess
+// would un-block days an owner deliberately closed. The cost is stated plainly:
+// a garment cleaned faster than forecast stays blocked for the rest of the
+// forecast window. Over-blocking is recoverable by the owner; double-booking a
+// garment that is in a wash is not.
+//
+// Failures are swallowed. The garment has moved and Sharetribe has recorded it;
+// a calendar or metadata write must never turn a transition that ALREADY
+// SUCCEEDED into an error the ops UI would retry into a 409.
+const handleRealReturn = ({
   integrationSdk,
   listing,
-  booking,
   turnaroundHours,
+  turnaroundSource,
+  requestedCleaningDays,
   txIdForLog,
 }) => {
-  const bookingStart = booking?.attributes?.start;
-  const bookingEnd = booking?.attributes?.end;
-  if (!listing || !bookingStart || !bookingEnd) {
+  if (!listing) {
     return Promise.resolve(null);
   }
 
-  // Never shorter than the window the original buffer already covers. The
-  // transaction can be in `overdue` while the actual return timestamp is still
-  // at or before booking end (clock skew, a booking edited after the fact), and
-  // a window that ended before the one already blocked would be a nonsensical
-  // range rather than an extension.
-  const actualReturn = new Date(Math.max(new Date().getTime(), new Date(bookingEnd).getTime()));
-  const { start, end } = computeAvailabilityBufferWindow(
-    new Date(bookingStart),
-    actualReturn,
-    turnaroundHours
-  );
-
-  return reconcileBufferWindow({
-    integrationSdk,
-    listingId: listing.id,
-    start,
-    end,
-    txIdForLog,
-  }).catch(e => {
-    log.error(e, 'laundry-late-return-buffer-failed', { txId: txIdForLog });
-    return null;
+  const returnedAt = new Date();
+  const { days: cleaningDays, source: cleaningDaysSource } = resolveCleaningDays({
+    requestedDays: requestedCleaningDays,
+    turnaroundHours,
   });
+  const { readyAt, blockWindow } = computeReadiness({ returnedAt, cleaningDays });
+
+  // Custody first, availability second. Custody is the fact the client asked to
+  // be recorded ("se queda en estatus onLaundry true"); the calendar block is a
+  // consequence of it. If only one of the two writes can land, it should be the
+  // fact.
+  // Promise.resolve().then(...) rather than calling straight into
+  // writeCustodyMetadata: this whole function runs after a transition that has
+  // ALREADY succeeded, so a synchronous throw (an unexpected SDK shape, say)
+  // must be caught by the same .catch() as a rejected write rather than escaping
+  // into the endpoint's error path and reporting a 500 for work that was done.
+  return Promise.resolve()
+    .then(() =>
+      writeCustodyMetadata({ integrationSdk, listingId: listing.id, onLaundry: true, readyAt })
+    )
+    .catch(e => {
+      log.error(e, 'laundry-return-custody-write-failed', { txId: txIdForLog });
+      return null;
+    })
+    .then(() => {
+      if (!blockWindow) {
+        // cleaningDays === 0: the laundry says it is ready today, so there is
+        // nothing to block.
+        return null;
+      }
+      return Promise.resolve()
+        .then(() =>
+          reconcileBufferWindow({
+            integrationSdk,
+            listingId: listing.id,
+            start: blockWindow.start,
+            end: blockWindow.end,
+            txIdForLog,
+          })
+        )
+        .catch(e => {
+          log.error(e, 'laundry-return-buffer-failed', { txId: txIdForLog });
+          return null;
+        });
+    })
+    .then(bufferResult => ({
+      onLaundry: true,
+      readyAt: readyAt.toISOString(),
+      cleaningDays,
+      cleaningDaysSource,
+      // Only meaningful when the days were NOT supplied by the laundry: it says
+      // which rung of the fallback chain the default came from ('category' - the
+      // hours this studio set for this garment's top-level category, 'studio' -
+      // its studio-wide setting, 'env-default' - ours). "3 days, because you set
+      // 72h for Dresses" and "3 days, because nobody configured anything" are
+      // very different statements to put in front of a studio.
+      ...(cleaningDaysSource === 'configured-turnaround' ? { turnaroundSource } : {}),
+      buffer: bufferResult,
+    }));
 };
 
 module.exports = (req, res) => {
-  const { transactionId, status, damaged, damageNote } = req.body || {};
+  const { transactionId, status, damaged, damageNote, cleaningDays } = req.body || {};
   const txIdForLog = transactionId?.uuid || transactionId || 'unknown';
 
   if (!transactionId) {
@@ -238,6 +303,23 @@ module.exports = (req, res) => {
         error: `Missing or invalid "status" in request body. Must be one of: ${LAUNDRY_STATUSES.join(
           ', '
         )}.`,
+      })
+      .end();
+    return;
+  }
+
+  // Rejected up front, before any transition is fired. A bad `cleaningDays` is a
+  // client bug and must surface as one: falling back to the configured default
+  // would hide it, and the transition is irreversible once fired, so there would
+  // be no way to correct the block afterwards without a second endpoint.
+  const cleaningDaysCheck = validateCleaningDays(cleaningDays);
+  if (!cleaningDaysCheck.valid) {
+    res
+      .status(400)
+      .json({
+        error:
+          'Invalid "cleaningDays" in request body. Must be an integer between 0 and ' +
+          `${MAX_CLEANING_DAYS}.`,
       })
       .end();
     return;
@@ -276,17 +358,25 @@ module.exports = (req, res) => {
         // profile is the authoritative source for the studio name, the
         // notification address and the turnaround time. No extra users.show.
         const profile = currentUser?.attributes?.profile || {};
+        // Per-category turnaround, selected by this listing's own top-level
+        // category, so the return/cleaning window matches the garment in hand.
+        // See api-util/categoryPricing.js for the fallback chain.
+        //
+        // resolveTurnaroundHoursEntry (rather than the thinner
+        // resolveCategoryTurnaroundHours wrapper) because the return response
+        // reports WHERE the default came from - a laundry accepting a pre-filled
+        // "3 days" deserves to know whether that is the number it set for this
+        // category, its studio-wide fallback, or ours.
+        const turnaroundEntry = resolveTurnaroundHoursEntry(
+          profile.privateData,
+          getListingCategoryValues(listing.attributes?.publicData)
+        );
         const laundry = {
           email: currentUser?.attributes?.email,
           studioName: profile.publicData?.laundryProfile?.studioName,
-          // Per-category turnaround, selected by this listing's own top-level
-          // category, so the return/cleaning window matches the garment in hand.
-          // See api-util/categoryPricing.js for the fallback chain.
+          turnaroundSource: turnaroundEntry?.source || 'env-default',
           turnaroundHours: resolveTurnaroundHours(
-            resolveCategoryTurnaroundHours(
-              profile.privateData,
-              getListingCategoryValues(listing.attributes?.publicData)
-            ),
+            turnaroundEntry?.value ?? null,
             process.env.DEFAULT_LAUNDRY_BUFFER_HOURS
           ),
         };
@@ -372,21 +462,25 @@ module.exports = (req, res) => {
         });
       }
 
-      const bufferPromise =
-        transition === TRANSITIONS.LAUNDRY_CONFIRM_RETURN_LATE
-          ? extendBufferForLateReturn({
-              integrationSdk,
-              listing,
-              booking,
-              turnaroundHours: laundry.turnaroundHours,
-              txIdForLog,
-            })
-          : Promise.resolve(null);
+      const isReturn =
+        transition === TRANSITIONS.LAUNDRY_CONFIRM_RETURN ||
+        transition === TRANSITIONS.LAUNDRY_CONFIRM_RETURN_LATE;
 
-      // The buffer extension IS awaited (unlike the mail) so its result can be
-      // reported, but extendBufferForLateReturn swallows its own failures - a
-      // calendar write must not fail a transition that already happened.
-      return bufferPromise.then(bufferResult => {
+      const returnPromise = isReturn
+        ? handleRealReturn({
+            integrationSdk,
+            listing,
+            turnaroundHours: laundry.turnaroundHours,
+            turnaroundSource: laundry.turnaroundSource,
+            requestedCleaningDays: cleaningDaysCheck.value,
+            txIdForLog,
+          })
+        : Promise.resolve(null);
+
+      // The custody/readiness work IS awaited (unlike the mail) so its result can
+      // be reported, but handleRealReturn swallows its own failures - a calendar
+      // or listing write must not fail a transition that already happened.
+      return returnPromise.then(returnResult => {
         res
           .status(200)
           .set('Content-Type', 'application/json')
@@ -399,7 +493,7 @@ module.exports = (req, res) => {
               ...(storedMetadata?.damageReported
                 ? { damageReported: storedMetadata.damageReported }
                 : {}),
-              ...(bufferResult ? { bufferExtension: bufferResult } : {}),
+              ...(returnResult ? { custody: returnResult } : {}),
             },
           })
           .end();

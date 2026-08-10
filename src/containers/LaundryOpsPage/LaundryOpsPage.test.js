@@ -225,6 +225,57 @@ describe('LaundryOpsPage', () => {
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
 
+    // How long cleaning will take, collected at the return step. It drives
+    // listing.metadata.readyAt and the availability block that replaces the
+    // estimate made at accept time.
+    it('sends the cleaning-days estimate the laundry typed', async () => {
+      const onAdvanceStatus = jest.fn();
+      render(
+        <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
+      );
+      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.type(screen.getByRole('spinbutton'), '3');
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
+
+      expect(onAdvanceStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'returned', cleaningDays: 3 })
+      );
+    });
+
+    it('sends NO cleaning-days when the field is left blank', async () => {
+      // Absent means "apply the turnaround this studio configured for the
+      // category", which only the server can resolve. Sending 0 instead would
+      // mean "ready today" and would block nothing at all.
+      const onAdvanceStatus = jest.fn();
+      render(
+        <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
+      );
+      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
+
+      expect(onAdvanceStatus.mock.calls[0][0]).not.toHaveProperty('cleaningDays');
+    });
+
+    it('sends an explicit 0 - "ready today" is a real answer', async () => {
+      const onAdvanceStatus = jest.fn();
+      render(
+        <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
+      );
+      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.type(screen.getByRole('spinbutton'), '0');
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
+
+      expect(onAdvanceStatus).toHaveBeenCalledWith(expect.objectContaining({ cleaningDays: 0 }));
+    });
+
+    it('does not offer the cleaning-days field at a non-returned step', async () => {
+      const rows = [orderRow({ state: 'returned' })];
+      render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
+      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    });
+
     it('keeps confirm-return and start-cleaning as two separate actions', async () => {
       // The gap between them is the only window in which an operator can
       // cancel with a refund after a damage report, so a returned garment must

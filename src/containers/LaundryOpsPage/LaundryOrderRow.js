@@ -38,6 +38,12 @@ const LaundryOrderRow = props => {
   const [isOpen, setIsOpen] = useState(false);
   const [damaged, setDamaged] = useState(false);
   const [damageNote, setDamageNote] = useState('');
+  // How many days cleaning will take, collected at the return step. Held as a
+  // STRING and started empty on purpose: empty means "use the turnaround this
+  // studio configured for this category", which the server resolves. Pre-filling
+  // a number here would mean guessing that turnaround client-side, and would turn
+  // the studio's configured default into a value the client had asserted.
+  const [cleaningDays, setCleaningDays] = useState('');
 
   const labelKey = statusLabelKey(row);
   const start = formatBookingDate(row.bookingStart, intl);
@@ -48,11 +54,24 @@ const LaundryOrderRow = props => {
   // the Inventory screen instead.
   const action = laundryActionsFor(row)[0] || null;
 
+  // Rows share a table, so the input's id has to be per-row or every label in the
+  // table would point at the first one.
+  const cleaningDaysInputId = `LaundryOrderRow.cleaningDays.${row.id}`;
+
+  // Only send cleaningDays when it is a usable non-negative integer. A blank box
+  // is not a zero: the server treats "absent" as "apply the configured
+  // turnaround", and sending 0 would mean "it is ready today" - which would
+  // block nothing at all.
+  const parsedCleaningDays = Number.parseInt(cleaningDays, 10);
+  const hasCleaningDays =
+    cleaningDays !== '' && Number.isInteger(parsedCleaningDays) && parsedCleaningDays >= 0;
+
   const handleAdvance = () => {
     onAdvanceStatus({
       transactionId: row.transactionId,
       status: action.status,
       ...(action.needsDamageReport ? { damaged, damageNote: damaged ? damageNote : '' } : {}),
+      ...(action.needsCleaningDays && hasCleaningDays ? { cleaningDays: parsedCleaningDays } : {}),
     });
   };
 
@@ -160,6 +179,31 @@ const LaundryOrderRow = props => {
 
                 {action ? (
                   <div className={css.advance}>
+                    {action.needsCleaningDays ? (
+                      <div className={css.cleaningDaysField}>
+                        <label className={css.cleaningDaysLabel} htmlFor={cleaningDaysInputId}>
+                          <FormattedMessage id="LaundryOpsPage.detail.cleaningDays" />
+                        </label>
+                        <input
+                          id={cleaningDaysInputId}
+                          className={css.cleaningDaysInput}
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={cleaningDays}
+                          onChange={e => setCleaningDays(e.target.value)}
+                          placeholder={intl.formatMessage({
+                            id: 'LaundryOpsPage.detail.cleaningDaysPlaceholder',
+                          })}
+                        />
+                        {/* Says what leaving it blank does, so the studio's own
+                            configured turnaround is a visible default rather than
+                            invisible behaviour. */}
+                        <span className={css.cleaningDaysHint}>
+                          <FormattedMessage id="LaundryOpsPage.detail.cleaningDaysHint" />
+                        </span>
+                      </div>
+                    ) : null}
                     {action.needsDamageReport ? (
                       <div className={css.damageFields}>
                         <label className={css.damageToggle}>

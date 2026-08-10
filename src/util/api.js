@@ -262,6 +262,33 @@ export const updateListingReadinessStatus = body => {
   return post('/api/listing-readiness-status', body);
 };
 
+// Hand a garment over: set `listing.metadata.onLaundry` (true = the garment is
+// physically at the laundry, false = it is back with its owner).
+//
+// Callable by EITHER the assigned laundry or the listing's owner, and only while
+// the listing has no active transaction - a 409 comes back otherwise. See
+// `server/api/listing-custody-status.js`, which explains why this is a separate
+// endpoint from listing-readiness-status rather than a branch inside it.
+//
+// Body: { listingId, onLaundry }
+export const updateListingCustodyStatus = body => {
+  return post('/api/listing-custody-status', body);
+};
+
+// Ask the server whether this listing's assigned laundry may be changed right
+// now. Answers 200 when it may, 409 when the garment is still at the laundry
+// (`metadata.onLaundry === true`).
+//
+// This is a PRECONDITION CHECK, not a write: the wizard still writes
+// `publicData.assignedLaundryId` through `sdk.ownListings.update()`. The header of
+// `server/api/listing-laundry-assignment.js` states exactly what that does and
+// does not enforce - read it before treating a 200 here as a guarantee.
+//
+// Body: { listingId, assignedLaundryId }
+export const checkListingLaundryAssignment = body => {
+  return post('/api/listing-laundry-assignment', body);
+};
+
 // Fetch everything the laundry ops dashboard renders, for the calling laundry
 // user: the design doc §8 union of "transactions on listings assigned to me"
 // and "assigned listings with no transaction", plus a per-garment inventory

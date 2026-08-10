@@ -13,6 +13,7 @@ import {
   CLEANING_PHASES,
   LAUNDRY_ACTION_STATUSES,
   DAMAGE_REPORT_STATUS,
+  CLEANING_DAYS_STATUS,
   PAYOUT_ACTION_STATUS,
   opsStatus,
   laundryActionsFor,
@@ -116,6 +117,29 @@ describe('laundryStatuses', () => {
       });
       expect(new Set(damageSteps)).toEqual(new Set([DAMAGE_REPORT_STATUS]));
       expect(new Set(payoutSteps)).toEqual(new Set([PAYOUT_ACTION_STATUS]));
+    });
+
+    it('asks for the cleaning-days estimate only at the return step', () => {
+      // The one moment somebody is holding the garment and can say how long it
+      // will take. Anywhere else the number is a guess, and it drives
+      // listing.metadata.readyAt and the availability block - so an extra step
+      // offering the field would let a stale forecast overwrite a real one.
+      const cleaningDaysSteps = [];
+      [...LAUNDRY_STATES].forEach(state => {
+        [null, ...CLEANING_PHASES].forEach(cleaningPhase => {
+          laundryActionsFor(row({ state, cleaningPhase })).forEach(a => {
+            if (a.needsCleaningDays) cleaningDaysSteps.push(a.status);
+          });
+        });
+      });
+      expect(new Set(cleaningDaysSteps)).toEqual(new Set([CLEANING_DAYS_STATUS]));
+    });
+
+    it('offers the cleaning-days field from both picked-up and overdue', () => {
+      // The two states a garment can come back from. A late return needs the
+      // estimate at least as much as an on-time one.
+      expect(laundryActionsFor(row({ state: 'picked-up' }))[0].needsCleaningDays).toBe(true);
+      expect(laundryActionsFor(row({ state: 'overdue' }))[0].needsCleaningDays).toBe(true);
     });
 
     it('keeps "confirm return" and "start cleaning" as two separate steps', () => {
