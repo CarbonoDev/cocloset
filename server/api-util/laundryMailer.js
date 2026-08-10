@@ -1,5 +1,6 @@
 const { sendMail, isMailgunConfigured } = require('./mailgun');
 const {
+  newIncomingGarmentNotification,
   pickupScheduledNotification,
   returnScheduledNotification,
   cleaningRequiredNotification,
@@ -24,10 +25,16 @@ const log = require('../log');
 // legitimately hand back a user with no email loaded) and an unexpected throw
 // while composing a body from partial API data.
 //
-// NOT IN SCOPE HERE: "New Incoming Garment" (§3.12). It fires when a garment
-// owner ships a garment in, at which point no transaction exists at all, so
-// there is no transition to hang it off. It needs its own trigger and is
-// deliberately left unwired.
+// BOTH SKIPS ARE LOGGED (Jonathan, 2026-08-10: "debe fallar solo con log sin
+// impedir el flujo si no existe la key o si no tenemos el mail de la laundry").
+// Note that the unconfigured check below SHORT-CIRCUITS before sendMail, so
+// mailgun.js's own skip log never runs for a laundry notification - this layer
+// has to do its own. That is not duplication; it is the only place the line gets
+// written on this path, and with no Mailgun account yet this path is every send.
+//
+// A skip is distinguishable from a failure by its code: `laundry-mail-skipped-*`
+// (we never tried) versus `laundry-mail-failed` (we tried and it broke). Skips
+// pass { skipSentry: true } - stdout, not alerting.
 
 /**
  * Compose + send one laundry notification. Always resolves.
@@ -41,10 +48,17 @@ const log = require('../log');
  */
 const send = ({ name, to, compose, logContext = {} }) => {
   try {
-    // Cheapest check first, and the one the client asked for: with no
-    // MAILGUN_API_KEY, do nothing at all rather than compose a body we would
-    // throw away. Keeps local dev, CI and the test suite silent.
+    // Cheapest check first: with no MAILGUN_API_KEY (or no MAILGUN_DOMAIN), do
+    // nothing rather than compose a body we would throw away - but log that a
+    // notification was due and went nowhere. Without this line the whole laundry
+    // mail path is indistinguishable from not existing.
     if (!isMailgunConfigured()) {
+      log.error(
+        new Error(`Mailgun is not configured - skipping laundry notification "${name}".`),
+        'laundry-mail-skipped-not-configured',
+        { notification: name, ...logContext },
+        { skipSentry: true }
+      );
       return Promise.resolve({ sent: false, reason: 'not-configured' });
     }
     if (!to) {
@@ -52,11 +66,9 @@ const send = ({ name, to, compose, logContext = {} }) => {
       // a laundry we cannot reach - say so once.
       log.error(
         new Error(`No recipient for laundry notification "${name}".`),
-        'laundry-mail-no-recipient',
-        {
-          notification: name,
-          ...logContext,
-        }
+        'laundry-mail-skipped-no-recipient',
+        { notification: name, ...logContext },
+        { skipSentry: true }
       );
       return Promise.resolve({ sent: false, reason: 'no-recipient' });
     }
@@ -66,6 +78,33 @@ const send = ({ name, to, compose, logContext = {} }) => {
     return Promise.resolve({ sent: false, reason: 'error', error });
   }
 };
+
+/**
+ * §3.12 New Incoming Garment - an owner has assigned this garment to this
+ * studio and is sending it in. Triggered from
+ * server/api/listing-laundry-assignment.js, which is the only write path for
+ * `listing.metadata.assignedLaundryId`.
+ *
+ * This is the one §3.12 notification with no transaction behind it: listing
+ * readiness is a separate lifecycle from transaction state (design §8), so the
+ * body carries listing data only and `logContext` keys off the listing id
+ * rather than a txId.
+ *
+ * ONLY ON A REAL CHANGE. The wizard lets an owner re-save the same laundry as
+ * often as they like, and this must not become three emails for three clicks.
+ * The caller is responsible for that gate (it holds the `changed` decision);
+ * see the call site.
+ *
+ * @param {Object} params - `to` plus the fields of newIncomingGarmentNotification
+ * @returns {Promise<Object>} never rejects
+ */
+const notifyNewIncomingGarment = ({ to, ...data }) =>
+  send({
+    name: 'new-incoming-garment',
+    to,
+    compose: () => newIncomingGarmentNotification(data),
+    logContext: { listingId: data.listingId },
+  });
 
 /**
  * §3.12 Pickup Scheduled - the booking was accepted, have the garment ready.
@@ -115,6 +154,7 @@ const notifyCleaningRequired = ({ to, ...data }) =>
   });
 
 module.exports = {
+  notifyNewIncomingGarment,
   notifyPickupScheduled,
   notifyReturnScheduled,
   notifyCleaningRequired,

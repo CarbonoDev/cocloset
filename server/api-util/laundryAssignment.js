@@ -241,16 +241,22 @@ const evaluateLaundryAssignment = ({
  * chain, including the transition that pays them out. lineItemHelpers.js already
  * defends the fee against exactly that; this closes it at the source.
  *
- * `privateData` rides along on the returned record, which the allowlisted directory
- * entry deliberately does not carry. It is needed by resolveInitialCleaningDays -
- * the per-category turnaround table lives there and only the Integration API can
- * read it - and this record never reaches an HTTP response: the endpoint's 200 body
- * is built from writeLaundryAssignment's explicit `written` object, not from this.
+ * `privateData` and `email` ride along on the returned record, which the allowlisted
+ * directory entry deliberately does not carry. `privateData` is needed by
+ * resolveInitialCleaningDays - the per-category turnaround table lives there and only
+ * the Integration API can read it. `email` is the account email, which the Marketplace
+ * API would not expose for a third party at all, and is needed to send the §3.12 New
+ * Incoming Garment notification.
+ *
+ * Neither reaches an HTTP response: the endpoint's 200 body is built from
+ * writeLaundryAssignment's explicit `written` object, not from this record. Taking the
+ * email off the `users.show` call this function already makes is also what keeps the
+ * assignment endpoint at one Integration API round trip per laundry instead of two.
  *
  * @param {Object} params
  * @param {Object} params.integrationSdk
  * @param {string} params.assignedLaundryId
- * @returns {Promise<{id: string, displayName: string, address: string, origin: {lat: number, lng: number}, privateData: Object}>}
+ * @returns {Promise<{id: string, displayName: string, studioName: string|null, address: string, origin: {lat: number, lng: number}, privateData: Object, email: string|undefined}>}
  */
 const resolveAssignedLaundry = ({ integrationSdk, assignedLaundryId }) =>
   integrationSdk.users
@@ -271,7 +277,11 @@ const resolveAssignedLaundry = ({ integrationSdk, assignedLaundryId }) =>
           'The chosen laundry has no usable address or location, so it cannot be assigned.'
         );
       }
-      return { ...entry, privateData: user?.attributes?.profile?.privateData || {} };
+      return {
+        ...entry,
+        privateData: user?.attributes?.profile?.privateData || {},
+        email: user?.attributes?.email,
+      };
     });
 
 /**

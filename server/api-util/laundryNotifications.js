@@ -141,6 +141,13 @@ const resolveMarketplaceName = name => name || process.env.REACT_APP_MARKETPLACE
  * is a separate lifecycle from transaction state), so this one deliberately
  * carries listing data only - no ticket code, no booking dates, no customer.
  *
+ * WIRED as of 2026-08-10, via laundryMailer.notifyNewIncomingGarment, from
+ * server/api/listing-laundry-assignment.js. It was defined and tested but
+ * unreachable before that: the absence of a transaction meant there was no
+ * transition to hang it off, and the assignment endpoint - the moment an owner
+ * actually picks a studio - only became the obvious trigger once the write moved
+ * server-side into it. The endpoint fires it on a real change only.
+ *
  * @param {Object} data
  * @param {string} [data.laundryName] - studio name, used in the greeting
  * @param {string} [data.garmentTitle] - listing title

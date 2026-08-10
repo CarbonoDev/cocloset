@@ -10,9 +10,21 @@ jest.mock('../api-util/listingOwnerAuth', () => ({
   requireListingAuthorCaller: jest.fn(),
 }));
 
+// The §3.12 New Incoming Garment notification, mocked the way
+// laundry-transaction-status.test.js mocks the mailer it fires: these tests are
+// about WHETHER and WITH WHAT the endpoint sends, not about composing a body or
+// about Mailgun. Mocking it also keeps the real (unconfigured) skip log out of
+// this suite's output.
+jest.mock('../api-util/laundryMailer', () => ({
+  notifyNewIncomingGarment: jest.fn(() => Promise.resolve({ sent: false, reason: 'mocked' })),
+}));
+
+jest.mock('../log', () => ({ error: jest.fn(), devLogger: jest.fn() }));
+
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { requireListingAuthorCaller } = require('../api-util/listingOwnerAuth');
+const { notifyNewIncomingGarment } = require('../api-util/laundryMailer');
 const { ACTIVE_LAST_TRANSITIONS } = require('../api-util/coclosetBookingProcess');
 
 const { resolveInitialCleaningDays } = require('../api-util/laundryAssignment');
@@ -61,10 +73,18 @@ const listingEntity = ({ assignedLaundryId = LAUNDRY_A, metadata = {} } = {}) =>
 
 // A user who genuinely passes `isLaundryUserEntity` and has a usable profile, so
 // api-util/laundryDirectory.js's mapping yields an address and an origin.
-const laundryUserEntity = ({ id = LAUNDRY_B, isLaundry = true, profile = {} } = {}) => ({
+const laundryUserEntity = ({
+  id = LAUNDRY_B,
+  isLaundry = true,
+  profile = {},
+  email = 'studio@marais.example.com',
+} = {}) => ({
   id: { uuid: id },
   type: 'user',
   attributes: {
+    // The account email, which only the Integration API exposes for a third
+    // party. It is what the New Incoming Garment notification is addressed to.
+    email,
     profile: {
       displayName: 'Maison du Marais',
       metadata: { isLaundry },
@@ -84,8 +104,20 @@ const laundryUserEntity = ({ id = LAUNDRY_B, isLaundry = true, profile = {} } = 
 // api-util/listingCustody.js's findActiveTransactions is deliberately NOT mocked,
 // so these tests exercise its real query and its real fail-closed behaviour
 // rather than a stand-in for them.
-const setupSdk = (listing, { transactions = [], transactionsReject, laundry } = {}) => {
-  const show = jest.fn(() => Promise.resolve({ data: { data: listing } }));
+// The author rides in `included`, which is why the endpoint asks for
+// `include: ['author']` (see api-util/listingOwnerAuth.js). Its display name is
+// the only thing the New Incoming Garment notification needs from it.
+const authorEntity = (displayName = 'Amélie Rousseau') => ({
+  id: { uuid: OWNER_ID },
+  type: 'user',
+  attributes: { profile: { displayName } },
+});
+
+const setupSdk = (
+  listing,
+  { transactions = [], transactionsReject, laundry, included = [authorEntity()] } = {}
+) => {
+  const show = jest.fn(() => Promise.resolve({ data: { data: listing, included } }));
   const update = jest.fn(() => Promise.resolve({ data: { data: listing } }));
   const transactionsQuery = jest.fn(() =>
     transactionsReject
@@ -803,5 +835,143 @@ describe('listing-laundry-assignment', () => {
         geolocation: { lat: 48.857, lng: 2.359 },
       });
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §3.12 New Incoming Garment.
+//
+// The notification body existed, was exported and was unit-tested for over a
+// week without a single caller: it fires when an owner ships a garment in, and
+// there is no transaction then, so there was no transition to hang it off. This
+// endpoint is the trigger - the moment the owner commits to a studio.
+//
+// The interesting requirement is NOT "does it send". It is "does it stay quiet".
+// The wizard's LAUNDRY tab can be saved over and over with the same studio
+// selected, and each of those is a legitimate 200. Three clicks on Save must be
+// one email, not three.
+// ---------------------------------------------------------------------------
+describe('the New Incoming Garment notification to the chosen studio', () => {
+  const assignable = () => listingEntity({ metadata: { onLaundry: false } });
+
+  beforeEach(() => {
+    // The shared jest config sets `resetMocks: true`, so re-arm the two mocks
+    // this endpoint needs on every test (as the suite above does).
+    requireListingAuthorCaller.mockResolvedValue({ id: { uuid: OWNER_ID } });
+    handleError.mockImplementation((res, e) => {
+      res.status(e.status || 500);
+      res.json({ error: e.statusText || 'error', data: e.data });
+      res.end();
+    });
+  });
+
+  it('tells the studio to expect a garment when the assignment actually changes', async () => {
+    setupSdk(assignable());
+
+    const res = await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.changed).toBe(true);
+    expect(notifyNewIncomingGarment).toHaveBeenCalledTimes(1);
+    expect(notifyNewIncomingGarment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // Resolved from the laundry's own account via the Integration API, never
+        // from the request body.
+        to: 'studio@marais.example.com',
+        laundryName: 'Maison du Marais',
+        ownerName: 'Amélie Rousseau',
+        listingId: LISTING_ID.uuid,
+        category: 'dresses',
+      })
+    );
+  });
+
+  it('does NOT email again on a no-op re-save of the same studio', async () => {
+    // listingEntity() already has LAUNDRY_A assigned, and the request re-picks
+    // LAUNDRY_A. This is the "owner pressed Save three times" case.
+    setupSdk(listingEntity({ assignedLaundryId: LAUNDRY_A, metadata: { onLaundry: false } }));
+
+    const res = await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_A });
+
+    // Still a success, and still re-writes the derived fields - it just does not
+    // announce anything, because nothing was announced.
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.changed).toBe(false);
+    expect(notifyNewIncomingGarment).not.toHaveBeenCalled();
+  });
+
+  it('sends exactly one email across three identical saves', async () => {
+    // The end-to-end version of the gate: change once, then re-save twice. Only
+    // the first save is a change, so only the first sends.
+    setupSdk(assignable());
+    await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+    setupSdk(listingEntity({ assignedLaundryId: LAUNDRY_B, metadata: { onLaundry: false } }));
+    await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+    await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+    expect(notifyNewIncomingGarment).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not email when the assignment was refused', async () => {
+    // A garment already at a studio cannot be reassigned (409). Nothing changed,
+    // so nothing may be announced - least of all to a studio that is not getting
+    // the garment.
+    setupSdk(listingEntity({ metadata: { onLaundry: true } }));
+
+    const res = await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+    expect(res.statusCode).toBe(409);
+    expect(notifyNewIncomingGarment).not.toHaveBeenCalled();
+  });
+
+  it('still answers 200 when the mailer cannot send', async () => {
+    // The write has already landed by the time this fires. Mailgun is entirely
+    // unconfigured in Dev, so this is the ONLY path that runs there today: it has
+    // to be invisible to the caller. If it were not, an owner would be sent back
+    // to re-save an assignment that had in fact been saved.
+    notifyNewIncomingGarment.mockResolvedValueOnce({ sent: false, reason: 'not-configured' });
+    setupSdk(assignable());
+
+    const res = await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.assignedLaundryId).toBe(LAUNDRY_B);
+    expect(handleError).not.toHaveBeenCalled();
+  });
+
+  it('does not fail the request even if the mailer throws synchronously', async () => {
+    // laundryMailer is documented never to reject, but this endpoint must not
+    // depend on that promise: a regression there must not cost an owner their
+    // assignment. (Same reasoning as laundry-transaction-status.test.js.)
+    notifyNewIncomingGarment.mockImplementationOnce(() => {
+      throw new Error('mailer exploded');
+    });
+    setupSdk(assignable());
+
+    const res = await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+    expect(res.statusCode).toBe(200);
+    expect(handleError).not.toHaveBeenCalled();
+  });
+
+  it('sends even when the studio has no email on file, and lets the mailer log it', async () => {
+    // Resolving no address is the mailer's `no-recipient` skip (which now logs).
+    // The endpoint deliberately does not pre-filter on it: swallowing the call
+    // here would mean nothing ever reported the misconfigured studio.
+    //
+    // The key is DELETED rather than passed as undefined - the Integration API
+    // can hand back a user entity with no `email` attribute at all, and a default
+    // parameter would quietly fill one back in.
+    const noEmail = laundryUserEntity();
+    delete noEmail.attributes.email;
+    setupSdk(assignable(), { laundry: noEmail });
+
+    const res = await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+    expect(res.statusCode).toBe(200);
+    expect(notifyNewIncomingGarment).toHaveBeenCalledWith(
+      expect.objectContaining({ to: undefined })
+    );
   });
 });
