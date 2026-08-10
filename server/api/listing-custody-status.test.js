@@ -140,6 +140,18 @@ describe('listing-custody-status', () => {
       );
     });
 
+    // Same seam as in listing-laundry-assignment.test.js: the authorizer is mocked
+    // here, so only the fetch itself can be asserted. Without
+    // `include: ['author']` the real API returns no `relationships`, the owner
+    // branch silently reads undefined, and an owner falls through to the laundry
+    // branch to be refused as "neither laundry nor owner" - a 403 blaming them for
+    // our missing parameter.
+    it("fetches the listing with include: ['author'] so the owner branch can be evaluated", async () => {
+      const { show } = setupSdk();
+      await run({ listingId: LISTING_ID, onLaundry: false });
+      expect(show).toHaveBeenCalledWith(expect.objectContaining({ include: ['author'] }));
+    });
+
     it('reports which principal was recognised', async () => {
       setupSdk();
       authorizeLaundryOrOwnerCaller.mockResolvedValue({ currentUser: {}, role: 'laundry' });

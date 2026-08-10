@@ -354,6 +354,22 @@ describe('listing-laundry-assignment', () => {
       );
     });
 
+    // `requireListingAuthorCaller` is mocked in this suite, so nothing here can
+    // catch it being handed a listing with no author to check - and that is
+    // exactly the bug that shipped: the fetch omitted `include: ['author']`, the
+    // real API returned no `relationships` at all, and every owner was told
+    // "Caller is not the owner of this listing." while assigning their own
+    // garment. The unit tests passed throughout, because their fixtures were more
+    // generous than the API.
+    //
+    // So this asserts the FETCH, not the decision. It is the only place in this
+    // suite that can.
+    it("fetches the listing with include: ['author'] - the ownership check is unanswerable without it", async () => {
+      const { show } = setupSdk(listingEntity());
+      await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+      expect(show).toHaveBeenCalledWith(expect.objectContaining({ include: ['author'] }));
+    });
+
     it('writes nothing at all when authorization fails', async () => {
       // Now that this endpoint IS the writer, "answers 403" and "wrote nothing" are
       // two separate claims, and only the second one protects anything.

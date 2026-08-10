@@ -30,6 +30,20 @@ const { readAssignedLaundryId } = require('./laundryAssignment');
 // application writes, so it can be wrong for ordinary bug reasons.
 // `relationships.author` cannot. When the question is "is this the owner", ask
 // the relationship.
+//
+// ...BUT THE RELATIONSHIP HAS TO BE ASKED FOR
+// `listings.show({ id })` returns NO `relationships` key at all unless the call
+// passes `include: ['author']` - verified against the Dev Integration API, where
+// the bare call yields `relationships: undefined`. That is how this shipped
+// broken: every owner got "Caller is not the owner of this listing." because the
+// check compared their id against `undefined`, which is not the owner of
+// anything. Both conditions read false the same way, so the bug wore the
+// costume of a working authorization rule.
+//
+// Hence assertAuthorRelationshipPresent below. A missing author relationship is
+// now a 500 naming the real fault, NOT a 403 about ownership: we must never again
+// tell an owner they are not the owner because we forgot to fetch the field. If
+// you add a new caller, fetch the listing with `include: ['author']`.
 
 const forbiddenError = message => {
   const error = new Error(message);
@@ -47,11 +61,38 @@ const unauthorizedError = () => {
   return error;
 };
 
+const misconfiguredError = () => {
+  const message =
+    'Listing was fetched without its author relationship; ' +
+    'ownership cannot be determined. Fetch it with include: ["author"].';
+  const error = new Error(message);
+  error.status = 500;
+  error.statusText = 'Listing author relationship missing.';
+  error.data = {};
+  return error;
+};
+
+/**
+ * Fail loudly when the listing carries no author relationship.
+ *
+ * This separates "we did not ask the API for the owner" (our bug, 500) from
+ * "the caller is not the owner" (their problem, 403). Collapsing the two is
+ * precisely the defect this function exists to prevent - see the header.
+ *
+ * @param {Object} [listing] - a listing API entity
+ * @throws when the author relationship is absent
+ */
+const assertAuthorRelationshipPresent = listing => {
+  if (!listing?.relationships?.author?.data?.id?.uuid) {
+    throw misconfiguredError();
+  }
+};
+
 /**
  * Is `currentUser` the author of `listing`?
  *
- * Pure. `listing` is an API listing entity (Marketplace or Integration - both
- * carry `relationships.author`).
+ * Pure. `listing` is an API listing entity that was fetched WITH
+ * `include: ['author']` - neither API returns the relationship otherwise.
  *
  * @param {Object} [currentUser] - a currentUser API entity
  * @param {Object} [listing] - a listing API entity
@@ -80,16 +121,19 @@ const resolveCaller = (req, res) =>
  *
  * @param {Object} req
  * @param {Object} res
- * @param {Object} listing - a listing API entity (must carry relationships.author)
+ * @param {Object} listing - a listing API entity fetched with include: ['author']
  * @returns {Promise<Object>} the currentUser entity
  */
 const requireListingAuthorCaller = (req, res, listing) =>
-  resolveCaller(req, res).then(currentUser => {
-    if (!isListingAuthor(currentUser, listing)) {
-      throw forbiddenError('Caller is not the owner of this listing.');
-    }
-    return currentUser;
-  });
+  Promise.resolve()
+    .then(() => assertAuthorRelationshipPresent(listing))
+    .then(() => resolveCaller(req, res))
+    .then(currentUser => {
+      if (!isListingAuthor(currentUser, listing)) {
+        throw forbiddenError('Caller is not the owner of this listing.');
+      }
+      return currentUser;
+    });
 
 /**
  * Require that the caller is EITHER the listing's assigned laundry OR its owner.
@@ -104,26 +148,33 @@ const requireListingAuthorCaller = (req, res, listing) =>
  * assertIsAssignedLaundry exactly as it is everywhere else - the laundry rule is
  * imported, not restated.
  *
+ * The author relationship is asserted BEFORE either branch runs. Without it an
+ * owner silently fails the first check and falls through to the laundry one,
+ * which rejects them from their own listing for the wrong reason entirely.
+ *
  * @param {Object} req
  * @param {Object} res
- * @param {Object} listing - a listing API entity
+ * @param {Object} listing - a listing API entity fetched with include: ['author']
  * @returns {Promise<{currentUser: Object, role: 'owner'|'laundry'}>}
  */
 const authorizeLaundryOrOwnerCaller = (req, res, listing) =>
-  resolveCaller(req, res).then(currentUser => {
-    if (isListingAuthor(currentUser, listing)) {
-      return { currentUser, role: 'owner' };
-    }
+  Promise.resolve()
+    .then(() => assertAuthorRelationshipPresent(listing))
+    .then(() => resolveCaller(req, res))
+    .then(currentUser => {
+      if (isListingAuthor(currentUser, listing)) {
+        return { currentUser, role: 'owner' };
+      }
 
-    if (isLaundryUser(currentUser)) {
-      assertIsAssignedLaundry(currentUser, readAssignedLaundryId(listing));
-      return { currentUser, role: 'laundry' };
-    }
+      if (isLaundryUser(currentUser)) {
+        assertIsAssignedLaundry(currentUser, readAssignedLaundryId(listing));
+        return { currentUser, role: 'laundry' };
+      }
 
-    throw forbiddenError(
-      'Caller is neither the laundry assigned to this listing nor the listing owner.'
-    );
-  });
+      throw forbiddenError(
+        'Caller is neither the laundry assigned to this listing nor the listing owner.'
+      );
+    });
 
 module.exports = {
   isListingAuthor,
