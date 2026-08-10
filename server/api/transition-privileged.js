@@ -1,6 +1,9 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
 const { buildLineItemsForListing } = require('../api-util/lineItems');
-const { assertMinimumBookingDays } = require('../api-util/bookingRules');
+const {
+  assertInitialCleaningLeadTime,
+  assertMinimumBookingDays,
+} = require('../api-util/bookingRules');
 const {
   addOfferToMetadata,
   getAmountFromPreviousOffer,
@@ -200,6 +203,22 @@ module.exports = (req, res) => {
         listing,
         bookingStart: bodyParams?.params?.bookingStart,
         bookingEnd: bodyParams?.params?.bookingEnd,
+      });
+
+      // The initial cleaning turnaround, for a garment that has never reached its
+      // laundry. Same "no-op unless this transition carries booking dates" caveat as
+      // the rule above, and the same reason it still has to be here:
+      // `request-payment-after-inquiry` creates a reservation, so this endpoint is
+      // the second door into the same booking.
+      //
+      // It reads `metadata` (`onLaundry`, `initialCleaningDays`) off the included
+      // listing. `include: ['listing']` returns the full listing resource - no
+      // `fields.listing` restriction is sent here - so `metadata` is present for the
+      // same reason `publicData` is, which the line-item builder below already
+      // depends on.
+      assertInitialCleaningLeadTime({
+        listing,
+        bookingStart: bodyParams?.params?.bookingStart,
       });
 
       // Cleaning fee is sourced from the assigned laundry's privateData

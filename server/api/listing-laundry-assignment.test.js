@@ -15,6 +15,9 @@ const { handleError } = require('../api-util/sdk');
 const { requireListingAuthorCaller } = require('../api-util/listingOwnerAuth');
 const { ACTIVE_LAST_TRANSITIONS } = require('../api-util/coclosetBookingProcess');
 
+const { resolveInitialCleaningDays } = require('../api-util/laundryAssignment');
+const { HARDCODED_DEFAULT_BUFFER_DAYS } = require('../api-util/availabilityHelpers');
+
 const listingLaundryAssignment = require('./listing-laundry-assignment');
 const { evaluateLaundryAssignment } = listingLaundryAssignment;
 
@@ -128,6 +131,91 @@ const run = async (body, res = mockRes()) => {
 //   > "se puede editar la laundry mientras que no este en una transaction activa
 //   >  y que onLaundry sea false"
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// The initial cleaning turnaround, snapshotted onto the listing at assignment.
+//
+// This number is what stops the booking calendar offering TOMORROW for a garment
+// that has never physically reached a studio:
+//
+//   > "Al hacer booking, el calendario muestra el siguiente día como disponible,
+//   >  pero no esta considerando los tiempos de lavado inicial"
+//
+// It has to agree with the turnaround create-availability-buffer.js uses to size
+// the block window around an accepted booking, so the resolution chain is REUSED
+// rather than restated. These tests pin the chain, including the fallbacks, because
+// this is the only moment the value is ever computed - it is then stored, and a
+// wrong number sits on the listing indefinitely.
+// ---------------------------------------------------------------------------
+
+describe('resolveInitialCleaningDays', () => {
+  const resolve = (laundryPrivateData, listingPublicData, envDefaultBufferDays) =>
+    resolveInitialCleaningDays({ laundryPrivateData, listingPublicData, envDefaultBufferDays });
+
+  it('prefers the turnaround the laundry set for THIS garment top-level category', () => {
+    expect(
+      resolve(
+        { turnaroundDays: 2, categoryPricing: { dresses: { turnaroundDays: 5 } } },
+        { categoryLevel1: 'dresses', categoryLevel2: 'midi_dress' }
+      )
+    ).toBe(5);
+  });
+
+  it('falls back to the studio-wide turnaround when the category has none', () => {
+    expect(
+      resolve(
+        { turnaroundDays: 2, categoryPricing: { tops: { turnaroundDays: 5 } } },
+        {
+          categoryLevel1: 'dresses',
+        }
+      )
+    ).toBe(2);
+  });
+
+  it('falls back to the env default, then to the hardcoded default', () => {
+    expect(resolve({}, { categoryLevel1: 'dresses' }, '4')).toBe(4);
+    expect(resolve({}, { categoryLevel1: 'dresses' })).toBe(HARDCODED_DEFAULT_BUFFER_DAYS);
+    expect(HARDCODED_DEFAULT_BUFFER_DAYS).toBe(2);
+  });
+
+  // Rounded UP, through the same computeBufferDays rule the buffer window uses.
+  // Under-blocking means offering a customer a garment that is still in the wash.
+  it('rounds a fractional turnaround up to a whole day', () => {
+    expect(resolve({ turnaroundDays: 1.5 }, {})).toBe(2);
+    expect(resolve({}, {}, '2.1')).toBe(3);
+  });
+
+  it('never returns zero or a non-integer, whatever the stored data looks like', () => {
+    // Every one of these has to end up as a usable positive integer: the value is
+    // written straight into metadata, and resolveInitialCleaningBlockDays treats a
+    // malformed one as NO BLOCK - i.e. a bad write here silently disables the rule.
+    [
+      undefined,
+      null,
+      {},
+      { turnaroundDays: 0 },
+      { turnaroundDays: -3 },
+      { turnaroundDays: 'x' },
+      {
+        categoryPricing: [],
+      },
+    ].forEach(privateData => {
+      const days = resolveInitialCleaningDays({
+        laundryPrivateData: privateData,
+        listingPublicData: { categoryLevel1: 'dresses' },
+      });
+      expect(Number.isInteger(days)).toBe(true);
+      expect(days).toBeGreaterThan(0);
+    });
+  });
+
+  it('does not need a category chain at all', () => {
+    // A listing whose category was never set still gets a usable number rather than
+    // NaN: getListingCategoryValues returns [] and resolution starts studio-wide.
+    expect(resolve({ turnaroundDays: 3 }, undefined)).toBe(3);
+    expect(resolve({ turnaroundDays: 3 }, {})).toBe(3);
+  });
+});
 
 describe('evaluateLaundryAssignment', () => {
   it('allows a first assignment (no laundry yet, no custody)', () => {
@@ -566,22 +654,76 @@ describe('listing-laundry-assignment', () => {
       });
     });
 
-    it('writes the id and all three derived fields in ONE call', async () => {
+    it('writes the id, the initial cleaning turnaround and all three derived fields in ONE call', async () => {
       // One call so they cannot land separately. `geolocation` is a top-level
       // attribute rather than extended data; the Integration API accepts it
       // alongside publicData and metadata (verified against Dev), which is what
       // makes a single call possible at all.
+      //
+      // `initialCleaningDays` rides along for the same reason: an assignment whose
+      // turnaround failed to land would leave the calendar offering tomorrow for a
+      // garment that is not there, which is the exact bug it exists to fix.
       const { update } = setupSdk(listingEntity({ metadata: { onLaundry: false } }));
       await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
 
       expect(update).toHaveBeenCalledTimes(1);
       const params = update.mock.calls[0][0];
-      expect(params.metadata).toEqual({ assignedLaundryId: LAUNDRY_B });
+      // The fixture laundry configures no turnaround at all, so this is the bottom
+      // of the fallback chain.
+      expect(params.metadata).toEqual({
+        assignedLaundryId: LAUNDRY_B,
+        initialCleaningDays: HARDCODED_DEFAULT_BUFFER_DAYS,
+      });
       expect(params.publicData).toEqual({
         assignedLaundryName: 'Maison du Marais',
         pickupAddress: '5 Rue des Rosiers, Paris',
       });
       expect(params.geolocation).toMatchObject({ lat: 48.857, lng: 2.359 });
+    });
+
+    it('resolves the turnaround for THIS garment category, from the laundry profile', async () => {
+      // The listing fixture is filed under `dresses`, and this studio takes 4 days
+      // over a dress. A studio-wide average would be the wrong number as often as
+      // the right one.
+      const { update } = setupSdk(listingEntity({ metadata: { onLaundry: false } }), {
+        laundry: laundryUserEntity({
+          profile: {
+            privateData: { turnaroundDays: 1, categoryPricing: { dresses: { turnaroundDays: 4 } } },
+          },
+        }),
+      });
+      await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+      expect(update.mock.calls[0][0].metadata.initialCleaningDays).toBe(4);
+    });
+
+    it('never takes the turnaround from the request body', async () => {
+      // A caller who could supply this could make their own garment bookable
+      // tomorrow, which is the whole rule.
+      const { update } = setupSdk(listingEntity({ metadata: { onLaundry: false } }));
+      await run({
+        listingId: LISTING_ID,
+        assignedLaundryId: LAUNDRY_B,
+        initialCleaningDays: 0,
+      });
+
+      expect(update.mock.calls[0][0].metadata.initialCleaningDays).toBe(
+        HARDCODED_DEFAULT_BUFFER_DAYS
+      );
+    });
+
+    it('does not touch the custody keys another writer owns', async () => {
+      // `onLaundry` / `readyAt` belong to api-util/listingCustody.js. Sharetribe
+      // merges extended data per top-level key (re-verified against Dev for this
+      // write - see writeLaundryAssignment), so neither writer has to know about the
+      // other's fields; what it must NOT do is send them and overwrite them.
+      const { update } = setupSdk(
+        listingEntity({ metadata: { onLaundry: false, readyAt: '2026-08-01T00:00:00.000Z' } })
+      );
+      await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+      expect(update.mock.calls[0][0].metadata).not.toHaveProperty('onLaundry');
+      expect(update.mock.calls[0][0].metadata).not.toHaveProperty('readyAt');
     });
 
     it('derives the address and location from the laundry, never from the body', async () => {
@@ -655,6 +797,7 @@ describe('listing-laundry-assignment', () => {
       expect(res.body.data).toMatchObject({
         allowed: true,
         assignedLaundryId: LAUNDRY_B,
+        initialCleaningDays: HARDCODED_DEFAULT_BUFFER_DAYS,
         assignedLaundryName: 'Maison du Marais',
         pickupAddress: '5 Rue des Rosiers, Paris',
         geolocation: { lat: 48.857, lng: 2.359 },

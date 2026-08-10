@@ -5,6 +5,7 @@ const {
   assertLaundryAssignmentAllowed,
   evaluateLaundryAssignment,
   resolveAssignedLaundry,
+  resolveInitialCleaningDays,
   writeLaundryAssignment,
 } = require('../api-util/laundryAssignment');
 
@@ -50,14 +51,23 @@ const {
 //     `publicData.pickupAddress`, top-level `geolocation`) are resolved from that
 //     laundry's own profile and written in the SAME call as the id, so a caller
 //     cannot submit an id and a pickup address that disagree.
+//   * `metadata.initialCleaningDays` - the turnaround for the FIRST wash of this
+//     garment at this laundry, resolved from the same profile (see
+//     api-util/laundryAssignment.js `resolveInitialCleaningDays`) and written in
+//     that same call. This is the only place it is ever written. It is in
+//     `metadata` and not `publicData` deliberately: the booking calendar and the
+//     privileged-endpoint gate in api-util/bookingRules.js both refuse dates based
+//     on it, so an owner-writable copy would make that refusal advisory. Storing it
+//     is also what keeps the checkout path free of any Integration API call - the
+//     laundry's turnaround lives in `privateData`, which only this API can read.
 //
 // A no-op re-save (the same laundry again) skips both conditions on purpose - see
 // evaluateLaundryAssignment's docblock for why gating it would dead-end the
 // wizard tab rather than protect anything.
 //
 // Success response (200): { data: { allowed: true, changed, onLaundry,
-//   currentAssignedLaundryId, assignedLaundryId, assignedLaundryName,
-//   pickupAddress, geolocation } }
+//   currentAssignedLaundryId, assignedLaundryId, initialCleaningDays,
+//   assignedLaundryName, pickupAddress, geolocation } }
 // Failure responses:
 //   400 - missing listingId / assignedLaundryId
 //   401 - no usable session
@@ -108,7 +118,23 @@ module.exports = (req, res) => {
         )
         .then(decision =>
           resolveAssignedLaundry({ integrationSdk, assignedLaundryId })
-            .then(laundry => writeLaundryAssignment({ integrationSdk, listingId, laundry }))
+            .then(laundry =>
+              writeLaundryAssignment({
+                integrationSdk,
+                listingId,
+                laundry,
+                // Resolved HERE, from the laundry's own privateData and this
+                // garment's category chain, and never accepted from the request
+                // body: it is the number the booking calendar and
+                // api-util/bookingRules.js will both honour, so a caller who could
+                // supply it could make their garment bookable tomorrow.
+                initialCleaningDays: resolveInitialCleaningDays({
+                  laundryPrivateData: laundry.privateData,
+                  listingPublicData: listing.attributes?.publicData,
+                  envDefaultBufferDays: process.env.DEFAULT_LAUNDRY_BUFFER_DAYS,
+                }),
+              })
+            )
             .then(written => ({ ...decision, ...written }))
         );
     })

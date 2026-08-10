@@ -1,4 +1,6 @@
 const { types: sdkTypes } = require('sharetribe-flex-integration-sdk');
+const { computeBufferDays, resolveTurnaroundDays } = require('./availabilityHelpers');
+const { getListingCategoryValues, resolveCategoryTurnaroundDays } = require('./categoryPricing');
 const { findActiveTransactions } = require('./listingCustody');
 const { isLaundryUserEntity, toLaundryDirectoryEntry } = require('./laundryDirectory');
 
@@ -57,6 +59,36 @@ const { isLaundryUserEntity, toLaundryDirectoryEntry } = require('./laundryDirec
 
 const ASSIGNED_LAUNDRY_KEY = 'assignedLaundryId';
 
+// ── THE INITIAL CLEANING TURNAROUND, SNAPSHOTTED ─────────────────────────────
+// `metadata.initialCleaningDays`: how long this garment will take to be cleaned
+// the FIRST time, before it has ever been rented.
+//
+//   > "Al hacer booking, el calendario muestra el siguiente día como disponible,
+//   >  pero no esta considerando los tiempos de lavado inicial"
+//
+// WHY IT IS STORED AT ALL, RATHER THAN LOOKED UP WHEN NEEDED
+// The two places that need it - the booking calendar in the browser and the
+// privileged-endpoint gate in api-util/bookingRules.js - both sit on the checkout
+// path, and neither may make an Integration API call: the browser must never hold
+// admin credentials, and this branch deliberately REMOVED the Integration API
+// lookup from the checkout path rather than adding one. The laundry's turnaround
+// lives in its `privateData`, which only the Integration API can read. So the
+// number is resolved once, here, at the only moment a laundry is chosen, and
+// stored on the listing where both sides can read it.
+//
+// WHY `metadata` AND NOT `publicData`
+// The same reason as ASSIGNED_LAUNDRY_KEY above, and here it is what makes the
+// rule an actual rule: `metadata` is Integration-API-only, so a garment owner
+// cannot delete their own `initialCleaningDays` to make their listing bookable
+// tomorrow. In `publicData` the whole gate would be advisory.
+//
+// A stored snapshot does drift if the laundry later changes its turnaround. That
+// is accepted, and it is the lesser of the two errors: the value only matters until
+// the garment first reaches a studio (see resolveInitialCleaningBlockDays), it is
+// refreshed on any re-save of the LAUNDRY tab, and the alternative is an admin-
+// credentialled round trip between a customer and their payment.
+const INITIAL_CLEANING_DAYS_KEY = 'initialCleaningDays';
+
 /**
  * Read the assigned laundry off a listing entity.
  *
@@ -74,6 +106,45 @@ const ASSIGNED_LAUNDRY_KEY = 'assignedLaundryId';
  * @returns {string|undefined} the laundry's user id, or undefined
  */
 const readAssignedLaundryId = listing => listing?.attributes?.metadata?.[ASSIGNED_LAUNDRY_KEY];
+
+/**
+ * The initial cleaning turnaround for ONE garment at ONE laundry, in whole days.
+ *
+ * Deliberately the SAME resolution chain server/api/create-availability-buffer.js
+ * uses to size the buffer around an accepted booking: the laundry's per-top-level-
+ * category turnaround, then its studio-wide `privateData.turnaroundDays`, then
+ * DEFAULT_LAUNDRY_BUFFER_DAYS, then a hardcoded 2 days. Two different numbers for
+ * "how long does this studio take to clean this garment" would be a bug waiting to
+ * be reported as "the calendar and the block window disagree", so the chain is
+ * reused rather than restated - see api-util/categoryPricing.js for the rules and
+ * api-util/availabilityHelpers.js for the fallbacks.
+ *
+ * Rounded UP through computeBufferDays for the same reason that function exists: a
+ * fractional 1.5 days out of an env var is 2 days of cleaning, not 1. Under-
+ * blocking here means offering a customer a garment that is still in the wash.
+ *
+ * ALWAYS RETURNS A USABLE POSITIVE INTEGER. There is no "unknown" answer: the chain
+ * bottoms out in HARDCODED_DEFAULT_BUFFER_DAYS, and a laundry that has configured
+ * nothing still needs time to clean.
+ *
+ * @param {Object} params
+ * @param {Object} [params.laundryPrivateData] - the laundry USER's profile privateData
+ * @param {Object} [params.listingPublicData] - the listing's publicData (for its category chain)
+ * @param {*} [params.envDefaultBufferDays] - process.env.DEFAULT_LAUNDRY_BUFFER_DAYS
+ * @returns {number} an integer >= 1
+ */
+const resolveInitialCleaningDays = ({
+  laundryPrivateData,
+  listingPublicData,
+  envDefaultBufferDays,
+}) => {
+  const turnaroundDays = resolveTurnaroundDays(
+    resolveCategoryTurnaroundDays(laundryPrivateData, getListingCategoryValues(listingPublicData)),
+    envDefaultBufferDays
+  );
+
+  return computeBufferDays(turnaroundDays).totalBufferDays;
+};
 
 // `reason` rides along in `error.data`, which api-util/sdk.js's handleError
 // forwards to the client verbatim. The wizard needs to say WHICH condition
@@ -170,10 +241,16 @@ const evaluateLaundryAssignment = ({
  * chain, including the transition that pays them out. lineItemHelpers.js already
  * defends the fee against exactly that; this closes it at the source.
  *
+ * `privateData` rides along on the returned record, which the allowlisted directory
+ * entry deliberately does not carry. It is needed by resolveInitialCleaningDays -
+ * the per-category turnaround table lives there and only the Integration API can
+ * read it - and this record never reaches an HTTP response: the endpoint's 200 body
+ * is built from writeLaundryAssignment's explicit `written` object, not from this.
+ *
  * @param {Object} params
  * @param {Object} params.integrationSdk
  * @param {string} params.assignedLaundryId
- * @returns {Promise<{id: string, displayName: string, address: string, origin: {lat: number, lng: number}}>}
+ * @returns {Promise<{id: string, displayName: string, address: string, origin: {lat: number, lng: number}, privateData: Object}>}
  */
 const resolveAssignedLaundry = ({ integrationSdk, assignedLaundryId }) =>
   integrationSdk.users
@@ -194,32 +271,51 @@ const resolveAssignedLaundry = ({ integrationSdk, assignedLaundryId }) =>
           'The chosen laundry has no usable address or location, so it cannot be assigned.'
         );
       }
-      return entry;
+      return { ...entry, privateData: user?.attributes?.profile?.privateData || {} };
     });
 
 /**
- * Write the assignment: the id into `metadata`, the three derived fields
- * alongside it, in ONE Integration API call.
+ * Write the assignment: the id and the initial cleaning turnaround into `metadata`,
+ * the three derived fields alongside them, in ONE Integration API call.
  *
  * Extended-data updates are merged per top-level key server-side, so this does
- * not need to read-and-spread the listing's other `metadata` / `publicData` keys
- * (verified against the real Dev API - the same property api-util/listingCustody.js
- * relies on).
+ * not need to read-and-spread the listing's other `metadata` / `publicData` keys.
+ * RE-VERIFIED against the real Dev marketplace for THIS write, because
+ * `initialCleaningDays` is the first metadata key with a second, independent writer
+ * that must not clobber it (api-util/listingCustody.js `writeCustodyMetadata`, which
+ * writes `onLaundry`/`readyAt` on custody events). Observed sequence on a real
+ * listing, Integration API, both orders:
+ *
+ *   update({ metadata: { initialCleaningDays: 7 } })
+ *     -> { initialCleaningDays: 7 }
+ *   update({ metadata: { onLaundry: true, readyAt: '…' } })
+ *     -> { initialCleaningDays: 7, onLaundry: true, readyAt: '…' }
+ *   update({ metadata: { initialCleaningDays: 3 } })
+ *     -> { initialCleaningDays: 3, onLaundry: true, readyAt: '…' }
+ *
+ * i.e. per-key merge in both directions, and `null` deletes a key rather than
+ * storing null. Neither writer needs to know about the other's fields.
  *
  * `geolocation` is a top-level attribute rather than extended data, so it is
  * passed as an SDK `LatLng` and not a plain object. It is included in this same
  * call - verified accepted by the Integration API - specifically so the id and the
  * location it implies cannot land separately.
  *
+ * `initialCleaningDays` goes in the same call for the same reason: an assignment
+ * whose turnaround failed to land would leave the calendar offering tomorrow for a
+ * garment that is not there, which is the exact bug this field exists to fix.
+ *
  * @param {Object} params
  * @param {Object} params.integrationSdk
  * @param {Object|string} params.listingId
  * @param {Object} params.laundry - a record from resolveAssignedLaundry
- * @returns {Promise<{assignedLaundryId: string, assignedLaundryName: string, pickupAddress: string, geolocation: {lat: number, lng: number}}>}
+ * @param {number} params.initialCleaningDays - from resolveInitialCleaningDays
+ * @returns {Promise<{assignedLaundryId: string, initialCleaningDays: number, assignedLaundryName: string, pickupAddress: string, geolocation: {lat: number, lng: number}}>}
  */
-const writeLaundryAssignment = ({ integrationSdk, listingId, laundry }) => {
+const writeLaundryAssignment = ({ integrationSdk, listingId, laundry, initialCleaningDays }) => {
   const written = {
     [ASSIGNED_LAUNDRY_KEY]: laundry.id,
+    [INITIAL_CLEANING_DAYS_KEY]: initialCleaningDays,
     assignedLaundryName: laundry.displayName || laundry.studioName || null,
     pickupAddress: laundry.address,
     geolocation: { lat: laundry.origin.lat, lng: laundry.origin.lng },
@@ -234,7 +330,10 @@ const writeLaundryAssignment = ({ integrationSdk, listingId, laundry }) => {
           assignedLaundryName: written.assignedLaundryName,
           pickupAddress: written.pickupAddress,
         },
-        metadata: { [ASSIGNED_LAUNDRY_KEY]: laundry.id },
+        metadata: {
+          [ASSIGNED_LAUNDRY_KEY]: laundry.id,
+          [INITIAL_CLEANING_DAYS_KEY]: initialCleaningDays,
+        },
       },
       { expand: true }
     )
@@ -312,7 +411,9 @@ const assertLaundryAssignmentAllowed = ({
 
 module.exports = {
   ASSIGNED_LAUNDRY_KEY,
+  INITIAL_CLEANING_DAYS_KEY,
   readAssignedLaundryId,
+  resolveInitialCleaningDays,
   evaluateLaundryAssignment,
   resolveAssignedLaundry,
   writeLaundryAssignment,

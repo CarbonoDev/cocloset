@@ -280,6 +280,83 @@ describe('OrderPanel', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Cocloset: the initial cleaning notice.
+  //
+  //   > "el calendario muestra el siguiente día como disponible, pero no esta
+  //   >  considerando los tiempos de lavado inicial ... si la prenda ya esta en
+  //   >  laundry entonces si debe aparecer disponible al siguiente día"
+  //
+  // BookingDatesForm's own tests cover the arithmetic. What they cannot cover is
+  // the THREADING: `onLaundry` and `initialCleaningDays` live in
+  // `listing.metadata`, and a rule that reads the wrong place - `publicData`, say,
+  // where the rest of the panel's props come from - reads `undefined` and silently
+  // never fires. That failure mode has shipped in this codebase before
+  // (`publicData.category` in EditListingLaundryPanel), so it is asserted here,
+  // from the listing entity down.
+  // ---------------------------------------------------------------------------
+  const dailyGarmentListing = (id, metadata) =>
+    createListing(id, {
+      title: 'the listing',
+      price: new Money(1000, 'USD'),
+      availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
+      publicData: {
+        listingType: 'rent-bicycles-daily',
+        transactionProcessAlias: 'default-booking/release-1',
+        unitType: 'day',
+      },
+      metadata,
+    });
+
+  it('Booking: explains why the near dates are unavailable before the garment reaches its laundry', async () => {
+    const listing = dailyGarmentListing('listing-not-at-laundry', {
+      initialCleaningDays: 3,
+      onLaundry: false,
+    });
+    const props = { ...commonProps, listing, isOwnListing: false, validListingTypes };
+    const { getByText } = render(<OrderPanel {...props} />, { config, routeConfiguration });
+
+    await waitFor(() => {
+      // A calendar that silently refuses the next three days reads as broken.
+      expect(getByText('BookingDatesForm.initialCleaningNotice')).toBeInTheDocument();
+    });
+  });
+
+  it('Booking: says nothing once the garment IS at the laundry', async () => {
+    const listing = dailyGarmentListing('listing-at-laundry', {
+      initialCleaningDays: 30,
+      onLaundry: true,
+    });
+    const props = { ...commonProps, listing, isOwnListing: false, validListingTypes };
+    const { queryByText, getByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
+    });
+    // Tomorrow is correct now, so the panel must look exactly as it did before this
+    // feature existed - no note, no explanation, nothing.
+    expect(queryByText('BookingDatesForm.initialCleaningNotice')).not.toBeInTheDocument();
+  });
+
+  it('Booking: says nothing for a listing with no stored turnaround', async () => {
+    // Every listing assigned before the field existed. No migration is planned - per
+    // the client, "en producción iniciaremos limpio".
+    const listing = dailyGarmentListing('listing-no-turnaround', {});
+    const props = { ...commonProps, listing, isOwnListing: false, validListingTypes };
+    const { queryByText, getByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingDatesForm.initialCleaningNotice')).not.toBeInTheDocument();
+  });
+
   it('Booking: nightly', async () => {
     const listing = createListing('listing-night', {
       title: 'the listing',

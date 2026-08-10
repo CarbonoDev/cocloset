@@ -326,6 +326,18 @@ const OrderPanel = props => {
     minimumBookingDays,
   } = publicData || {};
 
+  // Cocloset: garment custody, written ONLY by our server through the Integration
+  // API (see server/api-util/listingCustody.js and
+  // server/api/listing-laundry-assignment.js). Read from `metadata` and not
+  // `publicData` on purpose - the same two values gate the booking server-side in
+  // server/api-util/bookingRules.js, and `metadata` is the one kind of extended data
+  // a listing's own owner cannot write.
+  //
+  //   onLaundry           - true once a laundry has physically received the garment
+  //   initialCleaningDays - how long its FIRST wash takes, so the calendar can stop
+  //                         offering tomorrow for a garment that is not there yet
+  const { onLaundry, initialCleaningDays } = listing?.attributes?.metadata || {};
+
   const processName = resolveLatestProcessName(transactionProcessAlias.split('/')[0]);
   const lineItemUnitType = lineItemUnitTypeMaybe || `line-item/${unitType}`;
 
@@ -533,6 +545,8 @@ const OrderPanel = props => {
             className={css.bookingForm}
             formId="OrderPanelBookingDatesForm"
             minimumBookingDays={minimumBookingDays}
+            onLaundry={onLaundry}
+            initialCleaningDays={initialCleaningDays}
             dayCountAvailableForBooking={dayCountAvailableForBooking}
             monthlyTimeSlots={monthlyTimeSlots}
             onFetchTimeSlots={onFetchTimeSlots}

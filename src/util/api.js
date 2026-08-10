@@ -281,9 +281,11 @@ export const updateListingCustodyStatus = body => {
 // refuses to let an owner write (400 `validation-disallowed-key`), so the browser
 // cannot do this itself - by design. The server validates that the caller owns the
 // listing, that it has no active transaction, and that `metadata.onLaundry !== true`,
-// then writes the id together with the three fields derived from the chosen laundry
-// (`publicData.assignedLaundryName`, `publicData.pickupAddress` and the listing's
-// top-level `geolocation`) in one Integration API call.
+// then writes the id together with the four fields derived from the chosen laundry
+// (`publicData.assignedLaundryName`, `publicData.pickupAddress`, the listing's
+// top-level `geolocation`, and `metadata.initialCleaningDays` - the turnaround for
+// this garment's FIRST wash, which is what stops the booking calendar offering
+// tomorrow before the garment has ever reached a studio) in one Integration API call.
 //
 // So the wizard must NOT also write those fields through `ownListings.update()`.
 // Read the header of `server/api/listing-laundry-assignment.js` before changing

@@ -175,6 +175,58 @@ export const resolveMinimumDays = (minimumBookingDays, isDaily) =>
 export const minimumNightsForMinimumDays = minimumDays =>
   minimumDays ? minimumDays - 1 : undefined;
 
+/**
+ * How many days must pass before this garment can be rented at all?
+ *
+ *   > "Al hacer booking, el calendario muestra el siguiente día como disponible,
+ *   >  pero no esta considerando los tiempos de lavado inicial, esto debe aplicar
+ *   >  solo para la primera vez en esa prenda, si la prenda aun no esta en el
+ *   >  laundry, si la prenda ya esta en laundry entonces si debe aparecer
+ *   >  disponible al siguiente día"
+ *
+ * Both inputs come from `listing.attributes.metadata`, which only our server can
+ * write. `onLaundry === true` means the garment has physically reached its laundry,
+ * and from then on tomorrow is correct: this must return null and the calendar must
+ * behave EXACTLY as it did before this feature existed. That single condition is
+ * also what makes the rule first-time-only - once a studio has taken delivery,
+ * `onLaundry` never goes back to false without the garment having been cleaned.
+ *
+ * An ABSENT `initialCleaningDays` means no block, deliberately: every listing
+ * assigned before the field existed has none, and there is no migration (per the
+ * client, "en producción iniciaremos limpio"). Anything malformed - fractional, a
+ * string, 0, negative - is treated the same way, because a bad value must not be
+ * able to take a listing off the market. The server applies the identical rule; see
+ * server/api-util/bookingRules.js `resolveInitialCleaningBlockDays`.
+ *
+ * @param {number} [initialCleaningDays] - listing.attributes.metadata.initialCleaningDays
+ * @param {boolean} [onLaundry] - listing.attributes.metadata.onLaundry
+ * @returns {number|null}
+ */
+export const resolveInitialCleaningDays = (initialCleaningDays, onLaundry) =>
+  onLaundry !== true && Number.isInteger(initialCleaningDays) && initialCleaningDays > 0
+    ? initialCleaningDays
+    : null;
+
+/**
+ * The first day the picker may offer.
+ *
+ * Start of day in the LISTING's time zone, offset by whole days - not `now` plus
+ * n * 24h. A day count compared against an instant would make the calendar's floor
+ * depend on the hour the customer is shopping, and would let it disagree with the
+ * server's gate by up to a full day.
+ *
+ * With no block this is the stock floor, `getStartOf(today, 'day', timeZone)`, so
+ * `onLaundry === true` and a listing with no stored turnaround both take the exact
+ * path they took before this feature.
+ *
+ * @param {number|null} initialCleaningDays - from resolveInitialCleaningDays
+ * @param {string} timeZone - IANA key
+ * @param {Date} [today]
+ * @returns {Date}
+ */
+export const earliestBookableDate = (initialCleaningDays, timeZone, today = TODAY) =>
+  getStartOf(today, 'day', timeZone, initialCleaningDays || 0, 'days');
+
 const isOneBoundaryeSelected = (hasTimeSlots, startDate, endDate) => {
   const oneBoundarySelected = (startDate || endDate) && (!startDate || !endDate);
   return hasTimeSlots && oneBoundarySelected;
@@ -222,19 +274,29 @@ const getBookableRange = (timeSlotData, startOfAvailableRange, endOfAvailableRan
 /**
  * Returns an isOutsideRange function that can be passed to
  * a DateRangePicker component.
+ *
+ * Exported for testing: `earliestBookableDate` having the right answer is not the
+ * same claim as the picker actually USING it, and this project has shipped a rule
+ * that was never reached more than once.
  */
-const isOutsideRangeFn = (
+export const isOutsideRangeFn = (
   allTimeSlots,
   monthlyTimeSlots,
   startDate,
   endDate,
   lineItemUnitType,
   dayCountAvailableForBooking,
-  timeZone
+  timeZone,
+  // Cocloset: pushes the LOWER bound forward while the garment is still on its way
+  // to the laundry. null (the normal case, and always once it has arrived) leaves
+  // the floor at the start of today, exactly as upstream has it. Note the call site
+  // used to pass a stray `seatsEnabled` in this position that was never a parameter
+  // and never read; this replaces it.
+  initialCleaningDays
 ) => {
   const endOfAvailableRange = dayCountAvailableForBooking;
   const endOfAvailableRangeDate = getStartOf(TODAY, 'day', timeZone, endOfAvailableRange, 'days');
-  const startOfAvailableRangeDate = getStartOf(TODAY, 'day', timeZone);
+  const startOfAvailableRangeDate = earliestBookableDate(initialCleaningDays, timeZone);
 
   // Currently available monthly data
   const [startMonth, endMonth] = getMonthlyFetchRange(monthlyTimeSlots, timeZone);
@@ -555,6 +617,10 @@ const onPriceVariantChange = props => value => {
  * @param {Array<Object>} [props.priceVariants] - The price variants
  * @param {ReactNode} [props.priceVariantFieldComponent] - The component to use for the price variant field
  * @param {boolean} props.isPublishedListing - Whether the listing is published
+ * @param {number} [props.minimumBookingDays] - Cocloset: the owner's minimum rental length in days
+ * @param {boolean} [props.onLaundry] - Cocloset: true once the garment has reached its laundry
+ * @param {number} [props.initialCleaningDays] - Cocloset: days needed for the garment's first
+ *   cleaning, applied only while `onLaundry` is not true
  * @returns {JSX.Element}
  */
 export const BookingDatesForm = props => {
@@ -585,6 +651,13 @@ export const BookingDatesForm = props => {
     // server/api-util/bookingRules.js - because these dates are just request
     // parameters and a calendar-only rule is not a rule.
     minimumBookingDays,
+    // Cocloset: garment custody, from `listing.metadata` (server-written only).
+    // Destructured for the same reason as above - FinalForm would otherwise receive
+    // them as stray props. Together they answer "has this garment ever been at its
+    // laundry, and if not, how long does its first wash take". Re-checked
+    // server-side in server/api-util/bookingRules.js.
+    onLaundry,
+    initialCleaningDays,
     ...rest
   } = props;
   const intl = useIntl();
@@ -729,6 +802,11 @@ export const BookingDatesForm = props => {
           endDate,
           timeZone,
         });
+        // The initial cleaning turnaround, applied only while the garment has not
+        // reached its laundry. null means "behave exactly as before".
+        const initialCleaningBlockDays = resolveInitialCleaningDays(initialCleaningDays, onLaundry);
+        const earliestStartDate = earliestBookableDate(initialCleaningBlockDays, timeZone);
+
         const isOutsideRange = isOutsideRangeFn(
           relevantTimeSlots,
           monthlyTimeSlots,
@@ -737,7 +815,7 @@ export const BookingDatesForm = props => {
           lineItemUnitType,
           dayCountAvailableForBooking,
           timeZone,
-          seatsEnabled
+          initialCleaningBlockDays
         );
 
         const seatsOptions = getMinSeatsOptions(
@@ -764,6 +842,22 @@ export const BookingDatesForm = props => {
                 onPriceVariantChange={onPriceVariantChange(formRenderProps)}
                 disabled={!isPublishedListing}
               />
+            ) : null}
+
+            {/* A calendar that silently refuses the next few days reads as broken,
+                so say why. Rendered ABOVE the picker so it is read before the first
+                click rather than as an explanation of a failed one, and only while
+                the block is actually in force. */}
+            {initialCleaningBlockDays ? (
+              <p className={css.initialCleaningNotice}>
+                <FormattedMessage
+                  id="BookingDatesForm.initialCleaningNotice"
+                  values={{
+                    days: initialCleaningBlockDays,
+                    date: intl.formatDate(earliestStartDate, dateFormatOptions),
+                  }}
+                />
+              </p>
             ) : null}
 
             <FieldDateRangePicker

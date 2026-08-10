@@ -10,7 +10,10 @@ const {
 } = require('../api-util/sdk');
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { isCoclosetBookingListing } = require('../api-util/coclosetBookingProcess');
-const { assertMinimumBookingDays } = require('../api-util/bookingRules');
+const {
+  assertInitialCleaningLeadTime,
+  assertMinimumBookingDays,
+} = require('../api-util/bookingRules');
 const { ensureHandoverQr } = require('../api-util/handoverQr');
 const log = require('../log');
 
@@ -128,6 +131,18 @@ module.exports = (req, res) => {
         listing,
         bookingStart: bodyParams?.params?.bookingStart,
         bookingEnd: bodyParams?.params?.bookingEnd,
+      });
+
+      // The initial cleaning turnaround, for a garment that has never reached its
+      // laundry. Same argument as above for why it is here and not only in the
+      // calendar, plus one specific to this rule: it reads `metadata` only
+      // (`onLaundry`, `initialCleaningDays`), which the Marketplace API forbids the
+      // listing's own owner from writing, so no Integration API call is needed to
+      // check it and none is made. Applied on the speculative path too, for the
+      // same reason - a preview must not quote dates the charge will refuse.
+      assertInitialCleaningLeadTime({
+        listing,
+        bookingStart: bodyParams?.params?.bookingStart,
       });
 
       return buildLineItemsForListing({
