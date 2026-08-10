@@ -11,11 +11,11 @@ const {
   isInvalidTransitionError,
 } = require('../api-util/coclosetBookingProcess');
 const { buildTicketCode } = require('../api-util/ticketCodeHelpers');
-const { resolveTurnaroundHours } = require('../api-util/availabilityHelpers');
+const { resolveTurnaroundDays } = require('../api-util/availabilityHelpers');
 const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
 const {
   getListingCategoryValues,
-  resolveTurnaroundHoursEntry,
+  resolveTurnaroundDaysEntry,
 } = require('../api-util/categoryPricing');
 const {
   MAX_CLEANING_DAYS,
@@ -216,7 +216,7 @@ const buildTransitionMetadata = ({
 const handleRealReturn = ({
   integrationSdk,
   listing,
-  turnaroundHours,
+  turnaroundDays,
   turnaroundSource,
   requestedCleaningDays,
   txIdForLog,
@@ -228,7 +228,7 @@ const handleRealReturn = ({
   const returnedAt = new Date();
   const { days: cleaningDays, source: cleaningDaysSource } = resolveCleaningDays({
     requestedDays: requestedCleaningDays,
-    turnaroundHours,
+    turnaroundDays,
   });
   const { readyAt, blockWindow } = computeReadiness({ returnedAt, cleaningDays });
 
@@ -277,9 +277,9 @@ const handleRealReturn = ({
       cleaningDaysSource,
       // Only meaningful when the days were NOT supplied by the laundry: it says
       // which rung of the fallback chain the default came from ('category' - the
-      // hours this studio set for this garment's top-level category, 'studio' -
+      // days this studio set for this garment's top-level category, 'studio' -
       // its studio-wide setting, 'env-default' - ours). "3 days, because you set
-      // 72h for Dresses" and "3 days, because nobody configured anything" are
+      // 3 days for Dresses" and "3 days, because nobody configured anything" are
       // very different statements to put in front of a studio.
       ...(cleaningDaysSource === 'configured-turnaround' ? { turnaroundSource } : {}),
       buffer: bufferResult,
@@ -363,12 +363,12 @@ module.exports = (req, res) => {
         // category, so the return/cleaning window matches the garment in hand.
         // See api-util/categoryPricing.js for the fallback chain.
         //
-        // resolveTurnaroundHoursEntry (rather than the thinner
-        // resolveCategoryTurnaroundHours wrapper) because the return response
+        // resolveTurnaroundDaysEntry (rather than the thinner
+        // resolveCategoryTurnaroundDays wrapper) because the return response
         // reports WHERE the default came from - a laundry accepting a pre-filled
         // "3 days" deserves to know whether that is the number it set for this
         // category, its studio-wide fallback, or ours.
-        const turnaroundEntry = resolveTurnaroundHoursEntry(
+        const turnaroundEntry = resolveTurnaroundDaysEntry(
           profile.privateData,
           getListingCategoryValues(listing.attributes?.publicData)
         );
@@ -376,9 +376,9 @@ module.exports = (req, res) => {
           email: currentUser?.attributes?.email,
           studioName: profile.publicData?.laundryProfile?.studioName,
           turnaroundSource: turnaroundEntry?.source || 'env-default',
-          turnaroundHours: resolveTurnaroundHours(
+          turnaroundDays: resolveTurnaroundDays(
             turnaroundEntry?.value ?? null,
-            process.env.DEFAULT_LAUNDRY_BUFFER_HOURS
+            process.env.DEFAULT_LAUNDRY_BUFFER_DAYS
           ),
         };
 
@@ -471,7 +471,7 @@ module.exports = (req, res) => {
         ? handleRealReturn({
             integrationSdk,
             listing,
-            turnaroundHours: laundry.turnaroundHours,
+            turnaroundDays: laundry.turnaroundDays,
             turnaroundSource: laundry.turnaroundSource,
             requestedCleaningDays: cleaningDaysCheck.value,
             txIdForLog,

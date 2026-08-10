@@ -12,7 +12,7 @@ const laundries = [
     origin: { lat: 48.882, lng: 2.338 },
     businessHours: 'Mon–Sat · 11:00–21:00',
     acceptedCategories: ['Eveningwear', 'Sequins', 'Embroidery'],
-    turnaroundHours: 48,
+    turnaroundDays: 2,
   },
   {
     id: 'laundry-2',
@@ -22,7 +22,7 @@ const laundries = [
     origin: { lat: 48.857, lng: 2.359 },
     businessHours: 'Tue–Sun · 10:00–19:00',
     acceptedCategories: ['Denim', 'Cotton', 'Leather goods'],
-    turnaroundHours: 36,
+    turnaroundDays: 3,
   },
 ];
 

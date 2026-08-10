@@ -84,23 +84,24 @@ const validateCleaningDays = cleaningDays => {
  * How many days will this garment take to clean?
  *
  * The laundry's own number when it gave one, otherwise the turnaround it has
- * configured for this garment's category, expressed in days.
+ * configured for this garment's category — which is already in days, so this is
+ * a unit-free choice between two day counts.
  *
- * The default reuses computeBufferDays() rather than dividing by 24 here, so the
- * "never under-block, always round up" rule stays in one place: a 36h turnaround
- * is 2 days, not 1.5 silently truncated to 1.
+ * The default still goes through computeBufferDays() rather than using the
+ * number raw, so the "never under-block, always round up" rule stays in one
+ * place: a fractional 1.5-day turnaround out of an env var is 2 days, not 1.
  *
  * @param {Object} params
  * @param {number|null} [params.requestedDays] - validated caller value, or null
- * @param {number} params.turnaroundHours - resolved per-category turnaround
+ * @param {number} params.turnaroundDays - resolved per-category turnaround, in days
  * @returns {{days: number, source: 'laundry'|'configured-turnaround'}}
  */
-const resolveCleaningDays = ({ requestedDays, turnaroundHours }) => {
+const resolveCleaningDays = ({ requestedDays, turnaroundDays }) => {
   if (typeof requestedDays === 'number') {
     return { days: requestedDays, source: 'laundry' };
   }
   return {
-    days: computeBufferDays(turnaroundHours).totalBufferDays,
+    days: computeBufferDays(turnaroundDays).totalBufferDays,
     source: 'configured-turnaround',
   };
 };

@@ -50,7 +50,12 @@ beforeAll(() => {
 });
 
 // A laundry user with a fully configured profile — in particular a saved
-// cleaningFee, which is the value B6 silently destroyed.
+// turnaroundDays, which is the kind of value B6 silently destroyed (it was cleaningFee
+// at the time; the fee has since moved into the server environment).
+//
+// The privateData also carries a legacy `cleaningFee`, which is exactly what a real Dev
+// profile looks like after the fee moved out: dead data that must neither be shown nor
+// written back.
 //
 // `acceptedCategories` is deliberately the OLD free-text shape. Real laundries have
 // exactly this stored, and the multi-select migration must not lose it.
@@ -70,7 +75,7 @@ const laundryUser = {
         },
         acceptedCategories: ['Eveningwear', 'Sequins'],
       },
-      privateData: { turnaroundHours: 36, cleaningFee: 12.5 },
+      privateData: { turnaroundDays: 3, cleaningFee: 12.5 },
       metadata: { isLaundry: true },
     },
   },
@@ -107,7 +112,7 @@ describe('LaundryProfilePage', () => {
   // render. The page used to snapshot initialValues in a useState initializer
   // at that moment, which runs exactly once — so the snapshot stayed
   // all-undefined forever. The laundry saw a blank form, retyped the required
-  // fields, saved, and their configured cleaningFee was wiped.
+  // fields, saved, and their configured values were wiped.
   it('shows the saved profile when currentUser arrives after the first render', async () => {
     let rendered;
     await act(async () => {
@@ -132,9 +137,9 @@ describe('LaundryProfilePage', () => {
 
     expect(screen.getByDisplayValue('Studio Pigalle')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Mon-Sat 11-21')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('36')).toBeInTheDocument();
-    // The value the old code destroyed.
-    expect(screen.getByDisplayValue('12.5')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('3')).toBeInTheDocument();
+    // The legacy stored fee has no input to appear in any more.
+    expect(screen.queryByDisplayValue('12.5')).not.toBeInTheDocument();
     // Accepted categories are no longer a comma-joined text input: the stored
     // free-text values now surface as legacy chips (see the legacy tests below).
     expect(screen.getByText('Eveningwear')).toBeInTheDocument();
@@ -147,10 +152,10 @@ describe('LaundryProfilePage', () => {
     });
 
     expect(screen.getByDisplayValue('Studio Pigalle')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('12.5')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('3')).toBeInTheDocument();
   });
 
-  it('submits the saved cleaningFee unchanged when only another field is edited', async () => {
+  it('submits the saved turnaroundDays unchanged when only another field is edited', async () => {
     const onUpdateProfile = jest.fn();
     let rendered;
     await act(async () => {
@@ -191,33 +196,41 @@ describe('LaundryProfilePage', () => {
 
     expect(onUpdateProfile).toHaveBeenCalledTimes(1);
     const submitted = onUpdateProfile.mock.calls[0][0];
-    expect(submitted.privateData.cleaningFee).toBe(12.5);
-    expect(submitted.privateData.turnaroundHours).toBe(36);
+    expect(submitted.privateData.turnaroundDays).toBe(3);
+    // No fee is written at all, not even the one still sitting in storage: re-sending it
+    // would keep a value alive that nothing reads and the studio cannot see.
+    expect(submitted.privateData.cleaningFee).toBeUndefined();
+    expect(submitted.privateData).not.toHaveProperty('cleaningFee');
     expect(submitted.publicData.laundryProfile.businessHours).toBe('Mon-Fri 09-19');
     expect(submitted.publicData.laundryProfile.studioName).toBe('Studio Pigalle');
     expect(submitted.publicData.laundryProfile.origin).toEqual(ORIGIN);
     expect(submitted.publicData.acceptedCategories).toEqual(['Eveningwear', 'Sequins']);
   });
 
-  // cleaningFee has no `validate` on the form, so an emptied field submits as
-  // null. The page must not let that erase the stored fee — every future
-  // booking's price depends on it.
-  it('never writes a null over a saved cleaningFee if the field is emptied', async () => {
+  // An emptied number field submits as null, and a null turnaround would change how long
+  // every listing this studio handles stays blocked after a rental. Two independent things
+  // stop that: the field is `required`, so the form refuses to submit at all (asserted
+  // here), and the page's `preserved()` guard would keep the stored value even if a submit
+  // did get through with an absent one (asserted in the round-trip tests below, where a
+  // save that touches only another field still writes turnaroundDays: 3).
+  it('refuses to save at all when the studio-wide turnaround is emptied', async () => {
     const onUpdateProfile = jest.fn();
     await act(async () => {
       renderPage(laundryUser, onUpdateProfile);
     });
 
     await act(async () => {
-      await userEvent.clear(screen.getByDisplayValue('12.5'));
+      await userEvent.clear(screen.getByDisplayValue('3'));
     });
+
+    const saveButton = screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' });
+    expect(saveButton).toBeDisabled();
 
     await act(async () => {
-      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+      await userEvent.click(saveButton);
     });
 
-    expect(onUpdateProfile).toHaveBeenCalledTimes(1);
-    expect(onUpdateProfile.mock.calls[0][0].privateData.cleaningFee).toBe(12.5);
+    expect(onUpdateProfile).not.toHaveBeenCalled();
   });
 
   // Profiles seeded through the Integration API / scripts store `origin` as plain JSON,
@@ -363,16 +376,14 @@ describe('LaundryProfilePage', () => {
   });
 });
 
-// ── PER-CATEGORY PRICING: STORAGE ROUND-TRIP ─────────────────────────────────
-// The form holds these as FLAT fields (`categoryPricing__cleaningFee__midi_dress`)
+// ── PER-CATEGORY TURNAROUND: STORAGE ROUND-TRIP ──────────────────────────────
+// The form holds these as FLAT fields (`categoryPricing__turnaroundDays__dresses`)
 // because React Final Form reads dots in a field name as a path and Console category
 // ids are free-form operator input. The nested `privateData.categoryPricing` object is
 // assembled on submit — these tests pin both directions.
-describe('LaundryProfilePage per-category pricing', () => {
-  const priceInput = categoryId =>
-    document.getElementById(`LaundryProfileForm.categoryPricing__cleaningFee__${categoryId}`);
-  const hoursInput = categoryId =>
-    document.getElementById(`LaundryProfileForm.categoryPricing__turnaroundHours__${categoryId}`);
+describe('LaundryProfilePage per-category turnaround', () => {
+  const daysInput = categoryId =>
+    document.getElementById(`LaundryProfileForm.categoryPricing__turnaroundDays__${categoryId}`);
 
   const withPricing = (acceptedCategories, categoryPricing) => ({
     ...laundryUser,
@@ -389,27 +400,43 @@ describe('LaundryProfilePage per-category pricing', () => {
   it('prefills the boxes from the stored table', async () => {
     await act(async () => {
       renderPage(
+        withPricing(['dresses', 'pants'], {
+          dresses: { turnaroundDays: 5 },
+          pants: { turnaroundDays: 1 },
+        })
+      );
+    });
+
+    expect(daysInput('dresses')).toHaveValue(5);
+    expect(daysInput('pants')).toHaveValue(1);
+  });
+
+  it('ignores legacy per-category fees stored in the same table', async () => {
+    // A real Dev profile still holds fee rows. They must not resurface as inputs, and
+    // (see below) must not be written back on the next save either.
+    await act(async () => {
+      renderPage(
         withPricing(['dresses', 'midi_dress'], {
-          dresses: { turnaroundHours: 72, cleaningFee: 15 },
+          dresses: { turnaroundDays: 5, cleaningFee: 15 },
           midi_dress: { cleaningFee: 22 },
         })
       );
     });
 
-    expect(hoursInput('dresses')).toHaveValue(72);
-    expect(priceInput('dresses')).toHaveValue(15);
-    expect(priceInput('midi_dress')).toHaveValue(22);
+    expect(daysInput('dresses')).toHaveValue(5);
+    expect(screen.queryByDisplayValue('15')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('22')).not.toBeInTheDocument();
   });
 
   it('saves what was typed as a nested categoryPricing object', async () => {
     const onUpdateProfile = jest.fn();
     await act(async () => {
-      renderPage(withPricing(['dresses', 'midi_dress'], undefined), onUpdateProfile);
+      renderPage(withPricing(['dresses', 'pants'], undefined), onUpdateProfile);
     });
 
     await act(async () => {
-      await userEvent.type(hoursInput('dresses'), '72');
-      await userEvent.type(priceInput('midi_dress'), '22');
+      await userEvent.type(daysInput('dresses'), '5');
+      await userEvent.type(daysInput('pants'), '1');
     });
 
     await act(async () => {
@@ -418,31 +445,28 @@ describe('LaundryProfilePage per-category pricing', () => {
 
     expect(onUpdateProfile).toHaveBeenCalledTimes(1);
     expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({
-      dresses: { turnaroundHours: 72 },
-      midi_dress: { cleaningFee: 22 },
+      dresses: { turnaroundDays: 5 },
+      pants: { turnaroundDays: 1 },
     });
-    // The studio-wide values are untouched — they are the fallback, not a duplicate.
-    expect(onUpdateProfile.mock.calls[0][0].privateData.cleaningFee).toBe(12.5);
-    expect(onUpdateProfile.mock.calls[0][0].privateData.turnaroundHours).toBe(36);
+    // The studio-wide value is untouched — it is the fallback, not a duplicate.
+    expect(onUpdateProfile.mock.calls[0][0].privateData.turnaroundDays).toBe(3);
   });
 
-  it('RETAINS a stored price for a category the studio no longer accepts', async () => {
-    // The form renders no input for `pants` here, and a form that rebuilds the table
-    // only from what it rendered would silently delete a price the studio negotiated.
-    // Un-ticking a category is not a request to destroy its pricing.
+  it('does not write a legacy per-category cleaningFee back into storage', async () => {
+    // Sharetribe merges privateData per TOP-LEVEL key, so the whole categoryPricing
+    // object is replaced on every save. That is what finally retires the stored fees: the
+    // rebuilt table contains turnaround only.
     const onUpdateProfile = jest.fn();
     await act(async () => {
       renderPage(
-        withPricing(['dresses'], {
-          dresses: { cleaningFee: 15 },
-          pants: { turnaroundHours: 24, cleaningFee: 6 },
-        }),
+        withPricing(['dresses'], { dresses: { turnaroundDays: 5, cleaningFee: 15 } }),
         onUpdateProfile
       );
     });
 
     await act(async () => {
-      await userEvent.type(priceInput('dresses'), '9');
+      await userEvent.clear(daysInput('dresses'));
+      await userEvent.type(daysInput('dresses'), '4');
     });
 
     await act(async () => {
@@ -450,8 +474,37 @@ describe('LaundryProfilePage per-category pricing', () => {
     });
 
     expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({
-      dresses: { cleaningFee: 159 },
-      pants: { turnaroundHours: 24, cleaningFee: 6 },
+      dresses: { turnaroundDays: 4 },
+    });
+  });
+
+  it('RETAINS a stored turnaround for a category the studio no longer accepts', async () => {
+    // The form renders no input for `pants` here, and a form that rebuilds the table only
+    // from what it rendered would silently delete a value the studio configured.
+    // Un-ticking a category is not a request to destroy its turnaround.
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(
+        withPricing(['dresses'], {
+          dresses: { turnaroundDays: 5 },
+          pants: { turnaroundDays: 1 },
+        }),
+        onUpdateProfile
+      );
+    });
+
+    await act(async () => {
+      await userEvent.clear(daysInput('dresses'));
+      await userEvent.type(daysInput('dresses'), '4');
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({
+      dresses: { turnaroundDays: 4 },
+      pants: { turnaroundDays: 1 },
     });
   });
 
@@ -460,8 +513,8 @@ describe('LaundryProfilePage per-category pricing', () => {
     await act(async () => {
       renderPage(
         withPricing(['dresses'], {
-          dresses: { cleaningFee: 15 },
-          pants: { cleaningFee: 6 },
+          dresses: { turnaroundDays: 5 },
+          retired_category: { turnaroundDays: 1 },
         }),
         onUpdateProfile
       );
@@ -476,7 +529,7 @@ describe('LaundryProfilePage per-category pricing', () => {
     });
 
     expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({
-      dresses: { cleaningFee: 15 },
+      dresses: { turnaroundDays: 5 },
     });
   });
 
@@ -485,11 +538,11 @@ describe('LaundryProfilePage per-category pricing', () => {
     // A stored null would be a row that means nothing and has to be skipped on read.
     const onUpdateProfile = jest.fn();
     await act(async () => {
-      renderPage(withPricing(['dresses'], { dresses: { cleaningFee: 15 } }), onUpdateProfile);
+      renderPage(withPricing(['dresses'], { dresses: { turnaroundDays: 5 } }), onUpdateProfile);
     });
 
     await act(async () => {
-      await userEvent.clear(priceInput('dresses'));
+      await userEvent.clear(daysInput('dresses'));
     });
 
     await act(async () => {

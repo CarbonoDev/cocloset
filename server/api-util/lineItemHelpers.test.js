@@ -1,10 +1,17 @@
 const { types } = require('sharetribe-flex-sdk');
 const { Money } = types;
 
-// resolveCleaningFeeInSubunits() calls out to the Integration SDK (see
-// server/api-util/integrationSdk.js) to read the assigned laundry's
-// privateData.cleaningFee. Mock that module so these are true unit tests -
-// no real network calls - and so we can control what users.show() resolves to.
+// Silences the (correct) error log a malformed CLEANING_FEE_* value emits — the log
+// itself is asserted in cleaningFeeEnv.test.js, and letting it print here just buries
+// real failures in the suite output.
+jest.mock('../log', () => ({ error: jest.fn() }));
+
+// resolveCleaningFeeInSubunits() used to call the Integration SDK to read the assigned
+// laundry's privateData.cleaningFee. It no longer reads any laundry data at all — the fee
+// is server env configuration now (CLEANING_FEE_<CATEGORY_ID>, see cleaningFeeEnv.js).
+// The Integration SDK is still mocked here so the tests below can assert that NOTHING
+// looks a laundry up on the pricing path: a stored fee that could still reach an invoice
+// is the exact bug that change removed.
 const mockUsersShow = jest.fn();
 jest.mock('./integrationSdk', () => ({
   getIntegrationSdk: jest.fn(() => ({
@@ -35,6 +42,8 @@ const {
   getCleaningFeeLineItemMaybe,
   resolveCleaningFeeInSubunits,
 } = require('./lineItemHelpers');
+
+const { resetReportedMalformedEnvVars } = require('./cleaningFeeEnv');
 
 describe('calculateTotalPriceFromQuantity()', () => {
   it('should calculate price based on quantity', () => {
@@ -767,22 +776,41 @@ describe('getCleaningFeeLineItemMaybe()', () => {
 });
 
 describe('resolveCleaningFeeInSubunits()', () => {
-  const originalEnv = process.env.DEFAULT_CLEANING_FEE;
+  // Every fee-bearing var is set on process.env here rather than injected, because that
+  // is how the function is really called: it reads the process environment. Snapshot and
+  // restore the whole set so one test's fee cannot decide another's.
+  const FEE_VARS = [
+    'DEFAULT_CLEANING_FEE',
+    'CLEANING_FEE_DRESSES',
+    'CLEANING_FEE_MIDI_DRESS',
+    'CLEANING_FEE_PANTS',
+  ];
+  const originalEnv = {};
 
   beforeEach(() => {
-    // jest config has resetMocks: true, which wipes mock implementations
-    // (not just call history) before every test - including the one set by
-    // the jest.mock() factory above - so getIntegrationSdk() needs to be
-    // re-armed here on every test, not just once at module load.
+    FEE_VARS.forEach(name => {
+      originalEnv[name] = process.env[name];
+      delete process.env[name];
+    });
+    // jest config has resetMocks: true, which wipes mock implementations (not just call
+    // history) before every test - including the one set by the jest.mock() factory
+    // above - so getIntegrationSdk() needs to be re-armed here on every test.
     getIntegrationSdk.mockReturnValue({ users: { show: mockUsersShow } });
+    resetReportedMalformedEnvVars();
   });
 
   afterEach(() => {
-    process.env.DEFAULT_CLEANING_FEE = originalEnv;
+    FEE_VARS.forEach(name => {
+      if (originalEnv[name] === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = originalEnv[name];
+      }
+    });
   });
 
-  // The laundry id is in `metadata` (Integration-API-only); the category chain
-  // stays in `publicData`, which is where Console writes it.
+  // The laundry id is in `metadata` (Integration-API-only); the category chain stays in
+  // `publicData`, which is where Console writes it.
   const listingWithLaundry = (laundryId, categoryLevels = {}) => ({
     attributes: {
       metadata: { assignedLaundryId: laundryId },
@@ -792,277 +820,175 @@ describe('resolveCleaningFeeInSubunits()', () => {
 
   const listingWithoutLaundry = { attributes: { publicData: {} } };
 
-  // A laundry user flagged isLaundry, with whatever privateData the test needs.
-  const laundryUserWith = privateData => ({
-    data: { data: { attributes: { profile: { metadata: { isLaundry: true }, privateData } } } },
-  });
-
-  it("should use the assigned laundry's own privateData.cleaningFee when set", async () => {
-    delete process.env.DEFAULT_CLEANING_FEE;
-    mockUsersShow.mockResolvedValue({
-      data: {
-        data: {
-          attributes: {
-            profile: {
-              metadata: { isLaundry: true },
-              privateData: { cleaningFee: 12.5 }, // EUR 12.50, major units
-            },
-          },
-        },
-      },
+  const midiDressListing = laundryId =>
+    listingWithLaundry(laundryId, {
+      categoryLevel1: 'dresses',
+      categoryLevel2: 'midi_dress',
     });
 
-    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-1'), 'EUR');
-
-    expect(result).toBe(1250);
-    expect(mockUsersShow).toHaveBeenCalledWith({ id: 'laundry-1' }, { expand: true });
-  });
-
-  it('should fall back to DEFAULT_CLEANING_FEE when the laundry has not set a fee', async () => {
-    process.env.DEFAULT_CLEANING_FEE = '8';
-    mockUsersShow.mockResolvedValue({
-      data: {
-        data: {
-          attributes: {
-            profile: {
-              metadata: { isLaundry: true },
-              privateData: {}, // no cleaningFee set
-            },
-          },
-        },
-      },
-    });
-
-    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-2'), 'EUR');
-
-    expect(result).toBe(800);
-  });
-
-  it('should treat an explicit cleaningFee of 0 as set (not fall back to the env default)', async () => {
-    process.env.DEFAULT_CLEANING_FEE = '8';
-    mockUsersShow.mockResolvedValue({
-      data: {
-        data: {
-          attributes: {
-            profile: {
-              metadata: { isLaundry: true },
-              privateData: { cleaningFee: 0 },
-            },
-          },
-        },
-      },
-    });
-
-    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-3'), 'EUR');
-
-    expect(result).toBe(0);
-  });
-
-  it('should skip the Integration API lookup and use the env default when there is no assigned laundry', async () => {
-    process.env.DEFAULT_CLEANING_FEE = '15';
-
-    const result = await resolveCleaningFeeInSubunits(listingWithoutLaundry, 'EUR');
-
-    expect(result).toBe(1500);
-    expect(mockUsersShow).not.toHaveBeenCalled();
-  });
-
-  it('should default to 0 when there is no assigned laundry and no env default set', async () => {
-    delete process.env.DEFAULT_CLEANING_FEE;
-
-    const result = await resolveCleaningFeeInSubunits(listingWithoutLaundry, 'EUR');
-
-    expect(result).toBe(0);
-    expect(mockUsersShow).not.toHaveBeenCalled();
-  });
-
-  it('should fall back to the env default when the Integration API lookup fails (e.g. laundry removed)', async () => {
-    process.env.DEFAULT_CLEANING_FEE = '5';
-    mockUsersShow.mockRejectedValue(new Error('laundry not found'));
-
-    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-4'), 'EUR');
-
-    expect(result).toBe(500);
-  });
-
-  it('should default to 0 when neither the laundry nor the env default provides a fee', async () => {
-    delete process.env.DEFAULT_CLEANING_FEE;
-    mockUsersShow.mockResolvedValue({
-      data: {
-        data: {
-          attributes: {
-            profile: {
-              metadata: { isLaundry: true },
-              privateData: {},
-            },
-          },
-        },
-      },
-    });
-
-    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-5'), 'EUR');
-
-    expect(result).toBe(0);
-  });
-
-  // SECURITY REGRESSION TESTS. These predate `assignedLaundryId` moving to
-  // `metadata`, and they stay exactly as they were - the isLaundry check they pin
-  // is still load-bearing for three reasons the relocation does not touch: the
-  // migration relocates old values verbatim without auditing them, a laundry can
-  // be de-flagged after being assigned, and this value sets a customer's payin
-  // total so it deserves two independent checks. See the SECURITY note on
-  // resolveCleaningFeeInSubunits.
-  //
-  // The original reason, for the record: the id used to be provider-controlled
-  // publicData on the provider's own listing, so a provider could point it at any
-  // user - including themselves - and set that user's privateData.cleaningFee,
-  // zeroing the fee or inflating every customer's payin total by an amount that
-  // never appears in the listing price.
-  const nonLaundryUserWithFee = cleaningFee => ({
-    data: {
-      data: {
-        attributes: {
-          profile: {
-            privateData: { cleaningFee },
-          },
-        },
-      },
-    },
-  });
-
-  it('ignores a fee from a user who is NOT flagged isLaundry (fee inflation)', async () => {
-    process.env.DEFAULT_CLEANING_FEE = '10';
-    mockUsersShow.mockResolvedValue(nonLaundryUserWithFee(5000));
-
-    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('rogue-user'), 'EUR');
-
-    // The env default, NOT the 5000 EUR the provider tried to inject.
-    expect(result).toBe(1000);
-  });
-
-  it('ignores a zeroed fee from a user who is NOT flagged isLaundry (fee evasion)', async () => {
-    process.env.DEFAULT_CLEANING_FEE = '10';
-    mockUsersShow.mockResolvedValue(nonLaundryUserWithFee(0));
-
-    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('rogue-user'), 'EUR');
-
-    expect(result).toBe(1000);
-  });
-
-  it('ignores a fee from a user with isLaundry explicitly false', async () => {
-    process.env.DEFAULT_CLEANING_FEE = '10';
-    mockUsersShow.mockResolvedValue({
-      data: {
-        data: {
-          attributes: {
-            profile: {
-              metadata: { isLaundry: false },
-              privateData: { cleaningFee: 999 },
-            },
-          },
-        },
-      },
-    });
-
-    const result = await resolveCleaningFeeInSubunits(listingWithLaundry('rogue-user'), 'EUR');
-
-    expect(result).toBe(1000);
-  });
-
-  // ── PER-CATEGORY PRICING ───────────────────────────────────────────────────
+  // ── THE FEE COMES FROM THE ENVIRONMENT ─────────────────────────────────────
   // This is the money path: the number these tests pin is what lands on a customer's
   // invoice. The resolution rule itself is unit-tested exhaustively in
-  // categoryPricing.test.js; these check that resolveCleaningFeeInSubunits actually
-  // feeds it the LISTING's own category chain, and that every failure still degrades
-  // to the same fallback it always did rather than throwing.
+  // cleaningFeeEnv.test.js; these check that resolveCleaningFeeInSubunits feeds it the
+  // LISTING's own category chain, converts to subunits, and never consults a laundry.
 
-  it("charges the fee the laundry set for THIS garment's category", async () => {
+  it("charges the env fee configured for THIS garment's category", async () => {
     process.env.DEFAULT_CLEANING_FEE = '8';
-    mockUsersShow.mockResolvedValue(
-      laundryUserWith({ cleaningFee: 10, categoryPricing: { midi_dress: { cleaningFee: 22 } } })
-    );
+    process.env.CLEANING_FEE_MIDI_DRESS = '22';
 
-    const listing = listingWithLaundry('laundry-1', {
-      categoryLevel1: 'dresses',
-      categoryLevel2: 'midi_dress',
-    });
-
-    // 22.00 EUR, not the studio-wide 10 and not the env default 8.
-    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(2200);
+    // 22.00 EUR in cents, not the marketplace default 8.
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(2200);
   });
 
-  it('charges the HIGHEST matching category price, not the most specific one', async () => {
-    // The rule the client asked for: "utilizaría el precio mas alto". The subcategory
-    // is CHEAPER here, which is the case that separates highest-wins from
-    // deepest-wins — a most-specific implementation charges 800 and fails.
-    delete process.env.DEFAULT_CLEANING_FEE;
-    mockUsersShow.mockResolvedValue(
-      laundryUserWith({
-        cleaningFee: 4,
-        categoryPricing: { dresses: { cleaningFee: 10 }, midi_dress: { cleaningFee: 8 } },
-      })
-    );
+  it('charges the HIGHEST matching category fee, not the most specific one', async () => {
+    // The rule the client asked for: "utilizaría el precio mas alto". The subcategory is
+    // CHEAPER here, which is the case that separates highest-wins from deepest-wins — a
+    // most-specific implementation charges 800 and fails.
+    process.env.CLEANING_FEE_DRESSES = '10';
+    process.env.CLEANING_FEE_MIDI_DRESS = '8';
 
-    const listing = listingWithLaundry('laundry-1', {
-      categoryLevel1: 'dresses',
-      categoryLevel2: 'midi_dress',
-    });
-
-    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1000);
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(1000);
   });
 
-  it("falls back to the studio-wide fee for a category the laundry hasn't priced", async () => {
+  it('falls back to DEFAULT_CLEANING_FEE for a category with no var of its own', async () => {
     process.env.DEFAULT_CLEANING_FEE = '8';
-    mockUsersShow.mockResolvedValue(
-      laundryUserWith({ cleaningFee: 10, categoryPricing: { dresses: { cleaningFee: 22 } } })
-    );
+    process.env.CLEANING_FEE_DRESSES = '22';
 
     const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'pants' });
-
-    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1000);
-  });
-
-  it('falls back to the env default when neither the category nor the studio has a fee', async () => {
-    process.env.DEFAULT_CLEANING_FEE = '8';
-    mockUsersShow.mockResolvedValue(
-      laundryUserWith({ categoryPricing: { dresses: { turnaroundHours: 72 } } })
-    );
-
-    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
 
     expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(800);
   });
 
-  it('degrades to the fallback instead of throwing on a malformed pricing table', async () => {
-    // A hand-edited or half-written privateData blob must never be able to fail a
-    // booking. Same contract as every other failure mode in this function.
-    process.env.DEFAULT_CLEANING_FEE = '8';
-    mockUsersShow.mockResolvedValue(
-      laundryUserWith({ cleaningFee: 10, categoryPricing: 'not-a-table' })
-    );
+  it('converts a fractional major-unit fee to subunits, rounding half up', async () => {
+    process.env.CLEANING_FEE_DRESSES = '12.505';
 
     const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
 
-    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1000);
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1251);
   });
 
-  it('ignores a per-category fee from a user who is NOT flagged isLaundry', async () => {
-    // The isLaundry check runs BEFORE resolution, so per-category pricing gives a
-    // provider no new way to inject a fee by pointing assignedLaundryId at a user
-    // of their choosing.
-    process.env.DEFAULT_CLEANING_FEE = '10';
+  it('treats an explicit env fee of 0 as configured — free, no line item', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    process.env.CLEANING_FEE_MIDI_DRESS = '0';
+
+    // 0 wins over the default because the default is a fallback, not a competitor, and a
+    // zero fee simply adds no cleaning-fee line item.
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(0);
+  });
+
+  it('charges nothing when no category var and no default are set', async () => {
+    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(0);
+  });
+
+  it('uses the marketplace default for an uncategorised listing', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '15';
+
+    expect(await resolveCleaningFeeInSubunits(listingWithoutLaundry, 'EUR')).toBe(1500);
+  });
+
+  it('ignores a MALFORMED env fee rather than charging 0', async () => {
+    // A typo must not silently zero the charge: resolution falls through to the next
+    // configured level, exactly as if the var were unset.
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    process.env.CLEANING_FEE_MIDI_DRESS = 'twenty-two';
+
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(800);
+  });
+
+  it('never throws, whatever the listing looks like', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+
+    expect(await resolveCleaningFeeInSubunits(undefined, 'EUR')).toBe(800);
+    expect(await resolveCleaningFeeInSubunits({}, 'EUR')).toBe(800);
+    expect(await resolveCleaningFeeInSubunits({ attributes: {} }, 'EUR')).toBe(800);
+  });
+
+  it('returns 0 when no currency is given', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+
+    expect(await resolveCleaningFeeInSubunits(listingWithoutLaundry, null)).toBe(0);
+  });
+
+  // ── NO LAUNDRY DATA REACHES A PRICE ────────────────────────────────────────
+  // These replace the old isLaundry security tests. Those pinned that a fee stored by a
+  // user who is not a flagged laundry could not be honoured; the guarantee is now
+  // stronger and simpler — NO stored fee is honoured, from anyone, because the pricing
+  // path does not read a profile at all. Nothing about a de-flagged laundry, a listing
+  // migrated off the old provider-writable publicData.assignedLaundryId, or a rogue
+  // assignedLaundryId can move a customer's payin total any more.
+
+  it('makes no Integration API call at all', async () => {
+    process.env.CLEANING_FEE_DRESSES = '22';
+
+    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
+    await resolveCleaningFeeInSubunits(listing, 'EUR');
+
+    expect(mockUsersShow).not.toHaveBeenCalled();
+    expect(getIntegrationSdk).not.toHaveBeenCalled();
+  });
+
+  it("ignores a stored privateData.cleaningFee, even a real laundry's", async () => {
+    // Dead data. The form no longer collects it, and leaving a reader in place would let
+    // a stale stored value keep pricing rentals after the input was removed — which is
+    // precisely the bug this change exists to remove.
+    process.env.DEFAULT_CLEANING_FEE = '8';
     mockUsersShow.mockResolvedValue({
       data: {
         data: {
           attributes: {
-            profile: { privateData: { categoryPricing: { dresses: { cleaningFee: 5000 } } } },
+            profile: { metadata: { isLaundry: true }, privateData: { cleaningFee: 99 } },
           },
         },
       },
+    });
+
+    expect(await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-1'), 'EUR')).toBe(800);
+    expect(mockUsersShow).not.toHaveBeenCalled();
+  });
+
+  it('ignores a stored per-category cleaningFee table', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    mockUsersShow.mockResolvedValue({
+      data: {
+        data: {
+          attributes: {
+            profile: {
+              metadata: { isLaundry: true },
+              privateData: { categoryPricing: { midi_dress: { cleaningFee: 5000 } } },
+            },
+          },
+        },
+      },
+    });
+
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(800);
+  });
+
+  it('cannot be influenced by pointing assignedLaundryId at any user', async () => {
+    // The original attack: the id used to be provider-controlled publicData on the
+    // provider's own listing, so a provider could point it at themselves and set their
+    // own privateData.cleaningFee, zeroing the fee or inflating every customer's payin
+    // total. There is nothing left to point at.
+    process.env.CLEANING_FEE_DRESSES = '10';
+    mockUsersShow.mockResolvedValue({
+      data: { data: { attributes: { profile: { privateData: { cleaningFee: 5000 } } } } },
     });
 
     const listing = listingWithLaundry('rogue-user', { categoryLevel1: 'dresses' });
 
     expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1000);
+  });
+
+  it('charges the same for a listing with no assigned laundry as for one with', async () => {
+    // The fee is a property of the garment's category, not of who cleans it.
+    process.env.CLEANING_FEE_DRESSES = '11';
+
+    const assigned = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
+    const unassigned = { attributes: { publicData: { categoryLevel1: 'dresses' } } };
+
+    expect(await resolveCleaningFeeInSubunits(assigned, 'EUR')).toBe(1100);
+    expect(await resolveCleaningFeeInSubunits(unassigned, 'EUR')).toBe(1100);
   });
 });

@@ -4,7 +4,7 @@ import {
   categoryPricingToFormValues,
   flattenCategoryTree,
   getCategoryLabels,
-  getCategoryPricingGroups,
+  getTurnaroundCategoryIds,
   getListingCategoryValues,
   getOrphanedPricingCategories,
   isCategoryAcceptedByLaundry,
@@ -211,7 +211,7 @@ describe('isCategoryAcceptedByLaundry', () => {
   });
 });
 
-/* ================ Per-category laundry pricing ================ */
+/* ================ Per-category laundry turnaround ================ */
 
 describe('categoryPricingFieldName', () => {
   it('builds a FLAT field name, with no dots for final-form to parse as a path', () => {
@@ -219,8 +219,8 @@ describe('categoryPricingFieldName', () => {
     // ids are operator input, so an id containing a dot in a nested field name would
     // write somewhere else entirely: the studio types a price, sees it accepted, and
     // saves nothing. The name must stay flat.
-    const name = categoryPricingFieldName('cleaningFee', 'midi_dress');
-    expect(name).toBe('categoryPricing__cleaningFee__midi_dress');
+    const name = categoryPricingFieldName('turnaroundDays', 'midi_dress');
+    expect(name).toBe('categoryPricing__turnaroundDays__midi_dress');
     expect(name).not.toContain('.');
     expect(name).not.toContain('[');
   });
@@ -230,23 +230,34 @@ describe('categoryPricingToFormValues', () => {
   it('flattens the stored table into form fields', () => {
     expect(
       categoryPricingToFormValues({
-        dresses: { turnaroundHours: 72, cleaningFee: 15 },
-        midi_dress: { cleaningFee: 22 },
+        dresses: { turnaroundDays: 3 },
+        pants: { turnaroundDays: 1 },
       })
     ).toEqual({
-      categoryPricing__turnaroundHours__dresses: 72,
-      categoryPricing__cleaningFee__dresses: 15,
-      categoryPricing__cleaningFee__midi_dress: 22,
+      categoryPricing__turnaroundDays__dresses: 3,
+      categoryPricing__turnaroundDays__pants: 1,
     });
+  });
+
+  it('omits a stored cleaningFee, which is no longer a form field', () => {
+    // Fees are env configuration now. An old profile can still be carrying fee rows, and
+    // seeding them into the form would resurrect them on the next save.
+    expect(
+      categoryPricingToFormValues({
+        dresses: { turnaroundDays: 3, cleaningFee: 15 },
+        midi_dress: { cleaningFee: 22 },
+      })
+    ).toEqual({ categoryPricing__turnaroundDays__dresses: 3 });
   });
 
   it('omits blanks rather than prefilling boxes with nulls', () => {
     expect(
       categoryPricingToFormValues({
-        dresses: { turnaroundHours: null, cleaningFee: 15 },
-        pants: { cleaningFee: 'nope' },
+        dresses: { turnaroundDays: null },
+        pants: { turnaroundDays: 'nope' },
+        tops: { turnaroundDays: 1 },
       })
-    ).toEqual({ categoryPricing__cleaningFee__dresses: 15 });
+    ).toEqual({ categoryPricing__turnaroundDays__tops: 1 });
   });
 
   it('tolerates a missing or malformed table', () => {
@@ -257,7 +268,7 @@ describe('categoryPricingToFormValues', () => {
   });
 
   it('round-trips through categoryPricingFromFormValues', () => {
-    const stored = { dresses: { turnaroundHours: 72, cleaningFee: 15 }, silk: { cleaningFee: 30 } };
+    const stored = { dresses: { turnaroundDays: 3 }, pants: { turnaroundDays: 1 } };
     expect(categoryPricingFromFormValues(categoryPricingToFormValues(stored))).toEqual(stored);
   });
 });
@@ -267,16 +278,14 @@ describe('categoryPricingFromFormValues', () => {
     expect(
       categoryPricingFromFormValues({
         studioName: 'Studio Pigalle',
-        turnaroundHours: 48,
-        cleaningFee: 10,
+        turnaroundDays: 2,
         acceptedCategories: ['dresses'],
-        categoryPricing__turnaroundHours__dresses: 72,
-        categoryPricing__cleaningFee__dresses: 15,
-        categoryPricing__cleaningFee__midi_dress: 22,
+        categoryPricing__turnaroundDays__dresses: 3,
+        categoryPricing__turnaroundDays__pants: 1,
       })
     ).toEqual({
-      dresses: { turnaroundHours: 72, cleaningFee: 15 },
-      midi_dress: { cleaningFee: 22 },
+      dresses: { turnaroundDays: 3 },
+      pants: { turnaroundDays: 1 },
     });
   });
 
@@ -286,33 +295,38 @@ describe('categoryPricingFromFormValues', () => {
     // that mean nothing and have to be skipped on every read.
     expect(
       categoryPricingFromFormValues({
-        categoryPricing__cleaningFee__dresses: null,
-        categoryPricing__turnaroundHours__dresses: 72,
+        categoryPricing__turnaroundDays__dresses: null,
+        categoryPricing__turnaroundDays__pants: 1,
       })
-    ).toEqual({ dresses: { turnaroundHours: 72 } });
+    ).toEqual({ pants: { turnaroundDays: 1 } });
   });
 
-  it('emits no entry at all for a category whose every input was cleared', () => {
+  it('emits no entry at all for a category whose input was cleared', () => {
     expect(
       categoryPricingFromFormValues({
-        categoryPricing__cleaningFee__dresses: null,
-        categoryPricing__turnaroundHours__dresses: undefined,
+        categoryPricing__turnaroundDays__dresses: null,
+        categoryPricing__turnaroundDays__pants: undefined,
       })
     ).toEqual({});
   });
 
-  it('keeps an explicit zero, which is a real price ("free"), not a blank', () => {
-    expect(categoryPricingFromFormValues({ categoryPricing__cleaningFee__dresses: 0 })).toEqual({
-      dresses: { cleaningFee: 0 },
-    });
+  it('never rebuilds a cleaningFee out of a leftover form value', () => {
+    // The fee is not a form field any more, so a stray value under the old name must not
+    // be written back into storage where the server would once have read it.
+    expect(
+      categoryPricingFromFormValues({
+        categoryPricing__cleaningFee__dresses: 15,
+        categoryPricing__turnaroundDays__dresses: 3,
+      })
+    ).toEqual({ dresses: { turnaroundDays: 3 } });
   });
 
   it('ignores a field name that looks close but is not one of ours', () => {
     expect(
       categoryPricingFromFormValues({
         categoryPricing__depositAmount__dresses: 5,
-        categoryPricing__cleaningFee__: 5,
-        categoryPricing__cleaningFee: 5,
+        categoryPricing__turnaroundDays__: 5,
+        categoryPricing__turnaroundDays: 5,
       })
     ).toEqual({});
   });
@@ -323,61 +337,57 @@ describe('categoryPricingFromFormValues', () => {
   });
 });
 
-describe('getCategoryPricingGroups', () => {
-  it('groups accepted categories under their top-level branch', () => {
-    expect(getCategoryPricingGroups(CATEGORY_TREE, ['dresses', 'midi_dress', 'pants'])).toEqual([
-      {
-        id: 'dresses',
-        name: 'Dresses',
-        priceCategories: [
-          { id: 'dresses', name: 'Dresses', level: 1, path: ['Dresses'] },
-          { id: 'midi_dress', name: 'Midi Dress', level: 2, path: ['Dresses', 'Midi Dress'] },
-        ],
-      },
-      {
-        id: 'pants',
-        name: 'Pants',
-        priceCategories: [{ id: 'pants', name: 'Pants', level: 1, path: ['Pants'] }],
-      },
+describe('getTurnaroundCategoryIds', () => {
+  it('returns the top-level branch of every accepted category, in Console order', () => {
+    expect(getTurnaroundCategoryIds(CATEGORY_TREE, ['dresses', 'midi_dress', 'pants'])).toEqual([
+      'dresses',
+      'pants',
     ]);
   });
 
-  it('still emits the top-level group when ONLY a subcategory is accepted', () => {
-    // Hours are configured per top-level category, and a midi-dress listing resolves
-    // its turnaround from `dresses` whether or not the studio ticked `dresses`. Without
-    // the group there would be no input for the value the buffer actually reads.
-    const groups = getCategoryPricingGroups(CATEGORY_TREE, ['silk']);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].id).toBe('dresses');
-    expect(groups[0].priceCategories).toEqual([
-      { id: 'silk', name: 'Silk', level: 3, path: ['Dresses', 'Maxi Dress', 'Silk'] },
+  it('returns each branch once, however many of its members are accepted', () => {
+    expect(getTurnaroundCategoryIds(CATEGORY_TREE, ['dresses', 'maxi_dress', 'silk'])).toEqual([
+      'dresses',
     ]);
+  });
+
+  it('still returns the top-level id when ONLY a deep subcategory is accepted', () => {
+    // Turnaround is configured per top-level category, and a silk-maxi-dress listing
+    // resolves it from `dresses` whether or not the studio ticked `dresses`. Without this
+    // there would be no input for the value the availability buffer actually reads.
+    expect(getTurnaroundCategoryIds(CATEGORY_TREE, ['silk'])).toEqual(['dresses']);
   });
 
   it('omits branches the studio accepts nothing in', () => {
-    expect(getCategoryPricingGroups(CATEGORY_TREE, ['pants']).map(g => g.id)).toEqual(['pants']);
+    expect(getTurnaroundCategoryIds(CATEGORY_TREE, ['pants'])).toEqual(['pants']);
+  });
+
+  it('never returns a SUBcategory id, which would render an input nothing reads', () => {
+    const ids = getTurnaroundCategoryIds(CATEGORY_TREE, ['midi_dress', 'silk']);
+    expect(ids).not.toContain('midi_dress');
+    expect(ids).not.toContain('silk');
   });
 
   it('ignores pre-migration free text, which matches no category', () => {
-    expect(getCategoryPricingGroups(CATEGORY_TREE, ['Eveningwear', 'Sequins'])).toEqual([]);
+    expect(getTurnaroundCategoryIds(CATEGORY_TREE, ['Eveningwear', 'Sequins'])).toEqual([]);
   });
 
   it('tolerates a missing tree or an empty accepted list', () => {
-    expect(getCategoryPricingGroups(CATEGORY_TREE, [])).toEqual([]);
-    expect(getCategoryPricingGroups(CATEGORY_TREE)).toEqual([]);
-    expect(getCategoryPricingGroups(undefined, ['dresses'])).toEqual([]);
-    expect(getCategoryPricingGroups(null, null)).toEqual([]);
+    expect(getTurnaroundCategoryIds(CATEGORY_TREE, [])).toEqual([]);
+    expect(getTurnaroundCategoryIds(CATEGORY_TREE)).toEqual([]);
+    expect(getTurnaroundCategoryIds(undefined, ['dresses'])).toEqual([]);
+    expect(getTurnaroundCategoryIds(null, null)).toEqual([]);
   });
 });
 
 describe('getOrphanedPricingCategories', () => {
   it('reports stored pricing the studio can no longer see or edit', () => {
     // Values are retained, never pruned, when a category is un-ticked or leaves
-    // Console. Retained-but-invisible money is how a "why are we charging that?" bug
-    // survives for months, so the form has to surface it.
+    // Console. A retained-but-invisible turnaround is how a studio ends up blocking its
+    // calendar for a reason nobody can locate, so the form has to surface it.
     expect(
       getOrphanedPricingCategories(
-        { dresses: { cleaningFee: 15 }, retired_category: { cleaningFee: 40 } },
+        { dresses: { turnaroundDays: 3 }, retired_category: { turnaroundDays: 4 } },
         ['dresses']
       )
     ).toEqual(['retired_category']);
@@ -385,18 +395,24 @@ describe('getOrphanedPricingCategories', () => {
 
   it('reports nothing when every stored entry has a visible row', () => {
     expect(
-      getOrphanedPricingCategories({ dresses: { cleaningFee: 15 } }, ['dresses', 'pants'])
+      getOrphanedPricingCategories({ dresses: { turnaroundDays: 3 } }, ['dresses', 'pants'])
     ).toEqual([]);
+  });
+
+  it('ignores an entry holding only a legacy cleaningFee', () => {
+    // A fee row is dead data, not configuration the studio can act on: surfacing it would
+    // offer a "clear this" control for a value nothing reads.
+    expect(getOrphanedPricingCategories({ midi_dress: { cleaningFee: 22 } }, [])).toEqual([]);
   });
 
   it('ignores debris that holds no actual number', () => {
     expect(
-      getOrphanedPricingCategories({ empty: {}, junk: 'nope', blank: { cleaningFee: null } }, [])
+      getOrphanedPricingCategories({ empty: {}, junk: 'nope', blank: { turnaroundDays: null } }, [])
     ).toEqual([]);
   });
 
   it('tolerates missing input', () => {
     expect(getOrphanedPricingCategories(undefined, ['dresses'])).toEqual([]);
-    expect(getOrphanedPricingCategories({ dresses: { cleaningFee: 1 } })).toEqual(['dresses']);
+    expect(getOrphanedPricingCategories({ dresses: { turnaroundDays: 1 } })).toEqual(['dresses']);
   });
 });

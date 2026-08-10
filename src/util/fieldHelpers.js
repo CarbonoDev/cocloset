@@ -278,25 +278,34 @@ export const isCategoryAcceptedByLaundry = (
   return listingValues.some(value => acceptedSet.has(value));
 };
 
-/* ================ Per-category laundry pricing (form plumbing) ================ */
+/* ================ Per-category laundry turnaround (form plumbing) ================ */
 
 // A laundry's per-category configuration is stored as an OBJECT keyed by Console
 // category id, on its own profile privateData:
 //
 //   privateData.categoryPricing = {
-//     dresses:    { turnaroundHours: 72, cleaningFee: 15 },
-//     midi_dress: { cleaningFee: 22 },
+//     dresses: { turnaroundDays: 3 },
+//     tops:    { turnaroundDays: 1 },
 //   }
 //
-// The RESOLUTION rule (which of those applies to a given listing) lives server-side in
-// server/api-util/categoryPricing.js and is deliberately NOT duplicated here — the
+// TURNAROUND ONLY, AND IN DAYS. This table used to carry a per-category `cleaningFee`
+// too; fees are now marketplace-level server env configuration
+// (`CLEANING_FEE_<CATEGORY_ID>`, see server/api-util/cleaningFeeEnv.js), the form no
+// longer collects one, and nothing reads a stored one. The unit is days rather than
+// hours because that is what a studio states and what the day-granular availability
+// calendar consumes — there is no hours/days conversion anywhere.
+//
+// The RESOLUTION rule (which stored value applies to a given listing) lives server-side
+// in server/api-util/categoryPricing.js and is deliberately NOT duplicated here — the
 // helpers below are only about getting values in and out of the form. In short:
-// cleaningFee is settable at any level and the HIGHEST match on the listing's chain
-// wins; turnaroundHours is settable on TOP-LEVEL categories only.
+// turnaroundDays is settable on TOP-LEVEL categories only.
+//
+// Still an ARRAY of one field, not a bare string: the flat-field-name plumbing below
+// (and the orphan detection) is written against a set of per-category fields, and a
+// second field is a plausible future addition. Collapsing it would be churn for nothing.
+export const CATEGORY_PRICING_FIELDS = ['turnaroundDays'];
 
-export const CATEGORY_PRICING_FIELDS = ['turnaroundHours', 'cleaningFee'];
-
-// Form field names are FLAT, not `categoryPricing.dresses.cleaningFee`.
+// Form field names are FLAT, not `categoryPricing.dresses.turnaroundDays`.
 //
 // React Final Form parses dots and brackets in a field name as a path into the values
 // object. A Console category id is free-form operator input, so an id containing `.`
@@ -310,7 +319,7 @@ const CATEGORY_PRICING_PREFIX = `categoryPricing${CATEGORY_PRICING_SEPARATOR}`;
 /**
  * Build the form field name holding one field of one category's pricing.
  *
- * @param {String} field 'turnaroundHours' or 'cleaningFee'
+ * @param {String} field one of CATEGORY_PRICING_FIELDS (currently 'turnaroundDays')
  * @param {String} categoryId Console category id
  * @returns {String} a flat form field name
  */
@@ -420,60 +429,49 @@ export const getOrphanedPricingCategories = (categoryPricing, visibleCategoryIds
   });
 };
 
-// Walk one branch of the category tree depth-first, recording each node's depth and
-// the chain of ancestor names. Kept local (rather than reusing flattenCategoryTree)
-// because the grouping below needs to know which TOP-LEVEL branch a node belongs to,
-// and flattenCategoryTree's `path` records ancestor names, not ids.
-const collectBranchNodes = (subcategories, level, ancestorNames) =>
-  (Array.isArray(subcategories) ? subcategories : []).reduce((nodes, node) => {
-    const { id, name, subcategories: children } = node || {};
-    const label = typeof name === 'string' && name !== '' ? name : id;
-    // A node with no id can't be stored against or matched, so it is not editable —
-    // but its children still can be, so keep walking rather than pruning the branch.
-    const isUsable = typeof id === 'string' && id !== '';
-    const path = isUsable ? [...ancestorNames, label] : ancestorNames;
-    const selfMaybe = isUsable ? [{ id, name: label, level, path }] : [];
-    return [...nodes, ...selfMaybe, ...collectBranchNodes(children, level + 1, path)];
+// Collect the ids in one branch of the category tree, depth-first. Kept local (rather
+// than reusing flattenCategoryTree) because the caller below needs to know which
+// TOP-LEVEL branch a node belongs to, which a flat list of nodes cannot answer.
+//
+// A node with no id can't be stored against or matched, so it contributes nothing — but
+// its children still can, so the walk continues rather than pruning the branch.
+const collectBranchIds = subcategories =>
+  (Array.isArray(subcategories) ? subcategories : []).reduce((ids, node) => {
+    const { id, subcategories: children } = node || {};
+    const selfMaybe = typeof id === 'string' && id !== '' ? [id] : [];
+    return [...ids, ...selfMaybe, ...collectBranchIds(children)];
   }, []);
 
 /**
- * Group a laundry's accepted categories into the rows its pricing form should render.
+ * Which top-level categories should the laundry's table show a turnaround input for?
  *
- * The two fields are configured at different granularities, which is what shapes this:
- *   - turnaroundHours is set on the TOP-LEVEL category only ("las horas estan bien por
- *     categoría grande"), so it belongs to the group header.
- *   - cleaningFee is set on any accepted node, so it belongs to the rows inside.
+ * Turnaround is set on the TOP-LEVEL category only ("las horas estan bien por categoría
+ * grande"), so only these ids ever get an input — a days box on a subcategory row would
+ * be a control that silently does nothing, since a value stored there is never read.
  *
- * A group is emitted whenever the studio accepts anything in that branch — including
- * when it accepts only a subcategory. Accepting `midi_dress` but not `dresses` still
- * needs a `Dresses` hours input, because a midi-dress listing resolves its turnaround
- * from its top-level category regardless of which level the studio ticked.
+ * An id is included whenever the studio accepts ANYTHING in that branch, including only
+ * a subcategory. Accepting `midi_dress` but not `dresses` still needs a `Dresses`
+ * turnaround input, because a midi-dress listing resolves its turnaround from its
+ * top-level category regardless of which level the studio ticked.
  *
  * @param {Array<Object>} categories nested category configuration from Console
  * @param {Array<String>} acceptedCategories the laundry's stored accepted values
- * @returns {Array<{id: String, name: String, priceCategories: Array<{id, name, level, path}>}>}
- *   one entry per relevant top-level category, in Console's own order
+ * @returns {Array<String>} top-level category ids, in Console's own order
  */
-export const getCategoryPricingGroups = (categories, acceptedCategories = []) => {
+export const getTurnaroundCategoryIds = (categories, acceptedCategories = []) => {
   const accepted = new Set(
     (Array.isArray(acceptedCategories) ? acceptedCategories : []).filter(
       value => typeof value === 'string' && value !== ''
     )
   );
 
-  return (Array.isArray(categories) ? categories : []).reduce((groups, topLevel) => {
-    const { id, name, subcategories } = topLevel || {};
+  return (Array.isArray(categories) ? categories : []).reduce((ids, topLevel) => {
+    const { id, subcategories } = topLevel || {};
     if (typeof id !== 'string' || id === '') {
-      return groups;
+      return ids;
     }
-    const label = typeof name === 'string' && name !== '' ? name : id;
-
-    const priceCategories = [
-      ...(accepted.has(id) ? [{ id, name: label, level: 1, path: [label] }] : []),
-      ...collectBranchNodes(subcategories, 2, [label]).filter(node => accepted.has(node.id)),
-    ];
-
-    return priceCategories.length > 0 ? [...groups, { id, name: label, priceCategories }] : groups;
+    const branchIds = [id, ...collectBranchIds(subcategories)];
+    return branchIds.some(branchId => accepted.has(branchId)) ? [...ids, id] : ids;
   }, []);
 };
 

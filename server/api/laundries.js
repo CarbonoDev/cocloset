@@ -30,9 +30,9 @@ const { buildLaundryDirectory } = require('../api-util/laundryDirectory');
 //
 // `categories` is the category chain (general -> specific) of the garment the owner is
 // picking a laundry for — i.e. the listing's categoryLevel1/2/3. It is OPTIONAL and
-// purely presentational: when given, each entry's `turnaroundHours` is resolved for
-// THAT garment (a laundry sets hours per top-level category) instead of being the
-// studio-wide number, and `turnaroundHoursIsCategorySpecific` marks which it is.
+// purely presentational: when given, each entry's `turnaroundDays` is resolved for
+// THAT garment (a laundry sets days per top-level category) instead of being the
+// studio-wide number, and `turnaroundDaysIsCategorySpecific` marks which it is.
 // Omitting it returns exactly what this endpoint returned before.
 //
 // Nothing security-relevant hangs off the parameter: it selects between numbers the
@@ -41,8 +41,8 @@ const { buildLaundryDirectory } = require('../api-util/laundryDirectory');
 // into unbounded per-user work.
 //
 // Response (200): { data: [ { id, displayName, studioName, address, origin,
-//   businessHours, acceptedCategories, turnaroundHours,
-//   turnaroundHoursIsCategorySpecific } ], meta: {
+//   businessHours, acceptedCategories, turnaroundDays,
+//   turnaroundDaysIsCategorySpecific } ], meta: {
 //   totalUsersScanned, laundryUserCount, incompleteProfileCount, truncated } }
 //
 // Laundries with no usable profile (no address/origin) are omitted from `data`

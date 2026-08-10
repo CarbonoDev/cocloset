@@ -168,8 +168,8 @@ export const submitLaundryPartnerApplication = body => {
 // caller.
 //
 // Returns `{ data: [ { id, displayName, studioName, address, origin,
-// businessHours, acceptedCategories, turnaroundHours,
-// turnaroundHoursIsCategorySpecific } ], meta }` - a flat, explicitly allowlisted
+// businessHours, acceptedCategories, turnaroundDays,
+// turnaroundDaysIsCategorySpecific } ], meta }` - a flat, explicitly allowlisted
 // record per laundry, NOT the raw user publicData blob.
 // Laundries with no usable address/origin are omitted (they can't be assigned:
 // no geolocation would be written and the listing could never be published);
@@ -177,11 +177,11 @@ export const submitLaundryPartnerApplication = body => {
 //
 // `listingCategoryValues` is the category chain of the garment being assigned
 // (categoryLevel1/2/3, general -> specific). It is optional. Passing it makes each
-// card's `turnaroundHours` the value that laundry set for THAT garment's top-level
+// card's `turnaroundDays` the value that laundry set for THAT garment's top-level
 // category rather than a studio-wide average, with
-// `turnaroundHoursIsCategorySpecific` telling the card which it got. The resolution
-// deliberately happens server-side: the same privateData table also holds per-category
-// cleaning FEES, which must never reach the browser.
+// `turnaroundDaysIsCategorySpecific` telling the card which it got. The resolution
+// deliberately happens server-side: the underlying table is the laundry's privateData,
+// which no other user is entitled to read wholesale.
 //
 // See `server/api/laundries.js` for the full response shape and the reason the
 // filtering happens server-side in JS rather than in the API query.
