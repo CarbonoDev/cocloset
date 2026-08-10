@@ -192,6 +192,54 @@ export const numberAtLeast = (message, minNumber) => value => {
   return typeof valueNum === 'number' && valueNum >= minNumber ? VALID : message;
 };
 
+/**
+ * Validates an optional whole number inside an inclusive range.
+ *
+ * Unlike `validateInteger` below, this is a Final Form validator factory and it refuses to
+ * truncate: `Number.parseInt` turns "2.5" into 2 and "3 days" into 3, which would silently
+ * store something the user never typed. Anything that is not entirely digits (with an
+ * optional minus sign) is reported as a non-integer instead.
+ *
+ * An empty value passes — compose with `required` when the field is mandatory.
+ *
+ * @param {string} notAnIntegerMessage - Shown for decimals and other non-integer input.
+ * @param {string} numberTooSmallMessage - Shown when the value is below `min`.
+ * @param {string} numberTooBigMessage - Shown when the value is above `max`.
+ * @param {number} min - Smallest accepted value (inclusive).
+ * @param {number} max - Largest accepted value (inclusive).
+ * @returns {Function} A validator returning VALID or one of the given messages.
+ */
+export const optionalIntegerInRange = (
+  notAnIntegerMessage,
+  numberTooSmallMessage,
+  numberTooBigMessage,
+  min,
+  max
+) => value => {
+  const isBlank = value == null || (typeof value === 'string' && value.trim().length === 0);
+  if (isBlank) {
+    return VALID;
+  }
+
+  const isWholeNumber =
+    typeof value === 'number'
+      ? Number.isInteger(value)
+      : /^-?\d+$/.test(String(value).trim()) && Number.isFinite(Number(String(value).trim()));
+
+  if (!isWholeNumber) {
+    return notAnIntegerMessage;
+  }
+
+  const valueNum = Number(value);
+  if (valueNum < min) {
+    return numberTooSmallMessage;
+  }
+  if (valueNum > max) {
+    return numberTooBigMessage;
+  }
+  return VALID;
+};
+
 export const validateInteger = (value, max, min, numberTooSmallMessage, numberTooBigMessage) => {
   const parsedValue = Number.parseInt(value, 10);
   if (parsedValue > max) {

@@ -19,6 +19,10 @@ import {
   handleSubmitValuesForPriceVariants,
 } from './BookingPriceVariants';
 import {
+  getInitialValuesForMinimumBookingDays,
+  handleSubmitValuesForMinimumBookingDays,
+} from './MinimumBookingDays';
+import {
   getInitialValuesForStartTimeInterval,
   handleSubmitValuesForStartTimeInterval,
 } from './StartTimeInverval';
@@ -42,12 +46,17 @@ const getInitialValues = props => {
   // Note: publicData contains priceVariationsEnabled if listing is created with priceVariations enabled.
   const isPriceVariationsInUse = isPriceVariationsEnabled(publicData, listingTypeConfig);
 
+  // Included in both branches: getInitialValues re-seeds the form from the optimistic
+  // listing after every submit, so a field that is missing here is wiped from the form.
+  const minimumBookingDaysValues = getInitialValuesForMinimumBookingDays(props);
+
   return unitType === FIXED || isPriceVariationsInUse
     ? {
         ...getInitialValuesForPriceVariants(props, isPriceVariationsInUse),
         ...getInitialValuesForStartTimeInterval(props),
+        ...minimumBookingDaysValues,
       }
-    : { price: listing?.attributes?.price };
+    : { price: listing?.attributes?.price, ...minimumBookingDaysValues };
 };
 
 // This is needed to show the listing's price consistently over XHR calls.
@@ -186,6 +195,13 @@ const EditListingPricingPanel = props => {
                 unitType,
                 listingTypeConfig
               );
+              // This adds minimumBookingDays to publicData. It reaches this branch when a
+              // day-based listing type also has price variations enabled.
+              const minimumBookingDaysChanges = handleSubmitValuesForMinimumBookingDays(
+                values,
+                publicDataUpdates,
+                publicData
+              );
               updateValues = {
                 ...priceVariantChanges,
                 ...startTimeIntervalChanges,
@@ -193,17 +209,24 @@ const EditListingPricingPanel = props => {
                   priceVariationsEnabled: isPriceVariationsInUse,
                   ...startTimeIntervalChanges.publicData,
                   ...priceVariantChanges.publicData,
+                  ...minimumBookingDaysChanges.publicData,
                 },
               };
             } else {
+              // This is the branch a day-unit listing takes. Collect publicData additions
+              // into one object instead of writing publicData in a single shot, so that
+              // minimumBookingDays and priceVariationsEnabled don't clobber each other.
               const priceVariationsEnabledMaybe = isBooking
-                ? {
-                    publicData: {
-                      priceVariationsEnabled: false,
-                    },
-                  }
+                ? { priceVariationsEnabled: false }
                 : {};
-              updateValues = { price, ...priceVariationsEnabledMaybe };
+              const publicDataUpdates = handleSubmitValuesForMinimumBookingDays(
+                values,
+                priceVariationsEnabledMaybe,
+                publicData
+              ).publicData;
+              const publicDataMaybe =
+                Object.keys(publicDataUpdates).length > 0 ? { publicData: publicDataUpdates } : {};
+              updateValues = { price, ...publicDataMaybe };
             }
 
             // Save the initialValues to state

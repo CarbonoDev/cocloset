@@ -9,12 +9,13 @@ import { FormattedMessage, useIntl } from '../../../../util/reactIntl';
 import * as validators from '../../../../util/validators';
 import { formatMoney } from '../../../../util/currency';
 import { types as sdkTypes } from '../../../../util/sdkLoader';
-import { FIXED, isBookingProcess } from '../../../../transactions/transaction';
+import { DAY, FIXED, NIGHT, isBookingProcess } from '../../../../transactions/transaction';
 
 // Import shared components
 import { Button, Form, FieldCurrencyInput } from '../../../../components';
 
 import BookingPriceVariants from './BookingPriceVariants';
+import MinimumBookingDays from './MinimumBookingDays';
 import StartTimeInterval from './StartTimeInverval';
 
 // Import modules from this directory
@@ -137,6 +138,10 @@ export const EditListingPricingForm = props => (
       const isBookingPriceVariationsInUse = isBooking && isPriceVariationsInUse;
       const isUsingPriceVariants = isFixedLengthBooking || isBookingPriceVariationsInUse;
 
+      // A minimum rental length in days only makes sense when the booking is measured in
+      // days or nights. Cocloset's garment rentals use unitType 'day'.
+      const isDayBasedBooking = isBooking && [DAY, NIGHT].includes(unitType);
+
       return (
         <Form onSubmit={handleSubmit} className={classes}>
           <ErrorMessages fetchErrors={fetchErrors} />
@@ -170,6 +175,14 @@ export const EditListingPricingForm = props => (
               validate={priceValidators}
             />
           )}
+
+          {isDayBasedBooking ? (
+            <MinimumBookingDays
+              id={`${formId}minimumBookingDays`}
+              name="minimumBookingDays"
+              className={css.input}
+            />
+          ) : null}
 
           {isFixedLengthBooking ? (
             <StartTimeInterval

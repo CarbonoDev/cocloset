@@ -6,6 +6,7 @@ import {
   minLength,
   maxLength,
   moneySubUnitAmountAtLeast,
+  optionalIntegerInRange,
   composeValidators,
   validBusinessURL,
   validHKID,
@@ -182,6 +183,51 @@ describe('validators', () => {
       expect(moneySubUnitAmountAtLeast('fail', 0)(new Money(0, 'USD'))).toBeUndefined();
       expect(moneySubUnitAmountAtLeast('fail', 50)(new Money(50, 'USD'))).toBeUndefined();
       expect(moneySubUnitAmountAtLeast('fail', 50)(new Money(100, 'USD'))).toBeUndefined();
+    });
+  });
+  describe('optionalIntegerInRange()', () => {
+    const validate = optionalIntegerInRange('notInteger', 'tooSmall', 'tooBig', 1, 30);
+
+    it('should allow a missing or blank value', () => {
+      expect(validate(undefined)).toBeUndefined();
+      expect(validate(null)).toBeUndefined();
+      expect(validate('')).toBeUndefined();
+      expect(validate('   ')).toBeUndefined();
+    });
+    it('should allow the boundaries of the range', () => {
+      expect(validate('1')).toBeUndefined();
+      expect(validate(1)).toBeUndefined();
+      expect(validate('30')).toBeUndefined();
+      expect(validate(30)).toBeUndefined();
+    });
+    it('should allow a value inside the range', () => {
+      expect(validate('7')).toBeUndefined();
+      expect(validate(' 7 ')).toBeUndefined();
+    });
+    it('should reject a value below the minimum', () => {
+      expect(validate('0')).toEqual('tooSmall');
+      expect(validate(0)).toEqual('tooSmall');
+      expect(validate('-1')).toEqual('tooSmall');
+    });
+    it('should reject a value above the maximum', () => {
+      expect(validate('31')).toEqual('tooBig');
+      expect(validate(31)).toEqual('tooBig');
+    });
+    it('should reject decimals instead of truncating them', () => {
+      // Number.parseInt('2.5') is 2, which would silently store a different number.
+      expect(validate('2.5')).toEqual('notInteger');
+      expect(validate(2.5)).toEqual('notInteger');
+      expect(validate('1.0')).toEqual('notInteger');
+    });
+    it('should reject values that only start with digits', () => {
+      expect(validate('3 days')).toEqual('notInteger');
+      expect(validate('3px')).toEqual('notInteger');
+    });
+    it('should reject non-numeric values', () => {
+      expect(validate('abc')).toEqual('notInteger');
+      expect(validate(NaN)).toEqual('notInteger');
+      expect(validate(Infinity)).toEqual('notInteger');
+      expect(validate(true)).toEqual('notInteger');
     });
   });
   describe('validBusinessURL()', () => {
