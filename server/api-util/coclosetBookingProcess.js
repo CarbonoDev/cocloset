@@ -165,6 +165,24 @@ const TRANSITION_TO_STATE = {
 const stateFromLastTransition = lastTransition =>
   (lastTransition && TRANSITION_TO_STATE[lastTransition]) || null;
 
+/**
+ * Is this listing sold through the `cocloset-booking` process?
+ *
+ * A listing's process is `publicData.transactionProcessAlias`, e.g.
+ * 'cocloset-booking/release-1' - the alias carries a release suffix, so the
+ * comparison is on the part before the '/'. Needed by the endpoints that create
+ * a reservation (initiate-privileged.js / transition-privileged.js): those are
+ * shared by every process in the template (booking, purchase, inquiry,
+ * negotiation), and Cocloset-specific work must not run for the others.
+ *
+ * @param {Object} [listing] - a listing API entity
+ * @returns {boolean}
+ */
+const isCoclosetBookingListing = listing => {
+  const alias = listing?.attributes?.publicData?.transactionProcessAlias;
+  return typeof alias === 'string' && alias.split('/')[0] === COCLOSET_BOOKING_PROCESS_NAME;
+};
+
 // ---------------------------------------------------------------------------
 // The ops-facing status vocabulary
 // ---------------------------------------------------------------------------
@@ -327,6 +345,7 @@ module.exports = {
   TRANSITIONS,
   TRANSITION_TO_STATE,
   stateFromLastTransition,
+  isCoclosetBookingListing,
   LAUNDRY_STATUS_TRANSITIONS,
   LAUNDRY_STATUSES,
   DAMAGE_REPORT_STATUS,

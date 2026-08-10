@@ -1,0 +1,142 @@
+/**
+ * GET /api/transaction-qr?id=<transaction uuid>
+ *
+ * Renders the handover QR code for a transaction as a PNG image, server-side.
+ * Both consumers point a plain <img src> at it:
+ *
+ *   - src/containers/TransactionPage/TransactionPanel/HandoverQrMaybe.js (customer/owner)
+ *   - src/containers/LaundryOpsPage/LaundryOrderRow.js (the laundry's QR column)
+ *
+ * Generation itself is server/api-util/handoverQr.js; see that file for the
+ * payload scheme, the metadata record and why generation happens at reservation
+ * creation.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY PNG BYTES AND NOT A JSON `{ dataUrl }`
+ * ---------------------------------------------------------------------------
+ * The generation is server-side either way - the deliberate choice, so the
+ * customer's screen, the ops table, a laundry email and a print job all come
+ * from one `qrcode` call. What differs is only the transport, and an
+ * `image/png` response is better here for three concrete reasons:
+ *
+ *   1. `<img src="/api/transaction-qr?id=...">` needs zero client plumbing: no
+ *      fetch, no redux action, no loading/error state, and it renders on the
+ *      first SSR paint. A JSON data URL would need all of that in a container
+ *      that is already large.
+ *   2. The ops orders table renders one QR PER ROW (mockups 05-08). With
+ *      <img> that is N lazily-fetched, HTTP-cacheable images the browser
+ *      manages. With JSON it is N fetches held in component state, or an
+ *      extra ~2 KB of base64 per row inside the /api/laundry-orders payload -
+ *      which is the same bloat rejected for metadata.
+ *   3. base64 costs ~33% more bytes than the PNG it wraps, on every single
+ *      render.
+ *
+ * `renderHandoverQrDataUrl` is still exported from api-util/handoverQr.js for
+ * the email/print consumer, and is implemented over the same buffer renderer,
+ * so there is one implementation rather than two that can drift.
+ *
+ * ---------------------------------------------------------------------------
+ * AUTHORIZATION - deliberately none, and why that is safe here
+ * ---------------------------------------------------------------------------
+ * Read this before "fixing" it.
+ *
+ * The response encodes EXACTLY the transaction id the caller supplied and
+ * nothing else (design §11: the QR payload is the transaction id). So the
+ * endpoint discloses no information the caller did not already have; there is
+ * nothing for an authorization check to protect. Confirming that the caller is
+ * a party to the transaction would cost an Integration API
+ * `transactions.show` per image, and even a bare authentication check costs a
+ * Marketplace `currentUser.show()` per image - i.e. one per ops-table row,
+ * from up to dozens of parallel <img> requests, all of which would also be
+ * refreshing the same auth cookie concurrently.
+ *
+ * What IS enforced:
+ *
+ *   - `id` must be a well-formed UUID. This is the control that matters: it
+ *     stops the endpoint being a general-purpose QR generator for
+ *     attacker-chosen payloads (a phishing URL rendered on the marketplace's
+ *     own domain), which is the only real abuse this shape has.
+ *   - Per-IP and global rate limits, so it cannot be used as a CPU/bandwidth
+ *     amplifier.
+ *
+ * WHAT TO TELL THE CLIENT, because "show your QR to collect the garment"
+ * implies something this scheme does not provide: the QR is an IDENTIFIER, not
+ * a credential. Anyone who knows a transaction id can render the same code
+ * with any QR generator on the internet - that is inherent to the §11 payload
+ * decision, not to this endpoint. The controls that actually protect a
+ * handover are the laundry checking who is standing at the counter, and
+ * Sharetribe rejecting an out-of-order transition (HTTP 409
+ * `transaction-invalid-transition`). If bearer-token semantics are ever
+ * required, the payload scheme has to change (a signed, expiring token) - and
+ * HANDOVER_QR_VERSION exists for exactly that migration.
+ */
+
+const { createRateLimiter } = require('../api-util/rateLimit');
+const { buildHandoverQrPayload, renderHandoverQrPngBuffer } = require('../api-util/handoverQr');
+const log = require('../log');
+
+// Sharetribe ids are UUIDs. Anchored, case-insensitive, no version pinning
+// (the platform has used more than one UUID version).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const WINDOW_MS = 10 * 60 * 1000;
+// Generous per-IP budget: one ops-dashboard load legitimately asks for one
+// image per order row, and a laundry may reload repeatedly through a shift.
+const MAX_PER_IP_PER_WINDOW = 600;
+const MAX_TOTAL_PER_WINDOW = 20000;
+
+const limiter = createRateLimiter({
+  windowMs: WINDOW_MS,
+  maxPerKey: MAX_PER_IP_PER_WINDOW,
+  maxTotal: MAX_TOTAL_PER_WINDOW,
+});
+
+// Returns the render promise. Express ignores a handler's return value; this is
+// purely so tests can await the response deterministically instead of guessing
+// how many microtask ticks `qrcode` needs.
+module.exports = (req, res) => {
+  const { allowed, retryAfterSeconds } = limiter.check(req.ip);
+  if (!allowed) {
+    res
+      .status(429)
+      .set('Retry-After', String(retryAfterSeconds))
+      .json({ error: 'Too many QR requests from this address. Please try again later.' })
+      .end();
+    return Promise.resolve();
+  }
+
+  const id = req.query?.id;
+
+  if (!id || typeof id !== 'string' || !UUID_RE.test(id)) {
+    res
+      .status(400)
+      .json({ error: 'Query parameter "id" must be a transaction UUID.' })
+      .end();
+    return Promise.resolve();
+  }
+
+  return renderHandoverQrPngBuffer(buildHandoverQrPayload(id))
+    .then(buffer => {
+      res
+        .status(200)
+        .set('Content-Type', 'image/png')
+        .set('Content-Length', String(buffer.length))
+        // The image is a pure function of `id`, so it is immutable. `private`
+        // because it is tied to one user's booking even though it carries no
+        // secret, and it keeps shared proxies out of it.
+        .set('Cache-Control', 'private, max-age=86400, immutable')
+        .send(buffer)
+        .end();
+    })
+    .catch(e => {
+      log.error(e, 'transaction-qr-render-failed', { txId: id, message: e?.message });
+      res
+        .status(500)
+        .json({ error: 'Failed to render the QR code.' })
+        .end();
+    });
+};
+
+module.exports.MAX_PER_IP_PER_WINDOW = MAX_PER_IP_PER_WINDOW;
+module.exports.MAX_TOTAL_PER_WINDOW = MAX_TOTAL_PER_WINDOW;
+module.exports.WINDOW_MS = WINDOW_MS;

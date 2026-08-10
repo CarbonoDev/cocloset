@@ -3,8 +3,10 @@ import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { laundryActionsFor, statusLabelKey } from '../../util/laundryStatuses';
+import { handoverQrPayloadFromRecord } from '../../util/handoverQr';
+import { isHandoverQrVisibleState } from '../../transactions/transactionProcessCoclosetBooking';
 import { isLate } from './LaundryOpsPage.helpers';
-import { InlineTextButton, PrimaryButton } from '../../components';
+import { HandoverQrCode, InlineTextButton, PrimaryButton } from '../../components';
 
 import { statusTone } from './LaundryOpsPage.helpers';
 import css from './LaundryOpsPage.module.css';
@@ -48,6 +50,19 @@ const LaundryOrderRow = props => {
   // the Inventory screen instead.
   const action = laundryActionsFor(row)[0] || null;
 
+  // The handover QR. Same single code for both scans - the laundry uses it to
+  // hand the garment over and to take it back - so there is one payload here and
+  // no notion of "which" QR. It stops being rendered once the return has been
+  // confirmed (`isHandoverQrVisibleState`, derived from the row's real process
+  // state, never from a metadata flag): from `returned` onwards there is no
+  // handover left to scan, and a stale code on the worklist invites a
+  // pointless scan that Sharetribe would 409 anyway.
+  //
+  // Inventory-only rows (§8: an assigned garment with no booking) have no
+  // transaction and therefore no handover.
+  const qrPayload = handoverQrPayloadFromRecord(row.handoverQr, row.transactionId);
+  const showQr = !!qrPayload && isHandoverQrVisibleState(row.state);
+
   const handleAdvance = () => {
     onAdvanceStatus({
       transactionId: row.transactionId,
@@ -59,13 +74,16 @@ const LaundryOrderRow = props => {
   return (
     <>
       <tr className={css.row}>
-        {/* Design §11 fixes the QR payload as the raw transaction id. No QR
-            rendering library is bundled in this template, so the payload is
-            shown as text rather than pulling in a new dependency. */}
+        {/* Design §11 fixes the QR payload as the raw transaction id. The image
+            itself is rendered server-side by /api/transaction-qr. */}
         <td className={css.cellQr}>
-          <span className={css.qrPlaceholder} title={row.transactionId || ''}>
-            <FormattedMessage id="LaundryOpsPage.table.qrPlaceholder" />
-          </span>
+          {showQr ? (
+            <HandoverQrCode payload={qrPayload} size="small" id={`opsQr-${row.id}`} />
+          ) : (
+            // Same '—' every other empty cell in this table uses. The expanded
+            // detail panel says why it is gone.
+            <span className={css.secondaryText}>—</span>
+          )}
         </td>
         <td className={css.cellNoWrap}>
           <span className={css.primaryText}>{row.ticketCode || '—'}</span>
@@ -143,12 +161,42 @@ const LaundryOrderRow = props => {
                 )}
               </div>
               <div className={css.detailInfo}>
-                <p className={css.detailLine}>
-                  <FormattedMessage
-                    id="LaundryOpsPage.detail.qrPayload"
-                    values={{ id: row.transactionId || '—' }}
-                  />
-                </p>
+                {/* The scannable code, big enough to scan off the operator's own
+                    screen, with the payload still shown as selectable text
+                    underneath (HandoverQrCode showPayload) - a studio whose
+                    scanner is down needs to be able to read or copy it. */}
+                {showQr ? (
+                  <div className={css.detailQr}>
+                    <HandoverQrCode
+                      payload={qrPayload}
+                      size="large"
+                      showPayload={true}
+                      id={`opsQrDetail-${row.id}`}
+                    />
+                    <p className={css.detailLine}>
+                      <FormattedMessage id="LaundryOpsPage.detail.qrBothHandovers" />
+                    </p>
+                  </div>
+                ) : null}
+
+                {/* No code left to scan - usually because both handovers are
+                    done, but also for a cancelled or expired order, so the copy
+                    stays state-neutral. The transaction id is still how this
+                    order is looked up, so it stays readable. Inventory-only rows
+                    have neither. */}
+                {!showQr && row.transactionId ? (
+                  <>
+                    <p className={css.detailLine}>
+                      <FormattedMessage id="LaundryOpsPage.detail.qrInactive" />
+                    </p>
+                    <p className={css.detailLine}>
+                      <FormattedMessage
+                        id="LaundryOpsPage.detail.qrPayload"
+                        values={{ id: row.transactionId }}
+                      />
+                    </p>
+                  </>
+                ) : null}
                 {row.damageReported?.flag ? (
                   <p className={css.detailDamage}>
                     <FormattedMessage

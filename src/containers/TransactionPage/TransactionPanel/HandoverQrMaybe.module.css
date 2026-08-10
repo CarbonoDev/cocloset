@@ -1,0 +1,51 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  margin: 24px 0 0 0;
+  padding: 18px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurfaceRaised);
+
+  @media (--viewportMedium) {
+    margin: 32px 0 0 0;
+    padding: 24px;
+  }
+}
+
+.heading {
+  margin: 0 0 6px 0;
+  padding: 0;
+
+  @media (--viewportMedium) {
+    margin: 0 0 8px 0;
+    padding: 0;
+  }
+}
+
+.description {
+  margin: 0 0 18px 0;
+  color: var(--coclosetInkMuted);
+
+  @media (--viewportMedium) {
+    margin: 0 0 24px 0;
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ticket {
+  margin: 0;
+  color: var(--coclosetInkMuted);
+}
+
+.ticketCode {
+  font-weight: var(--fontWeightBold);
+  color: var(--coclosetInk);
+  letter-spacing: 0.5px;
+  user-select: all;
+}

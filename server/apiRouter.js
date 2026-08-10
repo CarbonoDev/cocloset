@@ -22,6 +22,7 @@ const createAvailabilityBuffer = require('./api/create-availability-buffer');
 const laundryTransactionStatus = require('./api/laundry-transaction-status');
 const listingReadinessStatus = require('./api/listing-readiness-status');
 const laundryOrders = require('./api/laundry-orders');
+const transactionQr = require('./api/transaction-qr');
 const initUserRole = require('./api/init-user-role');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
@@ -68,6 +69,11 @@ router.post('/create-availability-buffer', createAvailabilityBuffer);
 router.post('/laundry-transaction-status', laundryTransactionStatus);
 router.post('/listing-readiness-status', listingReadinessStatus);
 router.get('/laundry-orders', laundryOrders);
+
+// Renders the handover QR for a transaction as a PNG, for a plain <img src>.
+// Unauthenticated by design - it echoes back only the transaction id it was
+// given. See the header of server/api/transaction-qr.js before changing that.
+router.get('/transaction-qr', transactionQr);
 
 // Applies the `metadata.isLaundry = false` default to the CALLING user, right
 // after signup. Takes no request parameters at all - the target is the

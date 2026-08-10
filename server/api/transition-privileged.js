@@ -16,8 +16,47 @@ const {
   serialize,
   fetchCommission,
 } = require('../api-util/sdk');
+const { getIntegrationSdk } = require('../api-util/integrationSdk');
+const { TRANSITIONS, isCoclosetBookingListing } = require('../api-util/coclosetBookingProcess');
+const { ensureHandoverQr } = require('../api-util/handoverQr');
+const log = require('../log');
 
 const { Money } = sharetribeSdk.types;
+
+// The second way a reservation is created: a customer who started with an
+// inquiry books through `transition/request-payment-after-inquiry` instead of
+// `request-payment`. The transaction already exists (the `inquire` created it),
+// but the RESERVATION is created here, so this is the same moment as
+// initiate-privileged.js and gets the same treatment. See the GENERATION TIMING
+// section in api-util/handoverQr.js.
+//
+// Gated on the transition as well as the process, because this endpoint also
+// carries every default-negotiation offer transition; those must not mint a QR.
+//
+// `ensureHandoverQr` is idempotent, so having two call sites cannot produce two
+// codes - which is the point of requirement (2), "este mismo qr".
+//
+// Called after the response is sent, so it must never throw: getIntegrationSdk()
+// throws on missing env vars, and an escaping throw would reach the trailing
+// .catch() and try to respond twice.
+const generateHandoverQrMaybe = (transitionName, listing, transaction) => {
+  const isReservationCreation = transitionName === TRANSITIONS.REQUEST_PAYMENT_AFTER_INQUIRY;
+
+  if (!isReservationCreation || !isCoclosetBookingListing(listing) || !transaction?.id) {
+    return;
+  }
+
+  try {
+    ensureHandoverQr({
+      integrationSdk: getIntegrationSdk(),
+      transactionId: transaction.id,
+      existingMetadata: transaction.attributes?.metadata,
+      log,
+    });
+  } catch (e) {
+    log.error(e, 'handover-qr-write-failed', { txId: transaction.id?.uuid || 'unknown' });
+  }
+};
 
 const transactionPromise = (sdk, id) => sdk.transactions.show({ id, include: ['listing'] });
 const getListingRelationShip = transactionShowAPIData => {
@@ -120,12 +159,16 @@ module.exports = (req, res) => {
   const transitionName = bodyParams.transition;
   let lineItems = null;
   let metadataMaybe = {};
+  // Kept for the post-response handover-QR step, which needs to know whether
+  // this listing is on the cocloset-booking process.
+  let listingEntity = null;
 
   Promise.all([transactionPromise(sdk, bodyParams?.id), fetchCommission(sdk)])
     .then(responses => {
       const [showTransactionResponse, fetchAssetsResponse] = responses;
       const transaction = showTransactionResponse.data.data;
       const listing = getListingRelationShip(showTransactionResponse.data);
+      listingEntity = listing;
       const commissionAsset = fetchAssetsResponse.data.data[0];
 
       const existingMetadata = transaction?.attributes?.metadata;
@@ -200,6 +243,11 @@ module.exports = (req, res) => {
           })
         )
         .end();
+
+      // A speculative transition builds a breakdown only; nothing was created.
+      if (!isSpeculative) {
+        generateHandoverQrMaybe(transitionName, listingEntity, data?.data);
+      }
     })
     .catch(e => {
       handleError(res, e);

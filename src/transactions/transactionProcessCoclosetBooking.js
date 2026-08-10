@@ -382,6 +382,47 @@ export const isRefunded = transition => {
   return txRefundedTransitions.includes(transition);
 };
 
+// ---------------------------------------------------------------------------
+// The handover QR
+// ---------------------------------------------------------------------------
+//
+// Client mirror of HANDOVER_QR_VISIBLE_STATES in
+// server/api-util/handoverQr.js, which carries the full reasoning. In short:
+// ONE QR serves both handover events, so it is shown for as long as either is
+// still ahead of the garment, and hidden once both are done.
+//
+// The two handover events are:
+//   - laundry -> customer: LAUNDRY_CONFIRM_PICKUP, out of READY_FOR_PICKUP
+//   - customer -> laundry: LAUNDRY_CONFIRM_RETURN (out of PICKED_UP) and
+//     LAUNDRY_CONFIRM_RETURN_LATE (out of OVERDUE) - the same physical event,
+//     split in two only because the EDN's `:from` is single-valued.
+//
+// So visibility ends at RETURNED, because the only ways into RETURNED are those
+// two return transitions: being in RETURNED *is* the record that the second
+// handover happened. That is why there is no `metadata.qrUsed` flag - the state
+// machine already answers the question, and a duplicate flag could disagree
+// with it.
+export const HANDOVER_QR_TRANSITIONS = [
+  transitions.LAUNDRY_CONFIRM_PICKUP,
+  transitions.LAUNDRY_CONFIRM_RETURN,
+  transitions.LAUNDRY_CONFIRM_RETURN_LATE,
+];
+
+export const HANDOVER_QR_VISIBLE_STATES = [
+  states.ACCEPTED,
+  states.READY_FOR_PICKUP,
+  states.PICKED_UP,
+  states.OVERDUE,
+];
+
+/**
+ * Should the handover QR be shown for a transaction in this state?
+ *
+ * @param {string} [state] - a cocloset-booking state name
+ * @returns {boolean}
+ */
+export const isHandoverQrVisibleState = state => HANDOVER_QR_VISIBLE_STATES.includes(state);
+
 // The laundry states need the laundry's attention, not the garment owner's,
 // and the laundry is not a party to the transaction in the Sharetribe sense.
 // So this stays as it is in default-booking: the owner only has to act while
