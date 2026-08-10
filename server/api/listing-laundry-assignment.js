@@ -1,96 +1,71 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { requireListingAuthorCaller } = require('../api-util/listingOwnerAuth');
+const {
+  assertLaundryAssignmentAllowed,
+  evaluateLaundryAssignment,
+  resolveAssignedLaundry,
+  writeLaundryAssignment,
+} = require('../api-util/laundryAssignment');
 
-// The assigned-laundry guard.
+// Assign a laundry to a listing. THE ONLY WRITE PATH for that assignment.
 //
-//   > "No se debe cambiar la laundry seleccionada por el provider para un listing
-//   >  a menos que ya se haya devuelto la prenda onLaundry = false"
+//   > "se puede editar la laundry mientras que no este en una transaction activa
+//   >  y que onLaundry sea false"
 //
 // POST /api/listing-laundry-assignment
 // Request body: { listingId, assignedLaundryId }
 //
 // ---------------------------------------------------------------------------
-// READ THIS BEFORE TRUSTING THIS ENDPOINT: IT IS A DECISION, NOT A WRITE GATE
+// THIS ENDPOINT USED TO BE A DECISION, NOT A WRITE GATE. THAT WAS THE BUG.
 // ---------------------------------------------------------------------------
-// `publicData.assignedLaundryId` is written by the wizard from the BROWSER:
-// EditListingLaundryPanel -> EditListingPage.duck.js -> `sdk.ownListings.update()`
-// -> the Marketplace API. Our Express server is not in that path, and Sharetribe
-// exposes no write-time validation hook, so there is no position from which this
-// process can refuse that request.
+// Until this change the wizard wrote `publicData.assignedLaundryId` from the
+// BROWSER (EditListingLaundryPanel -> EditListingPage.duck.js ->
+// `sdk.ownListings.update()` -> the Marketplace API) and merely ASKED this
+// endpoint for permission first. `publicData` is owner-writable by design, so an
+// owner who simply did not make the call - or who used their own access token
+// directly - was unaffected by any rule this process cared to state. The previous
+// header said exactly that, and named relocating the field to `metadata` as the
+// airtight fix. That is what has now been done, with the client's approval:
 //
-// Moving the write into server/api/ would NOT change that, which is why this
-// endpoint deliberately does not do it. `publicData` is owner-writable BY DESIGN:
-// an owner holding their own access token can PUT
-// `publicData.assignedLaundryId` straight at the Marketplace API, and neither our
-// server nor Sharetribe will stop them. A server-side write path would add a
-// second writer and a Redux-sync problem while closing exactly none of the bypass.
+//   > "puedes cambiar esta propiedad a metadata como lo necesites, esto resuelve
+//   >  el punto 2"
 //
-// So what IS enforced here, precisely:
-//   * The DECISION is server-side and cannot be forged. `onLaundry` lives in
-//     `metadata`, which only the operator / Integration API can write (see
-//     api-util/listingCustody.js), and it is read HERE from the API rather than
-//     accepted from the request. A client cannot claim a garment is home.
-//   * The caller must be the listing's own author (api-util/listingOwnerAuth.js).
-//   * A stale wizard page loses. The picker is locked client-side from the same
-//     `metadata.onLaundry`, but a page loaded while the garment was home and
-//     submitted after it came back gets a 409 from this call.
+// `metadata` is Integration-API-only. Verified against the real Dev marketplace:
+// an owner's own `ownListings.update({ id, metadata: {...} })` is refused by the
+// Marketplace API with 400 `validation-disallowed-key`. So there is no longer a
+// second writer to race, and the rule below IS the rule - not a suggestion the
+// browser may decline to follow. See api-util/laundryAssignment.js for the full
+// argument, including what remains owner-writable (the derived fields) and why.
 //
-// What is NOT enforced: a caller who simply does not make this call. The two ways
-// to actually close that, neither of which is this change's scope:
-//   (a) Relocate `assignedLaundryId` from `publicData` to `metadata`. Airtight -
-//       the Marketplace API would refuse an owner's write outright. Costs a data
-//       migration plus edits to EditListingLaundryPanel, the `pub_assignedLaundryId`
-//       queries in server/api/laundry-orders.js and server/api-util/laundryDirectory.js,
-//       and the planned `flex-cli search` schema for that key.
-//   (b) A detect-and-revert worker on the Integration API event stream - the same
-//       missing worker server/api/create-availability-buffer.js already documents
-//       as its residual gap.
+// What is enforced here, all of it server-side and none of it forgeable:
+//   * The caller is the listing's own author (api-util/listingOwnerAuth.js,
+//     checked against `relationships.author`, which nobody can write).
+//   * The listing has NO active transaction AND `metadata.onLaundry !== true`.
+//     Both, per the client's sentence. Both are read from the API - the stored
+//     listing entity and `transactions.query` - never from the request body.
+//   * The target is genuinely a user flagged `metadata.isLaundry`, with a usable
+//     address and origin. An owner cannot appoint themselves their own laundry.
+//   * The three derived fields (`publicData.assignedLaundryName`,
+//     `publicData.pickupAddress`, top-level `geolocation`) are resolved from that
+//     laundry's own profile and written in the SAME call as the id, so a caller
+//     cannot submit an id and a pickup address that disagree.
+//
+// A no-op re-save (the same laundry again) skips both conditions on purpose - see
+// evaluateLaundryAssignment's docblock for why gating it would dead-end the
+// wizard tab rather than protect anything.
 //
 // Success response (200): { data: { allowed: true, changed, onLaundry,
-//   currentAssignedLaundryId } }
+//   currentAssignedLaundryId, assignedLaundryId, assignedLaundryName,
+//   pickupAddress, geolocation } }
 // Failure responses:
 //   400 - missing listingId / assignedLaundryId
 //   401 - no usable session
 //   403 - caller is not the listing's owner
-//   409 - the garment is at the laundry (`onLaundry === true`) and this is a change
+//   409 - the garment is at the laundry, or the listing has an active transaction
+//         (or we could not prove it hasn't - findActiveTransactions fails closed)
+//   422 - the chosen laundry does not exist, is not a laundry, or has no usable profile
 //   otherwise: standard handleError() shape (see api-util/sdk.js).
-
-const conflictError = message => {
-  const error = new Error(message);
-  error.status = 409;
-  error.statusText = message;
-  error.data = {};
-  return error;
-};
-
-/**
- * The rule itself, pure and separately testable.
- *
- * Re-saving the SAME laundry is allowed while the garment is at the laundry. The
- * wizard's LAUNDRY tab is re-submitted whenever an owner walks back through it,
- * and refusing a no-op change would make the tab impossible to pass rather than
- * making the assignment immutable.
- *
- * A missing `onLaundry` (every listing predating this field) reads as false. That
- * is the right default and not merely a lenient one: the field is only ever set
- * true by an event that physically happened, so absence genuinely means "no
- * laundry has ever reported holding this garment".
- *
- * @param {Object} params
- * @param {string} [params.currentAssignedLaundryId]
- * @param {string} params.nextAssignedLaundryId
- * @param {*} [params.onLaundry] - `listing.metadata.onLaundry`, as stored
- * @returns {{allowed: boolean, changed: boolean}}
- */
-const evaluateLaundryAssignment = ({
-  currentAssignedLaundryId,
-  nextAssignedLaundryId,
-  onLaundry,
-}) => {
-  const changed = (currentAssignedLaundryId || null) !== (nextAssignedLaundryId || null);
-  return { allowed: !changed || onLaundry !== true, changed };
-};
 
 module.exports = (req, res) => {
   const { listingId, assignedLaundryId } = req.body || {};
@@ -117,38 +92,28 @@ module.exports = (req, res) => {
     .then(listingResponse => {
       const listing = listingResponse.data.data;
 
-      return requireListingAuthorCaller(req, res, listing).then(() => {
-        const currentAssignedLaundryId = listing.attributes?.publicData?.assignedLaundryId;
-        const onLaundry = listing.attributes?.metadata?.onLaundry;
-
-        const { allowed, changed } = evaluateLaundryAssignment({
-          currentAssignedLaundryId,
-          nextAssignedLaundryId: assignedLaundryId,
-          onLaundry,
-        });
-
-        if (!allowed) {
-          throw conflictError(
-            'The garment is currently at the laundry. The assigned laundry cannot be changed ' +
-              'until it has been returned to its owner (onLaundry = false).'
-          );
-        }
-
-        return { changed, onLaundry: onLaundry === true, currentAssignedLaundryId };
-      });
+      // Authorization first, so a caller who is not the owner cannot use this
+      // endpoint as an oracle for which users happen to be flagged as laundries.
+      return requireListingAuthorCaller(req, res, listing)
+        .then(() =>
+          assertLaundryAssignmentAllowed({
+            integrationSdk,
+            listing,
+            listingId,
+            nextAssignedLaundryId: assignedLaundryId,
+          })
+        )
+        .then(decision =>
+          resolveAssignedLaundry({ integrationSdk, assignedLaundryId })
+            .then(laundry => writeLaundryAssignment({ integrationSdk, listingId, laundry }))
+            .then(written => ({ ...decision, ...written }))
+        );
     })
-    .then(({ changed, onLaundry, currentAssignedLaundryId }) => {
+    .then(result => {
       res
         .status(200)
         .set('Content-Type', 'application/json')
-        .send({
-          data: {
-            allowed: true,
-            changed,
-            onLaundry,
-            currentAssignedLaundryId: currentAssignedLaundryId || null,
-          },
-        })
+        .send({ data: { allowed: true, ...result } })
         .end();
     })
     .catch(e => {
@@ -156,4 +121,6 @@ module.exports = (req, res) => {
     });
 };
 
+// Re-exported so the rule stays reachable from this module's own test file, where
+// its counter-examples and their history are documented.
 module.exports.evaluateLaundryAssignment = evaluateLaundryAssignment;

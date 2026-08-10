@@ -1,6 +1,7 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
+const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
 const {
   TRANSITIONS,
   STATES,
@@ -351,7 +352,7 @@ module.exports = (req, res) => {
         );
       }
 
-      const assignedLaundryId = listing.attributes?.publicData?.assignedLaundryId;
+      const assignedLaundryId = readAssignedLaundryId(listing);
 
       return authorizeLaundryCaller(req, res, assignedLaundryId).then(currentUser => {
         // The caller IS the assigned laundry (just verified), so their own

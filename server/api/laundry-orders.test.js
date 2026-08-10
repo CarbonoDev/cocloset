@@ -48,9 +48,9 @@ const listing = (id, overrides = {}) => ({
   attributes: {
     title: `Listing ${id}`,
     state: 'published',
-    publicData: { assignedLaundryId: LAUNDRY_ID, brand: 'Galvan', size: 'FR 38' },
+    publicData: { brand: 'Galvan', size: 'FR 38' },
     privateData: { currentRack: 'Rack A-04' },
-    metadata: { readinessStatus: 'stored' },
+    metadata: { assignedLaundryId: LAUNDRY_ID, readinessStatus: 'stored' },
     ...overrides.attributes,
   },
   relationships: {
@@ -154,7 +154,7 @@ describe('laundry-orders', () => {
   it('only includes listings assigned to the calling laundry', async () => {
     const mine = listing('listing-mine');
     const theirs = listing('listing-theirs', {
-      attributes: { publicData: { assignedLaundryId: OTHER_LAUNDRY_ID } },
+      attributes: { metadata: { assignedLaundryId: OTHER_LAUNDRY_ID } },
     });
     setupSdk({
       listingPages: [page([mine, theirs], listingIncluded)],
@@ -299,7 +299,7 @@ describe('laundry-orders', () => {
     expect(res.body.data.meta.truncated).toBe(false);
   });
 
-  it('passes pub_assignedLaundryId so the query filters server-side once a search schema exists', async () => {
+  it('passes meta_assignedLaundryId so the query filters server-side once a search schema exists', async () => {
     const { listingsQuery } = setupSdk({
       listingPages: [page([listing('l-1')], listingIncluded)],
       transactionsByListing: {},
@@ -309,13 +309,16 @@ describe('laundry-orders', () => {
     await laundryOrders({}, res);
     await new Promise(setImmediate);
 
-    expect(listingsQuery.mock.calls[0][0]).toMatchObject({ pub_assignedLaundryId: LAUNDRY_ID });
+    // `meta_`, not `pub_` - the field moved scope, and so must the param. The
+    // already-pushed schema on `pub_assignedLaundryId` is dead; see the runbook.
+    expect(listingsQuery.mock.calls[0][0]).toMatchObject({ meta_assignedLaundryId: LAUNDRY_ID });
+    expect(listingsQuery.mock.calls[0][0].pub_assignedLaundryId).toBeUndefined();
   });
 
   it('narrows the transaction query with the native lastTransitions filter', async () => {
-    // Unlike pub_*, this one really filters today (verified against the real
-    // Dev API). It is what keeps inquiry-stage transactions off the studio
-    // worklist.
+    // Unlike the extended-data filters, this one really filters today (verified
+    // against the real Dev API). It is what keeps inquiry-stage transactions off
+    // the studio worklist.
     const { transactionsQuery } = setupSdk({
       listingPages: [page([listing('l-1')], listingIncluded)],
       transactionsByListing: {},

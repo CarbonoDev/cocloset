@@ -1,5 +1,6 @@
 const { getSdk } = require('./sdk');
 const { isLaundryUser, assertIsAssignedLaundry } = require('./laundryAuth');
+const { readAssignedLaundryId } = require('./laundryAssignment');
 
 // Authorization for the endpoints a garment's OWNER may call, and for the one
 // question that has two right answers: garment custody.
@@ -20,11 +21,15 @@ const { isLaundryUser, assertIsAssignedLaundry } = require('./laundryAuth');
 // it. So laundryAuth.js is imported here UNCHANGED and the owner check is a new,
 // independent predicate.
 //
-// WHY THE OWNER CHECK IS `relationships.author`, NOT `publicData`
+// WHY THE OWNER CHECK IS `relationships.author`, NOT EXTENDED DATA
 // A listing's author is a first-class API relationship, set by Sharetribe at
-// creation and not writable by anyone. Anything in extended data - including
-// `publicData.assignedLaundryId`, which the owner CAN write - would be checking
-// authorization against a value the caller controls.
+// creation and not writable by anyone at all - not even the operator. Extended
+// data is a weaker guarantee even at its strongest: `metadata.assignedLaundryId`
+// is now Integration-API-only (see api-util/laundryAssignment.js), which is what
+// makes it safe to authorize a LAUNDRY against, but it is still a value this
+// application writes, so it can be wrong for ordinary bug reasons.
+// `relationships.author` cannot. When the question is "is this the owner", ask
+// the relationship.
 
 const forbiddenError = message => {
   const error = new Error(message);
@@ -111,7 +116,7 @@ const authorizeLaundryOrOwnerCaller = (req, res, listing) =>
     }
 
     if (isLaundryUser(currentUser)) {
-      assertIsAssignedLaundry(currentUser, listing?.attributes?.publicData?.assignedLaundryId);
+      assertIsAssignedLaundry(currentUser, readAssignedLaundryId(listing));
       return { currentUser, role: 'laundry' };
     }
 

@@ -72,7 +72,7 @@ const listing = {
   type: 'listing',
   attributes: {
     title: 'Draped jersey gown, crimson',
-    publicData: { assignedLaundryId: LAUNDRY_ID },
+    metadata: { assignedLaundryId: LAUNDRY_ID },
     privateData: { currentRack: 'Rack A-04' },
   },
 };

@@ -70,8 +70,19 @@ const requireLaundryCaller = (req, res) => {
 
 // Confirm that `currentUser` (a laundry user, already checked via
 // requireLaundryCaller) is the specific laundry assigned to a resource
-// (a listing's `publicData.assignedLaundryId`, whether read directly off a
-// listing or off a transaction's included listing).
+// (a listing's `metadata.assignedLaundryId`, whether read directly off a listing
+// or off a transaction's included listing - always through
+// api-util/laundryAssignment.js's readAssignedLaundryId, never spelled out inline).
+//
+// THIS IS THE AUTHORIZATION ANCHOR OF THE WHOLE LAUNDRY FLOW, and it only became
+// worth anything when that field moved out of `publicData`. While it lived there
+// the owner could rewrite it straight against the Marketplace API, which meant an
+// owner could hand any user - including themselves - authority over an in-flight
+// custody chain and the payout on `laundry-mark-pending-cleaning`. `metadata` is
+// Integration-API-only (verified against Dev: an owner's write is refused with
+// 400 `validation-disallowed-key`), so the value compared here can now only have
+// been set by this server, after the checks in
+// server/api/listing-laundry-assignment.js.
 //
 // Throws a 403-shaped error if there's no assigned laundry at all, or if it
 // doesn't match the caller.

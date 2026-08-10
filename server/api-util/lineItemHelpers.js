@@ -7,6 +7,7 @@ const { getAmountAsDecimalJS, convertDecimalJSToNumber, unitDivisor } = require(
 const { nightsBetween, daysBetween } = require('./dates');
 const { getIntegrationSdk } = require('./integrationSdk');
 const { isLaundryUserEntity } = require('./laundryDirectory');
+const { readAssignedLaundryId } = require('./laundryAssignment');
 const { getListingCategoryValues, resolveCategoryCleaningFee } = require('./categoryPricing');
 const log = require('../log');
 const LINE_ITEM_NIGHT = 'line-item/night';
@@ -504,22 +505,29 @@ const cleaningFeeToSubunits = (amountMajorUnits, currency) => {
  * The category chain is read from the same stored listing entity in all three, so the
  * resolved fee cannot differ between the quote and the charge.
  *
- * SECURITY: `assignedLaundryId` lives in the *listing's* publicData, which the
- * provider fully controls (through the wizard, or directly via
- * ownListings.update). So the user it points at is NOT trustworthy: a provider
- * could point it at their own account and set their own `privateData.cleaningFee`
- * - to 0 to remove the fee, or to something enormous to inflate every customer's
- * payin total without it ever showing up in the listing price. The fee is
- * therefore only honoured when the referenced user is genuinely flagged
- * `metadata.isLaundry === true` (operator/Integration-API-writable only); anyone
- * else falls back to the env default.
+ * SECURITY: `assignedLaundryId` now lives in the listing's `metadata`, which only
+ * the Integration API can write, so a provider can no longer point it at their own
+ * account directly (see api-util/laundryAssignment.js). The isLaundry check below
+ * STAYS ANYWAY, and removing it because "the field is protected now" would be a
+ * mistake:
+ *   - This value sets a customer's payin total. Two independent checks on money is
+ *     the right number, and this one costs one lookup that is made regardless.
+ *   - The new write path can only refuse a non-laundry going FORWARD. Listings
+ *     migrated off the old `publicData` key carry whatever was written under the
+ *     old, unguarded regime - scripts/migrate-assigned-laundry-to-metadata.js
+ *     relocates the value verbatim, it does not audit it.
+ *   - A laundry can be DE-FLAGGED after being assigned, at which point a
+ *     historically valid id points at a user who must no longer be trusted with a
+ *     price.
+ * So the fee is still only honoured when the referenced user is genuinely flagged
+ * `metadata.isLaundry === true`; anyone else falls back to the env default.
  *
  * @param {Object} listing
  * @param {string} currency
  * @returns {Promise<number>} cleaning fee amount in the currency's subunits
  */
 exports.resolveCleaningFeeInSubunits = (listing, currency) => {
-  const assignedLaundryId = listing?.attributes?.publicData?.assignedLaundryId;
+  const assignedLaundryId = readAssignedLaundryId(listing);
   const fallbackFeeMajorUnits = getDefaultCleaningFeeMajorUnits();
 
   if (!assignedLaundryId) {

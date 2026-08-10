@@ -1,6 +1,7 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { requireLaundryCaller } = require('../api-util/laundryAuth');
+const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
 const {
   TRANSITIONS,
   OPS_LAST_TRANSITIONS,
@@ -30,20 +31,30 @@ const {
 // ---------------------------------------------------------------------------
 // Why the filtering happens in Node instead of in the query
 // ---------------------------------------------------------------------------
-// `pub_assignedLaundryId` is passed to `listings.query` below, but it is
+// `meta_assignedLaundryId` is passed to `listings.query` below, but it is
 // currently a NO-OP on this marketplace: extended-data query filters only take
 // effect once a search schema has been pushed for that key
-// (`flex-cli search set --listing ...`). Verified against the real Dev
-// Integration API: querying `pub_assignedLaundryId` with a deliberately bogus
-// value returned every listing in the marketplace, and unknown query params
-// are silently ignored rather than rejected. (The same is true of
-// `meta_isLaundry` in server/api/laundries.js.)
+// (`flex-cli search set --scope metadata --schema-for listing ...`). Verified
+// against the real Dev Integration API: querying the equivalent
+// `pub_assignedLaundryId` with a deliberately bogus value returned every listing
+// in the marketplace, and unknown query params are silently ignored rather than
+// rejected. (The same is true of `meta_isLaundry` in server/api/laundries.js.)
 //
-// So the filter is applied in JS after fetching, and the query param is kept
-// so this endpoint gets server-side filtering for free the day a search schema
-// is pushed - the JS filter then just becomes a redundant safety net rather
-// than the load-bearing part. Pushing that schema is a `flex-cli` operation
-// and needs explicit approval, so it is deliberately NOT done here.
+// THE PREFIX CHANGED WITH THE FIELD, AND THE FAIL-OPEN DID NOT. The assigned
+// laundry moved from `publicData` to `metadata` (see
+// api-util/laundryAssignment.js), so the param is now `meta_` and the schema
+// pushed for `pub_assignedLaundryId` is dead - it has to be unset and re-set on
+// the `metadata` scope (docs runbook "Search Schemas (flex-cli)"). Between those
+// two moments the query filters NOTHING, silently, and a marketplace-wide listing
+// dump reaching a single laundry's dashboard is exactly the bug class that has
+// already shipped here twice.
+//
+// So the filter is applied in JS after fetching, and stays applied whatever the
+// query param does. The param is kept only so this endpoint gets server-side
+// filtering (i.e. pagination that scales) for free the day the schema exists -
+// the JS filter is the load-bearing one, permanently, and must never be
+// "optimised" away. Pushing schemas is a `flex-cli` operation and needs explicit
+// approval, so it is deliberately NOT done here.
 //
 // ---------------------------------------------------------------------------
 // Why transactions are queried per listing
@@ -59,11 +70,11 @@ const {
 // with total marketplace volume, which is the right axis.
 //
 // ---------------------------------------------------------------------------
-// `lastTransitions` IS a real filter (unlike `pub_*`)
+// `lastTransitions` IS a real filter (unlike `pub_*` / `meta_*`)
 // ---------------------------------------------------------------------------
 // The per-listing transaction query below narrows with `lastTransitions`. That
 // is a NATIVE `transactions.query` filter, not extended data, so - unlike
-// `pub_assignedLaundryId` above - it genuinely works today with no search
+// `meta_assignedLaundryId` above - it genuinely works today with no search
 // schema. Verified against the real Dev Integration API: the parameter is
 // accepted (HTTP 200) and filters.
 //
@@ -136,8 +147,9 @@ const fetchAllListingPages = (integrationSdk, laundryId) => {
   const fetchPage = page =>
     integrationSdk.listings
       .query({
-        // No-op today (see note above), correct the day a search schema exists.
-        pub_assignedLaundryId: laundryId,
+        // No-op today (see note above), correct the day a metadata-scope search
+        // schema exists. Never the real filter - that is the JS pass below.
+        meta_assignedLaundryId: laundryId,
         page,
         perPage: LISTINGS_PER_PAGE,
         include: ['author', 'images'],
@@ -273,7 +285,7 @@ module.exports = (req, res) => {
         const assigned = [];
         pages.forEach(({ data, included }) => {
           data.forEach(listing => {
-            if (listing.attributes?.publicData?.assignedLaundryId === laundryId) {
+            if (readAssignedLaundryId(listing) === laundryId) {
               assigned.push({ listing, included });
             }
           });
