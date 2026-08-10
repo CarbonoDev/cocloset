@@ -9,7 +9,7 @@ import { FormattedMessage, useIntl } from '../../../../util/reactIntl';
 import * as validators from '../../../../util/validators';
 import { formatMoney } from '../../../../util/currency';
 import { types as sdkTypes } from '../../../../util/sdkLoader';
-import { DAY, FIXED, NIGHT, isBookingProcess } from '../../../../transactions/transaction';
+import { DAY, FIXED, isBookingProcess } from '../../../../transactions/transaction';
 
 // Import shared components
 import { Button, Form, FieldCurrencyInput } from '../../../../components';
@@ -139,8 +139,17 @@ export const EditListingPricingForm = props => (
       const isUsingPriceVariants = isFixedLengthBooking || isBookingPriceVariationsInUse;
 
       // A minimum rental length in days only makes sense when the booking is measured in
-      // days or nights. Cocloset's garment rentals use unitType 'day'.
-      const isDayBasedBooking = isBooking && [DAY, NIGHT].includes(unitType);
+      // days. Cocloset's garment rentals use unitType 'day'.
+      //
+      // NIGHT is deliberately excluded, even though the arithmetic happens to match.
+      // The minimum is enforced in two places that both key on 'day' - the booking
+      // calendar's floor (src/components/OrderPanel/BookingDatesForm) and
+      // server/api-util/bookingRules.js - and for a nightly listing the picker holds a
+      // different end date, so the day-count-to-nights conversion is not the same
+      // expression. Offering the field here without extending both of those would give
+      // an owner a control that stores a value nothing ever reads: the failure would be
+      // a rental shorter than the minimum they set, with no error anywhere.
+      const isDayBasedBooking = isBooking && unitType === DAY;
 
       return (
         <Form onSubmit={handleSubmit} className={classes}>

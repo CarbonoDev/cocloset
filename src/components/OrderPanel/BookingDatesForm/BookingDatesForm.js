@@ -139,6 +139,42 @@ const isBlockedBetween = (allTimeSlots, timeZone) => ([startDate, endDate]) => {
   return isBlockedBetween;
 };
 
+/**
+ * The listing's minimum rental length, or null when there is nothing to enforce.
+ *
+ * Applied to daily bookings only: the field is expressed in days and the two
+ * places that enforce it (the picker floor below and
+ * server/api-util/bookingRules.js) both key on the day unit. Anything unusable -
+ * absent, null (how the Marketplace API deletes an extended-data key, which is
+ * what the wizard writes when an owner clears the field), 0, or fractional -
+ * means no minimum.
+ *
+ * @param {number} [minimumBookingDays] - listing.attributes.publicData.minimumBookingDays
+ * @param {boolean} isDaily
+ * @returns {number|null}
+ */
+export const resolveMinimumDays = (minimumBookingDays, isDaily) =>
+  isDaily && Number.isInteger(minimumBookingDays) && minimumBookingDays > 1
+    ? minimumBookingDays
+    : null;
+
+/**
+ * Convert a minimum in DAYS into the picker's floor, which is counted in NIGHTS.
+ *
+ * The date picker holds an INCLUSIVE end date for daily bookings, so a 3-day
+ * rental spans 2 nights. Off by one here would block the shortest booking the
+ * owner actually allows, which presents as "the calendar is broken" rather than
+ * as a rule being applied.
+ *
+ * Exported and tested separately because it is the one piece of arithmetic in
+ * this feature that has a plausible wrong answer.
+ *
+ * @param {number|null} minimumDays
+ * @returns {number|undefined} undefined leaves the picker's own default in place
+ */
+export const minimumNightsForMinimumDays = minimumDays =>
+  minimumDays ? minimumDays - 1 : undefined;
+
 const isOneBoundaryeSelected = (hasTimeSlots, startDate, endDate) => {
   const oneBoundarySelected = (startDate || endDate) && (!startDate || !endDate);
   return hasTimeSlots && oneBoundarySelected;
@@ -716,15 +752,8 @@ export const BookingDatesForm = props => {
         // The owner's minimum rental length, applied only to day bookings: the
         // field is expressed in days, and Cocloset's garment-rental type is
         // day-based. Anything unusable (absent, 0, fractional) means no minimum.
-        const minimumDays =
-          isDaily && Number.isInteger(minimumBookingDays) && minimumBookingDays > 1
-            ? minimumBookingDays
-            : null;
-        // The picker holds an INCLUSIVE end date, so a 3-day rental spans 2
-        // nights: the floor it needs is one less than the day count. Getting
-        // this off by one would block the shortest legal booking, which looks
-        // exactly like the calendar being broken.
-        const minimumNights = minimumDays ? minimumDays - 1 : undefined;
+        const minimumDays = resolveMinimumDays(minimumBookingDays, isDaily);
+        const minimumNights = minimumNightsForMinimumDays(minimumDays);
 
         return (
           <Form onSubmit={handleSubmit} className={classes} enforcePagePreloadFor="CheckoutPage">
