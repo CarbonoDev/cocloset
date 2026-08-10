@@ -30,7 +30,7 @@ const mockRes = () => ({
   end: jest.fn().mockReturnThis(),
 });
 
-const application = { studioName: 'Spin Cycle', turnaroundHours: 24 };
+const application = { studioName: 'Spin Cycle', turnaroundDays: 2 };
 
 // The handler owns a module-level rate limiter, so each test needs a distinct IP.
 let ipCounter = 0;

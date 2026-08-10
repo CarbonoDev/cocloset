@@ -3,31 +3,27 @@ const {
   CATEGORY_PRICING_KEY,
   getListingCategoryValues,
   getCategoryPricingTable,
-  resolveCleaningFeeEntry,
-  resolveTurnaroundHoursEntry,
-  resolveCategoryCleaningFee,
-  resolveCategoryTurnaroundHours,
+  resolveTurnaroundDaysEntry,
+  resolveCategoryTurnaroundDays,
 } = require('./categoryPricing');
 
 // A studio with a studio-wide fallback plus per-category entries. Note the deliberate
-// shapes: `midi_dress` prices without hours (hours are top-level only, so an hours key
-// on a subcategory would simply never be read), and `silk` prices a third level.
+// shapes: `midi_dress` carries a days value even though days are top-level only (so it
+// must never be read), and there is an entry for a second top-level branch.
 const PRIVATE_DATA = {
-  turnaroundHours: 48,
-  cleaningFee: 10,
+  turnaroundDays: 2,
   [CATEGORY_PRICING_KEY]: {
-    dresses: { turnaroundHours: 72, cleaningFee: 15 },
-    midi_dress: { cleaningFee: 22 },
-    silk: { cleaningFee: 30 },
-    pants: { turnaroundHours: 24, cleaningFee: 6 },
+    dresses: { turnaroundDays: 3 },
+    midi_dress: { turnaroundDays: 1 },
+    pants: { turnaroundDays: 1 },
   },
 };
 
 describe('CATEGORY_LEVEL_KEYS', () => {
   // This list is duplicated from src/util/fieldHelpers.js because src is ESM and this
   // module is CommonJS run untranspiled by node. Pin it explicitly: if Console grows a
-  // fourth level and only one copy is updated, per-category pricing would silently
-  // resolve one level short of the listing's real category. Changing this test should
+  // fourth level and only one copy is updated, per-category resolution would silently
+  // work one level short of the listing's real category. Changing this test should
   // mean you changed both copies.
   it('matches the numbered category keys Console writes', () => {
     expect(CATEGORY_LEVEL_KEYS).toEqual(['categoryLevel1', 'categoryLevel2', 'categoryLevel3']);
@@ -70,10 +66,7 @@ describe('getListingCategoryValues()', () => {
 
 describe('getCategoryPricingTable()', () => {
   it('returns the stored table', () => {
-    expect(getCategoryPricingTable(PRIVATE_DATA).dresses).toEqual({
-      turnaroundHours: 72,
-      cleaningFee: 15,
-    });
+    expect(getCategoryPricingTable(PRIVATE_DATA).dresses).toEqual({ turnaroundDays: 3 });
   });
 
   it('returns an empty table for anything that is not a plain object', () => {
@@ -88,302 +81,151 @@ describe('getCategoryPricingTable()', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PRICE: HIGHEST MATCHING CATEGORY WINS.
+// NO CLEANING FEE LIVES HERE ANY MORE.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('resolveCategoryCleaningFee()', () => {
-  it('uses an exact leaf match', () => {
-    // Only one level of the chain prices this: 22 on midi_dress vs 15 on dresses, and
-    // 22 is also the higher of the two.
-    expect(resolveCategoryCleaningFee(PRIVATE_DATA, ['dresses', 'midi_dress'])).toBe(22);
+describe('cleaning fees', () => {
+  // The fee moved into the server environment (CLEANING_FEE_<CATEGORY_ID>, see
+  // cleaningFeeEnv.js). This module must not resolve one, and in particular must not
+  // grow the old readers back: a stored fee that still priced rentals after the form
+  // stopped collecting it is the exact bug that change removed. The resolution rules
+  // themselves (highest-in-the-chain wins, zero is free, negatives rejected) are now
+  // asserted in cleaningFeeEnv.test.js against env vars.
+  it('exports no fee resolver at all', () => {
+    const categoryPricing = require('./categoryPricing');
+    expect(categoryPricing.resolveCleaningFeeEntry).toBeUndefined();
+    expect(categoryPricing.resolveCategoryCleaningFee).toBeUndefined();
   });
 
-  it('uses a parent match when the leaf has no entry at all', () => {
-    // maxi_dress is not in the table; the parent `dresses` is. A price on the parent
-    // covers its whole branch, mirroring how accepting a parent accepts the branch.
-    expect(resolveCategoryCleaningFee(PRIVATE_DATA, ['dresses', 'maxi_dress'])).toBe(15);
-  });
-
-  it('takes the HIGHEST of several matching levels, not the deepest', () => {
-    // THE RULE, stated by the client as "utilizaría el precio mas alto".
-    // dresses = 15, maxi_dress = 18, silk = 30 -> 30. This example is ascending, so it
-    // passes under a most-specific-wins rule too and proves nothing on its own; the
-    // next test is the one that actually distinguishes them.
+  it('does not read a stored cleaningFee for any purpose', () => {
+    // A profile carrying only fees resolves nothing: the fee keys are inert data.
     const privateData = {
-      cleaningFee: 10,
-      [CATEGORY_PRICING_KEY]: {
-        dresses: { cleaningFee: 15 },
-        maxi_dress: { cleaningFee: 18 },
-        silk: { cleaningFee: 30 },
-      },
+      cleaningFee: 12,
+      [CATEGORY_PRICING_KEY]: { dresses: { cleaningFee: 15 } },
     };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'maxi_dress', 'silk'])).toBe(30);
-  });
-
-  it('takes the PARENT price when the deeper category is CHEAPER', () => {
-    // This is the test that separates "highest wins" from "most specific wins".
-    // The client's own example: 10 on `dresses`, 8 on `midi_dress` -> charge 10.
-    // A most-specific-wins implementation returns 8 here and fails.
-    const privateData = {
-      cleaningFee: 4,
-      [CATEGORY_PRICING_KEY]: {
-        dresses: { cleaningFee: 10 },
-        midi_dress: { cleaningFee: 8 },
-      },
-    };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'midi_dress'])).toBe(10);
-  });
-
-  it('takes the highest across three levels when the middle one is the maximum', () => {
-    // Neither the shallowest nor the deepest wins — only a real max does.
-    const privateData = {
-      [CATEGORY_PRICING_KEY]: {
-        dresses: { cleaningFee: 12 },
-        maxi_dress: { cleaningFee: 40 },
-        silk: { cleaningFee: 9 },
-      },
-    };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'maxi_dress', 'silk'])).toBe(40);
-  });
-
-  it('falls back to the studio-wide value when no level in the chain matches', () => {
-    expect(resolveCategoryCleaningFee(PRIVATE_DATA, ['coats', 'trench'])).toBe(10);
-  });
-
-  it('falls back to the studio-wide value when the listing has no category at all', () => {
-    expect(resolveCategoryCleaningFee(PRIVATE_DATA, [])).toBe(10);
-    expect(resolveCategoryCleaningFee(PRIVATE_DATA, undefined)).toBe(10);
-  });
-
-  it('does NOT let the studio-wide value compete in the max', () => {
-    // The studio-wide number is a fallback for "no category priced this", not a floor.
-    // A studio-wide 20 with a matching category entry of 8 charges 8.
-    const privateData = {
-      cleaningFee: 20,
-      [CATEGORY_PRICING_KEY]: { midi_dress: { cleaningFee: 8 } },
-    };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'midi_dress'])).toBe(8);
-  });
-
-  it('returns null (caller applies the env default) when nothing is configured anywhere', () => {
-    expect(resolveCategoryCleaningFee({}, ['dresses'])).toBeNull();
-    expect(resolveCategoryCleaningFee(undefined, ['dresses'])).toBeNull();
-    expect(
-      resolveCategoryCleaningFee({ [CATEGORY_PRICING_KEY]: { pants: {} } }, ['pants'])
-    ).toBeNull();
-  });
-
-  it('skips a category entry whose fee is BLANK and keeps considering the rest', () => {
-    // A row the studio opened in the form and never filled in must not count as a
-    // match, and must not suppress a real price set elsewhere in the chain.
-    ['', '   ', null, undefined, NaN, 'free', {}].forEach(blank => {
-      const privateData = {
-        cleaningFee: 3,
-        [CATEGORY_PRICING_KEY]: {
-          dresses: { cleaningFee: 15 },
-          midi_dress: { cleaningFee: blank },
-        },
-      };
-      expect(resolveCategoryCleaningFee(privateData, ['dresses', 'midi_dress'])).toBe(15);
-    });
-  });
-
-  it('falls through to the studio-wide value when the ONLY matching entry is blank', () => {
-    const privateData = {
-      cleaningFee: 7,
-      [CATEGORY_PRICING_KEY]: { midi_dress: { cleaningFee: null } },
-    };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'midi_dress'])).toBe(7);
-  });
-
-  it('treats an explicit ZERO as a configured price — free, not blank', () => {
-    // Zero has meant "this studio does not charge" for the studio-wide fee since it
-    // existed, so it stays expressible per category. Note the interaction with the max
-    // rule: a 0 only actually wins when no OTHER matching level prices the garment
-    // higher (see the next test).
-    const privateData = {
-      cleaningFee: 10,
-      [CATEGORY_PRICING_KEY]: { midi_dress: { cleaningFee: 0 } },
-    };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'midi_dress'])).toBe(0);
-  });
-
-  it('lets a priced parent beat a zeroed child, because highest wins', () => {
-    // Documented consequence of the max rule, not an accident: "free for midi dresses"
-    // cannot override a paid parent. Clear the parent's price to make it free.
-    const privateData = {
-      [CATEGORY_PRICING_KEY]: {
-        dresses: { cleaningFee: 15 },
-        midi_dress: { cleaningFee: 0 },
-      },
-    };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'midi_dress'])).toBe(15);
-  });
-
-  it('rejects a NEGATIVE fee as a data error, not a discount', () => {
-    const privateData = {
-      cleaningFee: 10,
-      [CATEGORY_PRICING_KEY]: { midi_dress: { cleaningFee: -5 } },
-    };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'midi_dress'])).toBe(10);
-  });
-
-  it('ignores a numeric STRING rather than guessing at real money', () => {
-    // parseFloat('12,50') === 12 — charging 12.00 instead of 12.50 with no error
-    // anywhere is worse than falling back to a value someone can see and reason about.
-    // The form writes numbers; anything else is treated as unconfigured.
-    const privateData = {
-      cleaningFee: 10,
-      [CATEGORY_PRICING_KEY]: { midi_dress: { cleaningFee: '22.50' } },
-    };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'midi_dress'])).toBe(10);
-  });
-
-  it('tolerates a malformed entry without throwing', () => {
-    const privateData = {
-      cleaningFee: 10,
-      [CATEGORY_PRICING_KEY]: { midi_dress: 'not-an-object', dresses: ['also-wrong'] },
-    };
-    expect(resolveCategoryCleaningFee(privateData, ['dresses', 'midi_dress'])).toBe(10);
-  });
-
-  it('ignores non-string ids in the chain', () => {
-    expect(resolveCategoryCleaningFee(PRIVATE_DATA, [null, '', 'midi_dress'])).toBe(22);
+    expect(resolveCategoryTurnaroundDays(privateData, ['dresses'])).toBeNull();
+    expect(resolveTurnaroundDaysEntry(privateData, ['dresses'])).toBeNull();
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOURS: TOP-LEVEL CATEGORY ONLY.
+// TURNAROUND (DAYS): TOP-LEVEL CATEGORY ONLY.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('resolveCategoryTurnaroundHours()', () => {
+describe('resolveCategoryTurnaroundDays()', () => {
   it('uses the top-level category of the chain', () => {
-    expect(resolveCategoryTurnaroundHours(PRIVATE_DATA, ['dresses', 'midi_dress'])).toBe(72);
-    expect(resolveCategoryTurnaroundHours(PRIVATE_DATA, ['pants'])).toBe(24);
+    expect(resolveCategoryTurnaroundDays(PRIVATE_DATA, ['dresses', 'midi_dress'])).toBe(3);
+    expect(resolveCategoryTurnaroundDays(PRIVATE_DATA, ['pants'])).toBe(1);
   });
 
   it('reads the top level even on a three-level chain', () => {
-    expect(resolveCategoryTurnaroundHours(PRIVATE_DATA, ['dresses', 'maxi_dress', 'silk'])).toBe(
-      72
-    );
+    expect(resolveCategoryTurnaroundDays(PRIVATE_DATA, ['dresses', 'maxi_dress', 'silk'])).toBe(3);
   });
 
-  it('NEVER reads an hours value stored on a subcategory', () => {
-    // Hours are "por categoría grande". A subcategory entry carrying turnaroundHours —
+  it('NEVER reads a turnaround stored on a subcategory', () => {
+    // Turnaround is "por categoría grande". A subcategory entry carrying turnaroundDays —
     // hand-written, or left behind by an earlier shape — is inert, and the top-level
     // value stands. Silently honouring it would make the availability buffer disagree
-    // with what the form lets a studio configure.
+    // with what the form lets a studio configure. PRIVATE_DATA stores 1 day on
+    // midi_dress precisely so this cannot pass by accident.
+    expect(resolveCategoryTurnaroundDays(PRIVATE_DATA, ['dresses', 'midi_dress'])).toBe(3);
+  });
+
+  it('reads turnaroundDays, never a legacy turnaroundHours key', () => {
+    // Old profiles may still carry hours. Reading them as days would turn a 48-hour
+    // turnaround into a 48-DAY calendar block — the unit bug this rename exists to make
+    // impossible. Hours keys are simply not a configured value.
     const privateData = {
       turnaroundHours: 48,
-      [CATEGORY_PRICING_KEY]: {
-        dresses: { turnaroundHours: 72 },
-        midi_dress: { turnaroundHours: 6 },
-      },
+      [CATEGORY_PRICING_KEY]: { dresses: { turnaroundHours: 72 } },
     };
-    expect(resolveCategoryTurnaroundHours(privateData, ['dresses', 'midi_dress'])).toBe(72);
+    expect(resolveCategoryTurnaroundDays(privateData, ['dresses'])).toBeNull();
   });
 
   it('falls back to the studio-wide value when the top-level category has no entry', () => {
-    expect(resolveCategoryTurnaroundHours(PRIVATE_DATA, ['coats', 'trench'])).toBe(48);
+    expect(resolveCategoryTurnaroundDays(PRIVATE_DATA, ['coats', 'trench'])).toBe(2);
   });
 
-  it('falls back to the studio-wide value when a subcategory is priced but the parent is not', () => {
-    // `midi_dress` sets a fee only. Hours come from the studio, because `dresses` has
-    // no entry — a fee entry on a child says nothing about scheduling.
+  it('falls back to the studio-wide value when only a subcategory has an entry', () => {
     const privateData = {
-      turnaroundHours: 48,
-      [CATEGORY_PRICING_KEY]: { midi_dress: { cleaningFee: 22 } },
+      turnaroundDays: 2,
+      [CATEGORY_PRICING_KEY]: { midi_dress: { turnaroundDays: 5 } },
     };
-    expect(resolveCategoryTurnaroundHours(privateData, ['dresses', 'midi_dress'])).toBe(48);
+    expect(resolveCategoryTurnaroundDays(privateData, ['dresses', 'midi_dress'])).toBe(2);
   });
 
   it('falls back to the studio-wide value when the listing has no category', () => {
-    expect(resolveCategoryTurnaroundHours(PRIVATE_DATA, [])).toBe(48);
-    expect(resolveCategoryTurnaroundHours(PRIVATE_DATA, undefined)).toBe(48);
+    expect(resolveCategoryTurnaroundDays(PRIVATE_DATA, [])).toBe(2);
+    expect(resolveCategoryTurnaroundDays(PRIVATE_DATA, undefined)).toBe(2);
   });
 
   it('returns null when nothing is configured at either level', () => {
-    expect(resolveCategoryTurnaroundHours({}, ['dresses'])).toBeNull();
-    expect(resolveCategoryTurnaroundHours(undefined, undefined)).toBeNull();
+    expect(resolveCategoryTurnaroundDays({}, ['dresses'])).toBeNull();
+    expect(resolveCategoryTurnaroundDays(undefined, undefined)).toBeNull();
   });
 
   it('skips a BLANK top-level turnaround and falls back to the studio-wide value', () => {
     const privateData = {
-      turnaroundHours: 48,
-      [CATEGORY_PRICING_KEY]: { dresses: { turnaroundHours: null, cleaningFee: 15 } },
+      turnaroundDays: 2,
+      [CATEGORY_PRICING_KEY]: { dresses: { turnaroundDays: null } },
     };
-    expect(resolveCategoryTurnaroundHours(privateData, ['dresses'])).toBe(48);
+    expect(resolveCategoryTurnaroundDays(privateData, ['dresses'])).toBe(2);
   });
 
-  it('treats ZERO hours as unconfigured — unlike a zero fee', () => {
-    // The asymmetry is intentional and load-bearing. A 0 fee is a business statement
-    // ("free"); a 0-hour turnaround is an empty box that happened to parse, and
-    // computeBufferDays throws on anything <= 0. availabilityHelpers'
-    // resolveTurnaroundHours already rejects 0 at the studio level; this matches it.
+  it('treats ZERO days as unconfigured', () => {
+    // A 0-day turnaround is an empty box that happened to parse, not a business
+    // statement: computeBufferDays throws on anything <= 0, and availabilityHelpers'
+    // resolveTurnaroundDays already rejects 0 at the studio level; this matches it.
     const privateData = {
-      turnaroundHours: 48,
-      [CATEGORY_PRICING_KEY]: { dresses: { turnaroundHours: 0 } },
+      turnaroundDays: 2,
+      [CATEGORY_PRICING_KEY]: { dresses: { turnaroundDays: 0 } },
     };
-    expect(resolveCategoryTurnaroundHours(privateData, ['dresses'])).toBe(48);
-    expect(resolveCategoryTurnaroundHours({ turnaroundHours: 0 }, [])).toBeNull();
+    expect(resolveCategoryTurnaroundDays(privateData, ['dresses'])).toBe(2);
+    expect(resolveCategoryTurnaroundDays({ turnaroundDays: 0 }, [])).toBeNull();
   });
 
-  it('rejects negative hours', () => {
+  it('rejects negative days', () => {
     const privateData = {
-      turnaroundHours: 48,
-      [CATEGORY_PRICING_KEY]: { dresses: { turnaroundHours: -12 } },
+      turnaroundDays: 2,
+      [CATEGORY_PRICING_KEY]: { dresses: { turnaroundDays: -3 } },
     };
-    expect(resolveCategoryTurnaroundHours(privateData, ['dresses'])).toBe(48);
+    expect(resolveCategoryTurnaroundDays(privateData, ['dresses'])).toBe(2);
+  });
+
+  it('ignores a numeric STRING rather than guessing', () => {
+    // The form writes numbers; anything else is treated as unconfigured. (The picker
+    // cards apply a deliberately more lenient read — see laundryDirectory.js.)
+    const privateData = {
+      turnaroundDays: 2,
+      [CATEGORY_PRICING_KEY]: { dresses: { turnaroundDays: '5' } },
+    };
+    expect(resolveCategoryTurnaroundDays(privateData, ['dresses'])).toBe(2);
+  });
+
+  it('tolerates a malformed entry without throwing', () => {
+    const privateData = {
+      turnaroundDays: 2,
+      [CATEGORY_PRICING_KEY]: { dresses: 'not-an-object', pants: ['also-wrong'] },
+    };
+    expect(resolveCategoryTurnaroundDays(privateData, ['dresses'])).toBe(2);
+    expect(resolveCategoryTurnaroundDays(privateData, ['pants'])).toBe(2);
+  });
+
+  it('ignores non-string ids in the chain', () => {
+    expect(resolveCategoryTurnaroundDays(PRIVATE_DATA, [null])).toBe(2);
   });
 });
 
-describe('the entry-returning variants', () => {
-  it('report WHERE the fee came from, so callers can label it', () => {
-    expect(resolveCleaningFeeEntry(PRIVATE_DATA, ['dresses', 'midi_dress'])).toEqual({
-      value: 22,
-      source: 'category',
-      categoryId: 'midi_dress',
-    });
-    expect(resolveCleaningFeeEntry(PRIVATE_DATA, ['coats'])).toEqual({
-      value: 10,
-      source: 'studio',
-      categoryId: null,
-    });
-    expect(resolveCleaningFeeEntry({}, ['coats'])).toBeNull();
-  });
-
-  it('name the category that supplied the WINNING (highest) fee, not the deepest', () => {
-    const privateData = {
-      [CATEGORY_PRICING_KEY]: {
-        dresses: { cleaningFee: 10 },
-        midi_dress: { cleaningFee: 8 },
-      },
-    };
-    expect(resolveCleaningFeeEntry(privateData, ['dresses', 'midi_dress'])).toEqual({
-      value: 10,
+describe('resolveTurnaroundDaysEntry()', () => {
+  it('reports WHERE the turnaround came from, so callers can label it', () => {
+    expect(resolveTurnaroundDaysEntry(PRIVATE_DATA, ['dresses', 'midi_dress'])).toEqual({
+      value: 3,
       source: 'category',
       categoryId: 'dresses',
     });
-  });
-
-  it('report WHERE the turnaround came from', () => {
-    expect(resolveTurnaroundHoursEntry(PRIVATE_DATA, ['dresses', 'midi_dress'])).toEqual({
-      value: 72,
-      source: 'category',
-      categoryId: 'dresses',
-    });
-    expect(resolveTurnaroundHoursEntry(PRIVATE_DATA, ['coats'])).toEqual({
-      value: 48,
+    expect(resolveTurnaroundDaysEntry(PRIVATE_DATA, ['coats'])).toEqual({
+      value: 2,
       source: 'studio',
       categoryId: null,
     });
-    expect(resolveTurnaroundHoursEntry({}, ['coats'])).toBeNull();
-  });
-
-  it('resolve the two fields INDEPENDENTLY for the same listing', () => {
-    // The same request takes its fee from the subcategory and its hours from the top
-    // level. Resolving them together (one "winning entry" for both) would be wrong.
-    const fee = resolveCleaningFeeEntry(PRIVATE_DATA, ['dresses', 'midi_dress']);
-    const hours = resolveTurnaroundHoursEntry(PRIVATE_DATA, ['dresses', 'midi_dress']);
-    expect(fee.categoryId).toBe('midi_dress');
-    expect(hours.categoryId).toBe('dresses');
+    expect(resolveTurnaroundDaysEntry({}, ['coats'])).toBeNull();
   });
 });

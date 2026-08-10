@@ -34,7 +34,7 @@ export const MAX_LENGTHS = {
   notes: 2000,
 };
 
-export const MAX_TURNAROUND_HOURS = 720;
+export const MAX_TURNAROUND_DAYS = 30;
 
 /**
  * Name of the honeypot input. It is rendered off-screen, hidden from assistive
@@ -52,9 +52,12 @@ export const HONEYPOT_FIELD = 'website';
  * operational partners of the marketplace.
  *
  * Field names deliberately match `LaundryProfileForm` where they overlap
- * (`studioName`, `businessHours`, `turnaroundHours`, `acceptedCategories`, including
+ * (`studioName`, `businessHours`, `turnaroundDays`, `acceptedCategories`, including
  * the comma-separated-string convention for categories) so an approved application
- * maps onto a real laundry profile without renaming anything.
+ * maps onto a real laundry profile without renaming anything. Turnaround is stated in
+ * DAYS for the same reason: that is the unit the profile field it becomes
+ * (`privateData.turnaroundDays`) is in, and an application quoting hours would need an
+ * operator to convert it by hand.
  *
  * `address` is the one exception: the real profile stores a geocoded `location` place
  * object via FieldLocationAutocompleteInput, which needs a configured map provider.
@@ -251,24 +254,22 @@ const PartnerApplicationForm = props => (
             type="number"
             step="1"
             min="1"
-            max={String(MAX_TURNAROUND_HOURS)}
-            id={`${formId}.turnaroundHours`}
-            name="turnaroundHours"
-            label={intl.formatMessage({ id: 'PartnerApplicationForm.turnaroundHoursLabel' })}
+            max={String(MAX_TURNAROUND_DAYS)}
+            id={`${formId}.turnaroundDays`}
+            name="turnaroundDays"
+            label={intl.formatMessage({ id: 'PartnerApplicationForm.turnaroundDaysLabel' })}
             placeholder={intl.formatMessage({
-              id: 'PartnerApplicationForm.turnaroundHoursPlaceholder',
+              id: 'PartnerApplicationForm.turnaroundDaysPlaceholder',
             })}
-            helpText={intl.formatMessage({ id: 'PartnerApplicationForm.turnaroundHoursHelp' })}
+            helpText={intl.formatMessage({ id: 'PartnerApplicationForm.turnaroundDaysHelp' })}
             parse={value => {
               const parsed = Number.parseInt(value, 10);
               return Number.isNaN(parsed) ? null : parsed;
             }}
             validate={composeValidators(
-              required(
-                intl.formatMessage({ id: 'PartnerApplicationForm.turnaroundHoursRequired' })
-              ),
+              required(intl.formatMessage({ id: 'PartnerApplicationForm.turnaroundDaysRequired' })),
               numberAtLeast(
-                intl.formatMessage({ id: 'PartnerApplicationForm.turnaroundHoursInvalid' }),
+                intl.formatMessage({ id: 'PartnerApplicationForm.turnaroundDaysInvalid' }),
                 1
               )
             )}

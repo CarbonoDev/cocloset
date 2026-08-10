@@ -44,7 +44,7 @@ const idBasedLaundries = [
     origin: { lat: 48.882, lng: 2.338 },
     businessHours: 'Mon–Sat · 11:00–21:00',
     acceptedCategories: ['dresses'],
-    turnaroundHours: 48,
+    turnaroundDays: 2,
   },
 ];
 
@@ -85,7 +85,7 @@ const laundries = [
     origin: { lat: 48.882, lng: 2.338 },
     businessHours: 'Mon–Sat · 11:00–21:00',
     acceptedCategories: ['Eveningwear', 'Sequins', 'Embroidery'],
-    turnaroundHours: 48,
+    turnaroundDays: 2,
   },
   {
     id: 'laundry-2',
@@ -95,7 +95,7 @@ const laundries = [
     origin: { lat: 48.857, lng: 2.359 },
     businessHours: 'Tue–Sun · 10:00–19:00',
     acceptedCategories: ['Denim', 'Cotton', 'Leather goods'],
-    turnaroundHours: 36,
+    turnaroundDays: 3,
   },
 ];
 
@@ -357,7 +357,7 @@ describe('EditListingLaundryForm', () => {
   it('labels a category-specific turnaround differently from a studio-wide one', async () => {
     await act(async () => {
       renderForm({
-        laundries: [{ ...idBasedLaundries[0], turnaroundHoursIsCategorySpecific: true }],
+        laundries: [{ ...idBasedLaundries[0], turnaroundDaysIsCategorySpecific: true }],
         listingCategories: ['dresses'],
       });
     });
@@ -369,7 +369,7 @@ describe('EditListingLaundryForm', () => {
   it('falls back to the plain turnaround label when the number is studio-wide', async () => {
     await act(async () => {
       renderForm({
-        laundries: [{ ...idBasedLaundries[0], turnaroundHoursIsCategorySpecific: false }],
+        laundries: [{ ...idBasedLaundries[0], turnaroundDaysIsCategorySpecific: false }],
         listingCategories: ['dresses'],
       });
     });

@@ -1,5 +1,5 @@
 const {
-  HARDCODED_DEFAULT_BUFFER_HOURS,
+  HARDCODED_DEFAULT_BUFFER_DAYS,
   subtractBlockedRanges,
   findBookableOverlaps,
   computeBufferDays,
@@ -7,22 +7,25 @@ const {
   floorToUtcDay,
   ceilToUtcDay,
   computeAvailabilityBufferWindow,
-  resolveTurnaroundHours,
+  resolveTurnaroundDays,
 } = require('./availabilityHelpers');
 
 describe('computeBufferDays()', () => {
-  it('splits an evenly-divisible turnaround exactly in half', () => {
-    // 48h = 2 days total -> 1 before, 1 after
-    expect(computeBufferDays(48)).toEqual({
+  // The input is DAYS. It used to be hours divided by 24 here; the unit moved to days
+  // end to end, so these are the same windows stated in the unit the studio types.
+  it('splits an even turnaround exactly in half', () => {
+    // 2 days total -> 1 before, 1 after
+    expect(computeBufferDays(2)).toEqual({
       totalBufferDays: 2,
       bufferBeforeDays: 1,
       bufferAfterDays: 1,
     });
   });
 
-  it('rounds a partial day UP before splitting (never under-blocks)', () => {
-    // 25h -> ceil(25/24) = 2 days total -> 1 before, 1 after
-    expect(computeBufferDays(25)).toEqual({
+  it('rounds a fractional day UP before splitting (never under-blocks)', () => {
+    // Only an env var or a hand-written profile can produce a fraction; the form takes
+    // integers. 1.1 days -> 2 days total -> 1 before, 1 after.
+    expect(computeBufferDays(1.1)).toEqual({
       totalBufferDays: 2,
       bufferBeforeDays: 1,
       bufferAfterDays: 1,
@@ -30,26 +33,25 @@ describe('computeBufferDays()', () => {
   });
 
   it('gives the extra day to the AFTER side on an odd total', () => {
-    // 72h = 3 days total -> odd split: 1 before, 2 after
-    expect(computeBufferDays(72)).toEqual({
+    // 3 days total -> odd split: 1 before, 2 after
+    expect(computeBufferDays(3)).toEqual({
       totalBufferDays: 3,
       bufferBeforeDays: 1,
       bufferAfterDays: 2,
     });
   });
 
-  it('handles turnaround under 24h as a single buffer day, all after', () => {
-    // 5h -> ceil(5/24) = 1 day total -> 0 before, 1 after
-    expect(computeBufferDays(5)).toEqual({
+  it('handles a single-day turnaround as one buffer day, all after', () => {
+    expect(computeBufferDays(1)).toEqual({
       totalBufferDays: 1,
       bufferBeforeDays: 0,
       bufferAfterDays: 1,
     });
   });
 
-  it('handles an exact single day with no remainder', () => {
-    // 24h -> 1 day total -> 0 before, 1 after
-    expect(computeBufferDays(24)).toEqual({
+  it('rounds a sub-one-day turnaround up to a whole day', () => {
+    // 0.5 days -> 1 day total. A day-granular calendar cannot express less.
+    expect(computeBufferDays(0.5)).toEqual({
       totalBufferDays: 1,
       bufferBeforeDays: 0,
       bufferAfterDays: 1,
@@ -57,12 +59,19 @@ describe('computeBufferDays()', () => {
   });
 
   it('handles a large turnaround (e.g. a week)', () => {
-    // 168h = 7 days total -> 3 before, 4 after
-    expect(computeBufferDays(168)).toEqual({
+    // 7 days total -> 3 before, 4 after
+    expect(computeBufferDays(7)).toEqual({
       totalBufferDays: 7,
       bufferBeforeDays: 3,
       bufferAfterDays: 4,
     });
+  });
+
+  it('does NOT treat its input as hours', () => {
+    // The regression guard for the rename: 48 means 48 DAYS now. If anything divides by
+    // 24 again, this returns 2 and a studio's calendar is blocked for a tenth of the
+    // time it asked for.
+    expect(computeBufferDays(48).totalBufferDays).toBe(48);
   });
 
   it('throws on non-positive or non-finite input rather than silently blocking nothing', () => {
@@ -139,11 +148,11 @@ describe('floorToUtcDay() / ceilToUtcDay()', () => {
 });
 
 describe('computeAvailabilityBufferWindow()', () => {
-  it('computes buffer-before + rental dates + buffer-after around a booking (48h turnaround)', () => {
+  it('computes buffer-before + rental dates + buffer-after around a booking (2-day turnaround)', () => {
     const bookingStart = new Date('2026-08-10T00:00:00.000Z');
     const bookingEnd = new Date('2026-08-13T00:00:00.000Z'); // 3-day rental, exclusive end
 
-    const result = computeAvailabilityBufferWindow(bookingStart, bookingEnd, 48);
+    const result = computeAvailabilityBufferWindow(bookingStart, bookingEnd, 2);
 
     expect(result).toEqual({
       start: new Date('2026-08-09T00:00:00.000Z'), // 1 day before
@@ -154,11 +163,11 @@ describe('computeAvailabilityBufferWindow()', () => {
     });
   });
 
-  it('matches the design doc "2 before / N rental / 2 after" shape at 96h turnaround', () => {
+  it('matches the design doc "2 before / N rental / 2 after" shape at a 4-day turnaround', () => {
     const bookingStart = new Date('2026-08-10T00:00:00.000Z');
     const bookingEnd = new Date('2026-08-13T00:00:00.000Z');
 
-    const result = computeAvailabilityBufferWindow(bookingStart, bookingEnd, 96);
+    const result = computeAvailabilityBufferWindow(bookingStart, bookingEnd, 4);
 
     expect(result.bufferBeforeDays).toBe(2);
     expect(result.bufferAfterDays).toBe(2);
@@ -166,11 +175,11 @@ describe('computeAvailabilityBufferWindow()', () => {
     expect(result.end).toEqual(new Date('2026-08-15T00:00:00.000Z'));
   });
 
-  it('handles a single-day rental with a sub-24h turnaround', () => {
+  it('handles a single-day rental with a one-day turnaround', () => {
     const bookingStart = new Date('2026-08-10T00:00:00.000Z');
     const bookingEnd = new Date('2026-08-11T00:00:00.000Z');
 
-    const result = computeAvailabilityBufferWindow(bookingStart, bookingEnd, 10);
+    const result = computeAvailabilityBufferWindow(bookingStart, bookingEnd, 1);
 
     expect(result.bufferBeforeDays).toBe(0);
     expect(result.bufferAfterDays).toBe(1);
@@ -179,36 +188,41 @@ describe('computeAvailabilityBufferWindow()', () => {
   });
 
   it('throws on invalid dates instead of silently producing NaN dates', () => {
-    expect(() => computeAvailabilityBufferWindow(new Date('invalid'), new Date(), 48)).toThrow();
-    expect(() => computeAvailabilityBufferWindow(new Date(), new Date('invalid'), 48)).toThrow();
-    expect(() => computeAvailabilityBufferWindow(null, new Date(), 48)).toThrow();
+    expect(() => computeAvailabilityBufferWindow(new Date('invalid'), new Date(), 2)).toThrow();
+    expect(() => computeAvailabilityBufferWindow(new Date(), new Date('invalid'), 2)).toThrow();
+    expect(() => computeAvailabilityBufferWindow(null, new Date(), 2)).toThrow();
   });
 });
 
-describe('resolveTurnaroundHours()', () => {
-  it('prefers the laundry-set turnaround hours when present and valid', () => {
-    expect(resolveTurnaroundHours(36, '48')).toBe(36);
+describe('resolveTurnaroundDays()', () => {
+  it('prefers the laundry-set turnaround days when present and valid', () => {
+    expect(resolveTurnaroundDays(3, '2')).toBe(3);
   });
 
   it('falls back to the env default when the laundry has not set turnaround', () => {
-    expect(resolveTurnaroundHours(undefined, '72')).toBe(72);
-    expect(resolveTurnaroundHours(null, '72')).toBe(72);
+    expect(resolveTurnaroundDays(undefined, '4')).toBe(4);
+    expect(resolveTurnaroundDays(null, '4')).toBe(4);
   });
 
   it('falls back to the hardcoded default when neither is set', () => {
-    expect(resolveTurnaroundHours(undefined, undefined)).toBe(HARDCODED_DEFAULT_BUFFER_HOURS);
+    expect(resolveTurnaroundDays(undefined, undefined)).toBe(HARDCODED_DEFAULT_BUFFER_DAYS);
+  });
+
+  it('defaults to 2 days, which is what the old 48-hour default worked out to', () => {
+    // The unit changed; the behaviour deliberately did not.
+    expect(HARDCODED_DEFAULT_BUFFER_DAYS).toBe(2);
   });
 
   it('falls back to the hardcoded default when the env value is not a usable number', () => {
-    expect(resolveTurnaroundHours(undefined, 'not-a-number')).toBe(HARDCODED_DEFAULT_BUFFER_HOURS);
-    expect(resolveTurnaroundHours(undefined, '0')).toBe(HARDCODED_DEFAULT_BUFFER_HOURS);
-    expect(resolveTurnaroundHours(undefined, '-5')).toBe(HARDCODED_DEFAULT_BUFFER_HOURS);
+    expect(resolveTurnaroundDays(undefined, 'not-a-number')).toBe(HARDCODED_DEFAULT_BUFFER_DAYS);
+    expect(resolveTurnaroundDays(undefined, '0')).toBe(HARDCODED_DEFAULT_BUFFER_DAYS);
+    expect(resolveTurnaroundDays(undefined, '-5')).toBe(HARDCODED_DEFAULT_BUFFER_DAYS);
   });
 
   it('ignores an invalid laundry turnaround value and falls through the chain', () => {
-    expect(resolveTurnaroundHours(0, '72')).toBe(72);
-    expect(resolveTurnaroundHours(-1, undefined)).toBe(HARDCODED_DEFAULT_BUFFER_HOURS);
-    expect(resolveTurnaroundHours(NaN, undefined)).toBe(HARDCODED_DEFAULT_BUFFER_HOURS);
+    expect(resolveTurnaroundDays(0, '4')).toBe(4);
+    expect(resolveTurnaroundDays(-1, undefined)).toBe(HARDCODED_DEFAULT_BUFFER_DAYS);
+    expect(resolveTurnaroundDays(NaN, undefined)).toBe(HARDCODED_DEFAULT_BUFFER_DAYS);
   });
 });
 
