@@ -1,5 +1,5 @@
 import { types as sdkTypes } from './sdkLoader';
-import { diffInTime } from './dates';
+import { daysBetween, diffInTime } from './dates';
 import { extractYouTubeID } from './string';
 
 const { LatLng, Money } = sdkTypes;
@@ -122,6 +122,50 @@ export const bookingDatesRequired = (inValidStartDateMessage, inValidEndDateMess
   } else if (!endDateIsValid) {
     return inValidEndDateMessage;
   } else {
+    return VALID;
+  }
+};
+
+/**
+ * A booking must last at least `minimumDays` days.
+ *
+ * WHY THIS EXISTS ALONGSIDE THE PICKER'S OWN `minimumNights`
+ * The calendar refuses to COMPLETE a too-short range, but it does so by
+ * returning early from its click handler (see DatePicker's onSelectDate), which
+ * gives the customer no explanation at all - the second click simply does
+ * nothing. It also only guards clicking: the start/end text inputs can be typed
+ * into directly, and that path never consults minimumNights. So this validator
+ * is both the visible message and the only check on typed input.
+ *
+ * It counts CALENDAR days via daysBetween rather than comparing timestamps.
+ * minimumNights does the latter (`>= n * 864e5`), which is one hour short across
+ * a spring-forward boundary and would reject a range that is genuinely long
+ * enough. Counting days cannot drift with the clock.
+ *
+ * `value.endDate` is the EXCLUSIVE end date the form holds for daily bookings
+ * (a one-day booking is start = D, end = D+1), which is exactly what daysBetween
+ * expects - so the result is the rental length in days, directly comparable.
+ *
+ * Skips validation when either date is missing: `bookingDatesRequired` owns that
+ * complaint, and reporting "too short" for an empty field would be a worse
+ * message, not an extra one.
+ *
+ * @param {number} minimumDays
+ * @param {string} message
+ */
+export const minimumBookingDays = (minimumDays, message) => value => {
+  const startDate = value?.startDate;
+  const endDate = value?.endDate;
+  const bothDatesPresent = startDate instanceof Date && endDate instanceof Date;
+
+  if (!bothDatesPresent || !Number.isInteger(minimumDays) || minimumDays <= 1) {
+    return VALID;
+  }
+
+  try {
+    return daysBetween(startDate, endDate) < minimumDays ? message : VALID;
+  } catch (e) {
+    // Reversed range. bookingDatesRequired / the picker own that case.
     return VALID;
   }
 };

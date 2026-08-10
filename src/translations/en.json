@@ -41,6 +41,7 @@
   "BookingDatesForm.bookingStartTitle": "Start date",
   "BookingDatesForm.priceBreakdownTitle": "Booking breakdown",
   "BookingDatesForm.requestToBook": "Request to book",
+  "BookingDatesForm.minimumBookingDays": "This garment must be rented for at least {minimumDays} days.",
   "BookingDatesForm.requiredDate": "Select an available date",
   "BookingDatesForm.seatsPlaceholder": "Select…",
   "BookingDatesForm.seatsTitle": "Number of seats",

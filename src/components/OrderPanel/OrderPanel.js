@@ -315,8 +315,16 @@ const OrderPanel = props => {
   } = props;
 
   const publicData = listing?.attributes?.publicData || {};
-  const { listingType, unitType, transactionProcessAlias = '', priceVariants, startTimeInterval } =
-    publicData || {};
+  const {
+    listingType,
+    unitType,
+    transactionProcessAlias = '',
+    priceVariants,
+    startTimeInterval,
+    // Cocloset: the owner's minimum rental length in days, set in the wizard's
+    // PRICE tab. Enforced again server-side (server/api-util/bookingRules.js).
+    minimumBookingDays,
+  } = publicData || {};
 
   const processName = resolveLatestProcessName(transactionProcessAlias.split('/')[0]);
   const lineItemUnitType = lineItemUnitTypeMaybe || `line-item/${unitType}`;
@@ -524,6 +532,7 @@ const OrderPanel = props => {
             seatsEnabled={seatsEnabled}
             className={css.bookingForm}
             formId="OrderPanelBookingDatesForm"
+            minimumBookingDays={minimumBookingDays}
             dayCountAvailableForBooking={dayCountAvailableForBooking}
             monthlyTimeSlots={monthlyTimeSlots}
             onFetchTimeSlots={onFetchTimeSlots}

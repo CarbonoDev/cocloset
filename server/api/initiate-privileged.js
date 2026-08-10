@@ -10,6 +10,7 @@ const {
 } = require('../api-util/sdk');
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { isCoclosetBookingListing } = require('../api-util/coclosetBookingProcess');
+const { assertMinimumBookingDays } = require('../api-util/bookingRules');
 const { ensureHandoverQr } = require('../api-util/handoverQr');
 const log = require('../log');
 
@@ -112,6 +113,23 @@ module.exports = (req, res) => {
       // checkout, and the laundry never gets paid. Same shared builder as
       // transition-privileged.js and transaction-line-items.js so preview and
       // charge cannot drift apart again.
+
+      // The owner's minimum rental length, checked BEFORE anything is priced.
+      // The booking calendar refuses a too-short range, but the dates arrive
+      // here as ordinary request parameters and used to be forwarded to the
+      // Marketplace API unread - so the minimum was, until now, a suggestion.
+      // Sharetribe will not catch this for us: booking LENGTH is not part of the
+      // availability model. See api-util/bookingRules.js.
+      //
+      // Deliberately applied on the speculative path too. A preview that quotes
+      // a booking the charge path will refuse is how a customer gets to the last
+      // step before finding out.
+      assertMinimumBookingDays({
+        listing,
+        bookingStart: bodyParams?.params?.bookingStart,
+        bookingEnd: bodyParams?.params?.bookingEnd,
+      });
+
       return buildLineItemsForListing({
         listing,
         orderData: getFullOrderData(orderData, bodyParams, currency),
