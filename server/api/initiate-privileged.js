@@ -8,8 +8,45 @@ const {
   serialize,
   fetchCommission,
 } = require('../api-util/sdk');
+const { getIntegrationSdk } = require('../api-util/integrationSdk');
+const { isCoclosetBookingListing } = require('../api-util/coclosetBookingProcess');
+const { ensureHandoverQr } = require('../api-util/handoverQr');
+const log = require('../log');
 
 const { Money } = sharetribeSdk.types;
+
+// "El QR ... se debe generar al momento de crear la reservación."
+//
+// This endpoint IS that moment: `transition/request-payment` is privileged, so
+// a `cocloset-booking` reservation cannot be created without coming through
+// here. See the GENERATION TIMING section in api-util/handoverQr.js for why the
+// accept-time hook (create-availability-buffer.js) was rejected.
+//
+// Fire-and-continue, deliberately, following the notifyPickupScheduled
+// precedent in create-availability-buffer.js: the customer is waiting on this
+// response to go and pay, and nothing downstream needs the record to exist yet
+// (resolveHandoverQrPayload renders a correct QR without it). ensureHandoverQr
+// never rejects and logs its own failures.
+// Called after the response has already been sent, so it must not be able to
+// throw: getIntegrationSdk() throws when the Integration API env vars are
+// missing, and an escaping throw here would reach the trailing .catch() and
+// try to respond twice.
+const generateHandoverQrMaybe = (listing, transaction) => {
+  if (!isCoclosetBookingListing(listing) || !transaction?.id) {
+    return;
+  }
+
+  try {
+    ensureHandoverQr({
+      integrationSdk: getIntegrationSdk(),
+      transactionId: transaction.id,
+      existingMetadata: transaction.attributes?.metadata,
+      log,
+    });
+  } catch (e) {
+    log.error(e, 'handover-qr-write-failed', { txId: transaction.id?.uuid || 'unknown' });
+  }
+};
 
 const listingPromise = (sdk, id) => sdk.listings.show({ id });
 
@@ -54,10 +91,14 @@ module.exports = (req, res) => {
   const sdk = getSdk(req, res);
   let lineItems = null;
   let metadataMaybe = {};
+  // Kept for the post-response handover-QR step, which needs to know whether
+  // this listing is on the cocloset-booking process.
+  let listingEntity = null;
 
   Promise.all([listingPromise(sdk, bodyParams?.params?.listingId), fetchCommission(sdk)])
     .then(([showListingResponse, fetchAssetsResponse]) => {
       const listing = showListingResponse.data.data;
+      listingEntity = listing;
       const commissionAsset = fetchAssetsResponse.data.data[0];
 
       const currency = listing.attributes.price?.currency || orderData.currency;
@@ -115,6 +156,12 @@ module.exports = (req, res) => {
           })
         )
         .end();
+
+      // A speculative call builds a breakdown for the CheckoutPage and creates
+      // no transaction, so there is nothing to attach a QR to.
+      if (!isSpeculative) {
+        generateHandoverQrMaybe(listingEntity, data?.data);
+      }
     })
     .catch(e => {
       handleError(res, e);

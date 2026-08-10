@@ -19,6 +19,7 @@ import BookingLocationMaybe from './BookingLocationMaybe';
 import FeedSection from './FeedSection';
 import DiminishedActionButtonMaybe from './DiminishedActionButtonMaybe';
 import PanelHeading from './PanelHeading';
+import HandoverQrMaybe from './HandoverQrMaybe';
 
 import css from './TransactionPanel.module.css';
 
@@ -80,6 +81,7 @@ const allowShowingExtraInfo = (showExtraInfo, transactionPartyInfo) => {
  * @param {propTypes.user} props.provider - The provider
  * @param {boolean} props.hasTransitions - Whether the transitions are shown
  * @param {propTypes.uuid} props.transactionId - The transaction id
+ * @param {Object} [props.metadata] - transaction.attributes.metadata
  * @param {Array<propTypes.message>)} props.messages - The messages
  * @param {boolean} props.savePaymentMethodFailed - Whether the save payment method failed
  * @param {propTypes.error} props.fetchMessagesError - The fetch messages error
@@ -108,6 +110,10 @@ export class TransactionPanelComponent extends Component {
       transitions,
       processName,
       protectedData,
+      // transaction.attributes.metadata. Carries `handoverQr` (the QR record
+      // written when the reservation was created) and `ticketCode`.
+      metadata,
+      transactionId,
       marketplaceName,
       messages,
       savePaymentMethodFailed = false,
@@ -230,6 +236,19 @@ export class TransactionPanelComponent extends Component {
             {requestQuote}
             {offer}
             {transactionFieldsComponent}
+
+            {/* The handover QR (mockups 16/17). Placed high in the main column,
+                above the message feed, because its whole job is to be found
+                quickly by someone standing at a laundry counter. It renders
+                nothing outside `cocloset-booking` and nothing once both
+                handovers are done - see HandoverQrMaybe. */}
+            <HandoverQrMaybe
+              processName={stateData.processName}
+              processState={stateData.processState}
+              transactionId={transactionId}
+              metadata={metadata}
+            />
+
             {fileAttachments}
 
             {!isInquiryProcess ? (

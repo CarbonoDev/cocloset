@@ -24,6 +24,7 @@ const listingReadinessStatus = require('./api/listing-readiness-status');
 const listingCustodyStatus = require('./api/listing-custody-status');
 const listingLaundryAssignment = require('./api/listing-laundry-assignment');
 const laundryOrders = require('./api/laundry-orders');
+const transactionQr = require('./api/transaction-qr');
 const initUserRole = require('./api/init-user-role');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
@@ -78,6 +79,11 @@ router.post('/listing-custody-status', listingCustodyStatus);
 // on it - it is a server-side DECISION, not a write gate.
 router.post('/listing-laundry-assignment', listingLaundryAssignment);
 router.get('/laundry-orders', laundryOrders);
+
+// Renders the handover QR for a transaction as a PNG, for a plain <img src>.
+// Unauthenticated by design - it echoes back only the transaction id it was
+// given. See the header of server/api/transaction-qr.js before changing that.
+router.get('/transaction-qr', transactionQr);
 
 // Applies the `metadata.isLaundry = false` default to the CALLING user, right
 // after signup. Takes no request parameters at all - the target is the

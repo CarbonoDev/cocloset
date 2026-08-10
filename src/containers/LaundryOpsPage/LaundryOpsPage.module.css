@@ -568,6 +568,14 @@
   word-break: break-all;
 }
 
+/* The scannable handover code in the expanded row. */
+.detailQr {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px 0;
+}
+
 /* Damage copy is red AND prefixed by its own label in the translation string,
    so it isn't announced by colour alone. */
 .detailDamage {

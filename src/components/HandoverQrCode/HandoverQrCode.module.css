@@ -1,0 +1,50 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.large {
+  gap: 12px;
+}
+
+.small {
+  gap: 0;
+}
+
+/* The QR must stay a crisp square. `image-rendering: pixelated` keeps the
+   module edges hard when the browser scales the PNG on a non-integer DPR
+   display - a smoothed QR is measurably harder for a phone camera to lock on
+   to. `background: white` guarantees the quiet zone stays light even if this
+   ever lands on a tinted surface: a QR on a coloured background can fail to
+   scan. */
+.image {
+  display: block;
+  width: 180px;
+  height: 180px;
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: #ffffff;
+  image-rendering: pixelated;
+}
+
+.small .image {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--coclosetBorder);
+}
+
+.payload {
+  color: var(--coclosetInkMuted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* Selectable, copyable, and wrappable: this is the fallback a laundry uses when
+   the scanner is down, so it must be readable and never truncated. */
+.payloadValue {
+  display: inline;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
