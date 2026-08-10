@@ -12,6 +12,7 @@ const {
 } = require('../api-util/categoryPricing');
 const { ACCEPT_TRANSITIONS } = require('../api-util/coclosetBookingProcess');
 const { notifyPickupScheduled } = require('../api-util/laundryMailer');
+const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
 
 // Creates the "buffer window" availability exception (seats: 0, i.e.
 // unavailable) around a booking once it's been accepted, so the listing
@@ -229,7 +230,7 @@ module.exports = (req, res) => {
         );
       }
 
-      const assignedLaundryId = listing.attributes?.publicData?.assignedLaundryId;
+      const assignedLaundryId = readAssignedLaundryId(listing);
       const { start: bookingStart, end: bookingEnd } = booking.attributes;
 
       if (!assignedLaundryId) {

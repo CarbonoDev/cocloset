@@ -19,8 +19,14 @@ export const fetchOrdersThunk = createAsyncThunk(
       .catch(e => rejectWithValue(storableError(e)))
 );
 
-// Advance one transaction's laundry status, optionally attaching a damage
-// report (only meaningful at the 'returned' step - design doc §10).
+// Advance one transaction's laundry status, optionally attaching a damage report
+// and/or the number of days cleaning will take (both only meaningful at the
+// 'returned' step - design doc §10 and the client's turnaround rule).
+//
+// `cleaningDays` is forwarded only when the caller supplied a number. Omitting it
+// is meaningful: the server then applies the turnaround this laundry configured
+// for the garment's category, and sizes listing.metadata.readyAt and the
+// availability block from that.
 //
 // The server re-validates the move against the legal sequence and answers 409
 // on an illegal jump; the UI only ever offers the single next status, so a 409
@@ -29,12 +35,13 @@ export const fetchOrdersThunk = createAsyncThunk(
 // terminal in the studio.
 export const advanceStatusThunk = createAsyncThunk(
   'LaundryOpsPage/advanceStatus',
-  ({ transactionId, status, damaged, damageNote }, { dispatch, rejectWithValue }) =>
+  ({ transactionId, status, damaged, damageNote, cleaningDays }, { dispatch, rejectWithValue }) =>
     updateLaundryTransactionStatus({
       transactionId,
       status,
       ...(typeof damaged === 'boolean' ? { damaged } : {}),
       ...(damageNote ? { damageNote } : {}),
+      ...(typeof cleaningDays === 'number' ? { cleaningDays } : {}),
     })
       .then(response => {
         dispatch(fetchOrdersThunk());

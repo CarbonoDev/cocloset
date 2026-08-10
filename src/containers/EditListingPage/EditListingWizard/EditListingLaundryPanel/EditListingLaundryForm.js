@@ -20,7 +20,7 @@ import css from './EditListingLaundryForm.module.css';
 // categories. The radio input itself is visually hidden - the whole card is
 // the clickable/label target.
 const LaundryCard = props => {
-  const { categoryTree, formId, laundry, selected } = props;
+  const { categoryTree, formId, laundry, selected, locked } = props;
   const intl = useIntl();
   // /api/laundries returns a flat, explicitly allowlisted record (see
   // server/api-util/laundryDirectory.js) rather than the raw publicData blob.
@@ -41,7 +41,13 @@ const LaundryCard = props => {
   }));
 
   return (
-    <label htmlFor={inputId} className={classNames(css.card, { [css.cardSelected]: selected })}>
+    <label
+      htmlFor={inputId}
+      className={classNames(css.card, {
+        [css.cardSelected]: selected,
+        [css.cardLocked]: locked,
+      })}
+    >
       <Field
         id={inputId}
         className={css.cardInput}
@@ -49,6 +55,11 @@ const LaundryCard = props => {
         component="input"
         type="radio"
         value={laundry.id}
+        // Disabling the input rather than hiding the grid: an owner whose garment
+        // is at the laundry should still be able to SEE which laundry has it, and
+        // a disabled radio says "not now" to assistive tech, where a removed one
+        // would say nothing at all.
+        disabled={locked}
         aria-label={intl.formatMessage(
           { id: 'EditListingLaundryForm.screenreader.chooseLaundry' },
           { name }
@@ -115,6 +126,10 @@ const LaundryCard = props => {
  * @param {Array} props.laundries - The laundries fetched via fetchLaundries()
  * @param {boolean} props.fetchLaundriesInProgress - Whether laundries are still loading
  * @param {Array<string>} [props.listingCategories] - The listing's own category values (categoryLevel1/2/3)
+ * @param {boolean} [props.laundryLocked] - True when `listing.metadata.onLaundry` is
+ *   set, i.e. the garment is physically at the laundry. Locks the picker (the
+ *   assigned laundry may not be changed until the garment is back with its owner)
+ *   while leaving Save enabled, so re-saving the same laundry still passes the tab.
  * @param {Object} props.errors - The errors object
  * @param {propTypes.error} props.errors.showListingsError - The show listings error
  * @param {propTypes.error} props.errors.updateListingError - The update listing error
@@ -140,6 +155,7 @@ export const EditListingLaundryForm = props => (
         laundries = [],
         fetchLaundriesInProgress,
         listingCategories,
+        laundryLocked = false,
         values,
       } = formRenderProps;
 
@@ -184,6 +200,16 @@ export const EditListingLaundryForm = props => (
             </p>
           ) : null}
 
+          {/* Sits directly above the picker it explains, rather than with the
+              panel's other notices, so an owner who finds the cards unclickable
+              reads the reason in the same glance. `role="status"` because it is
+              information about the control, not an error the owner caused. */}
+          {laundryLocked ? (
+            <p className={css.lockNotice} role="status">
+              <FormattedMessage id="EditListingLaundryForm.laundryLocked" />
+            </p>
+          ) : null}
+
           {fetchLaundriesInProgress ? (
             <p className={css.loading}>
               <FormattedMessage id="EditListingLaundryForm.loading" />
@@ -201,6 +227,7 @@ export const EditListingLaundryForm = props => (
                   formId={formId}
                   laundry={laundry}
                   selected={values.assignedLaundryId === laundry.id}
+                  locked={laundryLocked}
                 />
               ))}
             </div>

@@ -82,6 +82,36 @@
   }
 }
 
+/* The garment is at this laundry, so the assignment can't be changed yet. The
+   radio inside is `disabled`, which already blocks interaction - this only makes
+   that legible, and keeps the SELECTED card readable rather than greying out the
+   one piece of information the owner came for. */
+.cardLocked {
+  cursor: default;
+}
+
+/* Dim the alternatives and drop their hover affordance, but never the current
+   one: which laundry has the garment is the reason the owner opened this tab. */
+.cardLocked:not(.cardSelected) {
+  opacity: 0.6;
+
+  &:hover {
+    border-color: var(--coclosetBorder);
+  }
+}
+
+/* Explains why the picker above is locked. Deliberately styled as a notice, not
+   an error: nothing has gone wrong. */
+.lockNotice {
+  margin: 0 0 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--coclosetBorderStrong);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSubtle);
+  font-size: 14px;
+  line-height: 20px;
+}
+
 /* Visually hidden but still focusable/clickable native radio input */
 .cardInput {
   position: absolute;

@@ -262,6 +262,41 @@ export const updateListingReadinessStatus = body => {
   return post('/api/listing-readiness-status', body);
 };
 
+// Hand a garment over: set `listing.metadata.onLaundry` (true = the garment is
+// physically at the laundry, false = it is back with its owner).
+//
+// Callable by EITHER the assigned laundry or the listing's owner, and only while
+// the listing has no active transaction - a 409 comes back otherwise. See
+// `server/api/listing-custody-status.js`, which explains why this is a separate
+// endpoint from listing-readiness-status rather than a branch inside it.
+//
+// Body: { listingId, onLaundry }
+export const updateListingCustodyStatus = body => {
+  return post('/api/listing-custody-status', body);
+};
+
+// Assign a laundry to a listing. THIS IS THE WRITE, not a precondition check.
+//
+// `assignedLaundryId` lives in the listing's `metadata`, which the Marketplace API
+// refuses to let an owner write (400 `validation-disallowed-key`), so the browser
+// cannot do this itself - by design. The server validates that the caller owns the
+// listing, that it has no active transaction, and that `metadata.onLaundry !== true`,
+// then writes the id together with the three fields derived from the chosen laundry
+// (`publicData.assignedLaundryName`, `publicData.pickupAddress` and the listing's
+// top-level `geolocation`) in one Integration API call.
+//
+// So the wizard must NOT also write those fields through `ownListings.update()`.
+// Read the header of `server/api/listing-laundry-assignment.js` before changing
+// this call or what the panel does with its result.
+//
+// Rejects with 409 when the garment is at the laundry or a transaction is in
+// flight, and 422 when the chosen laundry is unusable.
+//
+// Body: { listingId, assignedLaundryId }
+export const assignListingLaundry = body => {
+  return post('/api/listing-laundry-assignment', body);
+};
+
 // Fetch everything the laundry ops dashboard renders, for the calling laundry
 // user: the design doc §8 union of "transactions on listings assigned to me"
 // and "assigned listings with no transaction", plus a per-garment inventory
