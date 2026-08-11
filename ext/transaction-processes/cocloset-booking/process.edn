@@ -732,6 +732,89 @@
    :template :booking-review-by-customer-wanted}
 
   ;; -------------------------------------------------------------------
+  ;; Cancellation
+  ;;
+  ;; Until now all five cancels notified NOBODY. A customer was refunded in
+  ;; full and an owner lost a payout in silence, including on
+  ;; :transition/cancel-from-returned, the damage write-off path.
+  ;;
+  ;; TEN ENTRIES, TWO TEMPLATES. :on and :to are both single-valued, so
+  ;; five transitions x two roles is ten entries and there is no shorter
+  ;; spelling. But they share exactly two templates - one per role - and
+  ;; that is deliberate:
+  ;;
+  ;;   1. The five are identical in money terms. Each runs
+  ;;      :action/calculate-full-refund + :action/stripe-refund-payment +
+  ;;      :action/cancel-booking, all :actor/operator, all into
+  ;;      :state/cancelled. For both parties the outcome is the same in all
+  ;;      five: customer refunded in full, provider paid nothing. There is
+  ;;      no per-transition substance for per-transition copy to carry.
+  ;;
+  ;;   2. Every string in these templates is hand-entered into Console's
+  ;;      content/email-texts.json by the client, in every language. Ten
+  ;;      templates would be roughly five times that work for wording that
+  ;;      says the same thing.
+  ;;
+  ;; SO THE COPY IS SITUATION-NEUTRAL ON PURPOSE. Neither template says
+  ;; where the garment physically is, because that genuinely differs across
+  ;; the five (never collected / with the customer / possibly lost / back at
+  ;; the laundry) and one template cannot be right about all four. Both point
+  ;; at the transaction page instead. The owner template neither claims nor
+  ;; denies damage for the same reason: cancel-from-returned may follow a
+  ;; damage report, the other four do not.
+  ;;
+  ;; If per-situation copy is ever wanted, it IS expressible - `eq` is a
+  ;; supported helper (see the unitType branches in booking-declined-request)
+  ;; and transaction.last-transition is available - so a single template
+  ;; could branch. That was weighed and rejected on the translation cost
+  ;; above, NOT ruled out. Do not "simplify" this into one entry per
+  ;; transition, though: :to cannot address both roles at once, and the two
+  ;; roles are not in the same position (one is getting money back, the
+  ;; other is not getting paid), so they must not share a template.
+  ;; -------------------------------------------------------------------
+
+  {:name :notification/booking-cancelled-to-customer,
+   :on :transition/cancel,
+   :to :actor.role/customer,
+   :template :booking-cancelled}
+  {:name :notification/booking-cancelled-to-provider,
+   :on :transition/cancel,
+   :to :actor.role/provider,
+   :template :booking-cancelled-owner}
+  {:name :notification/booking-cancelled-from-ready-for-pickup-to-customer,
+   :on :transition/cancel-from-ready-for-pickup,
+   :to :actor.role/customer,
+   :template :booking-cancelled}
+  {:name :notification/booking-cancelled-from-ready-for-pickup-to-provider,
+   :on :transition/cancel-from-ready-for-pickup,
+   :to :actor.role/provider,
+   :template :booking-cancelled-owner}
+  {:name :notification/booking-cancelled-from-picked-up-to-customer,
+   :on :transition/cancel-from-picked-up,
+   :to :actor.role/customer,
+   :template :booking-cancelled}
+  {:name :notification/booking-cancelled-from-picked-up-to-provider,
+   :on :transition/cancel-from-picked-up,
+   :to :actor.role/provider,
+   :template :booking-cancelled-owner}
+  {:name :notification/booking-cancelled-from-overdue-to-customer,
+   :on :transition/cancel-from-overdue,
+   :to :actor.role/customer,
+   :template :booking-cancelled}
+  {:name :notification/booking-cancelled-from-overdue-to-provider,
+   :on :transition/cancel-from-overdue,
+   :to :actor.role/provider,
+   :template :booking-cancelled-owner}
+  {:name :notification/booking-cancelled-from-returned-to-customer,
+   :on :transition/cancel-from-returned,
+   :to :actor.role/customer,
+   :template :booking-cancelled}
+  {:name :notification/booking-cancelled-from-returned-to-provider,
+   :on :transition/cancel-from-returned,
+   :to :actor.role/provider,
+   :template :booking-cancelled-owner}
+
+  ;; -------------------------------------------------------------------
   ;; Reviews
   ;; -------------------------------------------------------------------
 
