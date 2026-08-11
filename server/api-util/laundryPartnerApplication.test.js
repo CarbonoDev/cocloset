@@ -1,7 +1,7 @@
 const {
   validateApplication,
   deliverApplication,
-  MAX_TURNAROUND_HOURS,
+  MAX_TURNAROUND_DAYS,
   MAX_CATEGORIES,
 } = require('./laundryPartnerApplication');
 
@@ -17,7 +17,7 @@ const validBody = () => ({
   address: 'Calle Mayor 1, Madrid',
   businessHours: 'Mon-Fri 9:00-19:00',
   acceptedCategories: 'Dresses, Coats , Suits',
-  turnaroundHours: '48',
+  turnaroundDays: '2',
   notes: 'We have 40m2 of hanging storage.',
 });
 
@@ -35,7 +35,7 @@ describe('validateApplication', () => {
       address: 'Calle Mayor 1, Madrid',
       businessHours: 'Mon-Fri 9:00-19:00',
       acceptedCategories: ['Dresses', 'Coats', 'Suits'],
-      turnaroundHours: 48,
+      turnaroundDays: 2,
       notes: 'We have 40m2 of hanging storage.',
     });
   });
@@ -125,21 +125,30 @@ describe('validateApplication', () => {
     expect(result.error).toContain('phone');
   });
 
-  it.each([['0'], ['-1'], ['1.5'], ['abc'], [String(MAX_TURNAROUND_HOURS + 1)]])(
-    'rejects turnaroundHours of %s',
+  it.each([['0'], ['-1'], ['1.5'], ['abc'], [String(MAX_TURNAROUND_DAYS + 1)]])(
+    'rejects turnaroundDays of %s',
     value => {
-      const result = validateApplication({ ...validBody(), turnaroundHours: value });
+      const result = validateApplication({ ...validBody(), turnaroundDays: value });
 
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('turnaroundHours');
+      expect(result.error).toContain('turnaroundDays');
     }
   );
 
-  it('accepts a numeric turnaroundHours', () => {
-    const result = validateApplication({ ...validBody(), turnaroundHours: 24 });
+  it('rejects an hours-shaped value that is out of range as days', () => {
+    // A 48 typed into a form that used to ask for hours is now 48 DAYS, which is past
+    // the cap. Silently accepting it would block a studio's calendar for seven weeks.
+    const result = validateApplication({ ...validBody(), turnaroundDays: 48 });
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('turnaroundDays');
+  });
+
+  it('accepts a numeric turnaroundDays', () => {
+    const result = validateApplication({ ...validBody(), turnaroundDays: 3 });
 
     expect(result.valid).toBe(true);
-    expect(result.application.turnaroundHours).toBe(24);
+    expect(result.application.turnaroundDays).toBe(3);
   });
 
   it('rejects too many garment categories', () => {
@@ -189,7 +198,7 @@ describe('validateApplication', () => {
 });
 
 describe('deliverApplication', () => {
-  const application = { studioName: 'Spin Cycle', turnaroundHours: 24 };
+  const application = { studioName: 'Spin Cycle', turnaroundDays: 2 };
   let logSpy;
   let warnSpy;
 
@@ -273,7 +282,7 @@ describe('deliverApplication — email sink', () => {
     contactName: 'Ana Rivera',
     email: 'ana@example.com',
     acceptedCategories: ['Eveningwear', 'Silk'],
-    turnaroundHours: 48,
+    turnaroundDays: 2,
   };
   let logSpy;
   let warnSpy;

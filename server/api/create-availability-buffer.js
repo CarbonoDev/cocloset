@@ -3,12 +3,12 @@ const { getSdk, handleError } = require('../api-util/sdk');
 const log = require('../log');
 const {
   computeAvailabilityBufferWindow,
-  resolveTurnaroundHours,
+  resolveTurnaroundDays,
 } = require('../api-util/availabilityHelpers');
 const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
 const {
   getListingCategoryValues,
-  resolveCategoryTurnaroundHours,
+  resolveCategoryTurnaroundDays,
 } = require('../api-util/categoryPricing');
 const { ACCEPT_TRANSITIONS } = require('../api-util/coclosetBookingProcess');
 const { notifyPickupScheduled } = require('../api-util/laundryMailer');
@@ -249,16 +249,16 @@ module.exports = (req, res) => {
         const laundryUser = userResponse.data.data;
         const laundryProfile = laundryUser.attributes?.profile || {};
         // Size the buffer from the turnaround for the garment ACTUALLY being cleaned,
-        // not a studio-wide average: a laundry sets hours per top-level category
+        // not a studio-wide average: a laundry sets DAYS per top-level category
         // (privateData.categoryPricing), and the listing's own top-level category
-        // selects one. Falls back to the studio-wide privateData.turnaroundHours, and
-        // then (inside resolveTurnaroundHours) to DEFAULT_LAUNDRY_BUFFER_HOURS.
-        const turnaroundHours = resolveTurnaroundHours(
-          resolveCategoryTurnaroundHours(
+        // selects one. Falls back to the studio-wide privateData.turnaroundDays, and
+        // then (inside resolveTurnaroundDays) to DEFAULT_LAUNDRY_BUFFER_DAYS.
+        const turnaroundDays = resolveTurnaroundDays(
+          resolveCategoryTurnaroundDays(
             laundryProfile.privateData,
             getListingCategoryValues(listing.attributes?.publicData)
           ),
-          process.env.DEFAULT_LAUNDRY_BUFFER_HOURS
+          process.env.DEFAULT_LAUNDRY_BUFFER_DAYS
         );
 
         return {
@@ -266,7 +266,7 @@ module.exports = (req, res) => {
           listing,
           bookingStart,
           bookingEnd,
-          turnaroundHours,
+          turnaroundDays,
           laundry: {
             // `users.show` on the Integration API returns the account email,
             // which the Marketplace API would not expose for a third party.
@@ -287,14 +287,14 @@ module.exports = (req, res) => {
         return null;
       }
 
-      const { listing, bookingStart, bookingEnd, turnaroundHours, laundry, customerName } = result;
+      const { listing, bookingStart, bookingEnd, turnaroundDays, laundry, customerName } = result;
       const {
         start,
         end,
         bufferBeforeDays,
         bufferAfterDays,
         totalBufferDays,
-      } = computeAvailabilityBufferWindow(bookingStart, bookingEnd, turnaroundHours);
+      } = computeAvailabilityBufferWindow(bookingStart, bookingEnd, turnaroundDays);
 
       // §3.12 Pickup Scheduled. Fired before the calendar work rather than
       // after it, and never awaited: the laundry needs to know a rental is

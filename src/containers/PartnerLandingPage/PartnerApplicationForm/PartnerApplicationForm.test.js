@@ -17,7 +17,7 @@ const VALID_VALUES = {
   email: 'ana@example.com',
   phone: '+34600111222',
   acceptedCategories: 'Dresses, Coats',
-  turnaroundHours: '48',
+  turnaroundDays: '2',
 };
 
 const label = key => `PartnerApplicationForm.${key}`;
@@ -33,10 +33,7 @@ const fillValidForm = async user => {
     screen.getByLabelText(label('acceptedCategoriesLabel')),
     VALID_VALUES.acceptedCategories
   );
-  await user.type(
-    screen.getByLabelText(label('turnaroundHoursLabel')),
-    VALID_VALUES.turnaroundHours
-  );
+  await user.type(screen.getByLabelText(label('turnaroundDaysLabel')), VALID_VALUES.turnaroundDays);
 };
 
 describe('PartnerApplicationForm', () => {
@@ -51,7 +48,7 @@ describe('PartnerApplicationForm', () => {
       'emailLabel',
       'phoneLabel',
       'acceptedCategoriesLabel',
-      'turnaroundHoursLabel',
+      'turnaroundDaysLabel',
       'notesLabel',
     ].forEach(key => {
       expect(screen.getByLabelText(label(key))).toBeInTheDocument();
@@ -125,7 +122,7 @@ describe('PartnerApplicationForm', () => {
     expect(screen.getByText(label('studioNameTooLong'))).toBeInTheDocument();
   });
 
-  it('submits the values with turnaroundHours parsed to a number', async () => {
+  it('submits the values with turnaroundDays parsed to a number', async () => {
     const user = userEvent.setup();
     const onSubmit = jest.fn();
     render(<PartnerApplicationForm onSubmit={onSubmit} />);
@@ -137,7 +134,7 @@ describe('PartnerApplicationForm', () => {
     expect(onSubmit.mock.calls[0][0]).toEqual(
       expect.objectContaining({
         ...VALID_VALUES,
-        turnaroundHours: 48,
+        turnaroundDays: 2,
       })
     );
   });

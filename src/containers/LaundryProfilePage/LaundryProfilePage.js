@@ -56,15 +56,17 @@ const getInitialValues = currentUser => {
   const { laundryProfile = {}, acceptedCategories = [] } = publicData;
   const { studioName, address, businessHours } = laundryProfile;
   const origin = toLatLng(laundryProfile.origin);
-  const { turnaroundHours, cleaningFee } = privateData;
+  // No cleaningFee is read: fees are marketplace-level server env configuration now
+  // (CLEANING_FEE_<CATEGORY_ID>, see server/api-util/cleaningFeeEnv.js), the form has no
+  // input for one, and any value still stored on an old profile is dead data.
+  const { turnaroundDays } = privateData;
 
   return {
     studioName,
     businessHours,
-    turnaroundHours,
-    cleaningFee,
+    turnaroundDays,
     // The per-category table is flattened into one form field per value
-    // (`categoryPricing__cleaningFee__midi_dress`). Flat, not nested, because React
+    // (`categoryPricing__turnaroundDays__dresses`). Flat, not nested, because React
     // Final Form reads dots in a field name as a path and Console category ids are
     // free-form operator input — see categoryPricingFieldName.
     //
@@ -95,8 +97,8 @@ const getInitialValues = currentUser => {
  * on first render (ClientApp fetches it asynchronously). Snapshotting there
  * captured an all-undefined object permanently: the laundry opened the page,
  * saw a blank form, retyped the required fields, saved — and wiped their
- * configured `cleaningFee`, silently repricing every future booking to the
- * DEFAULT_CLEANING_FEE env fallback.
+ * configured `turnaroundDays`, silently resizing every future availability
+ * buffer to the DEFAULT_LAUNDRY_BUFFER_DAYS env fallback.
  *
  * Keeping the snapshot in a child that is only mounted once `currentUser` is
  * loaded (and remounted via `key` if the user identity ever changes) means the
@@ -113,17 +115,10 @@ const LaundryProfileFormSection = props => {
   const [state, setState] = useState({ initialValues: getInitialValues(currentUser) });
 
   const handleSubmit = values => {
-    const {
-      studioName,
-      businessHours,
-      turnaroundHours,
-      cleaningFee,
-      acceptedCategories,
-      location,
-    } = values;
+    const { studioName, businessHours, turnaroundDays, acceptedCategories, location } = values;
     const { address, origin } = location?.selectedPlace || {};
 
-    // FieldCheckboxGroup hands back an array of Console category ids, plus any legacy
+    // The category table hands back an array of Console category ids, plus any legacy
     // free-text values that were already stored and haven't been removed. Normalised
     // here (dedupe, drop blanks) so publicData never picks up empties from either side.
     const acceptedCategoriesArray = [
@@ -137,16 +132,14 @@ const LaundryProfileFormSection = props => {
 
     const { privateData: currentPrivateData = {} } = currentUser?.attributes?.profile || {};
 
-    // Belt and braces on the two money/scheduling values: `cleaningFee` has no
-    // `validate` on the form, so an absent value would submit as null. Never
-    // let an absent field erase a stored one — a wiped cleaningFee silently
-    // changes what every future customer is charged. Clearing them
-    // deliberately is not a Phase 1 requirement; not destroying them is.
+    // Belt and braces on the studio-wide turnaround: never let an absent field erase a
+    // stored one. A wiped turnaround silently changes how long every listing this studio
+    // handles is blocked for after a rental. Clearing it deliberately is not a Phase 1
+    // requirement; not destroying it is.
     const preserved = (submitted, existing) =>
       typeof submitted === 'number' && Number.isFinite(submitted) ? submitted : existing;
 
-    const nextTurnaroundHours = preserved(turnaroundHours, currentPrivateData.turnaroundHours);
-    const nextCleaningFee = preserved(cleaningFee, currentPrivateData.cleaningFee);
+    const nextTurnaroundDays = preserved(turnaroundDays, currentPrivateData.turnaroundDays);
 
     // Rebuild the nested table from the flat fields. Cleared inputs drop out entirely
     // rather than being stored as null: an empty box means "use the studio-wide value",
@@ -162,8 +155,7 @@ const LaundryProfileFormSection = props => {
         acceptedCategories: acceptedCategoriesArray,
       },
       privateData: {
-        turnaroundHours: nextTurnaroundHours,
-        cleaningFee: nextCleaningFee,
+        turnaroundDays: nextTurnaroundDays,
         categoryPricing: nextCategoryPricing,
       },
     };
@@ -174,8 +166,7 @@ const LaundryProfileFormSection = props => {
       initialValues: {
         studioName,
         businessHours,
-        turnaroundHours: nextTurnaroundHours,
-        cleaningFee: nextCleaningFee,
+        turnaroundDays: nextTurnaroundDays,
         acceptedCategories: acceptedCategoriesArray,
         ...categoryPricingToFormValues(nextCategoryPricing),
         location:
@@ -201,13 +192,15 @@ const LaundryProfileFormSection = props => {
  * LaundryProfilePage
  *
  * Laundry-only settings page for the studio profile: studio name, address,
- * business hours, studio-wide turnaround hours and cleaning fee, accepted garment
- * categories, and a turnaround/price per accepted category. Writes to
+ * business hours, studio-wide turnaround in days, and one table of accepted garment
+ * categories carrying a turnaround per top-level category. Writes to
  * publicData.laundryProfile, publicData.acceptedCategories and privateData
- * (turnaroundHours, cleaningFee, categoryPricing) on the laundry's own user profile
- * via the ordinary Marketplace API (sdk.currentUser.updateProfile) — no Integration
- * API involved. The per-category table is privateData rather than publicData because
- * it is a commercial pricing input: the laundry and the operator see it, nobody else.
+ * (turnaroundDays, categoryPricing) on the laundry's own user profile via the ordinary
+ * Marketplace API (sdk.currentUser.updateProfile) — no Integration API involved. It
+ * writes NO cleaning fee: fees are marketplace-level server env configuration
+ * (CLEANING_FEE_<CATEGORY_ID>), not something a studio sets. The per-category table is
+ * privateData rather than publicData because a studio's capacity is a commercial input:
+ * the laundry and the operator see it, nobody else.
  * Access is gated to users flagged via isLaundryUser (see
  * src/util/userHelpers.js); everyone else sees NotFoundPage, matching the pattern
  * used by other role-gated pages in this template (e.g. ProfilePage, InboxPage).

@@ -66,24 +66,69 @@
 .validLocation {
 }
 
-/* ================ Accepted categories ================ */
+/* ================ Accepted categories + turnaround (one table) ================ */
 
-/* The picker is fed from Console's category tree, so its length is not ours to
-   control - a marketplace with three levels of garment categories produces a very
-   tall list. Cap the OPTIONS (not the whole fieldset, or the label scrolls away too)
-   and scroll inside the card rather than pushing the save button off the bottom of a
-   phone screen. */
-.categoryList {
-  max-height: 240px;
+/* A fieldset carries its own browser default border/padding/margin, which would draw a
+   second box around a section that already sits in a card. */
+.categoryFieldset {
+  margin: 0 0 18px 0;
+  padding: 0;
+  border: none;
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
+}
+
+/* Accepting a garment and saying how long it takes are one decision, so they are one
+   table: each row is a category, with its accept checkbox and (top level only) its
+   turnaround input side by side.
+
+   The table is fed from Console's category tree, so its length is not ours to control -
+   a marketplace with three levels of garment categories produces a very tall list. Cap
+   the ROWS (not the whole fieldset, or the label scrolls away too) and scroll inside the
+   card rather than pushing the save button off the bottom of a phone screen. */
+.categoryTable {
+  max-height: 320px;
   overflow-y: auto;
+  margin: 0;
   padding: 6px 12px;
   border: 1px solid var(--coclosetBorder);
   border-radius: var(--coclosetRadiusSmall);
   background-color: var(--coclosetSurface);
+  list-style: none;
 
   @media (--viewportMedium) {
-    max-height: 300px;
+    max-height: 420px;
   }
+}
+
+/* Rows stack on a phone (a number input next to a long category name would wrap into
+   two cramped columns) and sit on one line once there is width for it. */
+.categoryRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+
+  @media (--viewportMedium) {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+  }
+}
+
+.categoryRow + .categoryRow {
+  border-top: 1px solid var(--coclosetBorder);
+}
+
+/* Lets the label take the space the turnaround control does not, so long category names
+   wrap rather than pushing the input off the row. */
+.categoryCheckbox {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .categoryEmpty {
@@ -197,91 +242,17 @@
   }
 }
 
-/* ================ Per-category pricing ================ */
+/* ================ Per-category turnaround control ================ */
 
-/* Studio-wide turnaround/fee are the FALLBACK; the real numbers are set here, per
-   category. The layout follows the two different granularities the values are
-   configured at: turnaround belongs to the top-level category (the group header),
-   price belongs to each accepted node (the rows). */
+/* The studio-wide turnaround above is the FALLBACK; the real number is set per
+   top-level category, on that category's own row in the table above. Only top-level
+   rows carry one - turnaround is "por categoría grande", and a subcategory input would
+   be a control that silently does nothing. */
 
 .pricingHelp {
   composes: h5 from global;
   margin: 0 0 12px 0;
   color: var(--coclosetInkMuted);
-}
-
-.pricingGroupList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pricingGroup {
-  padding: 12px;
-  border: 1px solid var(--coclosetBorder);
-  border-radius: var(--coclosetRadiusSmall);
-  background-color: var(--coclosetSurface);
-}
-
-/* Header stacks on a phone (a 90px number input next to a long category name would
-   wrap into two cramped columns) and sits on one row once there's width for it. */
-.pricingGroupHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-
-  @media (--viewportMedium) {
-    flex-direction: row;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-  }
-}
-
-.pricingGroupName {
-  composes: h4 from global;
-  margin: 0;
-  color: var(--coclosetInk);
-  font-weight: var(--fontWeightSemiBold);
-}
-
-.pricingRowList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 12px 0 0 0;
-  padding: 12px 0 0 0;
-  border-top: 1px solid var(--coclosetBorder);
-  list-style: none;
-
-  @media (--viewportMedium) {
-    gap: 8px;
-  }
-}
-
-.pricingRow {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  @media (--viewportMedium) {
-    flex-direction: row;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-  }
-}
-
-/* Carries the shared .categoryLevel* indent classes as well, so a subcategory price
-   row lines up under its parent exactly as it does in the checkbox list above. */
-.pricingRowName {
-  composes: h5 from global;
-  margin: 0;
-  padding-top: 6px;
-  color: var(--coclosetInk);
 }
 
 .pricingControl {

@@ -13,8 +13,8 @@ const userEntity = (
     displayName,
     laundryProfile,
     acceptedCategories,
-    turnaroundHours,
-    cleaningFee,
+    turnaroundDays,
+    legacyCleaningFee,
     categoryPricing,
   } = {}
 ) => ({
@@ -31,11 +31,12 @@ const userEntity = (
         someUnrelatedPublicKey: 'should-not-be-exposed',
       },
       privateData: {
-        ...(turnaroundHours !== undefined ? { turnaroundHours } : {}),
-        // cleaningFee is a server-side pricing input, never sent to the picker.
-        ...(cleaningFee !== undefined ? { cleaningFee } : {}),
-        // Neither is the per-category table, which holds per-category FEES alongside
-        // the hours. Only ONE resolved hours number may ever leave this module.
+        ...(turnaroundDays !== undefined ? { turnaroundDays } : {}),
+        // A cleaningFee left over from before fees became env configuration. It is dead
+        // data that nothing reads any more, and it must not leak into the picker either.
+        ...(legacyCleaningFee !== undefined ? { cleaningFee: legacyCleaningFee } : {}),
+        // The per-category table is privateData: only ONE resolved number may ever leave
+        // this module, never the table.
         ...(categoryPricing !== undefined ? { categoryPricing } : {}),
       },
       ...(isLaundry === undefined ? {} : { metadata: { isLaundry } }),
@@ -83,7 +84,7 @@ describe('toLaundryDirectoryEntry()', () => {
         displayName: 'Pigalle Pressing',
         laundryProfile: completeProfile,
         acceptedCategories: ['dresses', 'coats'],
-        turnaroundHours: 36,
+        turnaroundDays: 3,
       })
     );
 
@@ -95,20 +96,20 @@ describe('toLaundryDirectoryEntry()', () => {
       origin: { lat: 48.8821, lng: 2.3372 },
       businessHours: 'Mon-Fri 9-18',
       acceptedCategories: ['dresses', 'coats'],
-      turnaroundHours: 36,
+      turnaroundDays: 3,
       // No garment chain was passed, so this is the studio-wide number and the card
       // must not claim otherwise.
-      turnaroundHoursIsCategorySpecific: false,
+      turnaroundDaysIsCategorySpecific: false,
     });
   });
 
-  it('never leaks unrelated publicData keys or the cleaning fee', () => {
+  it('never leaks unrelated publicData keys or a legacy stored cleaning fee', () => {
     const entry = toLaundryDirectoryEntry(
       userEntity('laundry-1', {
         isLaundry: true,
         laundryProfile: completeProfile,
-        turnaroundHours: 24,
-        cleaningFee: 42,
+        turnaroundDays: 2,
+        legacyCleaningFee: 42,
       })
     );
 
@@ -120,31 +121,31 @@ describe('toLaundryDirectoryEntry()', () => {
       'id',
       'origin',
       'studioName',
-      'turnaroundHours',
-      'turnaroundHoursIsCategorySpecific',
+      'turnaroundDays',
+      'turnaroundDaysIsCategorySpecific',
     ]);
     expect(JSON.stringify(entry)).not.toContain('should-not-be-exposed');
     expect(JSON.stringify(entry)).not.toContain('42');
   });
 
-  it('never leaks PER-CATEGORY cleaning fees, even while resolving hours from that table', () => {
-    // The whole reason turnaround is resolved server-side instead of shipping
-    // `categoryPricing` to the browser: the same table holds the studio's fee list.
-    // One resolved number goes out; the price list does not.
+  it('never leaks the stored table, even while resolving turnaround from it', () => {
+    // Turnaround is resolved server-side rather than shipping `categoryPricing` to the
+    // browser: the table is the studio's privateData, including any fee rows left over
+    // from before fees became env configuration. One resolved number goes out.
     const entry = toLaundryDirectoryEntry(
       userEntity('laundry-1', {
         isLaundry: true,
         laundryProfile: completeProfile,
-        turnaroundHours: 24,
+        turnaroundDays: 2,
         categoryPricing: {
-          dresses: { turnaroundHours: 72, cleaningFee: 999 },
+          dresses: { turnaroundDays: 5, cleaningFee: 999 },
           midi_dress: { cleaningFee: 777 },
         },
       }),
       ['dresses', 'midi_dress']
     );
 
-    expect(entry.turnaroundHours).toBe(72);
+    expect(entry.turnaroundDays).toBe(5);
     expect(JSON.stringify(entry)).not.toContain('999');
     expect(JSON.stringify(entry)).not.toContain('777');
     expect(JSON.stringify(entry)).not.toContain('cleaningFee');
@@ -154,15 +155,15 @@ describe('toLaundryDirectoryEntry()', () => {
     const user = userEntity('l', {
       isLaundry: true,
       laundryProfile: completeProfile,
-      turnaroundHours: 24,
-      categoryPricing: { dresses: { turnaroundHours: 72 }, midi_dress: { turnaroundHours: 6 } },
+      turnaroundDays: 2,
+      categoryPricing: { dresses: { turnaroundDays: 5 }, midi_dress: { turnaroundDays: 1 } },
     });
 
-    // Hours are configured "por categoría grande", so the subcategory entry is inert
-    // and the top-level 72 is what this garment gets.
+    // Turnaround is configured "por categoría grande", so the subcategory entry is inert
+    // and the top-level 5 days is what this garment gets.
     const entry = toLaundryDirectoryEntry(user, ['dresses', 'midi_dress']);
-    expect(entry.turnaroundHours).toBe(72);
-    expect(entry.turnaroundHoursIsCategorySpecific).toBe(true);
+    expect(entry.turnaroundDays).toBe(5);
+    expect(entry.turnaroundDaysIsCategorySpecific).toBe(true);
   });
 
   it('falls back to the studio-wide number when the garment category has no entry', () => {
@@ -170,16 +171,16 @@ describe('toLaundryDirectoryEntry()', () => {
       userEntity('l', {
         isLaundry: true,
         laundryProfile: completeProfile,
-        turnaroundHours: 24,
-        categoryPricing: { dresses: { turnaroundHours: 72 } },
+        turnaroundDays: 2,
+        categoryPricing: { dresses: { turnaroundDays: 5 } },
       }),
       ['pants']
     );
 
-    expect(entry.turnaroundHours).toBe(24);
-    // False, so the card says "Turnaround: 24h" rather than promising 24h for pants
+    expect(entry.turnaroundDays).toBe(2);
+    // False, so the card says "Turnaround: 2 days" rather than promising 2 days for pants
     // specifically. A studio-wide number is not a per-category commitment.
-    expect(entry.turnaroundHoursIsCategorySpecific).toBe(false);
+    expect(entry.turnaroundDaysIsCategorySpecific).toBe(false);
   });
 
   it('keeps the studio-wide number when no garment chain is passed at all', () => {
@@ -189,39 +190,39 @@ describe('toLaundryDirectoryEntry()', () => {
       userEntity('l', {
         isLaundry: true,
         laundryProfile: completeProfile,
-        turnaroundHours: 24,
-        categoryPricing: { dresses: { turnaroundHours: 72 } },
+        turnaroundDays: 2,
+        categoryPricing: { dresses: { turnaroundDays: 5 } },
       })
     );
 
-    expect(entry.turnaroundHours).toBe(24);
-    expect(entry.turnaroundHoursIsCategorySpecific).toBe(false);
+    expect(entry.turnaroundDays).toBe(2);
+    expect(entry.turnaroundDaysIsCategorySpecific).toBe(false);
   });
 
   it('still coerces a STRING studio-wide turnaround when a garment chain is passed', () => {
-    // The pure resolver deliberately rejects strings; parseTurnaroundHours does not.
-    // Passing a category must not make a Console-written '36' vanish from the card.
+    // The pure resolver deliberately rejects strings; parseTurnaroundDays does not.
+    // Passing a category must not make a Console-written '3' vanish from the card.
     const entry = toLaundryDirectoryEntry(
-      userEntity('l', { isLaundry: true, laundryProfile: completeProfile, turnaroundHours: '36' }),
+      userEntity('l', { isLaundry: true, laundryProfile: completeProfile, turnaroundDays: '3' }),
       ['dresses']
     );
 
-    expect(entry.turnaroundHours).toBe(36);
-    expect(entry.turnaroundHoursIsCategorySpecific).toBe(false);
+    expect(entry.turnaroundDays).toBe(3);
+    expect(entry.turnaroundDaysIsCategorySpecific).toBe(false);
   });
 
-  it('coerces a string turnaroundHours to a number (Console/API can store a string)', () => {
+  it('coerces a string turnaroundDays to a number (Console/API can store a string)', () => {
     const entry = toLaundryDirectoryEntry(
-      userEntity('l', { isLaundry: true, laundryProfile: completeProfile, turnaroundHours: '36' })
+      userEntity('l', { isLaundry: true, laundryProfile: completeProfile, turnaroundDays: '3' })
     );
-    expect(entry.turnaroundHours).toBe(36);
+    expect(entry.turnaroundDays).toBe(3);
   });
 
-  it('nulls out a non-positive or unparseable turnaroundHours', () => {
+  it('nulls out a non-positive or unparseable turnaroundDays', () => {
     const mk = v =>
       toLaundryDirectoryEntry(
-        userEntity('l', { isLaundry: true, laundryProfile: completeProfile, turnaroundHours: v })
-      ).turnaroundHours;
+        userEntity('l', { isLaundry: true, laundryProfile: completeProfile, turnaroundDays: v })
+      ).turnaroundDays;
     expect(mk(0)).toBeNull();
     expect(mk(-5)).toBeNull();
     expect(mk('soon')).toBeNull();
@@ -238,6 +239,15 @@ describe('toLaundryDirectoryEntry()', () => {
     expect(mk({ lat: 1 })).toBeNull();
     expect(mk({ lat: '48.8', lng: '2.3' })).toBeNull();
     expect(mk({ lat: NaN, lng: 2 })).toBeNull();
+  });
+
+  it('does not read a legacy turnaroundHours key as days', () => {
+    // An old profile carrying 48 HOURS must not become a 48-DAY promise on a card.
+    const user = userEntity('l', { isLaundry: true, laundryProfile: completeProfile });
+    user.attributes.profile.privateData.turnaroundHours = 48;
+    user.attributes.profile.privateData.categoryPricing = { dresses: { turnaroundHours: 72 } };
+
+    expect(toLaundryDirectoryEntry(user, ['dresses']).turnaroundDays).toBeNull();
   });
 
   it('defaults acceptedCategories to an array', () => {
@@ -337,20 +347,20 @@ describe('buildLaundryDirectory()', () => {
       userEntity('a', {
         isLaundry: true,
         laundryProfile: completeProfile,
-        turnaroundHours: 24,
-        categoryPricing: { dresses: { turnaroundHours: 72 } },
+        turnaroundDays: 2,
+        categoryPricing: { dresses: { turnaroundDays: 5 } },
       }),
       userEntity('b', {
         isLaundry: true,
         laundryProfile: completeProfile,
-        turnaroundHours: 24,
-        categoryPricing: { dresses: { turnaroundHours: 12 } },
+        turnaroundDays: 2,
+        categoryPricing: { dresses: { turnaroundDays: 4 } },
       }),
     ];
 
     const { laundries } = buildLaundryDirectory(users, ['dresses', 'midi_dress']);
 
-    expect(laundries.map(l => l.turnaroundHours)).toEqual([72, 12]);
-    expect(laundries.every(l => l.turnaroundHoursIsCategorySpecific)).toBe(true);
+    expect(laundries.map(l => l.turnaroundDays)).toEqual([5, 4]);
+    expect(laundries.every(l => l.turnaroundDaysIsCategorySpecific)).toBe(true);
   });
 });

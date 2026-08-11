@@ -46,7 +46,7 @@ const LAUNDRIES = [
     address: '21 Rue Frochot, Paris',
     origin: { lat: 48.882, lng: 2.338 },
     acceptedCategories: ['dresses'],
-    turnaroundHours: 48,
+    turnaroundDays: 2,
   },
   {
     id: 'laundry-2',
@@ -55,7 +55,7 @@ const LAUNDRIES = [
     address: '5 Rue des Rosiers, Paris',
     origin: { lat: 48.857, lng: 2.359 },
     acceptedCategories: ['dresses'],
-    turnaroundHours: 36,
+    turnaroundDays: 3,
   },
 ];
 

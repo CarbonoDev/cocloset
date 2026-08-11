@@ -274,8 +274,11 @@ exports.transactionLineItems = (
  * copies of "resolve the fee, then call transactionLineItems" is exactly how
  * that happened, so there is now one copy and the endpoints call it.
  *
- * `transactionLineItems` stays synchronous; this wrapper owns the async
- * Integration API lookup that has to happen first.
+ * Still returns a Promise even though resolving the fee is now a synchronous env
+ * read (it used to be an Integration API lookup of the assigned laundry — see
+ * lineItemHelpers.resolveCleaningFeeInSubunits). Keeping the async contract means
+ * the three endpoints above did not have to change when the fee moved into the
+ * environment, and leaves room for a future input that does need I/O.
  *
  * @param {Object} params
  * @param {Object} params.listing
@@ -292,7 +295,7 @@ exports.buildLineItemsForListing = ({
   customerCommission,
   currency,
 }) =>
-  resolveCleaningFeeInSubunits(listing, currency).then(cleaningFeeInSubunits =>
+  Promise.resolve(resolveCleaningFeeInSubunits(listing, currency)).then(cleaningFeeInSubunits =>
     exports.transactionLineItems(
       listing,
       orderData,

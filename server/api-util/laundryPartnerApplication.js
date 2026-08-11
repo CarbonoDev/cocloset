@@ -14,16 +14,20 @@
  * - Every string field has a hard length cap, mirrored on the client.
  *
  * Field names intentionally match `src/containers/LaundryProfilePage/LaundryProfileForm`
- * where they overlap (`studioName`, `businessHours`, `turnaroundHours`,
+ * where they overlap (`studioName`, `businessHours`, `turnaroundDays`,
  * `acceptedCategories`) so an approved application maps onto a real laundry profile
- * without a translation layer.
+ * without a translation layer. That parity is the reason turnaround is stated in DAYS
+ * here: the profile field it maps onto is `privateData.turnaroundDays`, and an
+ * application quoting hours would need an operator to convert it by hand — which is
+ * exactly the sort of silent unit mismatch this codebase has none of.
  */
 
 const log = require('../log');
 const { sendMail } = require('./mailgun');
 
-// Max hours a laundry could plausibly claim as turnaround (30 days).
-const MAX_TURNAROUND_HOURS = 720;
+// Max days a laundry could plausibly claim as turnaround. A month is already
+// implausible; beyond it the number is a typo, not a service.
+const MAX_TURNAROUND_DAYS = 30;
 
 // Comma-separated garment categories are split into an array, matching the
 // convention already used by LaundryProfilePage.
@@ -105,19 +109,19 @@ const validateApplication = body => {
     application[name] = value;
   }
 
-  const turnaroundHours = Number(source.turnaroundHours);
+  const turnaroundDays = Number(source.turnaroundDays);
   if (
-    source.turnaroundHours == null ||
-    source.turnaroundHours === '' ||
-    !Number.isInteger(turnaroundHours) ||
-    turnaroundHours < 1 ||
-    turnaroundHours > MAX_TURNAROUND_HOURS
+    source.turnaroundDays == null ||
+    source.turnaroundDays === '' ||
+    !Number.isInteger(turnaroundDays) ||
+    turnaroundDays < 1 ||
+    turnaroundDays > MAX_TURNAROUND_DAYS
   ) {
     return invalid(
-      `Missing or invalid "turnaroundHours" in request body. Must be a whole number of hours between 1 and ${MAX_TURNAROUND_HOURS}.`
+      `Missing or invalid "turnaroundDays" in request body. Must be a whole number of days between 1 and ${MAX_TURNAROUND_DAYS}.`
     );
   }
-  application.turnaroundHours = turnaroundHours;
+  application.turnaroundDays = turnaroundDays;
 
   // Same comma-separated-string -> array convention as LaundryProfilePage.
   const categories = application.acceptedCategories
@@ -153,7 +157,7 @@ const EMAIL_FIELD_LABELS = [
   ['address', 'Address'],
   ['businessHours', 'Business hours'],
   ['acceptedCategories', 'Garments accepted'],
-  ['turnaroundHours', 'Turnaround (hours)'],
+  ['turnaroundDays', 'Turnaround (days)'],
   ['notes', 'Notes'],
 ];
 
@@ -302,7 +306,7 @@ module.exports = {
   deliverApplication,
   FIELD_SPECS,
   HONEYPOT_FIELD,
-  MAX_TURNAROUND_HOURS,
+  MAX_TURNAROUND_DAYS,
   MAX_CATEGORIES,
   MAX_CATEGORY_LENGTH,
 };

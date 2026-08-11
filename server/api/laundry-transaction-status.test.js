@@ -62,7 +62,7 @@ const laundryUser = {
     email: 'studio@example.com',
     profile: {
       publicData: { laundryProfile: { studioName: 'Studio Pigalle' } },
-      privateData: { turnaroundHours: 48 },
+      privateData: { turnaroundDays: 2 },
     },
   },
 };
@@ -533,7 +533,7 @@ describe('laundry-transaction-status', () => {
   // about returns than it did before.
   // -------------------------------------------------------------------------
   describe('the real return: custody, readiness and availability', () => {
-    // 48h configured turnaround (see laundryUser) -> 2 days by default.
+    // 2-day configured turnaround (see laundryUser).
     const DEFAULT_DAYS = 2;
     const dayMs = 24 * 3600 * 1000;
     const utcMidnight = date =>

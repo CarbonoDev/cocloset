@@ -19,25 +19,26 @@
 // spreading it turns this endpoint into an open pipe for whatever a laundry
 // happens to have stored on its profile now or in future.
 //
-// `turnaroundHours` lives in the laundry's *privateData* and is surfaced here
+// `turnaroundDays` lives in the laundry's *privateData* and is surfaced here
 // on purpose — the picker cards (mockup 12.jpg) show it to garment owners
-// before any relationship exists. `cleaningFee`, the other privateData field
-// on the laundry profile, is NOT exposed: it is a server-side pricing input.
+// before any relationship exists. Nothing else from privateData is exposed.
 //
-// PER-CATEGORY TURNAROUND. A laundry now sets hours per top-level category, so a
-// single studio-wide "Turnaround: 48h" on a card is the wrong number as often as it is
-// the right one — the owner is choosing a laundry for ONE specific garment. When the
-// caller passes that garment's category chain, `turnaroundHours` is the value resolved
-// for THAT category (see api-util/categoryPricing.js) and
-// `turnaroundHoursIsCategorySpecific` says so, letting the card label it honestly
-// instead of implying a studio-wide promise. With no chain passed, the response is
-// exactly what it was before: the studio-wide value.
+// Cleaning fees are not in this response and cannot be: they are no longer laundry
+// data at all, but marketplace-level server env configuration
+// (`CLEANING_FEE_<CATEGORY_ID>` — see api-util/cleaningFeeEnv.js).
+//
+// PER-CATEGORY TURNAROUND. A laundry sets DAYS per top-level category, so a single
+// studio-wide "Turnaround: 2 days" on a card is the wrong number as often as it is the
+// right one — the owner is choosing a laundry for ONE specific garment. When the caller
+// passes that garment's category chain, `turnaroundDays` is the value resolved for THAT
+// category (see api-util/categoryPricing.js) and `turnaroundDaysIsCategorySpecific` says
+// so, letting the card label it honestly instead of implying a studio-wide promise. With
+// no chain passed, the response is the studio-wide value.
 //
 // The resolution happens HERE, server-side, rather than shipping the whole
-// `categoryPricing` table to the client: that table also holds per-category cleaning
-// FEES, which are a pricing input and must not leave the server. Sending one resolved
-// number leaks nothing that the old single `turnaroundHours` field did not.
-const { resolveTurnaroundHoursEntry } = require('./categoryPricing');
+// `categoryPricing` table to the client: one resolved number is all a card needs, and
+// the table is privateData that no other user is entitled to read wholesale.
+const { resolveTurnaroundDaysEntry } = require('./categoryPricing');
 
 // A laundry's `origin` has to be a real coordinate pair, because the listing
 // wizard copies it onto the listing's own `geolocation` (see
@@ -54,11 +55,11 @@ const parseOrigin = origin => {
   return isValid ? { lat, lng } : null;
 };
 
-// turnaroundHours can legitimately arrive as a string: the LaundryProfileForm
+// turnaroundDays can legitimately arrive as a string: the LaundryProfileForm
 // parses it to an int, but Console / the Integration API / set-laundry-role.js
 // can all write a raw string. Coerce here so consumers get a number or null,
-// never `'36'` (which `Number.isFinite` rejects — see resolveTurnaroundHours).
-const parseTurnaroundHours = value => {
+// never `'3'` (which `Number.isFinite` rejects — see resolveTurnaroundDays).
+const parseTurnaroundDays = value => {
   const parsed = typeof value === 'number' ? value : Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
@@ -79,10 +80,10 @@ const isLaundryUserEntity = user => user?.attributes?.profile?.metadata?.isLaund
  * @param {Object} user - a `user` API entity
  * @param {Array<string>} [listingCategoryValues] - the category chain of the garment
  *   the owner is picking a laundry FOR, general -> specific. When given,
- *   `turnaroundHours` is resolved for that garment rather than studio-wide.
+ *   `turnaroundDays` is resolved for that garment rather than studio-wide.
  * @returns {Object} flat record: id, displayName, studioName, address, origin,
- *   businessHours, acceptedCategories, turnaroundHours,
- *   turnaroundHoursIsCategorySpecific
+ *   businessHours, acceptedCategories, turnaroundDays,
+ *   turnaroundDaysIsCategorySpecific
  */
 const toLaundryDirectoryEntry = (user, listingCategoryValues = []) => {
   const profile = user?.attributes?.profile || {};
@@ -94,13 +95,13 @@ const toLaundryDirectoryEntry = (user, listingCategoryValues = []) => {
   const chain = Array.isArray(listingCategoryValues) ? listingCategoryValues : [];
   // With a garment in hand, resolve for it (its top-level category, then studio-wide).
   // When that finds nothing — and always when no garment was passed — fall through to
-  // the pre-existing lenient studio-wide read: `parseTurnaroundHours` also coerces the
+  // the pre-existing lenient studio-wide read: `parseTurnaroundDays` also coerces the
   // raw strings Console / set-laundry-role.js can write, which the pure resolver
   // deliberately does not, and a card showing no turnaround at all would be a
   // regression for those profiles.
-  const resolved = chain.length > 0 ? resolveTurnaroundHoursEntry(privateData, chain) : null;
-  const turnaroundHours =
-    resolved !== null ? resolved.value : parseTurnaroundHours(privateData.turnaroundHours);
+  const resolved = chain.length > 0 ? resolveTurnaroundDaysEntry(privateData, chain) : null;
+  const turnaroundDays =
+    resolved !== null ? resolved.value : parseTurnaroundDays(privateData.turnaroundDays);
 
   return {
     id: user?.id?.uuid || null,
@@ -110,11 +111,11 @@ const toLaundryDirectoryEntry = (user, listingCategoryValues = []) => {
     origin: parseOrigin(laundryProfile.origin),
     businessHours: laundryProfile.businessHours || null,
     acceptedCategories: Array.isArray(acceptedCategories) ? acceptedCategories : [],
-    turnaroundHours,
+    turnaroundDays,
     // True only when the number above came from an entry for this garment's own
     // top-level category. A studio-wide value reads as `false`, so the card never
     // claims a category-specific promise the laundry did not make.
-    turnaroundHoursIsCategorySpecific: resolved?.source === 'category',
+    turnaroundDaysIsCategorySpecific: resolved?.source === 'category',
   };
 };
 

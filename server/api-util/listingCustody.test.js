@@ -56,7 +56,7 @@ describe('validateCleaningDays', () => {
 
 describe('resolveCleaningDays', () => {
   it("prefers the laundry's own number", () => {
-    expect(resolveCleaningDays({ requestedDays: 5, turnaroundHours: 48 })).toEqual({
+    expect(resolveCleaningDays({ requestedDays: 5, turnaroundDays: 2 })).toEqual({
       days: 5,
       source: 'laundry',
     });
@@ -65,25 +65,26 @@ describe('resolveCleaningDays', () => {
   it('keeps an explicit 0 rather than falling through to the default', () => {
     // The bug this pins: `requestedDays || default` would silently turn "ready
     // today" into a two-day block.
-    expect(resolveCleaningDays({ requestedDays: 0, turnaroundHours: 48 })).toEqual({
+    expect(resolveCleaningDays({ requestedDays: 0, turnaroundDays: 2 })).toEqual({
       days: 0,
       source: 'laundry',
     });
   });
 
-  it('falls back to the configured turnaround, rounded UP to whole days', () => {
-    // 36h is a day and a half of work; blocking one day would offer the garment
-    // while it is still in a machine.
-    expect(resolveCleaningDays({ requestedDays: null, turnaroundHours: 36 })).toEqual({
+  it('falls back to the configured turnaround, which is already in days', () => {
+    expect(resolveCleaningDays({ requestedDays: null, turnaroundDays: 2 })).toEqual({
       days: 2,
       source: 'configured-turnaround',
     });
-    expect(resolveCleaningDays({ requestedDays: null, turnaroundHours: 48 })).toEqual({
-      days: 2,
-      source: 'configured-turnaround',
-    });
-    expect(resolveCleaningDays({ requestedDays: null, turnaroundHours: 72 })).toEqual({
+    expect(resolveCleaningDays({ requestedDays: null, turnaroundDays: 3 })).toEqual({
       days: 3,
+      source: 'configured-turnaround',
+    });
+    // A fraction can still arrive from an env var or a hand-written profile, and is
+    // rounded UP: a day and a half of work blocked as one day would offer the garment
+    // while it is still in a machine.
+    expect(resolveCleaningDays({ requestedDays: null, turnaroundDays: 1.5 })).toEqual({
+      days: 2,
       source: 'configured-turnaround',
     });
   });

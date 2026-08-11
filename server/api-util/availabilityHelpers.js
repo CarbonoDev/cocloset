@@ -1,21 +1,30 @@
-const HOURS_IN_DAY = 24;
-
 // Hardcoded last-resort fallback if neither the laundry's own privateData
-// turnaround setting nor the DEFAULT_LAUNDRY_BUFFER_HOURS env var is set.
+// turnaround setting nor the DEFAULT_LAUNDRY_BUFFER_DAYS env var is set.
 // See create-availability-buffer.js for where this is actually consulted.
-const HARDCODED_DEFAULT_BUFFER_HOURS = 48;
+//
+// 2 days, which is what the previous 48-hour default worked out to. The unit
+// changed, the behaviour did not.
+const HARDCODED_DEFAULT_BUFFER_DAYS = 2;
 
 /**
- * Split a total laundry-turnaround time (in hours) into "buffer-before" and
+ * Split a total laundry-turnaround time (in DAYS) into "buffer-before" and
  * "buffer-after" day counts, to block on either side of a booking's rental
  * dates while the garment is picked up / cleaned / returned.
  *
+ * Turnaround is expressed in days end to end (a studio states days in its
+ * profile; DEFAULT_LAUNDRY_BUFFER_DAYS is days), and the calendar this feeds is
+ * day-granular, so there is NO unit conversion anywhere in this module. That is
+ * deliberate: this function used to take hours and divide by 24, which meant
+ * every caller had to remember which unit its variable was in.
+ *
  * Rounding rule (Phase 1 - deliberately simple, not spec'd exactly by the
  * design doc §5/§13, this is a judgment call):
- *   - totalBufferDays = ceil(turnaroundHours / 24). We always round UP so we
- *     never under-block - it's fine to hold a listing unavailable for an
- *     extra few hours, it is NOT fine to let a new booking start before the
- *     laundry has actually finished cleaning.
+ *   - totalBufferDays = ceil(turnaroundDays). Whole days only, and always
+ *     rounded UP so we never under-block: it's fine to hold a listing
+ *     unavailable for a few extra hours, it is NOT fine to let a new booking
+ *     start before the laundry has actually finished cleaning. (The ceiling
+ *     matters for a fractional value, which only an env var or a hand-written
+ *     profile can produce - the form takes integers.)
  *   - The total is then split as evenly as possible between "before" and
  *     "after". On an odd total, the extra day is assigned to the AFTER side:
  *     the before-buffer only covers pickup logistics (laundry hasn't
@@ -23,20 +32,20 @@ const HARDCODED_DEFAULT_BUFFER_HOURS = 48;
  *     cleaning work happens once the garment is back - that's the side more
  *     likely to need the extra day if turnaround doesn't divide evenly.
  *
- * @param {number} turnaroundHours - total laundry turnaround time, in hours.
+ * @param {number} turnaroundDays - total laundry turnaround time, in days.
  *   Must be a positive finite number; callers are responsible for resolving
  *   fallbacks (laundry privateData -> env var -> hardcoded default) before
  *   calling this function - it does not apply any fallback itself.
  * @returns {{ totalBufferDays: number, bufferBeforeDays: number, bufferAfterDays: number }}
  */
-const computeBufferDays = turnaroundHours => {
-  if (!Number.isFinite(turnaroundHours) || turnaroundHours <= 0) {
+const computeBufferDays = turnaroundDays => {
+  if (!Number.isFinite(turnaroundDays) || turnaroundDays <= 0) {
     throw new Error(
-      `computeBufferDays: turnaroundHours must be a positive finite number, got: ${turnaroundHours}`
+      `computeBufferDays: turnaroundDays must be a positive finite number, got: ${turnaroundDays}`
     );
   }
 
-  const totalBufferDays = Math.ceil(turnaroundHours / HOURS_IN_DAY);
+  const totalBufferDays = Math.ceil(turnaroundDays);
   const bufferBeforeDays = Math.floor(totalBufferDays / 2);
   const bufferAfterDays = totalBufferDays - bufferBeforeDays;
 
@@ -86,10 +95,10 @@ const ceilToUtcDay = date => {
  *
  * @param {Date} bookingStart
  * @param {Date} bookingEnd
- * @param {number} turnaroundHours - see computeBufferDays for fallback rules (resolved by caller)
+ * @param {number} turnaroundDays - see computeBufferDays for fallback rules (resolved by caller)
  * @returns {{ start: Date, end: Date, bufferBeforeDays: number, bufferAfterDays: number, totalBufferDays: number }}
  */
-const computeAvailabilityBufferWindow = (bookingStart, bookingEnd, turnaroundHours) => {
+const computeAvailabilityBufferWindow = (bookingStart, bookingEnd, turnaroundDays) => {
   if (!(bookingStart instanceof Date) || Number.isNaN(bookingStart.getTime())) {
     throw new Error('computeAvailabilityBufferWindow: bookingStart must be a valid Date');
   }
@@ -97,7 +106,7 @@ const computeAvailabilityBufferWindow = (bookingStart, bookingEnd, turnaroundHou
     throw new Error('computeAvailabilityBufferWindow: bookingEnd must be a valid Date');
   }
 
-  const { totalBufferDays, bufferBeforeDays, bufferAfterDays } = computeBufferDays(turnaroundHours);
+  const { totalBufferDays, bufferBeforeDays, bufferAfterDays } = computeBufferDays(turnaroundDays);
 
   const start = addDays(bookingStart, -bufferBeforeDays);
   const end = addDays(bookingEnd, bufferAfterDays);
@@ -105,21 +114,21 @@ const computeAvailabilityBufferWindow = (bookingStart, bookingEnd, turnaroundHou
   return { start, end, bufferBeforeDays, bufferAfterDays, totalBufferDays };
 };
 
-// Resolve the turnaround hours to use for a given laundry, applying the
+// Resolve the turnaround DAYS to use for a given laundry, applying the
 // fallback chain documented in create-availability-buffer.js: laundry's own
-// privateData setting -> DEFAULT_LAUNDRY_BUFFER_HOURS env var -> hardcoded
-// default. Never throws - always returns a usable positive number.
-const resolveTurnaroundHours = (laundryTurnaroundHours, envDefaultBufferHours) => {
-  if (Number.isFinite(laundryTurnaroundHours) && laundryTurnaroundHours > 0) {
-    return laundryTurnaroundHours;
+// privateData setting -> DEFAULT_LAUNDRY_BUFFER_DAYS env var -> hardcoded
+// default. Never throws - always returns a usable positive number of days.
+const resolveTurnaroundDays = (laundryTurnaroundDays, envDefaultBufferDays) => {
+  if (Number.isFinite(laundryTurnaroundDays) && laundryTurnaroundDays > 0) {
+    return laundryTurnaroundDays;
   }
 
-  const parsedEnvDefault = Number.parseFloat(envDefaultBufferHours);
+  const parsedEnvDefault = Number.parseFloat(envDefaultBufferDays);
   if (Number.isFinite(parsedEnvDefault) && parsedEnvDefault > 0) {
     return parsedEnvDefault;
   }
 
-  return HARDCODED_DEFAULT_BUFFER_HOURS;
+  return HARDCODED_DEFAULT_BUFFER_DAYS;
 };
 
 /**
@@ -233,14 +242,13 @@ const findBookableOverlaps = (desired, existing) => {
 };
 
 module.exports = {
-  HOURS_IN_DAY,
-  HARDCODED_DEFAULT_BUFFER_HOURS,
+  HARDCODED_DEFAULT_BUFFER_DAYS,
   computeBufferDays,
   addDays,
   floorToUtcDay,
   ceilToUtcDay,
   computeAvailabilityBufferWindow,
-  resolveTurnaroundHours,
+  resolveTurnaroundDays,
   subtractBlockedRanges,
   findBookableOverlaps,
 };
