@@ -6,9 +6,11 @@ import {
   minLength,
   maxLength,
   moneySubUnitAmountAtLeast,
+  optionalIntegerInRange,
   composeValidators,
   validBusinessURL,
   validHKID,
+  minimumBookingDays,
   requiredSelectTreeOption,
 } from './validators';
 import { createSlug } from '../util/urlHelpers';
@@ -183,6 +185,51 @@ describe('validators', () => {
       expect(moneySubUnitAmountAtLeast('fail', 50)(new Money(100, 'USD'))).toBeUndefined();
     });
   });
+  describe('optionalIntegerInRange()', () => {
+    const validate = optionalIntegerInRange('notInteger', 'tooSmall', 'tooBig', 1, 30);
+
+    it('should allow a missing or blank value', () => {
+      expect(validate(undefined)).toBeUndefined();
+      expect(validate(null)).toBeUndefined();
+      expect(validate('')).toBeUndefined();
+      expect(validate('   ')).toBeUndefined();
+    });
+    it('should allow the boundaries of the range', () => {
+      expect(validate('1')).toBeUndefined();
+      expect(validate(1)).toBeUndefined();
+      expect(validate('30')).toBeUndefined();
+      expect(validate(30)).toBeUndefined();
+    });
+    it('should allow a value inside the range', () => {
+      expect(validate('7')).toBeUndefined();
+      expect(validate(' 7 ')).toBeUndefined();
+    });
+    it('should reject a value below the minimum', () => {
+      expect(validate('0')).toEqual('tooSmall');
+      expect(validate(0)).toEqual('tooSmall');
+      expect(validate('-1')).toEqual('tooSmall');
+    });
+    it('should reject a value above the maximum', () => {
+      expect(validate('31')).toEqual('tooBig');
+      expect(validate(31)).toEqual('tooBig');
+    });
+    it('should reject decimals instead of truncating them', () => {
+      // Number.parseInt('2.5') is 2, which would silently store a different number.
+      expect(validate('2.5')).toEqual('notInteger');
+      expect(validate(2.5)).toEqual('notInteger');
+      expect(validate('1.0')).toEqual('notInteger');
+    });
+    it('should reject values that only start with digits', () => {
+      expect(validate('3 days')).toEqual('notInteger');
+      expect(validate('3px')).toEqual('notInteger');
+    });
+    it('should reject non-numeric values', () => {
+      expect(validate('abc')).toEqual('notInteger');
+      expect(validate(NaN)).toEqual('notInteger');
+      expect(validate(Infinity)).toEqual('notInteger');
+      expect(validate(true)).toEqual('notInteger');
+    });
+  });
   describe('validBusinessURL()', () => {
     it('should fail on example.com', () => {
       expect(validBusinessURL('fail')('example.com')).toEqual('fail');
@@ -272,4 +319,62 @@ describe('validators', () => {
       expect(validHKID('pass')('E327824(0)')).toBeUndefined();
     });
   });
+});
+
+describe('minimumBookingDays()', () => {
+  // Daily bookings hold an EXCLUSIVE end date: a 1-day rental is D -> D+1.
+  const d = n => new Date(2026, 7, n);
+  const range = days => ({ startDate: d(10), endDate: d(10 + days) });
+  const FAIL = 'too short';
+
+  it('rejects a range shorter than the minimum', () => {
+    expect(minimumBookingDays(3, FAIL)(range(2))).toEqual(FAIL);
+    expect(minimumBookingDays(3, FAIL)(range(1))).toEqual(FAIL);
+  });
+
+  it('accepts a range of exactly the minimum - the boundary is inclusive', () => {
+    expect(minimumBookingDays(3, FAIL)(range(3))).toBeUndefined();
+  });
+
+  it('accepts a longer range', () => {
+    expect(minimumBookingDays(3, FAIL)(range(9))).toBeUndefined();
+  });
+
+  // bookingDatesRequired owns the empty cases. Reporting "too short" for a field
+  // the customer has not filled in yet would be a worse message, not an extra one.
+  it('stays silent while either date is still missing', () => {
+    expect(minimumBookingDays(3, FAIL)({ startDate: d(10) })).toBeUndefined();
+    expect(minimumBookingDays(3, FAIL)({ endDate: d(12) })).toBeUndefined();
+    expect(minimumBookingDays(3, FAIL)({})).toBeUndefined();
+    expect(minimumBookingDays(3, FAIL)(undefined)).toBeUndefined();
+  });
+
+  it('is inert when there is no real minimum to enforce', () => {
+    expect(minimumBookingDays(1, FAIL)(range(1))).toBeUndefined();
+    expect(minimumBookingDays(0, FAIL)(range(1))).toBeUndefined();
+    expect(minimumBookingDays(null, FAIL)(range(1))).toBeUndefined();
+    expect(minimumBookingDays(undefined, FAIL)(range(1))).toBeUndefined();
+    expect(minimumBookingDays(2.5, FAIL)(range(1))).toBeUndefined();
+  });
+
+  it('stays silent on a reversed range instead of throwing', () => {
+    expect(() => minimumBookingDays(3, FAIL)({ startDate: d(20), endDate: d(10) })).not.toThrow();
+    expect(minimumBookingDays(3, FAIL)({ startDate: d(20), endDate: d(10) })).toBeUndefined();
+  });
+
+  // NOT TESTED HERE, DELIBERATELY: the DST case.
+  //
+  // This validator counts calendar days precisely because the picker's own
+  // `minimumNights` compares timestamps (`>= n * 864e5`), and across a
+  // spring-forward a genuine 3-day range spans only 71 hours - so the timestamp
+  // check rejects it while day counting accepts it. Verified directly against
+  // node in Europe/Madrid (2026-03-28 -> 2026-03-31 is 71h; moment's `diff(...,
+  // 'days')` still returns 3).
+  //
+  // It is not asserted in this suite because jest pins the process time zone:
+  // setting process.env.TZ inside a test has no effect in either the jsdom or the
+  // node environment (both keep reporting 72h), so any such test would pass
+  // without exercising a DST transition at all. A test that cannot fail for the
+  // reason it names is worse than no test, so the invariant is recorded here and
+  // in the validator's own comment instead.
 });

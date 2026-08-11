@@ -1,5 +1,6 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
 const { buildLineItemsForListing } = require('../api-util/lineItems');
+const { assertMinimumBookingDays } = require('../api-util/bookingRules');
 const {
   addOfferToMetadata,
   getAmountFromPreviousOffer,
@@ -184,6 +185,22 @@ module.exports = (req, res) => {
         orderData.currency;
       const { providerCommission, customerCommission } =
         commissionAsset?.type === 'jsonAsset' ? commissionAsset.attributes.data : {};
+
+      // The owner's minimum rental length. A no-op unless this transition
+      // actually carries booking dates (most do not - they act on a booking that
+      // already exists), but this endpoint is one of the two that can CREATE a
+      // reservation, so it needs the same gate as initiate-privileged.js.
+      //
+      // `listing` here comes from the transaction's `include: ['listing']`, and
+      // that included resource does carry `publicData`: the line-item builder
+      // below already reads `publicData.unitType` off this very object and
+      // refuses to price the booking when it is missing. So this check cannot
+      // silently skip for want of the field.
+      assertMinimumBookingDays({
+        listing,
+        bookingStart: bodyParams?.params?.bookingStart,
+        bookingEnd: bodyParams?.params?.bookingEnd,
+      });
 
       // Cleaning fee is sourced from the assigned laundry's privateData
       // (Integration API only), so it has to be resolved before the
