@@ -14,13 +14,31 @@
 // The message bodies live in ./laundryNotifications.js, deliberately kept
 // separate from this transport so each is testable on its own.
 //
-// THE CLIENT'S EXPLICIT REQUIREMENT (Jonathan, 2026-08-01):
-// "agreguemos un servicio de mailgun, si la key de mailgun no esta
-// establecida simplemente se ignora el envío" - when MAILGUN_API_KEY is not
-// set, sending is *silently skipped*, not attempted and not an error. Local
-// dev, CI and the test suite all run without Mailgun credentials and must
-// neither break nor emit noise. Hence: no throw, no console output, and no
-// HTTP call at all on the unconfigured path (see sendMail below).
+// THE CLIENT'S REQUIREMENT, AND THE REVISION TO IT
+//
+// Originally (Jonathan, 2026-08-01): "agreguemos un servicio de mailgun, si la
+// key de mailgun no esta establecida simplemente se ignora el envío" - when
+// MAILGUN_API_KEY is not set, sending is skipped, not attempted and not an
+// error.
+//
+// REVISED (Jonathan, 2026-08-10): "debe fallar solo con log sin impedir el flujo
+// si no existe la key o si no tenemos el mail de la laundry". The skip stays a
+// skip - still no throw, still no HTTP call, still never fails the surrounding
+// request - but it is no longer SILENT. It emits a log line.
+//
+// Why the change matters: there is no Mailgun account yet, so in Dev every send
+// takes the unconfigured path. Under the old behaviour the log was written with
+// log.devLogger, which prints only when REACT_APP_ENV === 'development' AND
+// VERBOSE === 'true' (see server/log.js) - i.e. never, in practice. That left no
+// observable evidence that any of this was wired up at all. The log is now the
+// only such evidence, which is exactly why it was asked for.
+//
+// A SKIP IS NOT A FAILURE, AND THE LOG SAYS WHICH. "We never tried" and "we
+// tried and it broke" are different operational facts, so they get different
+// codes: `mailgun-skipped-*` versus `mailgun-misconfigured` / `mailgun-send-failed`
+// / `mailgun-invalid-*`. Skips also pass `{ skipSentry: true }` - they belong in
+// stdout, not in an alerting channel, because in Dev they are the expected
+// outcome rather than an incident.
 //
 // NEVER REJECTS:
 // Every caller is a notification side-effect hanging off a transaction flow.
@@ -128,18 +146,18 @@ const partitionRecipients = to => {
  * **This promise never rejects.** It resolves with a result object:
  *
  *   { sent: true,  id }                              - accepted by Mailgun
- *   { sent: false, reason: 'not-configured' }        - no MAILGUN_API_KEY; silently skipped
+ *   { sent: false, reason: 'not-configured' }        - no MAILGUN_API_KEY; skipped, and logged
  *   { sent: false, reason: 'misconfigured', error }  - key set but MAILGUN_DOMAIN missing
  *   { sent: false, reason: 'invalid-recipient', error, invalid }
  *   { sent: false, reason: 'invalid-content', error }
  *   { sent: false, reason: 'error', error, status? } - network error or non-2xx from Mailgun
  *
  * The unconfigured path is checked FIRST, before any validation, so that a
- * credential-less environment produces exactly one outcome ('not-configured'),
- * makes zero HTTP calls, and writes nothing to stdout/stderr. Everything after
- * that check is only reachable when Mailgun is actually wired up, which is
- * also the only situation in which a failure is an operational problem worth
- * logging loudly.
+ * credential-less environment produces exactly one outcome ('not-configured')
+ * and makes zero HTTP calls. It logs that it did so (see the header note on the
+ * 2026-08-10 revision) but does not throw. Everything after that check is only
+ * reachable when Mailgun is actually wired up, which is also the only situation
+ * in which a failure is an operational problem rather than an expected skip.
  *
  * @param {Object} params
  * @param {string|string[]} params.to - recipient address(es), bare or `Name <a@b.com>`
@@ -155,15 +173,18 @@ const sendMail = async ({ to, subject, text, html, from, timeoutMs = DEFAULT_TIM
     const { apiKey, domain, fromEmail, apiBaseUrl } = readConfig();
 
     // ---- The client's requirement, first and cheapest ----------------------
-    // No key => do nothing, tell nobody, touch no network. devLogger is used
-    // rather than console.log on purpose: it prints only when
-    // REACT_APP_ENV === 'development' AND VERBOSE === 'true' (see
-    // server/log.js), so a developer who wants to know why no mail arrived can
-    // opt in, while `yarn test` / `yarn test-server` / CI - which may call this
-    // hundreds of times - stay completely silent. A bare console.log here
-    // would turn every unconfigured send into test-suite noise.
+    // No key => touch no network, fail nothing, but SAY SO. This used
+    // log.devLogger, which never prints in practice (see the header note on the
+    // 2026-08-10 revision); "fallar solo con log sin impedir el flujo" makes the
+    // log the point. skipSentry keeps it out of alerting: with no Mailgun
+    // account yet this is the expected outcome of every send, not an incident.
     if (!apiKey) {
-      log.devLogger('[mailgun] MAILGUN_API_KEY is not set - skipping email send.');
+      log.error(
+        new Error('MAILGUN_API_KEY is not set - skipping email send.'),
+        'mailgun-skipped-not-configured',
+        { subject },
+        { skipSentry: true }
+      );
       return { sent: false, reason: 'not-configured' };
     }
 

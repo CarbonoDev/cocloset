@@ -1,0 +1,56 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en">
+  {{set-translations (asset "content/email-texts.json")}}
+  {{set-locale (asset "general/localization.json" "locale" "en_US")}}
+  {{set-timezone transaction.listing.availability-plan.timezone}}
+  <head>
+    <meta http-equiv="Content-Type" content="text/html charset=UTF-8" />
+  </head>{{#with transaction}}
+  <table style="background-color:#FFF;margin:0 auto;padding:24px 12px 0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+    <tbody>
+      <tr>
+        <td>
+          <table align="center" role="presentation" cellSpacing="0" cellPadding="0" border="0" width="100%" style="max-width:600px;margin:0 auto">
+            <tr style="width:100%">
+              <td>
+                <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{#if metadata.damageReported.flag}}{{t "BookingReturnCompletedCustomer.TitleDamage" "The laundry reported damage on {listingTitle}" listingTitle=listing.title}}{{else}}{{t "BookingReturnCompletedCustomer.Title" "Thanks for returning {listingTitle}" listingTitle=listing.title}}{{/if}}</h1>
+                {{#if metadata.damageReported.flag}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompletedCustomer.ContentDamage" "The laundry has checked in {listingTitle} and inspected it. They have reported damage, so we are telling you at the same time as the owner. Their note is below, exactly as they wrote it." listingTitle=listing.title}}</p>
+                <table style="margin:16px 0;background-color:#FDF3F1;border-left:4px solid #D0432B;border-radius:4px" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                  <tbody>
+                    <tr>
+                      <td style="padding:16px 20px">
+                        <p style="font-size:13px;line-height:1.4;margin:0;color:#8A2D1B;text-transform:uppercase;letter-spacing:0.4px;font-weight:700">{{t "BookingReturnCompletedCustomer.DamageNoteLabel" "Damage reported by the laundry"}}</p>
+                        <p style="font-size:16px;line-height:1.5;margin:8px 0 0;color:#484848">{{#if metadata.damageReported.note}}{{metadata.damageReported.note}}{{else}}{{t "BookingReturnCompletedCustomer.DamageNoteMissing" "The laundry flagged damage but did not leave any details."}}{{/if}}</p>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompletedCustomer.DamageNextSteps" "This is a report, not a charge. Nothing has been taken from you and no decision has been made about who is responsible. {marketplaceName} will contact you before anything changes. If you think the note is wrong, reply on the order page now, while the garment is still at the laundry and can be re-checked." marketplaceName=marketplace.name}}</p>
+                {{else}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompletedCustomer.Content" "The laundry has checked in {listingTitle} and inspected it. They reported no damage, so your rental is complete and there is nothing left for you to do." listingTitle=listing.title}}</p>
+                {{/if}}
+                <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                  <tbody>
+                    <tr>
+                      <td><a href="{{marketplace.url}}/order/{{url-encode id}}/" target="_blank" style="color:#FFF;background-color:{{asset "design/branding.json" "marketplaceColors.notificationPrimaryButton" "#6938EF"}};border-radius:4px;font-size:15px;text-decoration:none;text-align:center;display:inline-block;min-width:210px;padding:0px 0px;line-height:100%;max-width:100%"><span><!--[if mso]><i style="letter-spacing: undefinedpx;mso-font-width:-100%;mso-text-raise:0" hidden>&nbsp;</i><![endif]--></span><span style="color:#FFF;background-color:{{asset "design/branding.json" "marketplaceColors.notificationPrimaryButton" "#6938EF"}};border-radius:4px;font-size:15px;text-decoration:none;text-align:center;display:inline-block;min-width:210px;padding:16px 32px;max-width:100%;line-height:120%;text-transform:none;mso-padding-alt:0px;mso-text-raise:0">{{t "BookingReturnCompletedCustomer.Cta" "View order details"}}</span><span><!--[if mso]><i style="letter-spacing: undefinedpx;mso-font-width:-100%" hidden>&nbsp;</i><![endif]--></span></a>
+                        <div>
+                          <p style="font-size:14px;line-height:1.5;margin:16px 0;color:#484848">{{t "TransactionEmails.AccessibleLinkText" "Can't click the button? Here's a link for your convenience:"}} <a target="_blank" style="color:{{asset "design/branding.json" "marketplaceColors.notificationPrimaryButton" "#6938EF"}};text-decoration:none" href="{{marketplace.url}}/order/{{url-encode id}}/">{{marketplace.url}}/order/{{url-encode id}}/</a></p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                {{/with}}
+                <div>
+                  <hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#E1E1E1;margin:20px 0" />
+                  <p style="font-size:12px;line-height:15px;margin:0 auto;color:#b7b7b7;text-align:left;margin-bottom:50px">{{t "TransactionEmails.MembershipParagraph" "You're a member of {marketplaceName}. If you no longer want to receive these emails, please contact {marketplaceName} team." marketplaceName=marketplace.name }}</p>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</html>

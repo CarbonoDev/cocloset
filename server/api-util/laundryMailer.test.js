@@ -12,12 +12,18 @@ const { sendMail, isMailgunConfigured } = require('./mailgun');
 const log = require('../log');
 
 const {
+  notifyNewIncomingGarment,
   notifyPickupScheduled,
   notifyReturnScheduled,
   notifyCleaningRequired,
 } = require('./laundryMailer');
 
+// Every laundry-facing notification, so the never-fail / always-log contracts are
+// asserted for all of them rather than for whichever ones were remembered.
+// `new-incoming-garment` joined the list when it was finally wired up (2026-08-10,
+// from server/api/listing-laundry-assignment.js).
 const ALL = [
+  ['new-incoming-garment', notifyNewIncomingGarment],
   ['pickup-scheduled', notifyPickupScheduled],
   ['return-scheduled', notifyReturnScheduled],
   ['cleaning-required', notifyCleaningRequired],
@@ -29,7 +35,16 @@ describe('laundryMailer', () => {
     sendMail.mockResolvedValue({ sent: true, id: 'msg-1' });
   });
 
-  describe('the client requirement: no key, no send', () => {
+  // REVISED REQUIREMENT (Jonathan, 2026-08-10): "debe fallar solo con log sin
+  // impedir el flujo si no existe la key o si no tenemos el mail de la laundry".
+  // The previous version of this block asserted the opposite of the first test
+  // below - that nothing was logged - per the original "simplemente se ignora".
+  //
+  // Note WHY this layer needs its own log: the unconfigured check here
+  // short-circuits before sendMail, so mailgun.js's own skip log never runs on
+  // this path. This is the only place the line gets written for a laundry
+  // notification, and with no Mailgun account yet, this path is every send.
+  describe('the client requirement: no key, no send - but a log', () => {
     it.each(ALL)('%s makes no call at all when Mailgun is unconfigured', async (name, notify) => {
       isMailgunConfigured.mockReturnValue(false);
 
@@ -37,8 +52,47 @@ describe('laundryMailer', () => {
 
       expect(result).toEqual({ sent: false, reason: 'not-configured' });
       expect(sendMail).not.toHaveBeenCalled();
-      // Local dev, CI and the test suite must stay silent, not just inert.
-      expect(log.error).not.toHaveBeenCalled();
+
+      // ...and says so, naming which notification went nowhere.
+      expect(log.error).toHaveBeenCalledTimes(1);
+      const [error, code, data, options] = log.error.mock.calls[0];
+      expect(error.message).toMatch(/Mailgun is not configured/);
+      expect(code).toBe('laundry-mail-skipped-not-configured');
+      expect(data).toMatchObject({ notification: name });
+      expect(options).toEqual({ skipSentry: true });
+    });
+
+    it.each(ALL)('%s logs a missing recipient as a skip, not a failure', async (name, notify) => {
+      isMailgunConfigured.mockReturnValue(true);
+
+      const result = await notify({ garmentTitle: 'A coat' });
+
+      expect(result).toEqual({ sent: false, reason: 'no-recipient' });
+      expect(sendMail).not.toHaveBeenCalled();
+
+      const [error, code, data, options] = log.error.mock.calls[0];
+      expect(error.message).toMatch(/No recipient/);
+      expect(code).toBe('laundry-mail-skipped-no-recipient');
+      expect(data).toMatchObject({ notification: name });
+      expect(options).toEqual({ skipSentry: true });
+    });
+
+    it.each(ALL)('%s distinguishes a skip from a genuine failure', async (name, notify) => {
+      // Same helper, two different codes, so the two facts stay separable in the
+      // log: nothing was attempted vs. composing the body threw.
+      isMailgunConfigured.mockReturnValue(false);
+      await notify({ to: 'studio@example.com' });
+      const skipCode = log.error.mock.calls[0][1];
+
+      expect(skipCode).toMatch(/^laundry-mail-skipped-/);
+      expect(skipCode).not.toBe('laundry-mail-failed');
+    });
+
+    it.each(ALL)('%s still resolves, so no caller can be blocked', async (name, notify) => {
+      isMailgunConfigured.mockReturnValue(false);
+
+      // The contract every call site relies on: not awaited, cannot reject.
+      await expect(notify({ to: 'studio@example.com' })).resolves.toMatchObject({ sent: false });
     });
   });
 

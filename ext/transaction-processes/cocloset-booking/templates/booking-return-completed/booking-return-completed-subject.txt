@@ -1,1 +1,1 @@
-{{set-translations (asset "content/email-texts.json")}}{{t "BookingReturnCompleted.Subject" "{listingTitle} has been returned" listingTitle=transaction.listing.title}}
+{{set-translations (asset "content/email-texts.json")}}{{#if transaction.metadata.damageReported.flag}}{{t "BookingReturnCompleted.SubjectDamage" "Damage reported on {listingTitle}" listingTitle=transaction.listing.title}}{{else}}{{t "BookingReturnCompleted.Subject" "{listingTitle} has been returned" listingTitle=transaction.listing.title}}{{/if}}

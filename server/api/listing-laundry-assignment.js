@@ -1,6 +1,9 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { requireListingAuthorCaller } = require('../api-util/listingOwnerAuth');
+const { getListingCategoryValues } = require('../api-util/categoryPricing');
+const { notifyNewIncomingGarment } = require('../api-util/laundryMailer');
+const log = require('../log');
 const {
   assertLaundryAssignmentAllowed,
   evaluateLaundryAssignment,
@@ -65,6 +68,14 @@ const {
 // evaluateLaundryAssignment's docblock for why gating it would dead-end the
 // wizard tab rather than protect anything.
 //
+// SIDE EFFECT: the §3.12 "New Incoming Garment" notification to the chosen studio,
+// fired here because this is the moment an owner commits to shipping a garment
+// somewhere and there is no transaction to hang a process notification off. It is
+// gated on `decision.changed`, so the no-op re-save above sends no mail - three
+// clicks on Save must not be three emails - and it is fire-and-continue: it cannot
+// reject and is never awaited, so it can neither fail nor delay the write that has
+// already landed. See api-util/laundryMailer.js.
+//
 // Success response (200): { data: { allowed: true, changed, onLaundry,
 //   currentAssignedLaundryId, assignedLaundryId, initialCleaningDays,
 //   assignedLaundryName, pickupAddress, geolocation } }
@@ -104,6 +115,12 @@ module.exports = (req, res) => {
     .show({ id: listingId, include: ['author'] })
     .then(listingResponse => {
       const listing = listingResponse.data.data;
+      const included = listingResponse.data.included || [];
+      const authorRef = listing?.relationships?.author?.data;
+      const author = authorRef
+        ? included.find(entity => entity.type === 'user' && entity.id?.uuid === authorRef.id?.uuid)
+        : null;
+      const ownerName = author?.attributes?.profile?.displayName;
 
       // Authorization first, so a caller who is not the owner cannot use this
       // endpoint as an oracle for which users happen to be flagged as laundries.
@@ -117,25 +134,74 @@ module.exports = (req, res) => {
           })
         )
         .then(decision =>
-          resolveAssignedLaundry({ integrationSdk, assignedLaundryId })
-            .then(laundry =>
-              writeLaundryAssignment({
-                integrationSdk,
-                listingId,
-                laundry,
-                // Resolved HERE, from the laundry's own privateData and this
-                // garment's category chain, and never accepted from the request
-                // body: it is the number the booking calendar and
-                // api-util/bookingRules.js will both honour, so a caller who could
-                // supply it could make their garment bookable tomorrow.
-                initialCleaningDays: resolveInitialCleaningDays({
-                  laundryPrivateData: laundry.privateData,
-                  listingPublicData: listing.attributes?.publicData,
-                  envDefaultBufferDays: process.env.DEFAULT_LAUNDRY_BUFFER_DAYS,
-                }),
-              })
-            )
-            .then(written => ({ ...decision, ...written }))
+          resolveAssignedLaundry({ integrationSdk, assignedLaundryId }).then(laundry =>
+            writeLaundryAssignment({
+              integrationSdk,
+              listingId,
+              laundry,
+              // Resolved HERE, from the laundry's own privateData and this
+              // garment's category chain, and never accepted from the request
+              // body: it is the number the booking calendar and
+              // api-util/bookingRules.js will both honour, so a caller who could
+              // supply it could make their garment bookable tomorrow.
+              initialCleaningDays: resolveInitialCleaningDays({
+                laundryPrivateData: laundry.privateData,
+                listingPublicData: listing.attributes?.publicData,
+                envDefaultBufferDays: process.env.DEFAULT_LAUNDRY_BUFFER_DAYS,
+              }),
+            }).then(written => {
+              // §3.12 New Incoming Garment. The owner has just picked this studio
+              // and will now physically ship the garment to it, so this is the
+              // moment the studio needs to know to expect it. It is the trigger
+              // this notification never had: there is no transaction here to hang
+              // a process notification off (design §8), and until the write moved
+              // server-side into this endpoint there was no server-side moment at
+              // all.
+              //
+              // ONLY ON A REAL CHANGE. `decision.changed` is the endpoint's
+              // existing no-op detector (evaluateLaundryAssignment: the stored id
+              // versus the requested one). The wizard lets an owner re-open the
+              // LAUNDRY tab and press Save on the same studio as often as they
+              // like, and each of those is a legitimate 200 that must not send
+              // another email. Gating on `changed` rather than on some new flag
+              // also means the mail follows exactly the same definition of
+              // "assignment changed" that the 409 rules and the response body use.
+              //
+              // FIRE-AND-CONTINUE, exactly as create-availability-buffer.js does
+              // for notifyPickupScheduled: not awaited, and it cannot reject (see
+              // api-util/laundryMailer.js). The assignment has already been
+              // written by this point; a mail problem must not turn a completed
+              // write into a failed response and send the owner back to re-save.
+              // With no Mailgun account yet this always takes the skip path, which
+              // now logs rather than passing silently.
+              //
+              // The try/catch is not belt-and-braces, for the same reason it is
+              // not in laundry-transaction-status.js: this call sits inside the
+              // `.then()` whose rejections land in this endpoint's catch, so a
+              // synchronous throw from anywhere in here would turn a write that
+              // ALREADY SUCCEEDED into a 500 and send the owner back to re-save an
+              // assignment that was in fact saved.
+              try {
+                if (decision.changed) {
+                  notifyNewIncomingGarment({
+                    to: laundry.email,
+                    laundryName: laundry.studioName || laundry.displayName,
+                    garmentTitle: listing.attributes?.title,
+                    ownerName,
+                    listingId: typeof listingId === 'string' ? listingId : listingId?.uuid,
+                    // Most specific set level, which is what a studio triages on.
+                    category: getListingCategoryValues(listing.attributes?.publicData).slice(-1)[0],
+                  });
+                }
+              } catch (mailError) {
+                log.error(mailError, 'new-incoming-garment-notification-failed', {
+                  listingId: typeof listingId === 'string' ? listingId : listingId?.uuid,
+                });
+              }
+
+              return { ...decision, ...written };
+            })
+          )
         );
     })
     .then(result => {

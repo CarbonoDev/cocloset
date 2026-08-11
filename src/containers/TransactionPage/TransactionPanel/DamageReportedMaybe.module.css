@@ -1,0 +1,78 @@
+/* The critical tone is the same visual language LaundryOpsPage already uses for
+   a damaged garment (.toneCritical / .detailDamage), so the flag looks like the
+   same fact on both sides of the marketplace. Colour is never the only signal:
+   the panel always carries a heading and a labelled note. */
+.root {
+  display: flex;
+  flex-direction: column;
+  margin: 24px 0 0 0;
+  padding: 18px;
+  border: 1px solid var(--coclosetToneCriticalDot);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetToneCriticalBg);
+
+  @media (--viewportMedium) {
+    margin: 32px 0 0 0;
+    padding: 24px;
+  }
+}
+
+.heading {
+  margin: 0 0 6px 0;
+  padding: 0;
+  color: var(--coclosetToneCriticalFg);
+
+  @media (--viewportMedium) {
+    margin: 0 0 8px 0;
+    padding: 0;
+  }
+}
+
+.description {
+  margin: 0 0 14px 0;
+  color: var(--coclosetInk);
+
+  @media (--viewportMedium) {
+    margin: 0 0 18px 0;
+  }
+}
+
+/* The note is the evidence, so it is set apart from our framing of it rather
+   than blended into a paragraph. */
+.note {
+  padding: 12px 14px;
+  border-left: 4px solid var(--coclosetToneCriticalDot);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurface);
+
+  @media (--viewportMedium) {
+    padding: 14px 18px;
+  }
+}
+
+.noteLabel {
+  margin: 0 0 4px 0;
+  color: var(--coclosetToneCriticalFg);
+  font-weight: var(--fontWeightBold);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+/* The laundry types this freely, so it may arrive with newlines and may be one
+   very long unbroken token. Preserve the breaks and force-wrap the rest rather
+   than letting it push the panel wider than its column. */
+.noteBody {
+  margin: 0;
+  color: var(--coclosetInk);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.nextSteps {
+  margin: 14px 0 0 0;
+  color: var(--coclosetInkMuted);
+
+  @media (--viewportMedium) {
+    margin: 18px 0 0 0;
+  }
+}

@@ -20,6 +20,7 @@ import FeedSection from './FeedSection';
 import DiminishedActionButtonMaybe from './DiminishedActionButtonMaybe';
 import PanelHeading from './PanelHeading';
 import HandoverQrMaybe from './HandoverQrMaybe';
+import DamageReportedMaybe from './DamageReportedMaybe';
 
 import css from './TransactionPanel.module.css';
 
@@ -246,6 +247,17 @@ export class TransactionPanelComponent extends Component {
               processName={stateData.processName}
               processState={stateData.processState}
               transactionId={transactionId}
+              metadata={metadata}
+            />
+
+            {/* The laundry's damage report (design §10). Sits directly below the
+                QR because it replaces it in practice: the QR disappears on entry
+                to `returned` and this is what the same spot then carries. Shown
+                to both parties, and only when damage was actually reported - see
+                DamageReportedMaybe. */}
+            <DamageReportedMaybe
+              processName={stateData.processName}
+              transactionRole={transactionRole}
               metadata={metadata}
             />
 

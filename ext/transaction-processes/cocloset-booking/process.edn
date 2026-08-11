@@ -550,6 +550,29 @@
    :on :transition/mark-overdue,
    :to :actor.role/provider,
    :template :booking-late-return-owner}
+  ;; BOTH PARTIES ARE TOLD ABOUT DAMAGE ("Sobre los daños, avisa a los dos",
+  ;; Jonathan 2026-08-10). The damage flag is metadata written BY these two
+  ;; transitions (:action/privileged-update-metadata above), so both templates
+  ;; read transaction.metadata.damageReported and branch on it.
+  ;;
+  ;; WHY THE TWO ROLES DO NOT SHARE ONE TEMPLATE. A notification's :template is
+  ;; fixed per entry, so two entries pointing at one template can never be made
+  ;; to differ in wording later without splitting it - and these two parties are
+  ;; not in the same position. The owner is being told their asset came back
+  ;; damaged and that their payout has not moved yet; the renter is being told a
+  ;; report was filed about a garment they returned, and specifically that it is
+  ;; NOT a charge. Identical copy would be wrong for one of them either way.
+  ;;
+  ;; WHAT THIS COSTS, STATED PLAINLY. A notification fires on a TRANSITION, not
+  ;; on a condition - there is no :when - so the customer entries below fire on
+  ;; every return, damaged or not. The customer therefore now gets one mail per
+  ;; completed return that they did not get before. The no-damage branch of the
+  ;; template is written to earn its place as a close-the-loop receipt ("nothing
+  ;; left for you to do"), but it IS new mail, and suppressing it is not
+  ;; something the process language can express. If the client would rather the
+  ;; renter heard about damage only in-app, the fix is to delete these two
+  ;; entries; the in-app surface (TransactionPanel/DamageReportedMaybe) is
+  ;; already conditional and shows both parties nothing when there is no damage.
   {:name :notification/booking-return-completed,
    :on :transition/laundry-confirm-return,
    :to :actor.role/provider,
@@ -558,6 +581,14 @@
    :on :transition/laundry-confirm-return-late,
    :to :actor.role/provider,
    :template :booking-return-completed}
+  {:name :notification/booking-return-completed-to-customer,
+   :on :transition/laundry-confirm-return,
+   :to :actor.role/customer,
+   :template :booking-return-completed-customer}
+  {:name :notification/booking-return-completed-late-to-customer,
+   :on :transition/laundry-confirm-return-late,
+   :to :actor.role/customer,
+   :template :booking-return-completed-customer}
 
   ;; The owner is told about the money on the transition that actually
   ;; moves it. Payout used to fire on both return transitions, so this

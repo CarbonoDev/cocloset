@@ -494,7 +494,10 @@ describe('cocloset-booking state resolution from a transaction entity', () => {
 describe('cocloset-booking owner notifications', () => {
   // The notifications the process attaches to a given transition, read out of
   // the :notifications section of the EDN.
-  const notificationsOn = transition => {
+  // Every :notifications entry attached to a transition, as
+  // { name, role, template }. Comments are stripped first so a `:on :...`
+  // written in prose (this section has a lot of prose) cannot be read as data.
+  const notificationEntriesOn = transition => {
     const raw = fs.readFileSync(EDN_PATH, 'utf8');
     const withoutComments = raw
       .split('\n')
@@ -505,8 +508,22 @@ describe('cocloset-booking owner notifications', () => {
       .split('{:name :notification/')
       .slice(1)
       .filter(chunk => chunk.includes(`:on :${transition},`))
-      .map(chunk => chunk.match(/^\s*([a-z0-9-]+)/)[1]);
+      .map(chunk => ({
+        name: chunk.match(/^\s*([a-z0-9-]+)/)[1],
+        role: chunk.match(/:to :actor\.role\/([a-z]+)/)[1],
+        template: chunk.match(/:template :([a-z0-9-]+)/)[1],
+      }));
   };
+
+  const notificationsOn = transition => notificationEntriesOn(transition).map(e => e.name);
+
+  const notificationRolesOn = transition => notificationEntriesOn(transition).map(e => e.role);
+
+  const templatesByRoleOn = transition =>
+    notificationEntriesOn(transition).reduce(
+      (acc, entry) => ({ ...acc, [entry.role]: entry.template }),
+      {}
+    );
 
   it('sends nothing to the owner for the laundry-internal cleaning sub-phases', () => {
     // "Quita los avisos que no le corresponden al vendedor" (Jonathan,
@@ -526,10 +543,37 @@ describe('cocloset-booking owner notifications', () => {
     // ...and not on the return transitions, which no longer pay out.
     expect(notificationsOn(transitions.LAUNDRY_CONFIRM_RETURN)).toEqual([
       'booking-return-completed',
+      'booking-return-completed-to-customer',
     ]);
     expect(notificationsOn(transitions.LAUNDRY_CONFIRM_RETURN_LATE)).toEqual([
       'booking-return-completed-late',
+      'booking-return-completed-late-to-customer',
     ]);
+  });
+
+  // "Sobre los daños, avisa a los dos" (Jonathan, 2026-08-10). The damage flag
+  // is written BY these two transitions, so the notification that carries it has
+  // to hang off them - and it has to reach both roles, which takes two entries
+  // per transition because :to is single-valued.
+  it('tells BOTH parties when the laundry has checked a garment back in', () => {
+    [transitions.LAUNDRY_CONFIRM_RETURN, transitions.LAUNDRY_CONFIRM_RETURN_LATE].forEach(
+      transition => {
+        const roles = notificationRolesOn(transition);
+        expect(roles).toContain('provider');
+        expect(roles).toContain('customer');
+      }
+    );
+  });
+
+  it('gives the two roles different templates, so their copy can differ', () => {
+    // Sharing one template would compile and send, but the owner ("your asset
+    // is damaged, your payout has not moved") and the renter ("a report was
+    // filed, this is not a charge") need different words, and :template cannot
+    // be varied per recipient once shared.
+    const templates = templatesByRoleOn(transitions.LAUNDRY_CONFIRM_RETURN);
+    expect(templates.provider).toEqual('booking-return-completed');
+    expect(templates.customer).toEqual('booking-return-completed-customer');
+    expect(templates.provider).not.toEqual(templates.customer);
   });
 });
 
@@ -557,5 +601,193 @@ describe('cocloset-booking email templates', () => {
     fs.readdirSync(TEMPLATES_DIR).forEach(dir => {
       expect(referenced.has(dir)).toEqual(true);
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // The damage branch.
+  //
+  // These are textual assertions rather than rendered output: Sharetribe
+  // renders these templates on their side and `handlebars` is deliberately not
+  // a dependency of this repo (AGENTS.md: ask before adding a library). So
+  // instead of grepping - which would pass on a template that mentioned damage
+  // in only one branch - the {{#if}} block is split on its own {{else}} and
+  // each side is asserted separately. That is what makes "both directions" a
+  // real assertion here.
+  // -------------------------------------------------------------------------
+  const read = (name, part) =>
+    fs.readFileSync(path.join(TEMPLATES_DIR, name, `${name}-${part}`), 'utf8');
+
+  // Split EVERY {{#if <cond>}} block in the source and return the two arms
+  // concatenated across all of them, so an assertion covers the whole template
+  // rather than whichever block happens to come first. (These templates branch
+  // twice on the damage flag: once for the <h1>, once for the body.)
+  //
+  // Nesting-aware: the damaged arm contains an inner {{#if ...note}}, and a
+  // naive indexOf('{{/if}}') would cut that arm off at the inner close and
+  // silently assert almost nothing.
+  const splitIfBlock = (source, cond) => {
+    const open = `{{#if ${cond}}}`;
+    const tokenRe = /\{\{#if [^}]*\}\}|\{\{else\}\}|\{\{\/if\}\}/g;
+    const arms = { whenDamaged: '', whenClean: '' };
+    let found = false;
+    let from = 0;
+
+    for (;;) {
+      const start = source.indexOf(open, from);
+      if (start === -1) {
+        break;
+      }
+      found = true;
+      const bodyStart = start + open.length;
+      tokenRe.lastIndex = bodyStart;
+      let depth = 1;
+      let elseAt = -1;
+      let match;
+      while ((match = tokenRe.exec(source)) !== null) {
+        if (match[0].startsWith('{{#if')) {
+          depth += 1;
+        } else if (match[0] === '{{/if}}') {
+          depth -= 1;
+          if (depth === 0) {
+            arms.whenDamaged +=
+              '\n' + source.slice(bodyStart, elseAt === -1 ? match.index : elseAt);
+            if (elseAt !== -1) {
+              arms.whenClean += '\n' + source.slice(elseAt + '{{else}}'.length, match.index);
+            }
+            break;
+          }
+        } else if (match[0] === '{{else}}' && depth === 1) {
+          elseAt = match.index;
+        }
+      }
+      if (!match) {
+        // Unbalanced {{#if}} - a broken template, not a passing test.
+        return null;
+      }
+      from = tokenRe.lastIndex;
+    }
+
+    return found ? arms : null;
+  };
+
+  describe.each([
+    ['booking-return-completed', 'BookingReturnCompleted', 'transaction.metadata', 'metadata'],
+    [
+      'booking-return-completed-customer',
+      'BookingReturnCompletedCustomer',
+      'transaction.metadata',
+      'metadata',
+    ],
+  ])('%s branches on the damage flag', (template, keyPrefix, subjectPath, bodyPath) => {
+    it('has a different subject in each direction', () => {
+      const arms = splitIfBlock(
+        read(template, 'subject.txt'),
+        `${subjectPath}.damageReported.flag`
+      );
+
+      expect(arms).not.toBeNull();
+      expect(arms.whenDamaged).toContain(`${keyPrefix}.SubjectDamage`);
+      expect(arms.whenClean).toContain(`${keyPrefix}.Subject"`);
+      // The whole point: the two arms are not the same sentence.
+      expect(arms.whenDamaged).not.toEqual(arms.whenClean);
+      expect(arms.whenClean).not.toContain('Damage');
+    });
+
+    it('names the damage and prints the laundry note, in the damaged direction only', () => {
+      const arms = splitIfBlock(read(template, 'html.html'), `${bodyPath}.damageReported.flag`);
+
+      expect(arms).not.toBeNull();
+      // The note itself has to reach the reader, not just the fact of a flag.
+      expect(arms.whenDamaged).toContain(`${bodyPath}.damageReported.note`);
+      expect(arms.whenDamaged).toContain(`${keyPrefix}.DamageNoteLabel`);
+      expect(arms.whenDamaged).toContain(`${keyPrefix}.DamageNextSteps`);
+      // An empty note must not render a blank box with no explanation.
+      expect(arms.whenDamaged).toContain(`${keyPrefix}.DamageNoteMissing`);
+
+      // ...and none of that leaks into the undamaged email, which is the half
+      // of "both directions" that a grep-based test would miss.
+      expect(arms.whenClean).toContain(`${keyPrefix}.Content"`);
+      expect(arms.whenClean).not.toContain('damageReported.note');
+      expect(arms.whenClean).not.toContain('DamageNoteLabel');
+      expect(arms.whenClean).not.toContain('DamageNextSteps');
+    });
+
+    it('routes every string through {{t}} with the right key prefix', () => {
+      const html = read(template, 'html.html');
+
+      expect(html).toContain('{{set-translations (asset "content/email-texts.json")}}');
+      // Every new key belongs to this template's own namespace. (Shared
+      // TransactionEmails.* keys are pre-existing and deliberately excluded.)
+      const keys = (html.match(/\{\{t "([A-Za-z.]+)"/g) || []).map(m =>
+        m.replace(/\{\{t "/, '').replace(/"$/, '')
+      );
+      expect(keys.length).toBeGreaterThan(0);
+      keys
+        .filter(key => !key.startsWith('TransactionEmails.'))
+        .forEach(key => {
+          expect(key.startsWith(`${keyPrefix}.`)).toEqual(true);
+        });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // The payout claim.
+  //
+  // `booking-return-completed` told the owner "Your payout for this rental has
+  // been released." on a transition that carries NO :action/stripe-create-payout
+  // - payout moved to :transition/laundry-mark-pending-cleaning, one step later.
+  // The key was RETIRED rather than reworded: `{{t}}` resolves from the hosted
+  // Console asset content/email-texts.json, so editing the inline default here
+  // would leave a Console entry for the old key still asserting the falsehood.
+  // A new key cannot be overridden by a value nobody has written yet.
+  // -----------------------------------------------------------------------
+  it('does not tell the owner their payout has moved before it has', () => {
+    const html = read('booking-return-completed', 'html.html');
+
+    expect(html).not.toContain('BookingReturnCompleted.Payout"');
+    expect(html).not.toMatch(/payout[^"]*has been released/i);
+    expect(html).toContain('BookingReturnCompleted.PayoutPending');
+    expect(html).toMatch(/has not been released yet/i);
+  });
+
+  it('claims a payout only in templates whose transition actually pays out', () => {
+    // The generalisation of the bug above, across every template: if a template
+    // says the money has moved, every transition it is sent on must carry
+    // :action/stripe-create-payout.
+    const raw = fs.readFileSync(EDN_PATH, 'utf8');
+    const withoutComments = raw
+      .split('\n')
+      .map(line => line.replace(/;;.*$/, ''))
+      .join('\n');
+
+    const payoutTransitions = new Set(
+      (withoutComments.split('{:name :transition/').slice(1) || [])
+        .filter(chunk => chunk.includes(':action/stripe-create-payout'))
+        .map(chunk => chunk.match(/^([a-z0-9-]+)/)[1])
+    );
+
+    const notifications = withoutComments
+      .slice(withoutComments.indexOf('\n :notifications'))
+      .split('{:name :notification/')
+      .slice(1)
+      .map(chunk => ({
+        on: chunk.match(/:on :transition\/([a-z0-9-]+)/)[1],
+        template: chunk.match(/:template :([a-z0-9-]+)/)[1],
+      }));
+
+    // "The money is already yours", as opposed to "you will be paid" (a
+    // forecast, legitimate anywhere) or "has NOT been released yet" (the
+    // corrected copy, which must not read as a claim - hence matching the
+    // auxiliary and participle adjacently rather than a loose `payout.*released`).
+    const claimsPaidAlready = name => {
+      const source = read(name, 'html.html') + read(name, 'subject.txt');
+      return /(have|has) been (paid|released)/i.test(source);
+    };
+
+    const wrong = notifications
+      .filter(n => claimsPaidAlready(n.template))
+      .filter(n => !payoutTransitions.has(n.on));
+
+    expect(wrong).toEqual([]);
   });
 });

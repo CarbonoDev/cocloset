@@ -136,10 +136,17 @@ describe('parseAddress()', () => {
   });
 });
 
-// THE CLIENT'S EXPLICIT REQUIREMENT (Jonathan): "si la key de mailgun no esta
-// establecida simplemente se ignora el envío". Local dev, CI and this very
-// test suite run without Mailgun credentials, so the unconfigured path must
-// be inert: no throw, no HTTP call, no log noise.
+// THE CLIENT'S REQUIREMENT, AS REVISED (Jonathan, 2026-08-10): "debe fallar solo
+// con log sin impedir el flujo si no existe la key o si no tenemos el mail de la
+// laundry".
+//
+// This REPLACES the original "simplemente se ignora el envío" (2026-08-01), which
+// these tests used to pin as *silence* - they asserted log.error was never called
+// and that the only output was devLogger, which prints solely when
+// REACT_APP_ENV === 'development' AND VERBOSE === 'true', i.e. never in practice.
+// With no Mailgun account yet, that made the entire mail path indistinguishable
+// from not existing. The skip is still a skip - no throw, no HTTP call, caller
+// still resolves - but it now leaves a trace.
 describe('sendMail() when Mailgun is not configured', () => {
   it('resolves (never rejects) and reports not-sent', async () => {
     await expect(sendMail(message)).resolves.toEqual({
@@ -153,33 +160,48 @@ describe('sendMail() when Mailgun is not configured', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('logs no error - an unconfigured environment is not a failure', async () => {
+  it('LOGS the skip rather than passing silently', async () => {
     await sendMail(message);
-    expect(log.error).not.toHaveBeenCalled();
+
+    expect(log.error).toHaveBeenCalledTimes(1);
+    const [error, code] = log.error.mock.calls[0];
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toMatch(/MAILGUN_API_KEY is not set/);
+    expect(code).toBe('mailgun-skipped-not-configured');
   });
 
-  // devLogger only prints when REACT_APP_ENV=development AND VERBOSE=true, so
-  // this stays silent in tests/CI while remaining discoverable in dev.
-  it('says so only through devLogger, never console directly', async () => {
-    const consoleLog = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+  it('marks the skip as distinct from a send failure', async () => {
+    // "We never tried" and "we tried and it broke" are different operational
+    // facts. Somebody grepping for a broken mail path must not be drowned in
+    // expected Dev skips, and vice versa.
     await sendMail(message);
-    expect(log.devLogger).toHaveBeenCalled();
-    expect(consoleLog).not.toHaveBeenCalled();
-    expect(consoleError).not.toHaveBeenCalled();
-    consoleLog.mockRestore();
-    consoleError.mockRestore();
+
+    const code = log.error.mock.calls[0][1];
+    expect(code).toMatch(/^mailgun-skipped-/);
+    expect(code).not.toBe('mailgun-send-failed');
+    expect(code).not.toBe('mailgun-misconfigured');
+  });
+
+  it('keeps the skip out of Sentry while still writing it to stdout', async () => {
+    // With no Mailgun account this is the expected outcome of EVERY send, so it
+    // belongs in the log, not in an alerting channel.
+    await sendMail(message);
+
+    expect(log.error.mock.calls[0][3]).toEqual({ skipSentry: true });
   });
 
   // Ordering guarantee: the config check comes first, so an unconfigured
   // environment always yields exactly one outcome regardless of the payload.
-  it('skips before validating, so bad input is still a silent skip', async () => {
+  it('skips before validating, so bad input is still just a skip', async () => {
     await expect(sendMail({ to: 'nonsense', subject: '', text: '' })).resolves.toEqual({
       sent: false,
       reason: 'not-configured',
     });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(log.error).not.toHaveBeenCalled();
+    // One line, and the skip one - not the invalid-recipient/content errors,
+    // which are never reached.
+    expect(log.error).toHaveBeenCalledTimes(1);
+    expect(log.error.mock.calls[0][1]).toBe('mailgun-skipped-not-configured');
   });
 
   it('is safe to fire-and-forget with no arguments at all', async () => {
