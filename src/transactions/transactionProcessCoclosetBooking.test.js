@@ -497,6 +497,13 @@ describe('cocloset-booking owner notifications', () => {
   // Every :notifications entry attached to a transition, as
   // { name, role, template }. Comments are stripped first so a `:on :...`
   // written in prose (this section has a lot of prose) cannot be read as data.
+  //
+  // The split is a regex rather than the literal '{:name :notification/'
+  // because the EDN is machine-formatted at 80 columns, and a long enough
+  // :notification name gets wrapped onto its own line ("{:name\n
+  // :notification/review-period-start-customer-auto-complete-from-picked-up,").
+  // A literal split silently dropped every wrapped entry, so the helper saw
+  // fewer notifications than the process actually declares.
   const notificationEntriesOn = transition => {
     const raw = fs.readFileSync(EDN_PATH, 'utf8');
     const withoutComments = raw
@@ -505,7 +512,7 @@ describe('cocloset-booking owner notifications', () => {
       .join('\n');
     const section = withoutComments.slice(withoutComments.indexOf('\n :notifications'));
     return section
-      .split('{:name :notification/')
+      .split(/\{:name\s+:notification\//)
       .slice(1)
       .filter(chunk => chunk.includes(`:on :${transition},`))
       .map(chunk => ({
@@ -575,6 +582,64 @@ describe('cocloset-booking owner notifications', () => {
     expect(templates.customer).toEqual('booking-return-completed-customer');
     expect(templates.provider).not.toEqual(templates.customer);
   });
+
+  // -----------------------------------------------------------------------
+  // Cancellation.
+  //
+  // All five cancels used to notify NOBODY: a full refund to the customer and
+  // a lost payout for the owner, in silence, including on the damage
+  // write-off path. `:on` and `:to` are both single-valued, so "tell both
+  // parties on all five" is exactly ten entries - there is no shorter
+  // spelling, and a missing one is a silent refund all over again.
+  // -----------------------------------------------------------------------
+  const CANCEL_TRANSITIONS = [
+    transitions.CANCEL,
+    transitions.CANCEL_FROM_READY_FOR_PICKUP,
+    transitions.CANCEL_FROM_PICKED_UP,
+    transitions.CANCEL_FROM_OVERDUE,
+    transitions.CANCEL_FROM_RETURNED,
+  ];
+
+  it('covers every cancel transition the process has, not a list of our own', () => {
+    // If a sixth cancel is ever added, this fails rather than leaving the new
+    // one silently unnotified.
+    const ednCancels = readEdnTransitions()
+      .filter(t => toJsState(t.to) === states.CANCELED)
+      .map(t => t.transition);
+    expect(ednCancels.slice().sort()).toEqual(CANCEL_TRANSITIONS.slice().sort());
+  });
+
+  it.each(CANCEL_TRANSITIONS)('notifies exactly two parties on %s', transition => {
+    expect(notificationEntriesOn(transition)).toHaveLength(2);
+  });
+
+  it.each(CANCEL_TRANSITIONS)('notifies one customer and one provider on %s', transition => {
+    expect(
+      notificationRolesOn(transition)
+        .slice()
+        .sort()
+    ).toEqual(['customer', 'provider']);
+  });
+
+  it('uses one template per role across all five, not one per transition', () => {
+    // The five are identical in money terms (customer refunded in full,
+    // provider paid nothing), so the substance does not vary by transition and
+    // ten templates would be ~5x the Console translation work for the same
+    // words. The two ROLES do not share, because one is getting money back and
+    // the other is not being paid.
+    CANCEL_TRANSITIONS.forEach(transition => {
+      expect(templatesByRoleOn(transition)).toEqual({
+        customer: 'booking-cancelled',
+        provider: 'booking-cancelled-owner',
+      });
+    });
+  });
+
+  it('gives every one of the ten entries its own name', () => {
+    const names = CANCEL_TRANSITIONS.flatMap(notificationsOn);
+    expect(names).toHaveLength(10);
+    expect(new Set(names).size).toEqual(10);
+  });
 });
 
 describe('cocloset-booking email templates', () => {
@@ -590,7 +655,17 @@ describe('cocloset-booking email templates', () => {
   };
 
   it('has a subject and an html file for every template the process references', () => {
-    referencedTemplates().forEach(name => {
+    const referenced = referencedTemplates();
+
+    // The regex is the only thing standing between this test and passing
+    // vacuously, so name a few templates it must have found - including the
+    // two cancellation ones, which are referenced from ten entries each
+    // sharing a template and would be the first casualty of a parser change.
+    expect(referenced).toContain('booking-cancelled');
+    expect(referenced).toContain('booking-cancelled-owner');
+    expect(referenced.length).toBeGreaterThan(20);
+
+    referenced.forEach(name => {
       expect(fs.existsSync(path.join(TEMPLATES_DIR, name, `${name}-subject.txt`))).toEqual(true);
       expect(fs.existsSync(path.join(TEMPLATES_DIR, name, `${name}-html.html`))).toEqual(true);
     });
@@ -789,5 +864,139 @@ describe('cocloset-booking email templates', () => {
       .filter(n => !payoutTransitions.has(n.on));
 
     expect(wrong).toEqual([]);
+  });
+
+  // -----------------------------------------------------------------------
+  // The two cancellation templates.
+  //
+  // One template per role serves all five cancel transitions, so every
+  // sentence in them has to be true whether the garment was never collected,
+  // is still with the customer, is possibly lost, or is back at the laundry.
+  // These assertions are what stops a later edit from making the copy
+  // specific to whichever situation the editor had in mind.
+  // -----------------------------------------------------------------------
+  // The inline English defaults only - `{{t "Key" "default" args}}` - with the
+  // markup, style attributes and handlebars paths stripped out. Assertions
+  // about WORDING have to run on the words, not on the file: the file is 95%
+  // inline CSS, so a sentence-level check against the raw source degenerates
+  // into one enormous "sentence" that matches almost anything.
+  const copyOf = name => {
+    const source = read(name, 'html.html') + '\n' + read(name, 'subject.txt');
+    return (source.match(/\{\{t "[A-Za-z.]+" "(?:[^"\\]|\\.)*"/g) || [])
+      .map(m => m.replace(/^\{\{t "[A-Za-z.]+" "/, '').replace(/"$/, ''))
+      .join(' ');
+  };
+
+  describe.each([
+    ['booking-cancelled', 'BookingCancelled'],
+    ['booking-cancelled-owner', 'BookingCancelledOwner'],
+  ])('%s is safe for all five cancel transitions', (template, keyPrefix) => {
+    const source = () => read(template, 'html.html') + read(template, 'subject.txt');
+
+    it('routes every string through {{t}} with the right key prefix', () => {
+      const html = read(template, 'html.html');
+
+      expect(html).toContain('{{set-translations (asset "content/email-texts.json")}}');
+      expect(read(template, 'subject.txt')).toContain(
+        '{{set-translations (asset "content/email-texts.json")}}'
+      );
+
+      const keys = (html.match(/\{\{t "([A-Za-z.]+)"/g) || []).map(m =>
+        m.replace(/\{\{t "/, '').replace(/"$/, '')
+      );
+      expect(keys.length).toBeGreaterThan(0);
+      keys
+        .filter(key => !key.startsWith('TransactionEmails.'))
+        .forEach(key => {
+          expect(key.startsWith(`${keyPrefix}.`)).toEqual(true);
+        });
+    });
+
+    it('leaves no prose outside a {{t}} call', () => {
+      // The check the key-prefix test above cannot make: a hardcoded English
+      // sentence has no key to inspect, so it passes that test silently and
+      // then ships untranslatable - Console can never override it.
+      //
+      // Strip handlebars expressions, comments and tags, and what is left is
+      // text a reader sees that did NOT come from {{t}}. That is not empty for
+      // any template in this process - the accessible fallback link prints its
+      // own href as visible text, which reduces to "/order//" once the
+      // handlebars are gone - so the assertion is "no two adjacent words",
+      // i.e. no sentence, rather than "nothing at all".
+      const leftover = read(template, 'html.html')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/\{\{[\s\S]*?\}\}/g, '')
+        .replace(/<!DOCTYPE[\s\S]*?>/gi, '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/&nbsp;|&amp;/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      expect(leftover).not.toMatch(/[A-Za-z]{2,}\s+[A-Za-z]{2,}/);
+    });
+
+    it('never asserts where the garment physically is', () => {
+      // The one fact that genuinely differs across the five. Each of these
+      // would be false on at least one of them.
+      [
+        /back at the laundry/i,
+        /returned to the laundry/i,
+        /still have the garment/i,
+        /never collected/i,
+        /has been lost/i,
+        /back in your wardrobe/i,
+        /available to rent again/i,
+      ].forEach(claim => expect(source()).not.toMatch(claim));
+    });
+
+    it('says nothing about damage in either direction', () => {
+      // cancel-from-returned may follow a damage report; the other four do
+      // not. One template cannot claim it, and must not deny it either.
+      expect(source()).not.toMatch(/damage/i);
+      expect(source()).not.toMatch(/no fault/i);
+    });
+
+    it('does not explain or attribute the cancellation', () => {
+      expect(source()).not.toMatch(/because you/i);
+      expect(source()).not.toMatch(/your fault/i);
+      expect(source()).not.toMatch(/late return/i);
+    });
+  });
+
+  it('tells the customer, without hedging, that they have their money back', () => {
+    const copy = copyOf('booking-cancelled');
+    expect(read('booking-cancelled', 'html.html')).toContain('BookingCancelled.Content');
+    expect(copy).toMatch(/refunded in full/i);
+    // "will be refunded" would be a forecast. :action/stripe-refund-payment
+    // runs on the transition that sends this mail, so it is already done.
+    expect(copy).not.toMatch(/will be refunded/i);
+    // And it never says a payout to anyone happened or will.
+    expect(copy).not.toMatch(/payout/i);
+  });
+
+  it('tells the owner plainly that there is no payout, without sounding like one', () => {
+    const html = read('booking-cancelled-owner', 'html.html');
+    const subject = read('booking-cancelled-owner', 'subject.txt');
+    const copy = copyOf('booking-cancelled-owner');
+
+    // Straightforward, in the body AND the subject: a vague email about a
+    // cancellation, when money is involved, is worse than none.
+    expect(html).toContain('BookingCancelledOwner.NoPayout');
+    expect(copy).toMatch(/no payout for this rental/i);
+    expect(subject).toMatch(/no payout/i);
+
+    // ...and it must not read as a payout confirmation to the general guard
+    // above ('claims a payout only in templates whose transition actually pays
+    // out'), which matches an auxiliary+participle pair adjacently. The cancel
+    // transitions carry :action/stripe-refund-payment, never
+    // :action/stripe-create-payout, so a match here is a false claim.
+    expect(html + subject).not.toMatch(/(have|has) been (paid|released)/i);
+
+    // Every sentence in the copy that mentions a payout negates it. A bare
+    // "your payout for this rental" sentence is exactly the misreading this
+    // template has to avoid, and it would slip past the regex above.
+    const payoutSentences = copy.split(/(?<=[.!?])\s+/).filter(s => /payout/i.test(s));
+    expect(payoutSentences.length).toBeGreaterThan(1);
+    payoutSentences.forEach(sentence => expect(sentence).toMatch(/\b(no|not|never)\b/i));
   });
 });
