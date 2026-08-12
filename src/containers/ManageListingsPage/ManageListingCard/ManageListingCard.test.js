@@ -198,6 +198,65 @@ describe('ManageListingCard', () => {
     expect(tree.getByText('ManageListingCard.manageAvailability')).toBeInTheDocument();
   });
 
+  it('cocloset-booking: does not offer a "manage availability" link', () => {
+    // cocloset-booking has no AVAILABILITY step in its wizard - the plan is written
+    // automatically at draft creation - so there is no screen for this link to open.
+    // Rendering it anyway is not a harmless no-op: EditListingWizard's "tab not
+    // activated" branch quietly redirects to the Pricing panel and logs to the console,
+    // so the owner would be told they were going to availability and land on pricing.
+    //
+    // This must stay true even though the listing IS bookable in every other respect:
+    // `isBookingProcessAlias` deliberately counts cocloset-booking, which is what made
+    // the link appear here in the first place.
+    const listing = createOwnListing('garment-1', {
+      title: 'the garment',
+      description: 'Lorem ipsum',
+      price: new Money(1000, 'USD'),
+      publicData: {
+        listingType: 'garment-rental',
+        transactionProcessAlias: 'cocloset-booking/release-1',
+        unitType: 'day',
+      },
+    });
+
+    const config = getConfig([
+      {
+        id: 'garment-rental',
+        transactionProcess: {
+          // Console cannot name a custom process, so the hosted asset says
+          // default-booking and LISTING_TYPE_PROCESS_OVERRIDES rewrites it. The listing's
+          // own saved alias is what this component reads, and that is cocloset-booking.
+          name: 'default-booking',
+          alias: 'default-booking/release-1',
+        },
+        unitType: 'day',
+        availabilityType: 'oneSeat',
+      },
+    ]);
+
+    const tree = render(
+      <ManageListingCard
+        history={{ push: noop }}
+        listing={listing}
+        intl={fakeIntl}
+        isMenuOpen={false}
+        onCloseListing={noop}
+        onOpenListing={noop}
+        onToggleMenu={noop}
+        hasClosingError={false}
+        hasOpeningError={false}
+        availabilityEnabled={true}
+      />,
+      { config }
+    );
+
+    // The rest of the card is unaffected - this is a removed link, not a removed card.
+    expect(tree.getByText(/the garment/i)).toBeInTheDocument();
+    expect(tree.getByText('ManageListingCard.editListing')).toBeInTheDocument();
+    expect(tree.queryByText('ManageListingCard.manageAvailability')).not.toBeInTheDocument();
+    expect(tree.queryByText('ManageListingCard.manageStock')).not.toBeInTheDocument();
+  });
+
   it('Booking (day): closed', () => {
     const listing = createOwnListing('listing-day', {
       title: 'the listing',
