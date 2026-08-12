@@ -199,9 +199,17 @@ module.exports = (req, res) => {
       // below already reads `publicData.unitType` off this very object and
       // refuses to price the booking when it is missing. So this check cannot
       // silently skip for want of the field.
+      //
+      // Read through `getFullOrderData`, not off `orderData`: the two client paths put
+      // `priceVariantName` in different places (see the same note in
+      // initiate-privileged.js), and pricing has always read the merged view. Resolving it
+      // the same way is what stops the gate and the price from disagreeing about which
+      // period was chosen.
+      const fullOrderData = getFullOrderData(orderData, bodyParams, currency, existingOffers);
+
       assertRentalPeriodBooking({
         listing,
-        priceVariantName: orderData?.priceVariantName,
+        priceVariantName: fullOrderData?.priceVariantName,
         bookingStart: bodyParams?.params?.bookingStart,
         bookingEnd: bodyParams?.params?.bookingEnd,
       });
@@ -240,7 +248,7 @@ module.exports = (req, res) => {
         // endpoints share so preview and charge cannot drift apart.
         return buildLineItemsForListing({
           listing,
-          orderData: getFullOrderData(orderData, bodyParams, currency, existingOffers),
+          orderData: fullOrderData,
           providerCommission,
           customerCommission,
           currency,

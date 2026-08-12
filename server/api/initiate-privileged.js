@@ -128,9 +128,21 @@ module.exports = (req, res) => {
       // Deliberately applied on the speculative path too. A preview that quotes a booking
       // the charge path will refuse is how a customer gets to the last step before finding
       // out.
+      //
+      // READ THROUGH `getFullOrderData`, NOT OFF `orderData`. The two client paths put
+      // `priceVariantName` in DIFFERENT places: the speculative one
+      // (CheckoutPage.duck.js `speculateTransaction`) destructures it into `orderData`, and
+      // the real one (`initiateOrder`) does not, so it stays in `otherOrderParams` and
+      // arrives inside `bodyParams.params`. Pricing has always been immune because
+      // `getFullOrderData` merges the two; reading `orderData` alone here meant the name was
+      // `undefined` on every real booking and this rule refused all of them. Resolving it the
+      // same way the line-item builder does is what stops the gate and the price from ever
+      // disagreeing about which period was chosen.
+      const fullOrderData = getFullOrderData(orderData, bodyParams, currency);
+
       assertRentalPeriodBooking({
         listing,
-        priceVariantName: orderData?.priceVariantName,
+        priceVariantName: fullOrderData?.priceVariantName,
         bookingStart: bodyParams?.params?.bookingStart,
         bookingEnd: bodyParams?.params?.bookingEnd,
       });
@@ -164,7 +176,7 @@ module.exports = (req, res) => {
 
         return buildLineItemsForListing({
           listing,
-          orderData: getFullOrderData(orderData, bodyParams, currency),
+          orderData: fullOrderData,
           providerCommission,
           customerCommission,
           currency,

@@ -222,9 +222,24 @@ export const resolveInitialCleaningDays = (
  * depend on the hour the customer is shopping, and would let it disagree with the
  * server's gate by up to a full day.
  *
- * With no block this is the stock floor, `getStartOf(today, 'day', timeZone)`, so
- * `onLaundry === true` and a listing with no stored turnaround both take the exact
- * path they took before this feature.
+ * THE CLEANING STARTS TOMORROW, NOT TODAY - hence the +1.
+ *
+ *   > "hoy es 12 de agosto, si un listing tiene un periodo de 1 día de laundry segun la
+ *   >  limpieza, el próximo día disponible debe ser el 14 de agosto, ya que es un día de
+ *   >  lavado (13 de agosto) y el siguiente día disponible es 14"
+ *
+ * Today is already partly over: the garment cannot reach the studio, be washed and be
+ * handed over inside the hours that are left. So the first cleaning day is tomorrow, n
+ * cleaning days run from there, and the first bookable day is the one after those.
+ *
+ * The previous version counted from today (`today + n`), which made a ONE-day turnaround
+ * invisible: today is already unbookable anyway, because Sharetribe's availability slot for
+ * the current day starts at the moment of the query rather than at midnight, so `today + 1`
+ * was the floor with or without the rule. The client noticed exactly that.
+ *
+ * With no block this is still the stock floor, `getStartOf(today, 'day', timeZone)` - the
+ * +1 applies only when there is a turnaround to wait for, so `onLaundry === true` and a
+ * listing with no stored turnaround take the exact path they took before this feature.
  *
  * @param {number|null} initialCleaningDays - from resolveInitialCleaningDays
  * @param {string} timeZone - IANA key
@@ -232,7 +247,7 @@ export const resolveInitialCleaningDays = (
  * @returns {Date}
  */
 export const earliestBookableDate = (initialCleaningDays, timeZone, today = TODAY) =>
-  getStartOf(today, 'day', timeZone, initialCleaningDays || 0, 'days');
+  getStartOf(today, 'day', timeZone, initialCleaningDays ? initialCleaningDays + 1 : 0, 'days');
 
 const isOneBoundaryeSelected = (hasTimeSlots, startDate, endDate) => {
   const oneBoundarySelected = (startDate || endDate) && (!startDate || !endDate);

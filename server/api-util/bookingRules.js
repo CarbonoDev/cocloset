@@ -168,6 +168,27 @@ const resolveInitialCleaningBlockDays = (metadata, liveInitialCleaningDays) => {
 /**
  * The first day this garment can be rented, given the lead time.
  *
+ * THE CLEANING STARTS TOMORROW, NOT TODAY - hence the +1.
+ *
+ *   > "hoy es 12 de agosto, si un listing tiene un periodo de 1 día de laundry segun la
+ *   >  limpieza, el próximo día disponible debe ser el 14 de agosto, ya que es un día de
+ *   >  lavado (13 de agosto) y el siguiente día disponible es 14"
+ *
+ * Today is already partly over: the garment cannot reach the studio, be washed and be handed
+ * over inside the hours that are left. The first cleaning day is tomorrow, n cleaning days
+ * run from there, and the first bookable day is the one after those.
+ *
+ * MUST MATCH `earliestBookableDate` in src/components/OrderPanel/BookingDatesForm - a
+ * calendar floor and a checkout gate that disagree by a day present as "the calendar offered
+ * me a date and then payment refused it". initialCleaningAgreement.test.js holds them
+ * together.
+ *
+ * A falsy day count means no block and yields the start of today, matching the client
+ * exactly. Production never reaches here in that case - `assertInitialCleaningLeadTime`
+ * returns before calling this - but making the two functions genuinely interchangeable is
+ * what lets the agreement test compare them over the whole input space instead of only over
+ * the inputs one of them happens to accept.
+ *
  * @param {Object} params
  * @param {number} params.initialCleaningDays
  * @param {string} [params.timeZone]
@@ -175,7 +196,7 @@ const resolveInitialCleaningBlockDays = (metadata, liveInitialCleaningDays) => {
  * @returns {Date} start of that day, in the listing's time zone
  */
 const earliestBookingStart = ({ initialCleaningDays, timeZone, now = new Date() }) =>
-  startOfDayInTimeZone(now, timeZone, initialCleaningDays);
+  startOfDayInTimeZone(now, timeZone, initialCleaningDays ? initialCleaningDays + 1 : 0);
 
 const tooEarlyError = ({ initialCleaningDays, earliestStart }) => {
   const message =

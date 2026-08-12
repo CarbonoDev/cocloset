@@ -56,8 +56,10 @@ describe('the calendar floor and the server gate agree on the earliest bookable 
     const client = earliestBookableDate(3, TZ, now);
     const server = earliestBookingStart({ initialCleaningDays: 3, timeZone: TZ, now });
     expect(client.toISOString()).toBe(server.toISOString());
-    // And it really is the local midnight of 30 March, not 29 March 23:00.
-    expect(server.toISOString()).toBe('2026-03-29T22:00:00.000Z');
+    // Now = 27 March. Cleaning runs 28, 29, 30; the garment is bookable from the 31st. And
+    // it really is the local midnight of 31 March, not 30 March 23:00 - Madrid is UTC+2 by
+    // then, so a naive 24h-at-a-time addition across the 29th would land an hour short.
+    expect(server.toISOString()).toBe('2026-03-30T22:00:00.000Z');
   });
 
   it('agree across an autumn fall-back (Europe/Madrid, 2026-10-25)', () => {

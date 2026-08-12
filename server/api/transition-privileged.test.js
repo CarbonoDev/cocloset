@@ -96,10 +96,15 @@ const mockRes = () => ({
   end: jest.fn().mockReturnThis(),
 });
 
-const req = ({ days, startsInDays = 0, priceVariantName = '7-days' }) => ({
+// See the note in initiate-privileged.test.js: the real client path puts
+// `priceVariantName` in `bodyParams.params`, not in `orderData`. Default to that shape.
+const req = ({ days, startsInDays = 0, priceVariantName = '7-days', variantIn = 'params' }) => ({
   body: {
     isSpeculative: false,
-    orderData: { currency: 'EUR', priceVariantName },
+    orderData: {
+      currency: 'EUR',
+      ...(variantIn === 'orderData' ? { priceVariantName } : {}),
+    },
     bodyParams: {
       id: TX_ID,
       transition: 'transition/request-payment-after-inquiry',
@@ -107,6 +112,7 @@ const req = ({ days, startsInDays = 0, priceVariantName = '7-days' }) => ({
         listingId: LISTING_ID,
         bookingStart: daysFromToday(startsInDays),
         bookingEnd: daysFromToday(startsInDays + days),
+        ...(variantIn === 'params' ? { priceVariantName } : {}),
       },
     },
     queryParams: {},
@@ -202,7 +208,7 @@ describe('transition-privileged: the booking gates are reached on this door too'
   it('lets a legal booking through to pricing and the transition', async () => {
     const { transition } = setup({ priceVariants: PERIODS, initialCleaningDays: 3 });
 
-    await run({ days: 7, startsInDays: 3, priceVariantName: '7-days' });
+    await run({ days: 7, startsInDays: 4, priceVariantName: '7-days' });
 
     expect(buildLineItemsForListing).toHaveBeenCalled();
     expect(transition).toHaveBeenCalled();
@@ -246,13 +252,14 @@ describe('transition-privileged: the booking gates are reached on this door too'
     });
 
     it('allows a day the stale snapshot would have refused', async () => {
+      // Snapshot 7 days puts the floor at +8; the studio now needs 2, so it is +3.
       const { transition } = setup({
         initialCleaningDays: 7,
         assignedLaundryId: 'laundry-1',
         laundryTurnaroundDays: 2,
       });
 
-      await run({ days: 2, startsInDays: 2 });
+      await run({ days: 2, startsInDays: 3 });
 
       expect(transition).toHaveBeenCalled();
     });
