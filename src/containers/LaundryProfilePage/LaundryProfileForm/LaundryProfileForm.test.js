@@ -488,3 +488,117 @@ describe('LaundryProfileForm category table', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+// ── THE ADDRESS: THE ALERT AND THE LOCK ──────────────────────────────────────────
+//
+//   > "la laundry no puede estar en la lista de disponibles si no tiene dirección,
+//   >  por lo que en el form de laundry hay que poner una alerta llamativa de que no
+//   >  se le pueden asignar prendas si no tiene dirección establecida, a su vez, en
+//   >  ese mismo form, debemos indicar al usuario que no puede cambiar su dirección y
+//   >  que si desea modificar la dirección, debe solicitar apoyo al administrador o
+//   >  soporte"
+//
+// These tests drive the two booleans directly. What DERIVES them from the stored
+// profile lives in util/laundryProfile.js (parity-tested against the server's own
+// predicates) and is asserted end to end in LaundryProfilePage.test.js.
+describe('LaundryProfileForm address alert and lock', () => {
+  const COMPLETE_LOCATION = {
+    search: '21 Rue Frochot, Paris',
+    selectedPlace: { address: '21 Rue Frochot, Paris', origin: new LatLng(48.879, 2.337) },
+  };
+
+  const renderAddressForm = (extraProps = {}) =>
+    act(async () => {
+      render(
+        <LaundryProfileForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onSubmit={noop}
+          updateInProgress={false}
+          initialValues={{ location: COMPLETE_LOCATION }}
+          {...extraProps}
+        />,
+        { config: configWithCategories }
+      );
+    });
+
+  const addressInput = () => screen.getByTestId('location-search');
+
+  it('shows a prominent alert when the studio has no usable address', async () => {
+    await renderAddressForm({ hasUsableAddress: false, addressEditable: true });
+
+    // `role="alert"` rather than `role="status"`: this is the reason the studio is
+    // receiving nothing, and it should interrupt.
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText('LaundryProfileForm.noAddressAlertTitle')).toBeInTheDocument();
+    expect(screen.getByText('LaundryProfileForm.noAddressAlertText')).toBeInTheDocument();
+  });
+
+  it('shows no alert once the studio has a usable address', async () => {
+    await renderAddressForm({ hasUsableAddress: true, addressEditable: false });
+
+    expect(screen.queryByText('LaundryProfileForm.noAddressAlertTitle')).not.toBeInTheDocument();
+  });
+
+  // A STUDIO WITH NO ADDRESS MUST BE ABLE TO SET ONE. A permanently disabled empty
+  // field would strand every new studio: it is invisible in the picker until it has
+  // an address, and it could never get one.
+  it('leaves the address field editable, with no lock note, while onboarding', async () => {
+    await renderAddressForm({ hasUsableAddress: false, addressEditable: true });
+
+    expect(addressInput()).toBeEnabled();
+    expect(
+      screen.queryByText('LaundryProfileForm.addressChangeRequiresSupport')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('LaundryProfileForm.addressChangeGranted')).not.toBeInTheDocument();
+  });
+
+  it('locks the address field and points at support when the change is not permitted', async () => {
+    await renderAddressForm({ hasUsableAddress: true, addressEditable: false });
+
+    expect(addressInput()).toBeDisabled();
+    expect(screen.getByText('LaundryProfileForm.addressChangeRequiresSupport')).toBeInTheDocument();
+  });
+
+  // A studio that has just been granted the change has to be able to tell.
+  it('opens the field and says so once an admin has granted the change', async () => {
+    await renderAddressForm({ hasUsableAddress: true, addressEditable: true });
+
+    expect(addressInput()).toBeEnabled();
+    expect(screen.getByText('LaundryProfileForm.addressChangeGranted')).toBeInTheDocument();
+    expect(
+      screen.queryByText('LaundryProfileForm.addressChangeRequiresSupport')
+    ).not.toBeInTheDocument();
+  });
+
+  // The message is switched on the server's machine-readable `data.code`, never on
+  // its English `statusText`, which would put a server sentence on a translated page.
+  it('shows the ask-support message for a refused address change', async () => {
+    await renderAddressForm({
+      hasUsableAddress: true,
+      addressEditable: true,
+      updateAddressError: { type: 'error', status: 403, code: 'change-not-allowed' },
+    });
+
+    expect(screen.getByText('LaundryProfileForm.addressChangeNotAllowed')).toBeInTheDocument();
+    expect(screen.queryByText('LaundryProfileForm.updateAddressFailed')).not.toBeInTheDocument();
+  });
+
+  it('shows a generic failure for any other address error', async () => {
+    await renderAddressForm({
+      hasUsableAddress: true,
+      addressEditable: true,
+      updateAddressError: { type: 'error', status: 500, code: null },
+    });
+
+    expect(screen.getByText('LaundryProfileForm.updateAddressFailed')).toBeInTheDocument();
+  });
+
+  // Defensive default: a caller that passes neither prop gets the pre-existing
+  // editable form rather than a silently frozen one.
+  it('defaults to an editable address field when the props are absent', async () => {
+    await renderAddressForm();
+
+    expect(addressInput()).toBeEnabled();
+  });
+});

@@ -285,6 +285,46 @@ const resolveAssignedLaundry = ({ integrationSdk, assignedLaundryId }) =>
     });
 
 /**
+ * THE THREE DERIVED FIELDS, as values. The single definition of what a laundry
+ * implies for a listing.
+ *
+ * Two callers now write these — an assignment (writeLaundryAssignment) and an
+ * address change (writeLaundryDerivedListingFields) — and a third reads them back
+ * for reporting (scripts/update-laundry-address.js). They are built here, once, so
+ * "which name wins" and "what shape geolocation is" cannot be answered two
+ * different ways in two different files. A disagreement between them would show up
+ * as a listing whose map pin and whose printed address are different places, and
+ * nothing in the system would notice.
+ *
+ * @param {Object} laundry - `{ displayName, studioName, address, origin: {lat,lng} }`
+ * @returns {{assignedLaundryName: string|null, pickupAddress: string, geolocation: {lat: number, lng: number}}}
+ */
+const laundryDerivedListingFields = laundry => ({
+  assignedLaundryName: laundry.displayName || laundry.studioName || null,
+  pickupAddress: laundry.address,
+  geolocation: { lat: laundry.origin.lat, lng: laundry.origin.lng },
+});
+
+/**
+ * The same three fields, shaped as `listings.update` params.
+ *
+ * `geolocation` is a top-level listing attribute rather than extended data, so it
+ * has to be an SDK `LatLng` and not the plain object above — which is the whole
+ * reason this is a second function rather than a spread of the first.
+ *
+ * @param {Object} laundry - as laundryDerivedListingFields
+ * @returns {{geolocation: Object, publicData: {assignedLaundryName: string|null, pickupAddress: string}}}
+ */
+const laundryDerivedListingParams = laundry => {
+  const { assignedLaundryName, pickupAddress } = laundryDerivedListingFields(laundry);
+
+  return {
+    geolocation: new sdkTypes.LatLng(laundry.origin.lat, laundry.origin.lng),
+    publicData: { assignedLaundryName, pickupAddress },
+  };
+};
+
+/**
  * Write the assignment: the id and the initial cleaning turnaround into `metadata`,
  * the three derived fields alongside them, in ONE Integration API call.
  *
@@ -323,23 +363,18 @@ const resolveAssignedLaundry = ({ integrationSdk, assignedLaundryId }) =>
  * @returns {Promise<{assignedLaundryId: string, initialCleaningDays: number, assignedLaundryName: string, pickupAddress: string, geolocation: {lat: number, lng: number}}>}
  */
 const writeLaundryAssignment = ({ integrationSdk, listingId, laundry, initialCleaningDays }) => {
+  const derived = laundryDerivedListingFields(laundry);
   const written = {
     [ASSIGNED_LAUNDRY_KEY]: laundry.id,
     [INITIAL_CLEANING_DAYS_KEY]: initialCleaningDays,
-    assignedLaundryName: laundry.displayName || laundry.studioName || null,
-    pickupAddress: laundry.address,
-    geolocation: { lat: laundry.origin.lat, lng: laundry.origin.lng },
+    ...derived,
   };
 
   return integrationSdk.listings
     .update(
       {
         id: listingId,
-        geolocation: new sdkTypes.LatLng(laundry.origin.lat, laundry.origin.lng),
-        publicData: {
-          assignedLaundryName: written.assignedLaundryName,
-          pickupAddress: written.pickupAddress,
-        },
+        ...laundryDerivedListingParams(laundry),
         metadata: {
           [ASSIGNED_LAUNDRY_KEY]: laundry.id,
           [INITIAL_CLEANING_DAYS_KEY]: initialCleaningDays,
@@ -349,6 +384,45 @@ const writeLaundryAssignment = ({ integrationSdk, listingId, laundry, initialCle
     )
     .then(() => written);
 };
+
+/**
+ * Re-write ONLY the three laundry-derived fields on a listing, from a laundry
+ * record — no `metadata`, no re-decision, nothing else touched.
+ *
+ * WHY IT EXISTS
+ *   > "una vez que se pueda cambiar la dirección, debe cambiar tambien la
+ *   >  dirección de todos los listings asociados a ese laundry"
+ *
+ * A studio that moves does not re-assign anybody's garment: the assignment is
+ * unchanged, only the place it is picked up from. So the address change needs a
+ * writer that refreshes the derived trio WITHOUT re-stamping
+ * `assignedLaundryId` / `initialCleaningDays`. Re-stamping the id would be a
+ * harmless no-op, but re-resolving `initialCleaningDays` would silently resize
+ * the calendar block of a garment whose booking may be in flight, for a change
+ * that has nothing to do with turnaround.
+ *
+ * IT SHARES laundryDerivedListingParams WITH writeLaundryAssignment ON PURPOSE.
+ * Two writers of `pickupAddress` + `geolocation` that each spelled the fields out
+ * would be two chances to disagree about, say, whether `assignedLaundryName`
+ * prefers `displayName` or `studioName` — and the symptom of that disagreement is
+ * a listing whose map and whose printed address point at different places, which
+ * nothing would flag. The params are built in exactly one place.
+ *
+ * Used by server/api/laundry-address.js (the studio's own sanctioned change) and
+ * by scripts/update-laundry-address.js (the admin's). Both therefore write byte
+ * for byte what an assignment would have written.
+ *
+ * @param {Object} params
+ * @param {Object} params.integrationSdk
+ * @param {Object|string} params.listingId
+ * @param {Object} params.laundry - `{ displayName, studioName, address, origin }`,
+ *   the same record shape resolveAssignedLaundry / toLaundryDirectoryEntry return
+ * @returns {Promise<{assignedLaundryName: string, pickupAddress: string, geolocation: {lat: number, lng: number}}>}
+ */
+const writeLaundryDerivedListingFields = ({ integrationSdk, listingId, laundry }) =>
+  integrationSdk.listings
+    .update({ id: listingId, ...laundryDerivedListingParams(laundry) }, { expand: true })
+    .then(() => laundryDerivedListingFields(laundry));
 
 /**
  * Apply the rule to a listing and throw the right 409 if it refuses.
@@ -426,6 +500,9 @@ module.exports = {
   resolveInitialCleaningDays,
   evaluateLaundryAssignment,
   resolveAssignedLaundry,
+  laundryDerivedListingFields,
+  laundryDerivedListingParams,
   writeLaundryAssignment,
+  writeLaundryDerivedListingFields,
   assertLaundryAssignmentAllowed,
 };

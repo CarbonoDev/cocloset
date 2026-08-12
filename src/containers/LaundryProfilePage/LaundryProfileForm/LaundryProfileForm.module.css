@@ -20,6 +20,85 @@
   }
 }
 
+/* ── No usable address: the studio is invisible in the picker ─────────────────
+   Deliberately the loudest thing on this form ("una alerta llamativa"). It is
+   pitched above the mild amber used for the legacy-category notes below, because
+   the amber notes are housekeeping and this is "you are receiving nothing and
+   nowhere else will tell you". Full-bleed tint plus a thick leading rule, so it
+   reads as an alert even before the text does. */
+.addressAlert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px;
+  border: 1px solid var(--colorFail);
+  border-left-width: 6px;
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--colorFailSubtle);
+
+  @media (--viewportMedium) {
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 16px;
+  }
+}
+
+.addressAlertIcon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  stroke: var(--colorFail);
+
+  @media (--viewportMedium) {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.addressAlertBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  @media (--viewportMedium) {
+    gap: 8px;
+  }
+}
+
+.addressAlertTitle {
+  composes: h4 from global;
+  margin: 0;
+  padding: 0;
+  color: var(--colorFail);
+  font-weight: var(--fontWeightBold);
+}
+
+.addressAlertText {
+  composes: h5 from global;
+  margin: 0;
+  padding: 0;
+  color: var(--coclosetInk);
+}
+
+/* Sits directly under the address field: why it is closed, or why it just opened.
+   Muted, because unlike the alert above this is an explanation and not a problem. */
+.addressNote {
+  composes: h5 from global;
+  margin: -12px 0 18px 0;
+  padding: 0;
+  color: var(--coclosetInkMuted);
+
+  @media (--viewportMedium) {
+    margin: -16px 0 24px 0;
+  }
+}
+
+.addressNoteGranted {
+  composes: addressNote;
+  color: var(--coclosetToneGreenFg);
+}
+
 /* Mockup 03.jpg labels the studio settings fields in small caps rather than the
    template's default sentence-case bold — it's what separates the label row from the
    input value at a glance on a dense settings form. */

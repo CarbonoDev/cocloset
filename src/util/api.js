@@ -337,3 +337,29 @@ export const fetchListingInitialCleaning = listingId => {
 export const fetchLaundryOrders = () => {
   return request('/api/laundry-orders', { method: methods.GET });
 };
+
+// Save the CALLING laundry's own address, and propagate it to every listing
+// assigned to that studio.
+//
+// A separate call from the rest of the studio profile on purpose: everything else on
+// LaundryProfilePage still saves straight from the browser with
+// `sdk.currentUser.updateProfile`, and only the address comes through our server.
+// Two reasons, both server-side:
+//   * the change is GATED. Once a studio has a usable address, changing it needs
+//     `metadata.addressChangeAllowed === true`, which an admin grants and which a
+//     user cannot write for themselves. Rejects 403 with `data.code`
+//     'change-not-allowed' - switch the message on that code, never on statusText.
+//   * it PROPAGATES. Every listing assigned to this studio has its
+//     `publicData.pickupAddress`, `publicData.assignedLaundryName` and top-level
+//     `geolocation` rewritten in the same request, which needs the Integration API.
+//
+// Takes NO laundry id - the target is the caller's own session.
+//
+// The address itself stays in owner-writable `publicData`, so this call is the
+// sanctioned path, not the only possible one. Read the header of
+// `server/api/laundry-address.js` before describing it as protected anywhere.
+//
+// Body: { address, origin: { lat, lng } }
+export const updateLaundryAddress = body => {
+  return post('/api/laundry-address', body);
+};

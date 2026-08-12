@@ -24,6 +24,7 @@ const listingReadinessStatus = require('./api/listing-readiness-status');
 const listingCustodyStatus = require('./api/listing-custody-status');
 const listingLaundryAssignment = require('./api/listing-laundry-assignment');
 const listingInitialCleaning = require('./api/listing-initial-cleaning');
+const laundryAddress = require('./api/laundry-address');
 const laundryOrders = require('./api/laundry-orders');
 const transactionQr = require('./api/transaction-qr');
 const initUserRole = require('./api/init-user-role');
@@ -80,6 +81,14 @@ router.post('/listing-custody-status', listingCustodyStatus);
 // on it - it is a server-side DECISION, not a write gate.
 router.post('/listing-laundry-assignment', listingLaundryAssignment);
 router.get('/laundry-orders', laundryOrders);
+
+// A laundry's OWN address, and only the address - the rest of the studio profile
+// still saves straight from the browser. Gated on an admin-granted
+// `metadata.addressChangeAllowed` once an address exists, and propagates the change
+// to every listing assigned to that studio. Read the header of
+// server/api/laundry-address.js before relying on the gate: the address stays in
+// owner-writable `publicData`, so this gates OUR path, not every path.
+router.post('/laundry-address', laundryAddress);
 
 // The assigned laundry's CURRENT initial-cleaning turnaround for one listing, as a
 // single integer. PUBLIC and rate limited - ListingPage is public, and the customer who

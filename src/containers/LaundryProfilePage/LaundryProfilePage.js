@@ -4,6 +4,7 @@ import { connect } from 'react-redux';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { isLaundryUser } from '../../util/userHelpers';
+import { canChangeLaundryAddress, hasUsableLaundryAddressForUser } from '../../util/laundryProfile';
 import {
   categoryPricingFromFormValues,
   categoryPricingToFormValues,
@@ -110,9 +111,20 @@ const getInitialValues = currentUser => {
  * @returns {JSX.Element}
  */
 const LaundryProfileFormSection = props => {
-  const { currentUser, onUpdateProfile, updateProfileInProgress, updateProfileError } = props;
+  const {
+    currentUser,
+    onUpdateProfile,
+    updateProfileInProgress,
+    updateProfileError,
+    updateAddressInProgress,
+    updateAddressError,
+  } = props;
 
   const [state, setState] = useState({ initialValues: getInitialValues(currentUser) });
+
+  const storedLaundryProfile = currentUser?.attributes?.profile?.publicData?.laundryProfile || {};
+  const hasUsableAddress = hasUsableLaundryAddressForUser(currentUser);
+  const addressEditable = canChangeLaundryAddress(currentUser);
 
   const handleSubmit = values => {
     const { studioName, businessHours, turnaroundDays, acceptedCategories, location } = values;
@@ -146,18 +158,74 @@ const LaundryProfileFormSection = props => {
     // and that is expressed by the key's absence, not by a row full of nulls.
     const nextCategoryPricing = categoryPricingFromFormValues(values);
 
+    // ── THE ADDRESS DOES NOT TRAVEL WITH THIS WRITE ────────────────────────────
+    //   > "Igual podemos hacer una llamada secundaria que solo guarde la dirección,
+    //   >  el resto se sigue guardando igual, pero la dirección (aun en publicData)
+    //   >  se guarda a través de integration API"
+    //
+    // The address goes to /api/laundry-address instead (see below), because the
+    // change is gated on an admin-granted flag and has to be mirrored onto every
+    // listing assigned to this studio — neither of which the browser can do.
+    //
+    // But it cannot simply be OMITTED here. `laundryProfile` is ONE top-level
+    // extended-data key holding a nested object, and Sharetribe merges by top-level
+    // key: sending `laundryProfile: { studioName, businessHours }` would replace the
+    // whole object and delete the studio's stored address and coordinates. So this
+    // write carries the STORED values back verbatim — never the submitted ones, so
+    // that this ungated path cannot move the address even if the form is bypassed.
+    //
+    // `toLatLng` rehydrates a plain-JSON origin (what an Integration API / script
+    // write leaves behind) into the LatLng a browser write stores, so re-saving a
+    // seeded profile normalises the shape instead of round-tripping two of them.
+    const preservedOrigin = toLatLng(storedLaundryProfile.origin);
+
     // Only the keys this page owns are sent. Sharetribe merges top-level
     // publicData/privateData keys, so re-sending the whole existing blob would
     // only widen the lost-update window against a concurrent write.
     const profile = {
       publicData: {
-        laundryProfile: { studioName, address, origin, businessHours },
+        laundryProfile: {
+          studioName,
+          businessHours,
+          // Absent keys are omitted rather than written as undefined: a studio
+          // setting its FIRST address has nothing stored to preserve, and the
+          // address call right after this one is what puts it there.
+          ...(storedLaundryProfile.address ? { address: storedLaundryProfile.address } : {}),
+          ...(preservedOrigin ? { origin: preservedOrigin } : {}),
+        },
         acceptedCategories: acceptedCategoriesArray,
       },
       privateData: {
         turnaroundDays: nextTurnaroundDays,
         categoryPricing: nextCategoryPricing,
       },
+    };
+
+    // Has the studio actually submitted a different address? Compared against the
+    // STORED value, so re-saving another field does not spend an admin's one-off
+    // grant on a no-op — and so a locked field (whose value is the stored one)
+    // never triggers the call at all.
+    const addressChanged =
+      !!address &&
+      !!origin &&
+      (address !== storedLaundryProfile.address ||
+        origin.lat !== storedLaundryProfile.origin?.lat ||
+        origin.lng !== storedLaundryProfile.origin?.lng);
+
+    // `addressEditable` is re-checked here even though the field is disabled when it
+    // is false. The disabled input is UX; this is the client-side half of the rule,
+    // and the server takes the same decision again against the stored user. Stated
+    // plainly: none of the three is real enforcement of the address itself, which
+    // stays in owner-writable `publicData` — see server/api-util/laundryAddress.js.
+    const addressChange = addressChanged && addressEditable ? { address, origin } : null;
+
+    // What the address will actually BE once both writes land: the submitted value
+    // only when it is being sent, otherwise the stored one. Snapshotting the
+    // submitted address unconditionally would leave the form displaying an address
+    // that was never saved.
+    const nextLocation = addressChange || {
+      address: storedLaundryProfile.address,
+      origin: preservedOrigin,
     };
 
     // Cache the values we just saved so the form doesn't revert to stale
@@ -170,11 +238,19 @@ const LaundryProfileFormSection = props => {
         acceptedCategories: acceptedCategoriesArray,
         ...categoryPricingToFormValues(nextCategoryPricing),
         location:
-          address && origin ? { search: address, selectedPlace: { address, origin } } : null,
+          nextLocation.address && nextLocation.origin
+            ? {
+                search: nextLocation.address,
+                selectedPlace: {
+                  address: nextLocation.address,
+                  origin: nextLocation.origin,
+                },
+              }
+            : null,
       },
     });
 
-    onUpdateProfile(profile);
+    onUpdateProfile(profile, addressChange);
   };
 
   return (
@@ -183,7 +259,10 @@ const LaundryProfileFormSection = props => {
       initialValues={state.initialValues}
       onSubmit={handleSubmit}
       updateProfileError={updateProfileError}
-      updateInProgress={updateProfileInProgress}
+      updateAddressError={updateAddressError}
+      updateInProgress={updateProfileInProgress || updateAddressInProgress}
+      hasUsableAddress={hasUsableAddress}
+      addressEditable={addressEditable}
     />
   );
 };
@@ -196,8 +275,17 @@ const LaundryProfileFormSection = props => {
  * categories carrying a turnaround per top-level category. Writes to
  * publicData.laundryProfile, publicData.acceptedCategories and privateData
  * (turnaroundDays, categoryPricing) on the laundry's own user profile via the ordinary
- * Marketplace API (sdk.currentUser.updateProfile) — no Integration API involved. It
- * writes NO cleaning fee: fees are marketplace-level server env configuration
+ * Marketplace API (sdk.currentUser.updateProfile).
+ *
+ * THE ADDRESS IS THE ONE EXCEPTION. It is saved by a second call, to our own server
+ * (/api/laundry-address -> Integration API), because two things about it need a
+ * server: the change is gated on an admin-granted `metadata.addressChangeAllowed`
+ * (a flag a user cannot write for itself), and it has to be mirrored onto every
+ * listing assigned to this studio. The address itself still lives in `publicData`,
+ * so that call is the sanctioned path and not the only possible one — read the
+ * header of server/api-util/laundryAddress.js before describing it as protected.
+ *
+ * It writes NO cleaning fee: fees are marketplace-level server env configuration
  * (CLEANING_FEE_<CATEGORY_ID>), not something a studio sets. The per-category table is
  * privateData rather than publicData because a studio's capacity is a commercial input:
  * the laundry and the operator see it, nobody else.
@@ -208,9 +296,12 @@ const LaundryProfileFormSection = props => {
  * @param {Object} props
  * @param {propTypes.currentUser} [props.currentUser] - The current user
  * @param {boolean} props.scrollingDisabled - Whether the scrolling is disabled
- * @param {Function} props.onUpdateProfile - The submit profile update function
+ * @param {Function} props.onUpdateProfile - The submit handler, called as
+ *   `(profile, addressChange)` - see LaundryProfilePage.duck.js `updateProfile`
  * @param {boolean} [props.updateProfileInProgress] - Whether the update is in progress
  * @param {propTypes.error} [props.updateProfileError] - The update profile error
+ * @param {boolean} [props.updateAddressInProgress] - Whether the address call is in progress
+ * @param {Object} [props.updateAddressError] - The address call error, carrying `code`
  * @returns {JSX.Element}
  */
 export const LaundryProfilePageComponent = props => {
@@ -221,6 +312,8 @@ export const LaundryProfilePageComponent = props => {
     onUpdateProfile,
     updateProfileInProgress = false,
     updateProfileError,
+    updateAddressInProgress = false,
+    updateAddressError,
     staticContext,
   } = props;
 
@@ -275,6 +368,8 @@ export const LaundryProfilePageComponent = props => {
             onUpdateProfile={onUpdateProfile}
             updateProfileInProgress={updateProfileInProgress}
             updateProfileError={updateProfileError}
+            updateAddressInProgress={updateAddressInProgress}
+            updateAddressError={updateAddressError}
           />
         </div>
       </LayoutSideNavigation>
@@ -284,17 +379,28 @@ export const LaundryProfilePageComponent = props => {
 
 const mapStateToProps = state => {
   const { currentUser } = state.user;
-  const { updateProfileInProgress, updateProfileError } = state.LaundryProfilePage;
+  const {
+    updateProfileInProgress,
+    updateProfileError,
+    updateAddressInProgress,
+    updateAddressError,
+  } = state.LaundryProfilePage;
   return {
     currentUser,
     scrollingDisabled: isScrollingDisabled(state),
     updateProfileInProgress,
     updateProfileError,
+    updateAddressInProgress,
+    updateAddressError,
   };
 };
 
 const mapDispatchToProps = dispatch => ({
-  onUpdateProfile: values => dispatch(updateProfile(values)),
+  // Two arguments: the ordinary profile write, and (only when the studio submitted a
+  // different address and may currently change it) the gated address change. The duck
+  // sequences them - see LaundryProfilePage.duck.js `updateProfile` for why the order
+  // matters.
+  onUpdateProfile: (values, addressChange) => dispatch(updateProfile(values, addressChange)),
 });
 
 const LaundryProfilePage = compose(

@@ -30,6 +30,7 @@ import {
   FieldCheckbox,
   FieldTextInput,
   FieldLocationAutocompleteInput,
+  IconAlert,
   InlineTextButton,
 } from '../../../components';
 
@@ -145,8 +146,54 @@ const FallbackHint = props => {
  * @param {string} [props.className] - Custom class that extends the default class for the root element
  * @param {string} [props.formId] - The form id
  * @param {Function} props.onSubmit - The function to handle form submission
+ * ── THE ADDRESS IS DIFFERENT FROM EVERY OTHER FIELD HERE ────────────────────────
+ * Two client rules land on it:
+ *
+ *   > "la laundry no puede estar en la lista de disponibles si no tiene dirección,
+ *   >  por lo que en el form de laundry hay que poner una alerta llamativa de que no
+ *   >  se le pueden asignar prendas si no tiene dirección establecida"
+ *
+ *   > "debemos indicar al usuario que no puede cambiar su dirección y que si desea
+ *   >  modificar la dirección, debe solicitar apoyo al administrador o soporte"
+ *
+ * THE ALERT fires on `hasUsableAddress === false`, which is BOTH "no address" and
+ * "an address with no geocoded coordinates" — the server excludes the second case
+ * exactly as hard as the first (see util/laundryProfile.js, which is parity-tested
+ * against the server predicate), and a studio told "you have an address" while
+ * receiving nothing would be worse than no alert. It has to be loud because the
+ * symptom is silence: /api/laundries simply omits this studio, so nothing else on
+ * any screen tells the laundry why no garments arrive.
+ *
+ * THE LOCK is `addressEditable === false`, and it is NOT "locked whenever an address
+ * exists". It is locked unless the studio may currently change it: no usable
+ * address yet (onboarding — a permanently disabled empty field would strand every
+ * new studio), or an admin has granted a one-off change
+ * (`metadata.addressChangeAllowed`). When the grant is present the field opens and
+ * says so, so a studio that has just been granted the change can tell.
+ *
+ * WHAT THE LOCK IS WORTH, HONESTLY: the disabled input is UX. The address is saved
+ * through a gated server endpoint (/api/laundry-address, which re-takes the same
+ * decision against the stored user), but it still LIVES in the laundry's own
+ * `publicData`, which it can write directly against the Marketplace API. So this
+ * form and that endpoint gate the sanctioned path; neither closes the direct one.
+ * Nothing in this file may say otherwise — see server/api-util/laundryAddress.js.
+ *
+ * @component
+ * @param {Object} props
+ * @param {string} [props.rootClassName] - Custom class that overrides the default class for the root element
+ * @param {string} [props.className] - Custom class that extends the default class for the root element
+ * @param {string} [props.formId] - The form id
+ * @param {Function} props.onSubmit - The function to handle form submission
  * @param {boolean} props.updateInProgress - Whether the update is in progress
  * @param {propTypes.error} [props.updateProfileError] - The update profile error
+ * @param {Object} [props.updateAddressError] - The gated address call's error. Carries
+ *   `code` ('change-not-allowed' | 'invalid-address' | ...) so the message can be
+ *   translated rather than echoing the server's English `statusText`.
+ * @param {boolean} [props.hasUsableAddress] - Does the STORED profile have an address
+ *   AND usable coordinates? Drives the alert.
+ * @param {boolean} [props.addressEditable] - May the studio change the address right
+ *   now? Drives the lock. Defaults to true so a caller that passes neither prop gets
+ *   the pre-existing editable form rather than a silently frozen one.
  * @returns {JSX.Element}
  */
 const LaundryProfileForm = props => (
@@ -155,14 +202,17 @@ const LaundryProfileForm = props => (
     mutators={{ ...arrayMutators }}
     render={fieldRenderProps => {
       const {
+        addressEditable = true,
         className,
         form,
         formId = 'LaundryProfileForm',
         handleSubmit,
+        hasUsableAddress = false,
         initialValues,
         invalid,
         pristine,
         rootClassName,
+        updateAddressError,
         updateInProgress,
         updateProfileError,
         values,
@@ -183,6 +233,40 @@ const LaundryProfileForm = props => (
           <FormattedMessage id="LaundryProfileForm.updateProfileFailed" />
         </div>
       ) : null;
+
+      // The address call fails for its own reasons, and one of them - the change is
+      // not currently permitted - is not an error the studio can fix by retrying.
+      // Switched on the server's machine-readable `data.code`, never on `statusText`,
+      // which would put an English server sentence on a translated page.
+      const addressError = updateAddressError ? (
+        <div className={css.error} role="alert">
+          <FormattedMessage
+            id={
+              updateAddressError.code === 'change-not-allowed'
+                ? 'LaundryProfileForm.addressChangeNotAllowed'
+                : 'LaundryProfileForm.updateAddressFailed'
+            }
+          />
+        </div>
+      ) : null;
+
+      // ── THE ALERT ─────────────────────────────────────────────────────────────
+      // `role="alert"` rather than `role="status"`: this is not progress
+      // information, it is the reason the studio is receiving nothing, and it should
+      // interrupt.
+      const missingAddressAlert = hasUsableAddress ? null : (
+        <div className={css.addressAlert} role="alert">
+          <IconAlert className={css.addressAlertIcon} />
+          <div className={css.addressAlertBody}>
+            <p className={css.addressAlertTitle}>
+              <FormattedMessage id="LaundryProfileForm.noAddressAlertTitle" />
+            </p>
+            <p className={css.addressAlertText}>
+              <FormattedMessage id="LaundryProfileForm.noAddressAlertText" />
+            </p>
+          </div>
+        </div>
+      );
 
       // The category tree comes from Console (hosted asset). An empty tree is a real
       // possibility — a marketplace that hasn't configured categories yet — and must
@@ -266,7 +350,11 @@ const LaundryProfileForm = props => (
 
       return (
         <Form className={classes} onSubmit={handleSubmit}>
+          {/* First thing on the form, before any field: a studio that cannot receive
+              garments needs to know that before it edits anything else. */}
+          {missingAddressAlert}
           {submitError}
+          {addressError}
 
           <FieldTextInput
             className={css.field}
@@ -293,11 +381,28 @@ const LaundryProfileForm = props => (
             useDefaultPredictions={false}
             format={identity}
             valueFromForm={values.location}
+            // UX only. The value still submits (final-form keeps it from
+            // initialValues), the page sends the STORED address on the ungated write,
+            // and the gated endpoint decides again server-side. See the docblock.
+            disabled={!addressEditable}
             validate={composeValidators(
               autocompleteSearchRequired(addressRequiredMessage),
               autocompletePlaceSelected(addressNotRecognizedMessage)
             )}
           />
+
+          {/* Why the field is closed, or why it has just opened. Not rendered at all
+              during onboarding: a studio with no address yet has the alert above
+              telling it to set one, and a third block would only add noise. */}
+          {!addressEditable ? (
+            <p className={css.addressNote}>
+              <FormattedMessage id="LaundryProfileForm.addressChangeRequiresSupport" />
+            </p>
+          ) : hasUsableAddress ? (
+            <p className={css.addressNoteGranted}>
+              <FormattedMessage id="LaundryProfileForm.addressChangeGranted" />
+            </p>
+          ) : null}
 
           <FieldTextInput
             className={css.field}

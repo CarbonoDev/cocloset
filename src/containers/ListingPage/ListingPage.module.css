@@ -645,6 +645,43 @@
   }
 }
 
+/* The assigned laundry's studio name + street address, above the map that
+   plots it. Rendered only when the address came from an assigned laundry —
+   see SectionMapMaybe. */
+.pickupLocation {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 18px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
+}
+
+.pickupLocationName {
+  composes: p from global;
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0;
+}
+
+.pickupLocationAddress {
+  composes: p from global;
+  /* <address> is italic by default in every browser; this is a street address
+     in running text, not an aside. */
+  font-style: normal;
+  margin: 0;
+}
+
+.pickupLocationNote {
+  composes: h5 from global;
+  color: var(--colorGrey700);
+  margin: 6px 0 0 0;
+
+  @media (--viewportMedium) {
+    margin: 8px 0 0 0;
+  }
+}
+
 .sectionReviews,
 .sectionAuthor {
   padding: 0 24px;

@@ -54,3 +54,37 @@ export const getPickupLocation = publicData => {
  */
 export const getListingPickupLocation = listing =>
   getPickupLocation(listing?.attributes?.publicData);
+
+/**
+ * The pickup location, but ONLY when it genuinely came from an assigned laundry.
+ *
+ * WHY THIS EXISTS ALONGSIDE getPickupLocation, RATHER THAN REPLACING IT.
+ * getPickupLocation deliberately falls back to the legacy `publicData.location`
+ * so that pre-repurposing listings keep rendering *something* in blocks that
+ * would otherwise go blank (checkout's pickup panel, the map's address label).
+ * For a block whose entire purpose is to PRINT the address as prose, that
+ * fallback is not a graceful degradation — it is a privacy incident. On listings
+ * created before EditListingLocationPanel was repurposed, `publicData.location`
+ * holds the OWNER'S OWN HOME ADDRESS (see the header comment above), and
+ * ListingPage is a fully public page.
+ *
+ * So the rule for any *new* reader that renders the address as text is: gate on
+ * the laundry-derived value, never on "whatever the helper returns".
+ * `publicData.pickupAddress` is that marker — the only writer of it is
+ * server/api/listing-laundry-assignment.js, which resolves it server-side from
+ * the chosen laundry's own profile in the same Integration API call that writes
+ * `metadata.assignedLaundryId` and the listing's `geolocation`. If it is absent,
+ * no laundry has ever been assigned and there is no public address to show.
+ *
+ * Returns `null` (not `{}`) so a caller has to make a decision about the empty
+ * case instead of rendering an empty string into a paragraph.
+ *
+ * @param {Object} [publicData] - a listing's `attributes.publicData`
+ * @returns {{ address: string, building?: string }|null} null when the address
+ *   is absent or is only the legacy owner-derived `publicData.location`
+ */
+export const getAssignedLaundryLocation = publicData => {
+  // Reuse the single place that knows the stored shape, then keep only the
+  // laundry-derived branch of its answer.
+  return publicData?.pickupAddress ? getPickupLocation(publicData) : null;
+};
