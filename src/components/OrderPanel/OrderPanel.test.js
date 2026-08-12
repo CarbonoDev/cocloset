@@ -357,6 +357,99 @@ describe('OrderPanel', () => {
     expect(queryByText('BookingDatesForm.initialCleaningNotice')).not.toBeInTheDocument();
   });
 
+  // ---------------------------------------------------------------------------
+  // Cocloset: the minimum rental length legend.
+  //
+  //   > "hay que mostrar una leyenda donde indique que la prenda necesita ser reservada
+  //   >  por un mínimo de n días, de acuerdo al valor que haya ingresado el provider,
+  //   >  siempre que n sea mayor a 1, es importante que el cliente vea esta información ya
+  //   >  que de otra manera no sabrá por que no le permite reservar por menos días"
+  //
+  // The value lives in `publicData.minimumBookingDays`, which is where the owner's wizard
+  // writes it - so this asserts the same threading the initial-cleaning notice does, and
+  // the "> 1" condition, which is the whole of the client's instruction about when to show
+  // it. The validation message is a different string and is deliberately left alone: it
+  // fires after a failed attempt, which is exactly what the client says is too late.
+  // ---------------------------------------------------------------------------
+  const dailyGarmentListingWithMinimum = (id, minimumBookingDays) =>
+    createListing(id, {
+      title: 'the listing',
+      price: new Money(1000, 'USD'),
+      availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
+      publicData: {
+        listingType: 'rent-bicycles-daily',
+        transactionProcessAlias: 'default-booking/release-1',
+        unitType: 'day',
+        ...(minimumBookingDays === undefined ? {} : { minimumBookingDays }),
+      },
+      metadata: {},
+    });
+
+  const renderWithMinimum = (id, minimumBookingDays) => {
+    const listing = dailyGarmentListingWithMinimum(id, minimumBookingDays);
+    const props = { ...commonProps, listing, isOwnListing: false, validListingTypes };
+    return render(<OrderPanel {...props} />, { config, routeConfiguration });
+  };
+
+  it('Booking: states the minimum rental length up front when there is one', async () => {
+    const { getByText } = renderWithMinimum('listing-minimum-3', 3);
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.minimumBookingDaysNotice')).toBeInTheDocument();
+    });
+  });
+
+  it('Booking: says nothing when the minimum is 1, which is no minimum at all', async () => {
+    // A "minimum of 1 day" is the stock behaviour. Announcing it would be noise on every
+    // listing in the marketplace.
+    const { queryByText, getByText } = renderWithMinimum('listing-minimum-1', 1);
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingDatesForm.minimumBookingDaysNotice')).not.toBeInTheDocument();
+  });
+
+  it('Booking: says nothing when the owner set no minimum', async () => {
+    const { queryByText, getByText } = renderWithMinimum('listing-minimum-none', undefined);
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingDatesForm.minimumBookingDaysNotice')).not.toBeInTheDocument();
+  });
+
+  it.each([['0', 0], ['a fraction', 2.5], ['a string', '3'], ['null', null]])(
+    'Booking: says nothing for the unusable minimum %s rather than guessing',
+    async (_label, minimumBookingDays) => {
+      // A legend claiming a rule the picker is not enforcing is worse than no legend: it
+      // tells the customer the calendar is broken when the calendar is right.
+      const { queryByText, getByText } = renderWithMinimum(
+        `listing-minimum-${String(minimumBookingDays)}`,
+        minimumBookingDays
+      );
+
+      await waitFor(() => {
+        expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
+      });
+      expect(queryByText('BookingDatesForm.minimumBookingDaysNotice')).not.toBeInTheDocument();
+    }
+  );
+
+  it('Booking: leaves the after-the-fact validation message in place', async () => {
+    // The legend is ADDITIVE. The validator still has to exist: `minimumNights` makes the
+    // second calendar click silently do nothing and does not guard the typed-in inputs at
+    // all, so something has to name the rule at the moment it is broken too.
+    const { queryByText } = renderWithMinimum('listing-minimum-additive', 3);
+
+    await waitFor(() => {
+      expect(queryByText('BookingDatesForm.minimumBookingDaysNotice')).toBeInTheDocument();
+    });
+    // Not yet shown - it appears only after a failed attempt, which is the client's whole
+    // complaint and the reason the legend was added alongside it.
+    expect(queryByText('BookingDatesForm.minimumBookingDays')).not.toBeInTheDocument();
+  });
+
   it('Booking: nightly', async () => {
     const listing = createListing('listing-night', {
       title: 'the listing',

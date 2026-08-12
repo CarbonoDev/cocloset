@@ -860,6 +860,32 @@ export const BookingDatesForm = props => {
               </p>
             ) : null}
 
+            {/* The owner's minimum rental length, stated BEFORE the customer tries.
+                  > "hay que mostrar una leyenda donde indique que la prenda necesita
+                  >  ser reservada por un mínimo de n días ... es importante que el
+                  >  cliente vea esta información ya que de otra manera no sabrá por
+                  >  que no le permite reservar por menos días"
+                `minimumNights` makes the second click in the calendar silently do
+                nothing, and the `minimumBookingDays` validator only speaks up after a
+                failed attempt - so without this the rule is discoverable only by
+                bumping into it. This is ADDITIVE: the validator stays, because it also
+                guards the typed-in date inputs and has to name the rule at the moment
+                it is broken.
+
+                `minimumDays` is null unless the effective minimum is genuinely > 1
+                (resolveMinimumDays), so a listing with no minimum, a minimum of 1, or
+                an hourly/fixed listing renders nothing at all - the same condition the
+                picker floor and the validator use, from the same call, so the legend
+                cannot claim a rule the calendar is not enforcing. */}
+            {minimumDays ? (
+              <p className={css.minimumBookingDaysNotice}>
+                <FormattedMessage
+                  id="BookingDatesForm.minimumBookingDaysNotice"
+                  values={{ days: minimumDays }}
+                />
+              </p>
+            ) : null}
+
             <FieldDateRangePicker
               className={css.bookingDates}
               name="bookingDates"
