@@ -253,7 +253,7 @@ export const LaundryProfilePageComponent = props => {
               desktopClassName={css.desktopTopbar}
               mobileClassName={css.mobileTopbar}
             />
-            <UserNav currentPage="LaundryProfilePage" showLaundryProfileLink />
+            <UserNav currentPage="LaundryProfilePage" showLaundryProfileLink showManageListingsLink />
           </>
         }
         sideNav={<LaundryOpsNav currentPage="LaundryProfilePage" studioName={studioName} />}
