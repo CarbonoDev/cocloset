@@ -15,7 +15,10 @@ import {
   isFieldForListingType,
   pickCategoryFields,
 } from '../../../../util/fieldHelpers';
-import { isBookingProcessAlias } from '../../../../transactions/transaction';
+import {
+  COCLOSET_BOOKING_PROCESS_NAME,
+  isBookingProcessAlias,
+} from '../../../../transactions/transaction';
 
 // Import shared components
 import { H3, ListingLink } from '../../../../components';
@@ -219,6 +222,65 @@ const setNoAvailabilityForUnbookableListings = processAlias => {
       };
 };
 
+// The plan timezone for an automatically-created cocloset-booking listing.
+//
+// NOT the browser's zone, which is what the removed AVAILABILITY panel wrote. The
+// listing's plan timezone silently becomes the day-boundary authority for the server's
+// minimum-booking-days and initial-cleaning gates (server/api-util/bookingRules.js falls
+// back to 'Etc/UTC' today, with a test pinning it). Writing the owner's browser zone
+// would make those refusals depend on which machine the garment was listed from - a
+// garment listed in Madrid and one listed in Bogotá would compute different first
+// bookable days for identical data. 'Etc/UTC' preserves exactly today's server
+// behaviour.
+//
+// This is a deliberate choice, not a discovered constant: if Cocloset wants a single
+// marketplace-wide zone (e.g. 'Europe/Madrid'), this is the one line to change.
+export const FULL_AVAILABILITY_TIMEZONE = 'Etc/UTC';
+
+const DAYS_OF_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+/**
+ * A cocloset-booking listing must be available every day, all day, and it must get that
+ * plan without anyone being asked: the wizard has no AVAILABILITY step for this process
+ * (see `tabsForListingType`). This is load-bearing rather than cosmetic - OrderPanel
+ * gates its whole booking form on `availabilityPlan.timezone` existing, so a plan-less
+ * listing cannot be booked at all.
+ *
+ * The counterpart of `setNoAvailabilityForUnbookableListings` above, and shaped exactly
+ * like what the AVAILABILITY form itself persisted for a full-day `oneSeat` listing: one
+ * entry per weekday, `00:00` to `00:00`. The end time is not a typo - the form normalises
+ * a whole day's `24:00` down to `00:00` when saving (see AvailabilityPlanEntries.js), and
+ * `src/util/testData.js` carries the same shape.
+ *
+ * Skipped when the listing already has a plan, so editing the details of an existing
+ * listing never overwrites availability someone has deliberately set.
+ *
+ * @param {string} processAlias selected for this listing, e.g. 'cocloset-booking/release-1'
+ * @param {Object} [existingAvailabilityPlan] the plan already stored on the listing, if any
+ * @returns {Object} `{ availabilityPlan }`, or `{}` when nothing should be written
+ */
+export const setFullAvailabilityForCoclosetBooking = (processAlias, existingAvailabilityPlan) => {
+  const processName = processAlias ? processAlias.split('/')[0] : null;
+  const isCoclosetBooking = processName === COCLOSET_BOOKING_PROCESS_NAME;
+
+  if (!isCoclosetBooking || existingAvailabilityPlan) {
+    return {};
+  }
+
+  return {
+    availabilityPlan: {
+      type: 'availability-plan/time',
+      timezone: FULL_AVAILABILITY_TIMEZONE,
+      entries: DAYS_OF_WEEK.map(dayOfWeek => ({
+        dayOfWeek,
+        startTime: '00:00',
+        endTime: '00:00',
+        seats: 1,
+      })),
+    },
+  };
+};
+
 /**
  * Get initialValues for the form. This function includes
  * title, description, listingType, transactionProcessAlias, unitType,
@@ -248,10 +310,18 @@ const getInitialValues = (
   const listingType = publicData?.listingType || preselectedListingType;
 
   const nestedCategories = pickCategoryFields(publicData, categoryKey, 1, listingCategories);
+  // The owner's own private shipping address, which the LOCATION tab used to own. Kept
+  // under distinct `owner*` field names so it cannot collide with a configured listing
+  // field (those are always `pub_`/`priv_` namespaced) or with the category keys.
+  const { street, city, postcode } = privateData?.ownerAddress || {};
+
   // Initial values for the form
   return {
     title,
     description,
+    ownerStreet: street,
+    ownerCity: city,
+    ownerPostcode: postcode,
     ...nestedCategories,
     // Transaction type info: listingType, transactionProcessAlias, unitType
     ...getTransactionInfo({ listingTypes, existingListingTypeInfo, preselectedListingType }),
@@ -284,6 +354,9 @@ const getInitialValues = (
  * @param {boolean} props.ready - Whether the form is ready
  * @param {Function} props.onSubmit - The submit function
  * @param {Function} props.onListingTypeChange - The listing type change function
+ * @param {boolean} [props.captureOwnerAddress] - Whether this panel should also ask for the
+ *   owner's own private shipping address (`privateData.ownerAddress`). True only for
+ *   processes whose wizard has no LOCATION tab; see EditListingWizard.js.
  * @param {string} props.submitButtonText - The submit button text
  * @param {boolean} props.panelUpdated - Whether the panel is updated
  * @param {boolean} props.updateInProgress - Whether the update is in progress
@@ -302,6 +375,7 @@ const EditListingDetailsPanel = props => {
     ready,
     onSubmit,
     onListingTypeChange,
+    captureOwnerAddress = false,
     submitButtonText,
     panelUpdated,
     updateInProgress,
@@ -392,6 +466,9 @@ const EditListingDetailsPanel = props => {
               listingType,
               transactionProcessAlias,
               unitType,
+              ownerStreet,
+              ownerCity,
+              ownerPostcode,
               ...rest
             } = values;
 
@@ -415,6 +492,21 @@ const EditListingDetailsPanel = props => {
               nestedCategories,
               listingFields
             );
+            // The owner's own private shipping address - the counterpart of the public,
+            // laundry-derived pickup address. It is captured here only for processes whose
+            // wizard has no LOCATION tab (cocloset-booking); everywhere else that tab
+            // still owns the field, and sending it from here as well would overwrite a
+            // saved address with three undefineds the first time details were edited.
+            const ownerAddressMaybe = captureOwnerAddress
+              ? {
+                  ownerAddress: {
+                    street: ownerStreet,
+                    city: ownerCity,
+                    postcode: ownerPostcode,
+                  },
+                }
+              : {};
+
             // New values for listing attributes
             const updateValues = {
               title: title.trim(),
@@ -426,8 +518,12 @@ const EditListingDetailsPanel = props => {
                 ...cleanedNestedCategories,
                 ...publicListingFields,
               },
-              privateData: privateListingFields,
+              privateData: { ...privateListingFields, ...ownerAddressMaybe },
               ...setNoAvailabilityForUnbookableListings(transactionProcessAlias),
+              ...setFullAvailabilityForCoclosetBooking(
+                transactionProcessAlias,
+                listing?.attributes?.availabilityPlan
+              ),
             };
 
             onSubmit(updateValues);
@@ -446,6 +542,7 @@ const EditListingDetailsPanel = props => {
           }
           categoryPrefix={categoryKey}
           onListingTypeChange={onListingTypeChange}
+          showOwnerAddress={captureOwnerAddress}
           listingFieldsConfig={listingFields}
           listingCurrency={listing?.attributes?.price?.currency}
           marketplaceCurrency={config.currency}

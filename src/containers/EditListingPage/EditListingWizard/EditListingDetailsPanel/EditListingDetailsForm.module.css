@@ -75,3 +75,40 @@
     margin-top: 100px;
   }
 }
+
+/* The owner's own private shipping address (privateData.ownerAddress). Grouped and
+   labelled as its own block because it is the one thing on this panel that is NOT
+   about the garment - it used to be a wizard step of its own. */
+.ownerAddress {
+  composes: formMargins;
+  display: flex;
+  flex-direction: column;
+}
+
+.ownerAddressTitle {
+  margin-top: 0;
+  margin-bottom: 6px;
+
+  @media (--viewportMedium) {
+    margin-top: 0;
+    margin-bottom: 8px;
+  }
+}
+
+.ownerAddressHelp {
+  margin-top: 0;
+  margin-bottom: 18px;
+  color: var(--colorGrey700);
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
+}
+
+.ownerAddressField {
+  margin-bottom: 18px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
+}

@@ -709,6 +709,15 @@ class EditListingWizard extends Component {
         ? TABS_DETAILS_ONLY
         : tabsForListingType(processName, listingTypeConfig);
 
+    // `privateData.ownerAddress` - the owner's own private shipping address, the
+    // counterpart of the public laundry-derived pickup address - is captured by the
+    // LOCATION panel. cocloset-booking has no LOCATION step any more, so the DETAILS
+    // panel asks for those three fields instead: the client's reason for dropping the tab
+    // ("la dirección viene de laundry") is about the PUBLIC address and says nothing
+    // about the owner's own, and losing the field is the irreversible direction.
+    const captureOwnerAddress =
+      processName === COCLOSET_BOOKING_PROCESS_NAME && !tabs.includes(LOCATION);
+
     // Images that are renderable right now: the listing's own plus this session's
     // uploads, which live only in Redux until a listing exists to attach them to.
     // `images` is intentionally left in `rest` (the tabs need it too), so read it
@@ -898,6 +907,7 @@ class EditListingWizard extends Component {
                 errors={errors}
                 handleCreateFlowTabScrolling={this.handleCreateFlowTabScrolling}
                 handlePublishListing={this.handlePublishListing}
+                captureOwnerAddress={captureOwnerAddress}
                 fetchInProgress={fetchInProgress}
                 onListingTypeChange={selectedListingType => this.setState({ selectedListingType })}
                 onManageDisableScrolling={onManageDisableScrolling}
