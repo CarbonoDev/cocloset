@@ -271,6 +271,10 @@ const hasValidPriceVariants = priceVariants => {
  * @param {string} props.marketplaceCurrency - The currency used in the marketplace
  * @param {number} props.dayCountAvailableForBooking - Number of days available for booking
  * @param {string} props.marketplaceName - Name of the marketplace
+ * @param {number} [props.liveInitialCleaningDays] - Cocloset: the assigned laundry's
+ *   CURRENT initial-cleaning turnaround, resolved server-side at page load by
+ *   ListingPage.duck.js. Takes precedence over the `metadata.initialCleaningDays`
+ *   snapshot; null (not yet arrived, or any failure) falls back to it.
  *
  * @returns {JSX.Element} Component that displays the order panel with appropriate form
  */
@@ -312,6 +316,10 @@ const OrderPanel = props => {
     showListingImage,
     hideAuthorInfo,
     hidePrice,
+    // Cocloset: see the JSDoc above. Resolved by the ListingPage duck through
+    // /api/listing-initial-cleaning, because the number lives in the laundry user's
+    // privateData and the browser cannot read it.
+    liveInitialCleaningDays,
   } = props;
 
   const publicData = listing?.attributes?.publicData || {};
@@ -336,6 +344,14 @@ const OrderPanel = props => {
   //   onLaundry           - true once a laundry has physically received the garment
   //   initialCleaningDays - how long its FIRST wash takes, so the calendar can stop
   //                         offering tomorrow for a garment that is not there yet
+  //
+  // `initialCleaningDays` here is a SNAPSHOT from the moment the laundry was assigned. It
+  // is still read, and still needed, because it is the FALLBACK: `liveInitialCleaningDays`
+  // is the studio's current number, and it is null until the page-load lookup returns and
+  // for good after any failure. Both are handed to BookingDatesForm, which applies the
+  // same precedence the server gate does (see resolveInitialCleaningDays there and
+  // server/api-util/bookingRules.js `resolveInitialCleaningBlockDays`) - live first,
+  // snapshot second, never "no block" just because a read failed.
   const { onLaundry, initialCleaningDays } = listing?.attributes?.metadata || {};
 
   const processName = resolveLatestProcessName(transactionProcessAlias.split('/')[0]);
@@ -547,6 +563,7 @@ const OrderPanel = props => {
             minimumBookingDays={minimumBookingDays}
             onLaundry={onLaundry}
             initialCleaningDays={initialCleaningDays}
+            liveInitialCleaningDays={liveInitialCleaningDays}
             dayCountAvailableForBooking={dayCountAvailableForBooking}
             monthlyTimeSlots={monthlyTimeSlots}
             onFetchTimeSlots={onFetchTimeSlots}

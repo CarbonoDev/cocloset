@@ -4,6 +4,7 @@ const {
   assertInitialCleaningLeadTime,
   assertMinimumBookingDays,
 } = require('../api-util/bookingRules');
+const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
 const {
   addOfferToMetadata,
   getAmountFromPreviousOffer,
@@ -215,29 +216,41 @@ module.exports = (req, res) => {
       // listing. `include: ['listing']` returns the full listing resource - no
       // `fields.listing` restriction is sent here - so `metadata` is present for the
       // same reason `publicData` is, which the line-item builder below already
-      // depends on.
-      assertInitialCleaningLeadTime({
-        listing,
-        bookingStart: bodyParams?.params?.bookingStart,
-      });
+      // depends on. It also needs `publicData` for the garment's category chain, which
+      // the live turnaround is resolved against.
+      //
+      // The live resolution is here for the same reason it is in
+      // initiate-privileged.js: the calendar now honours the laundry's CURRENT
+      // turnaround, and a gate reading the stale snapshot could refuse a date the
+      // calendar offered. It costs an Integration API call only while
+      // `metadata.onLaundry !== true` (first rental only - see
+      // api-util/liveInitialCleaning.js), and a failed read falls back to the snapshot
+      // rather than to "no block".
+      return resolveLiveInitialCleaningDays({ listing }).then(liveInitialCleaningDays => {
+        assertInitialCleaningLeadTime({
+          listing,
+          bookingStart: bodyParams?.params?.bookingStart,
+          liveInitialCleaningDays,
+        });
 
-      // Cleaning fee is sourced from the assigned laundry's privateData
-      // (Integration API only), so it has to be resolved before the
-      // (synchronous) line items array can be built - see
-      // lineItems.buildLineItemsForListing, which all three line-item
-      // endpoints share so preview and charge cannot drift apart.
-      return buildLineItemsForListing({
-        listing,
-        orderData: getFullOrderData(orderData, bodyParams, currency, existingOffers),
-        providerCommission,
-        customerCommission,
-        currency,
-      }).then(builtLineItems => {
-        lineItems = builtLineItems;
+        // Cleaning fee is sourced from the assigned laundry's privateData
+        // (Integration API only), so it has to be resolved before the
+        // (synchronous) line items array can be built - see
+        // lineItems.buildLineItemsForListing, which all three line-item
+        // endpoints share so preview and charge cannot drift apart.
+        return buildLineItemsForListing({
+          listing,
+          orderData: getFullOrderData(orderData, bodyParams, currency, existingOffers),
+          providerCommission,
+          customerCommission,
+          currency,
+        }).then(builtLineItems => {
+          lineItems = builtLineItems;
 
-        metadataMaybe = getUpdatedMetadata(orderData, transitionName, existingMetadata);
+          metadataMaybe = getUpdatedMetadata(orderData, transitionName, existingMetadata);
 
-        return getTrustedSdk(req);
+          return getTrustedSdk(req);
+        });
       });
     })
     .then(trustedSdk => {

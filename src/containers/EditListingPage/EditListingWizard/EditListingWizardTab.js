@@ -57,6 +57,20 @@ const pathParamsToNextTab = (params, tab, marketplaceTabs) => {
   return { ...params, tab: nextTab };
 };
 
+// Advance to the next tab without having saved anything.
+//
+// Used only by the tabs that precede DETAILS in the cocloset-booking flow: they cannot
+// create the draft (`ownListings.createDraft` requires `title` and `listingType`, which
+// only DETAILS collects), so submitting them while no listing exists writes nothing at
+// all. The path params are passed through untouched, which is the point: the URL must
+// stay `new` until a draft really exists, so that `redirectAfterDraftUpdate` below can
+// still perform the new -> draft swap on the first real save.
+const redirectToNextTabWithoutSaving = (params, tab, marketplaceTabs, history, routes) => {
+  const nextPathParams = pathParamsToNextTab(params, tab, marketplaceTabs);
+  const to = createResourceLocatorString('EditListingPage', routes, nextPathParams, {});
+  history.push(to);
+};
+
 // When user has update draft listing, he should be redirected to next EditListingWizardTab
 const redirectAfterDraftUpdate = (listingId, params, tab, marketplaceTabs, history, routes) => {
   const listingUUID = listingId.uuid;
@@ -127,6 +141,7 @@ const EditListingWizardTab = props => {
     hasPendingFileUploads,
     allFilesUploadedAndVerified,
     filesRequired,
+    captureOwnerAddress,
   } = props;
 
   const { type } = params;
@@ -158,12 +173,47 @@ const EditListingWizardTab = props => {
   };
 
   const onCompleteEditListingWizardTab = (tab, updateValues) => {
+    // Which tab creates the draft listing.
+    //
+    // It used to be "whichever tab is submitted while the URL says `new`", i.e. always the
+    // first tab in the array. cocloset-booking opens on PHOTOS, and per the Marketplace
+    // API reference `title` and `listingType` are REQUIRED to create a draft - neither of
+    // which the photos panel has. So creation is pinned to DETAILS wherever it sits in the
+    // array instead. Every other process still has DETAILS first, so for them this is a
+    // no-op.
+    const createsTheDraft = tab === DETAILS;
+
+    if (isNewURI && !createsTheDraft) {
+      // Nothing to save: there is no listing to update and this tab cannot create one.
+      // The uploaded image ids simply stay in Redux (EditListingPage.uploadedImages is
+      // keyed by a client-side temp id and is not cleared on listing change) and are
+      // handed to createDraft when DETAILS runs.
+      //
+      // A page refresh at this point does lose those ids - they were never persisted
+      // anywhere else - but it does not strand the owner: PHOTOS then reports itself
+      // incomplete, and EditListingWizard's own guard redirects from the locked tab back
+      // to the first one.
+      handleCreateFlowTabScrolling(false);
+      redirectToNextTabWithoutSaving(params, tab, marketplaceTabs, history, routeConfiguration);
+      return Promise.resolve();
+    }
+
     const onUpdateListingOrCreateListingDraft = isNewURI
       ? (tab, values) => onCreateListingDraft(values, config)
       : (tab, values) => onUpdateListing(tab, values, config);
 
+    // Hand the images collected on the earlier PHOTOS tab to the create call. The duck
+    // runs `imageIds()` on the create path exactly as it does on update, and createDraft
+    // accepts `images`. Only added when there is something to add, so a details-first
+    // process sends precisely what it sent before.
+    const collectedImages = images || [];
+    const imagesMaybe =
+      collectedImages.length > 0 && typeof updateValues.images === 'undefined'
+        ? { images: collectedImages }
+        : {};
+
     const updateListingValues = isNewURI
-      ? updateValues
+      ? { ...updateValues, ...imagesMaybe }
       : { ...updateValues, id: currentListing.id };
 
     return onUpdateListingOrCreateListingDraft(tab, updateListingValues)
@@ -221,6 +271,7 @@ const EditListingWizardTab = props => {
         <EditListingDetailsPanel
           {...panelProps(DETAILS)}
           onListingTypeChange={onListingTypeChange}
+          captureOwnerAddress={captureOwnerAddress}
           config={config}
         />
       );
@@ -265,7 +316,18 @@ const EditListingWizardTab = props => {
       return <EditListingLocationPanel {...panelProps(LOCATION)} />;
     }
     case LAUNDRY: {
-      return <EditListingLaundryPanel {...panelProps(LAUNDRY)} />;
+      // The file props are here for the same reason PHOTOS and STYLE get them: this
+      // panel is the LAST one of the cocloset-booking new-listing flow, so it is where
+      // the "files still being verified" explanation for a disabled publish button has
+      // to render. See Note 4 on `tabsForListingType`.
+      return (
+        <EditListingLaundryPanel
+          {...panelProps(LAUNDRY)}
+          allFilesUploadedAndVerified={allFilesUploadedAndVerified}
+          filesTabParams={filesTabParams}
+          filesRequired={filesRequired}
+        />
+      );
     }
     case AVAILABILITY: {
       return (

@@ -299,6 +299,30 @@ export const assignListingLaundry = body => {
   return post('/api/listing-laundry-assignment', body);
 };
 
+// How many days must pass before this garment can be rented, according to its
+// assigned laundry's CURRENT turnaround.
+//
+// `listing.metadata.initialCleaningDays` is only a snapshot from the moment the
+// owner picked a laundry, so a studio that has since changed its turnaround is
+// not reflected there. The live number cannot be resolved in the browser: it
+// lives in the laundry USER's `privateData`, which no other user may read. Hence
+// this endpoint.
+//
+// Returns `{ data: { initialCleaningDays } }`, or `{ data: {} }` when no block
+// applies (the garment is already at its laundry, none is assigned, or the
+// laundry's profile could not be read). Callers must treat a missing key and any
+// failure as "use the `metadata.initialCleaningDays` snapshot" - see
+// ListingPage.duck.js. Never as "no block".
+//
+// See `server/api/listing-initial-cleaning.js`. It is public and rate limited,
+// and it returns one integer and nothing else: per-category cleaning FEES live in
+// the same laundry privateData and must not reach the browser.
+export const fetchListingInitialCleaning = listingId => {
+  return request(`/api/listing-initial-cleaning?listingId=${encodeURIComponent(listingId)}`, {
+    method: methods.GET,
+  });
+};
+
 // Fetch everything the laundry ops dashboard renders, for the calling laundry
 // user: the design doc §8 union of "transactions on listings assigned to me"
 // and "assigned listings with no transaction", plus a per-garment inventory
@@ -312,4 +336,30 @@ export const assignListingLaundry = body => {
 // See `server/api/laundry-orders.js` for the full response shape.
 export const fetchLaundryOrders = () => {
   return request('/api/laundry-orders', { method: methods.GET });
+};
+
+// Save the CALLING laundry's own address, and propagate it to every listing
+// assigned to that studio.
+//
+// A separate call from the rest of the studio profile on purpose: everything else on
+// LaundryProfilePage still saves straight from the browser with
+// `sdk.currentUser.updateProfile`, and only the address comes through our server.
+// Two reasons, both server-side:
+//   * the change is GATED. Once a studio has a usable address, changing it needs
+//     `metadata.addressChangeAllowed === true`, which an admin grants and which a
+//     user cannot write for themselves. Rejects 403 with `data.code`
+//     'change-not-allowed' - switch the message on that code, never on statusText.
+//   * it PROPAGATES. Every listing assigned to this studio has its
+//     `publicData.pickupAddress`, `publicData.assignedLaundryName` and top-level
+//     `geolocation` rewritten in the same request, which needs the Integration API.
+//
+// Takes NO laundry id - the target is the caller's own session.
+//
+// The address itself stays in owner-writable `publicData`, so this call is the
+// sanctioned path, not the only possible one. Read the header of
+// `server/api/laundry-address.js` before describing it as protected anywhere.
+//
+// Body: { address, origin: { lat, lng } }
+export const updateLaundryAddress = body => {
+  return post('/api/laundry-address', body);
 };

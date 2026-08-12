@@ -163,15 +163,59 @@
   --marketplaceButtonSmallDesktopPadding: 9px 16px 9px 16px;
 
   /* ================ DatePicker ================ */
+  /* The default theme paints the whole calendar in the brand colour and writes on
+     it in white, so every foreground in this block has to hold up against an
+     ARBITRARY --marketplaceColor. Two rules follow from that, and both were
+     broken here:
+
+     1. A FOREGROUND MUST NEVER BE DERIVED FROM --marketplaceColor* WHILE THE
+        BACKGROUND IS --marketplaceColor. `--marketplaceColorDark` is
+        `hexToCssHsl(mainColor, -10)` (src/util/configHelpers.js) - the same hue
+        with 10 lightness points removed, and NOT clamped. Cocloset's hosted
+        branding sets mainColor `#000000`, so it evaluated to
+        `hsl(0, 0%, -10%)`, which every browser clamps back to black: disabled
+        days were rendered black-on-black and the client reported a calendar with
+        nothing on it but the selected range. The same collapse happens at the
+        other end (`#ffffff` -> `hsl(0, 0%, 110%)` -> white-on-white), and even a
+        mid-tone brand only ever reached ~1.4:1. A derived colour cannot be fixed
+        by picking a better offset; it has to stop being derived.
+
+     2. COLOUR MUST NOT BE THE ONLY SIGNAL. `--datepickerDisabledTextDeco` was
+        `unset` here while the `light` theme has always used `line-through`, so
+        "unavailable" was carried by contrast alone - which fails WCAG 1.4.1 and
+        fails colour-blind and low-vision users even when the contrast is fine.
+
+     A TRANSLUCENT WHITE is the fix for (1) rather than a fixed grey: it composites
+     against whatever the brand colour turns out to be, so it always lands strictly
+     BETWEEN the background and the white enabled text. That three-way separation
+     (background < disabled < selectable) is the property the client actually asked
+     for - "otros colores que identifiquen que esos días son inválidos" - and it is
+     preserved for every brand colour this theme already supports, instead of only
+     for mid-tones. 60% white gives 7.4:1 against a black brand and 3.0:1 against
+     the stock purple, while staying a clear step below the white enabled days
+     (2.9:1 and 1.9:1 respectively) - and line-through carries the rest. It also
+     matches the `rgba(255, 255, 255, …)` veils already used for the hover states
+     below. See src/styles/datepickerColors.test.js, which measures all of this.
+
+     NOTE the theme's own precondition, which this does not change: with
+     `--datepickerFgColor: var(--colorWhite)` on `--marketplaceColor`, a very light
+     brand colour makes the ENABLED days unreadable too. That is a separate defect
+     of the default theme (use the `light` theme for a light brand), and no choice
+     of disabled colour can paper over it. */
   --datepickerFgColor: var(--colorWhite);
   --datepickerBgColor: var(--marketplaceColor);
   --datepickerBorderColor: var(--colorGrey50);
-  --datepickerDisabledFgColor: var(--marketplaceColorDark);
-  --datepickerDisabledTextDeco: unset;
+  --datepickerDisabledFgColor: rgba(255, 255, 255, 0.6);
+  --datepickerDisabledTextDeco: line-through;
   --datepickerHoveredFgColor: inherit;
   --datepickerHoveredBgColor: rgba(255, 255, 255, 0.2);
   --datepickerHeaderFgColor: var(--colorWhite);
-  --datepickerHeaderFgColorDisabled: var(--colorGrey100);
+  /* Weekday labels while the whole picker is disabled. `--colorGrey100` is 90%
+     lightness - near enough to white that a disabled header was indistinguishable
+     from an enabled one on any dark brand colour. Not the same bug as above (it is
+     not brand-derived, so it never became invisible), but the same fix applies and
+     keeps the two disabled states reading alike. */
+  --datepickerHeaderFgColorDisabled: rgba(255, 255, 255, 0.6);
   --datepickerHeaderArrowColor: var(--colorWhite);
   --datepickerDateOutline: white solid 1px;
   --datepickerButtonOutlineColor: var(--colorGrey50);

@@ -228,7 +228,11 @@ const getVariantURL = (socialSharingImage, variantName) => {
     : null;
 };
 
-const mergeBranding = (brandingConfig, defaultBranding) => {
+// Exported so the derived colours can be tested against a real hosted `mainColor`
+// without going through mergeConfig (which needs a full set of hosted assets to run).
+// `marketplaceColorDark` painted on `marketplaceColor` is how the booking calendar's
+// disabled days became invisible - see src/styles/datepickerColors.test.js.
+export const mergeBranding = (brandingConfig, defaultBranding) => {
   const {
     marketplaceColors,
     logo,

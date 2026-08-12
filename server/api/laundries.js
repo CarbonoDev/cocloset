@@ -8,15 +8,27 @@ const { buildLaundryDirectory } = require('../api-util/laundryDirectory');
 //
 // SECURITY — two things this endpoint deliberately does NOT do:
 //
-// 1. It does not pass `meta_isLaundry` to `users.query`. That filter is
-//    silently ignored: the Integration API drops unrecognised query params
-//    rather than rejecting them, so `users.query({ meta_isLaundry: true })`
-//    returns EVERY user in the marketplace. Verified against Dev — `true`,
-//    `false`, and an entirely invented key all return the identical full set.
-//    Filtering user extended data requires a user-scope search schema
-//    (`flex-cli search`), which this marketplace does not have. The real
-//    filter is therefore done in JS, on the actual metadata value, in
-//    api-util/laundryDirectory.js. Do not "optimise" it back into the query.
+// 1. It does not pass `meta_isLaundry` to `users.query`, and the JS filter in
+//    api-util/laundryDirectory.js is the load-bearing one. Do not "optimise" it
+//    back into the query.
+//
+//    The stated reason has CHANGED, so read this before acting on it. The
+//    user-scope search schema now EXISTS on Dev — re-measured 2026-08-12:
+//    `meta_isLaundry=true` returns 4 and `=false` returns 11, against a real
+//    distribution of 4 true / 11 false / 12 absent. The earlier note here, that
+//    `true`, `false` and an invented key all returned the identical full set, is
+//    no longer true of the first two.
+//
+//    What is still true is the part that matters: an unrecognised KEY is silently
+//    ignored and returns every user (`meta_totallyMadeUpKey` returned all 27), so
+//    the API fails OPEN. A schema can also be unset, or be missing on Test/Live
+//    while present on Dev, and this endpoint decides who is a laundry — so it must
+//    not depend on a schema being pushed in whichever environment it runs in.
+//
+//    Beware how you re-verify: a bogus VALUE does not test for a schema. On a
+//    boolean field a garbage value is coerced to `false` rather than rejected
+//    (`meta_isLaundry="nonsense"` returns the 11 false users), which looks like a
+//    broken filter when the schema is fine. Probe with an unknown key instead.
 //
 // 2. It does not forward the laundry's `publicData` blob. The response is an
 //    explicit allowlist (see laundryDirectory.toLaundryDirectoryEntry) so that

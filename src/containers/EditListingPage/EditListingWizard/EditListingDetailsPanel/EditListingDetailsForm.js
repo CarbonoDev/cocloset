@@ -282,6 +282,66 @@ const getListingTypeConfig = (config, listingType) => {
 };
 
 /**
+ * The garment owner's OWN address, used only for shipping the garment in to the assigned
+ * laundry. Stored in `privateData.ownerAddress`, never shown to renters, and never used as
+ * the listing's public geolocation - that comes from the assigned laundry.
+ *
+ * These three inputs used to live on their own wizard step (EditListingLocationForm).
+ * cocloset-booking dropped that step because its PUBLIC pickup address comes from the
+ * laundry, which says nothing about the owner's own address, so the capture moved here
+ * rather than being deleted. Plain text fields, no map or autocomplete, and the same
+ * required-ness the dedicated step had.
+ */
+const FieldOwnerAddress = props => {
+  const { formId, intl } = props;
+
+  return (
+    <div className={css.ownerAddress}>
+      <Heading as="h3" rootClassName={css.ownerAddressTitle}>
+        {intl.formatMessage({ id: 'EditListingDetailsForm.ownerAddressTitle' })}
+      </Heading>
+      <p className={css.ownerAddressHelp}>
+        {intl.formatMessage({ id: 'EditListingDetailsForm.ownerAddressHelp' })}
+      </p>
+
+      <FieldTextInput
+        id={`${formId}ownerStreet`}
+        name="ownerStreet"
+        className={css.ownerAddressField}
+        type="text"
+        label={intl.formatMessage({ id: 'EditListingDetailsForm.ownerStreet' })}
+        placeholder={intl.formatMessage({ id: 'EditListingDetailsForm.ownerStreetPlaceholder' })}
+        validate={required(
+          intl.formatMessage({ id: 'EditListingDetailsForm.ownerStreetRequired' })
+        )}
+      />
+
+      <FieldTextInput
+        id={`${formId}ownerCity`}
+        name="ownerCity"
+        className={css.ownerAddressField}
+        type="text"
+        label={intl.formatMessage({ id: 'EditListingDetailsForm.ownerCity' })}
+        placeholder={intl.formatMessage({ id: 'EditListingDetailsForm.ownerCityPlaceholder' })}
+        validate={required(intl.formatMessage({ id: 'EditListingDetailsForm.ownerCityRequired' }))}
+      />
+
+      <FieldTextInput
+        id={`${formId}ownerPostcode`}
+        name="ownerPostcode"
+        className={css.ownerAddressField}
+        type="text"
+        label={intl.formatMessage({ id: 'EditListingDetailsForm.ownerPostcode' })}
+        placeholder={intl.formatMessage({ id: 'EditListingDetailsForm.ownerPostcodePlaceholder' })}
+        validate={required(
+          intl.formatMessage({ id: 'EditListingDetailsForm.ownerPostcodeRequired' })
+        )}
+      />
+    </div>
+  );
+};
+
+/**
  * Form that asks title, description, transaction process and unit type for pricing
  * In addition, it asks about custom fields according to marketplace-custom-config.js
  *
@@ -302,6 +362,9 @@ const getListingTypeConfig = (config, listingType) => {
  * @param {boolean} props.hasPredefinedListingType - Whether the listing type is already saved or predefined through URL
  * @param {propTypes.listingFields} props.listingFieldsConfig - The listing fields config
  * @param {string} props.listingCurrency - The listing currency
+ * @param {boolean} [props.showOwnerAddress] - Whether to ask for the owner's own private
+ *   shipping address (`privateData.ownerAddress`). Set for processes whose wizard has no
+ *   LOCATION step; see FieldOwnerAddress above.
  * @param {string} props.saveActionMsg - The save action message
  * @param {boolean} [props.autoFocus] - Whether the form should autofocus
  * @param {Function} props.onListingTypeChange - The listing type change function
@@ -337,6 +400,7 @@ const EditListingDetailsForm = props => (
         fetchErrors,
         listingFieldsConfig = [],
         listingCurrency,
+        showOwnerAddress = false,
         values,
       } = formRenderProps;
 
@@ -462,6 +526,10 @@ const EditListingDetailsForm = props => (
               formId={formId}
               intl={intl}
             />
+          )}
+
+          {showOwnerAddress && showListingFields && isCompatibleCurrency && (
+            <FieldOwnerAddress formId={formId} intl={intl} />
           )}
 
           {!isCompatibleCurrency && listingType && (

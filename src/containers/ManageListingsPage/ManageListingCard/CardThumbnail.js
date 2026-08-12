@@ -115,6 +115,14 @@ const DraftOverlay = props => {
           { listingTitle: title }
         )}
       >
+        {/* `tab: 'photos'` is the FIRST step of the cocloset-booking wizard rather than
+            the last one (see `tabsForListingType`), so this now resumes a draft at the
+            beginning instead of at the finish line. It still lands somewhere valid and
+            never dead-ends: a draft always has its images attached (they are handed to
+            createDraft on the details step), so the photos step reports itself complete
+            and every later step stays linkable. If a draft somehow has no images, the
+            wizard's own guard sends the owner here anyway - which is where this link
+            already points. */}
         <NamedLink
           className={css.finishListingDraftLink}
           name="EditListingPage"

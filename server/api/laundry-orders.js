@@ -31,14 +31,27 @@ const {
 // ---------------------------------------------------------------------------
 // Why the filtering happens in Node instead of in the query
 // ---------------------------------------------------------------------------
-// `meta_assignedLaundryId` is passed to `listings.query` below, but it is
-// currently a NO-OP on this marketplace: extended-data query filters only take
-// effect once a search schema has been pushed for that key
-// (`flex-cli search set --scope metadata --schema-for listing ...`). Verified
-// against the real Dev Integration API: querying the equivalent
-// `pub_assignedLaundryId` with a deliberately bogus value returned every listing
-// in the marketplace, and unknown query params are silently ignored rather than
-// rejected. (The same is true of `meta_isLaundry` in server/api/laundries.js.)
+// `meta_assignedLaundryId` is passed to `listings.query` below. As of
+// 2026-08-12 the metadata-scope search schema IS live on Dev and this filter
+// really filters - measured, not assumed: a bogus id returns 0 rather than
+// everything, and for each of the three laundries that have garments assigned the
+// query returns exactly the number of listings that actually carry that id.
+// (`meta_isLaundry` in server/api/laundries.js is live too: true -> 4, false -> 11,
+// against a real distribution of 4/11/12 true/false/absent.)
+//
+// WHAT HAS NOT CHANGED, AND IS WHY THE JS FILTER STAYS. An extended-data filter
+// whose key has NO schema is still silently ignored, returning the whole
+// marketplace: verified in the same session with `meta_totallyMadeUpKey`, which
+// returned all 27 users. So the API fails OPEN on an unrecognised key, and a
+// marketplace-wide listing dump reaching one laundry's dashboard is a bug class
+// that has already shipped here twice.
+//
+// A TRAP IN TESTING THIS, worth knowing before you verify it again: probing with
+// a deliberately bogus VALUE does not test whether a schema exists. On a
+// boolean-typed field a garbage value is coerced to `false` rather than rejected
+// (`meta_isLaundry="nonsense"` returns the 11 users whose flag is false), so the
+// probe looks broken while the schema is fine. The reliable test is an unknown
+// KEY: if the result is everything, the filter did nothing.
 //
 // THE PREFIX CHANGED WITH THE FIELD, AND THE FAIL-OPEN DID NOT. The assigned
 // laundry moved from `publicData` to `metadata` (see

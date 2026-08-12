@@ -291,6 +291,119 @@ describe('LaundryProfilePage', () => {
     expect(screen.queryByDisplayValue('Studio Pigalle')).not.toBeInTheDocument();
   });
 
+  // ================ The address: the alert, the lock, and the split write ============
+  //
+  // The two booleans the form renders from are DERIVED here, from the stored profile
+  // and the admin-granted `metadata.addressChangeAllowed`. util/laundryProfile.js owns
+  // the rules (and is parity-tested against the server's own predicates); these tests
+  // assert this page wires the right currentUser into them.
+
+  const withLaundryProfile = (laundryProfile, metadata = {}) => ({
+    ...laundryUser,
+    attributes: {
+      ...laundryUser.attributes,
+      profile: {
+        ...laundryUser.attributes.profile,
+        metadata: { ...laundryUser.attributes.profile.metadata, ...metadata },
+        publicData: { ...laundryUser.attributes.profile.publicData, laundryProfile },
+      },
+    },
+  });
+
+  // By id, not by testid: the Topbar renders its own location search on this page, so
+  // `getByTestId('location-search')` finds two.
+  const addressInput = () => document.getElementById('LaundryProfileForm.location');
+
+  it('warns a studio with no address that nothing can be assigned to it, and lets it set one', async () => {
+    await act(async () => {
+      renderPage(withLaundryProfile({ studioName: 'Studio Pigalle', businessHours: 'Mon-Sat' }));
+    });
+
+    expect(screen.getByText('LaundryProfileForm.noAddressAlertTitle')).toBeInTheDocument();
+    // Onboarding must always work.
+    expect(addressInput()).toBeEnabled();
+  });
+
+  // THE TRAP. An address string with no geocoded coordinates is dropped by
+  // /api/laundries exactly as hard as no address at all, so the alert has to fire for
+  // it too - otherwise the studio reads "you have an address" and still receives
+  // nothing - and the field has to stay editable so it can be fixed.
+  it('warns a studio whose address has no usable coordinates, and lets it fix it', async () => {
+    await act(async () => {
+      renderPage(withLaundryProfile({ studioName: 'Studio Pigalle', address: '21 Rue Frochot' }));
+    });
+
+    expect(screen.getByText('LaundryProfileForm.noAddressAlertTitle')).toBeInTheDocument();
+    expect(addressInput()).toBeEnabled();
+  });
+
+  it('locks the address of a studio with a complete profile and no grant', async () => {
+    await act(async () => {
+      renderPage(laundryUser);
+    });
+
+    expect(screen.queryByText('LaundryProfileForm.noAddressAlertTitle')).not.toBeInTheDocument();
+    expect(addressInput()).toBeDisabled();
+    expect(screen.getByText('LaundryProfileForm.addressChangeRequiresSupport')).toBeInTheDocument();
+  });
+
+  it('opens the address of a studio an admin has granted a change to', async () => {
+    await act(async () => {
+      renderPage(
+        withLaundryProfile(laundryUser.attributes.profile.publicData.laundryProfile, {
+          addressChangeAllowed: true,
+        })
+      );
+    });
+
+    expect(addressInput()).toBeEnabled();
+    expect(screen.getByText('LaundryProfileForm.addressChangeGranted')).toBeInTheDocument();
+  });
+
+  // A permission a string could satisfy is not a permission.
+  it('does not open the address for a truthy-but-not-true grant', async () => {
+    await act(async () => {
+      renderPage(
+        withLaundryProfile(laundryUser.attributes.profile.publicData.laundryProfile, {
+          addressChangeAllowed: 'true',
+        })
+      );
+    });
+
+    expect(addressInput()).toBeDisabled();
+  });
+
+  // THE SPLIT WRITE. The ordinary profile save must carry the STORED address back
+  // verbatim, never a submitted one: `laundryProfile` is ONE top-level extended-data
+  // key holding a nested object, so omitting the address would DELETE it, and
+  // forwarding a submitted one would move it through the ungated path.
+  it('re-sends the stored address on the ordinary profile write, and asks for no address change', async () => {
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(laundryUser, onUpdateProfile);
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Pants' }));
+    });
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile).toHaveBeenCalledTimes(1);
+    const [profile, addressChange] = onUpdateProfile.mock.calls[0];
+    expect(profile.publicData.laundryProfile.address).toBe('21 Rue Frochot, Paris');
+    expect(profile.publicData.laundryProfile.origin).toEqual(ORIGIN);
+    // Nothing changed about the address, so no grant is spent on a no-op.
+    expect(addressChange).toBeNull();
+  });
+
+  // What happens when the studio submits a DIFFERENT address is tested in
+  // LaundryProfilePage.addressWrite.test.js: selecting a place here means driving the
+  // geocoder's debounced prediction list, which is a lot of machinery to stand between
+  // a test and the one-line rule it is checking. That file stubs the form and calls
+  // its `onSubmit` directly.
+
   // ================ Accepted categories: Console ids, not free text ================
 
   it('saves Console category IDs — not labels — when categories are ticked', async () => {

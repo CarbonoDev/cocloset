@@ -181,6 +181,60 @@ describe("the calendar's lower bound honours the garment's initial cleaning time
         expect(resolveInitialCleaningDays(initialCleaningDays, false)).toBeNull();
       }
     );
+
+    // The LIVE turnaround, fetched at ListingPage load because the number lives in the
+    // laundry USER's privateData and the browser cannot read it.
+    //
+    //   > "si la laundry necesita por ejemplo 2 días para su lavado, la disponibilidad
+    //   >  debe estar 2 días despues de hoy"
+    //
+    // The stored value is only what the laundry's turnaround WAS when it was assigned.
+    // initialCleaningAgreement.test.js proves this precedence matches the server gate's
+    // over the whole cross product of inputs; these state it locally.
+    describe('the live turnaround', () => {
+      it('wins over the stored snapshot, in both directions', () => {
+        expect(resolveInitialCleaningDays(2, false, 5)).toBe(5);
+        expect(resolveInitialCleaningDays(7, false, 2)).toBe(2);
+      });
+
+      it('applies to a listing with no snapshot at all', () => {
+        // Every garment assigned before the field existed. The live lookup is what gives
+        // those a correct floor for the first time.
+        expect(resolveInitialCleaningDays(undefined, false, 3)).toBe(3);
+      });
+
+      // null is BOTH the initial state and the result of every failure the lookup can
+      // have. Falling back to "no block" would let a flaky network offer a garment that
+      // has never left its owner's wardrobe.
+      it.each([
+        ['null', null],
+        ['undefined', undefined],
+        ['0', 0],
+        ['a fraction', 1.5],
+        ['a string', '2'],
+      ])(
+        'falls back to the snapshot, not to "no block", when the live value is %s',
+        (_label, live) => {
+          expect(resolveInitialCleaningDays(4, false, live)).toBe(4);
+        }
+      );
+
+      it('is still no block when neither value is usable', () => {
+        expect(resolveInitialCleaningDays(undefined, false, null)).toBeNull();
+        expect(resolveInitialCleaningDays(0, false, 0)).toBeNull();
+      });
+
+      // `onLaundry` is checked first, so the carve-out cannot be undone by a slow studio.
+      it('cannot resurrect the rule once the garment is at its laundry', () => {
+        expect(resolveInitialCleaningDays(undefined, true, 9)).toBeNull();
+        expect(resolveInitialCleaningDays(3, true, 9)).toBeNull();
+      });
+
+      it('is clamped, so a fat-fingered profile cannot take a listing off the market', () => {
+        expect(resolveInitialCleaningDays(undefined, false, 4000)).toBe(365);
+        expect(resolveInitialCleaningDays(4000, false, undefined)).toBe(365);
+      });
+    });
   });
 
   describe('earliestBookableDate', () => {
