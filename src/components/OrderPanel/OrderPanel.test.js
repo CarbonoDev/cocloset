@@ -358,6 +358,81 @@ describe('OrderPanel', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Cocloset: the LIVE turnaround, resolved at page load, overrides the snapshot.
+  //
+  //   > "desde el momento de la carga de listingPage, se debe consultar las propiedades
+  //   >  de la laundry seleccionada para este listing para obtener los días que se
+  //   >  necesiten para el lavado siempre que onLaundry sea false"
+  //
+  // `metadata.initialCleaningDays` is only what the laundry's turnaround was on the day it
+  // was assigned. The current number arrives as a prop from the ListingPage duck, and the
+  // panel has to prefer it - the threading is what these assert, for the same reason as
+  // above: the value comes from a different place than the rest of the panel's props, and
+  // a rule reading the wrong one reads `undefined` and silently never fires.
+  // ---------------------------------------------------------------------------
+  it('Booking: applies a live turnaround for a garment with NO stored snapshot at all', async () => {
+    // The strongest form of the claim: the snapshot alone would render no notice, so a
+    // notice here can only have come from the live value.
+    const listing = dailyGarmentListing('listing-live-only', { onLaundry: false });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes,
+      liveInitialCleaningDays: 3,
+    };
+    const { getByText } = render(<OrderPanel {...props} />, { config, routeConfiguration });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.initialCleaningNotice')).toBeInTheDocument();
+    });
+  });
+
+  it('Booking: falls back to the snapshot when the live lookup has not answered', async () => {
+    // null is both the initial state and the outcome of every failure. It must never mean
+    // "no block" - that would hand the customer a garment still in its owner's wardrobe.
+    const listing = dailyGarmentListing('listing-live-null', {
+      initialCleaningDays: 3,
+      onLaundry: false,
+    });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes,
+      liveInitialCleaningDays: null,
+    };
+    const { getByText } = render(<OrderPanel {...props} />, { config, routeConfiguration });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.initialCleaningNotice')).toBeInTheDocument();
+    });
+  });
+
+  it('Booking: a live turnaround cannot resurrect the rule once the garment is at its laundry', async () => {
+    const listing = dailyGarmentListing('listing-live-at-laundry', {
+      initialCleaningDays: 3,
+      onLaundry: true,
+    });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes,
+      liveInitialCleaningDays: 30,
+    };
+    const { queryByText, getByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingDatesForm.initialCleaningNotice')).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
   // Cocloset: the minimum rental length legend.
   //
   //   > "hay que mostrar una leyenda donde indique que la prenda necesita ser reservada

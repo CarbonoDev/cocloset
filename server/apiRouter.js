@@ -23,6 +23,7 @@ const laundryTransactionStatus = require('./api/laundry-transaction-status');
 const listingReadinessStatus = require('./api/listing-readiness-status');
 const listingCustodyStatus = require('./api/listing-custody-status');
 const listingLaundryAssignment = require('./api/listing-laundry-assignment');
+const listingInitialCleaning = require('./api/listing-initial-cleaning');
 const laundryOrders = require('./api/laundry-orders');
 const transactionQr = require('./api/transaction-qr');
 const initUserRole = require('./api/init-user-role');
@@ -79,6 +80,13 @@ router.post('/listing-custody-status', listingCustodyStatus);
 // on it - it is a server-side DECISION, not a write gate.
 router.post('/listing-laundry-assignment', listingLaundryAssignment);
 router.get('/laundry-orders', laundryOrders);
+
+// The assigned laundry's CURRENT initial-cleaning turnaround for one listing, as a
+// single integer. PUBLIC and rate limited - ListingPage is public, and the customer who
+// needs the number has no session yet. Read the header of
+// server/api/listing-initial-cleaning.js before widening the response: the same laundry
+// privateData blob holds per-category cleaning fees, which must never reach the browser.
+router.get('/listing-initial-cleaning', listingInitialCleaning);
 
 // Renders the handover QR for a transaction as a PNG, for a plain <img src>.
 // Unauthenticated by design - it echoes back only the transaction id it was
