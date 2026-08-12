@@ -879,3 +879,115 @@ describe('transactionLineItems', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// COCLOSET: FIXED RENTAL PERIODS
+//
+//   > "el precio que el cliente va a pagar es el precio que marque el provider, es decir,
+//   >  si puso el precio para 7 días en $100, el cliente va a pagar $100, no $700"
+//
+// The whole feature, from this module's side, is that the base line item carries
+// `quantity: 1` even though the booking spans a week. Feeding the day count in as the
+// quantity is precisely the $700 bug.
+// ---------------------------------------------------------------------------
+describe('transactionLineItems: fixed rental periods', () => {
+  const PERIODS = [
+    { name: '7-days', bookingLengthInDays: 7, priceInSubunits: 10000 },
+    { name: '14-days', bookingLengthInDays: 14, priceInSubunits: 18000 },
+  ];
+
+  const garment = (publicData = {}) => ({
+    attributes: {
+      // The cheapest period, which is what the pricing panel writes here.
+      price: new Money(10000, 'EUR'),
+      publicData: {
+        unitType: 'day',
+        transactionProcessAlias: 'cocloset-booking/release-1',
+        priceVariants: PERIODS,
+        ...publicData,
+      },
+    },
+  });
+
+  const weekOrder = (priceVariantName = '7-days', days = 7) => ({
+    bookingStart: '2026-09-01T00:00:00.000Z',
+    bookingEnd: new Date(Date.UTC(2026, 8, 1 + days)).toISOString(),
+    priceVariantName,
+    currency: 'EUR',
+  });
+
+  const baseItem = lineItems => lineItems.find(li => li.code === 'line-item/day');
+
+  it('charges the period price once, not once per day', () => {
+    const result = transactionLineItems(garment(), weekOrder(), null, null);
+    const base = baseItem(result);
+
+    expect(base.quantity).toBe(1);
+    expect(base.unitPrice).toEqual(new Money(10000, 'EUR'));
+  });
+
+  it('charges the longer period its own price', () => {
+    const result = transactionLineItems(garment(), weekOrder('14-days', 14), null, null);
+    const base = baseItem(result);
+
+    expect(base.quantity).toBe(1);
+    expect(base.unitPrice).toEqual(new Money(18000, 'EUR'));
+  });
+
+  it('prices from the period even when priceVariationsEnabled is stored as false', () => {
+    // Every garment created before this feature carries `priceVariationsEnabled: false` -
+    // the pricing panel wrote it explicitly. Keying the price off that flag would make
+    // those listings fall back to `listing.price`, i.e. the CHEAPEST period, so a customer
+    // picking 14 days would be charged the 7-day price.
+    const result = transactionLineItems(
+      garment({ priceVariationsEnabled: false }),
+      weekOrder('14-days', 14),
+      null,
+      null
+    );
+
+    expect(baseItem(result).unitPrice).toEqual(new Money(18000, 'EUR'));
+  });
+
+  it('refuses to price an unknown period rather than falling back to listing.price', () => {
+    // The fallback would be the cheapest period, so a silent undercharge. This is the
+    // backstop for a caller that skipped assertRentalPeriodBooking.
+    expect(() => transactionLineItems(garment(), weekOrder('30-days', 30), null, null)).toThrow(
+      /priceVariantName/
+    );
+  });
+
+  it('bases the commissions on the flat period price', () => {
+    const result = transactionLineItems(
+      garment(),
+      weekOrder(),
+      { percentage: 10 },
+      { percentage: 5 }
+    );
+
+    const provider = result.find(li => li.code === 'line-item/provider-commission');
+    const customer = result.find(li => li.code === 'line-item/customer-commission');
+    // Percentages are applied to the base line item, which is now 100.00 rather than 700.00.
+    expect(provider.unitPrice).toEqual(new Money(10000, 'EUR'));
+    expect(customer.unitPrice).toEqual(new Money(10000, 'EUR'));
+  });
+
+  it('leaves a day listing on another process priced per day', () => {
+    const result = transactionLineItems(
+      {
+        attributes: {
+          price: new Money(10000, 'EUR'),
+          publicData: {
+            unitType: 'day',
+            transactionProcessAlias: 'default-booking/release-1',
+          },
+        },
+      },
+      { bookingStart: '2026-09-01T00:00:00.000Z', bookingEnd: '2026-09-08T00:00:00.000Z' },
+      null,
+      null
+    );
+
+    expect(baseItem(result).quantity).toBe(7);
+  });
+});

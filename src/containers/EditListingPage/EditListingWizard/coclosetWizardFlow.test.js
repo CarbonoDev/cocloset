@@ -132,7 +132,9 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
     // image ids stay in Redux and are handed to createDraft when DETAILS runs.
     const user = userEvent.setup();
     const { view, onCreateListingDraft, onUpdateListing, history } = renderTab(PHOTOS, {
-      images: [createImage('image-1')],
+      // Two, not one: the photos form requires MIN_LISTING_IMAGES to submit at all, and a
+      // form that will not submit would pass this test for the wrong reason.
+      images: [createImage('image-1'), createImage('image-2')],
     });
 
     await user.click(submitButton(view));
@@ -152,7 +154,9 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
     // premature `history.replace` would point the back button, and the next tab's submit,
     // at a draft id that does not exist.
     const user = userEvent.setup();
-    const { view, history } = renderTab(PHOTOS, { images: [createImage('image-1')] });
+    const { view, history } = renderTab(PHOTOS, {
+      images: [createImage('image-1'), createImage('image-2')],
+    });
 
     await user.click(submitButton(view));
 

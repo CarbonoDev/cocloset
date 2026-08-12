@@ -1,5 +1,5 @@
 import { types as sdkTypes } from './sdkLoader';
-import { daysBetween, diffInTime } from './dates';
+import { diffInTime } from './dates';
 import { extractYouTubeID } from './string';
 
 const { LatLng, Money } = sdkTypes;
@@ -95,6 +95,25 @@ export const nonEmptyArray = message => value => {
   return value && Array.isArray(value) && value.length > 0 ? VALID : message;
 };
 
+/**
+ * At least `minCount` entries in an array field.
+ *
+ *   > "puedes integrar en el form de editlistingpage que el mínimo de imagenes es de dos,
+ *   >  si sube solo 1 no puede continuar"
+ *
+ * A generalisation of `nonEmptyArray` rather than an image-specific check, because the
+ * failure mode it guards is the same for any FieldArray: `nonEmptyArray` is satisfied by a
+ * single entry, so a listing with one photo passed validation and the wizard let the owner
+ * publish it.
+ *
+ * @param {number} minCount - the smallest acceptable length
+ * @param {string} message - shown when the array is shorter
+ * @returns {Function} a Final Form validator
+ */
+export const minCountArray = (minCount, message) => value => {
+  return value && Array.isArray(value) && value.length >= minCount ? VALID : message;
+};
+
 export const autocompleteSearchRequired = message => value => {
   return value && value.search ? VALID : message;
 };
@@ -126,50 +145,6 @@ export const bookingDatesRequired = (inValidStartDateMessage, inValidEndDateMess
   }
 };
 
-/**
- * A booking must last at least `minimumDays` days.
- *
- * WHY THIS EXISTS ALONGSIDE THE PICKER'S OWN `minimumNights`
- * The calendar refuses to COMPLETE a too-short range, but it does so by
- * returning early from its click handler (see DatePicker's onSelectDate), which
- * gives the customer no explanation at all - the second click simply does
- * nothing. It also only guards clicking: the start/end text inputs can be typed
- * into directly, and that path never consults minimumNights. So this validator
- * is both the visible message and the only check on typed input.
- *
- * It counts CALENDAR days via daysBetween rather than comparing timestamps.
- * minimumNights does the latter (`>= n * 864e5`), which is one hour short across
- * a spring-forward boundary and would reject a range that is genuinely long
- * enough. Counting days cannot drift with the clock.
- *
- * `value.endDate` is the EXCLUSIVE end date the form holds for daily bookings
- * (a one-day booking is start = D, end = D+1), which is exactly what daysBetween
- * expects - so the result is the rental length in days, directly comparable.
- *
- * Skips validation when either date is missing: `bookingDatesRequired` owns that
- * complaint, and reporting "too short" for an empty field would be a worse
- * message, not an extra one.
- *
- * @param {number} minimumDays
- * @param {string} message
- */
-export const minimumBookingDays = (minimumDays, message) => value => {
-  const startDate = value?.startDate;
-  const endDate = value?.endDate;
-  const bothDatesPresent = startDate instanceof Date && endDate instanceof Date;
-
-  if (!bothDatesPresent || !Number.isInteger(minimumDays) || minimumDays <= 1) {
-    return VALID;
-  }
-
-  try {
-    return daysBetween(startDate, endDate) < minimumDays ? message : VALID;
-  } catch (e) {
-    // Reversed range. bookingDatesRequired / the picker own that case.
-    return VALID;
-  }
-};
-
 // Source: http://www.regular-expressions.info/email.html
 // See the link above for an explanation of the tradeoffs.
 const EMAIL_RE = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
@@ -190,54 +165,6 @@ const parseNum = str => {
 export const numberAtLeast = (message, minNumber) => value => {
   const valueNum = parseNum(value);
   return typeof valueNum === 'number' && valueNum >= minNumber ? VALID : message;
-};
-
-/**
- * Validates an optional whole number inside an inclusive range.
- *
- * Unlike `validateInteger` below, this is a Final Form validator factory and it refuses to
- * truncate: `Number.parseInt` turns "2.5" into 2 and "3 days" into 3, which would silently
- * store something the user never typed. Anything that is not entirely digits (with an
- * optional minus sign) is reported as a non-integer instead.
- *
- * An empty value passes — compose with `required` when the field is mandatory.
- *
- * @param {string} notAnIntegerMessage - Shown for decimals and other non-integer input.
- * @param {string} numberTooSmallMessage - Shown when the value is below `min`.
- * @param {string} numberTooBigMessage - Shown when the value is above `max`.
- * @param {number} min - Smallest accepted value (inclusive).
- * @param {number} max - Largest accepted value (inclusive).
- * @returns {Function} A validator returning VALID or one of the given messages.
- */
-export const optionalIntegerInRange = (
-  notAnIntegerMessage,
-  numberTooSmallMessage,
-  numberTooBigMessage,
-  min,
-  max
-) => value => {
-  const isBlank = value == null || (typeof value === 'string' && value.trim().length === 0);
-  if (isBlank) {
-    return VALID;
-  }
-
-  const isWholeNumber =
-    typeof value === 'number'
-      ? Number.isInteger(value)
-      : /^-?\d+$/.test(String(value).trim()) && Number.isFinite(Number(String(value).trim()));
-
-  if (!isWholeNumber) {
-    return notAnIntegerMessage;
-  }
-
-  const valueNum = Number(value);
-  if (valueNum < min) {
-    return numberTooSmallMessage;
-  }
-  if (valueNum > max) {
-    return numberTooBigMessage;
-  }
-  return VALID;
 };
 
 export const validateInteger = (value, max, min, numberTooSmallMessage, numberTooBigMessage) => {

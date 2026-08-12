@@ -33,14 +33,23 @@ const initiatePrivileged = require('./initiate-privileged');
 // any transaction is created, and that a legal one still gets through.
 //
 // Two rules live on this path now, and they must stay distinguishable:
-//   * the owner's minimum rental length (data.code 'booking-below-minimum-days')
+//   * the fixed rental period: the dates must match the period being charged for
+//     (data.code 'rental-period-length-mismatch' / 'rental-period-unknown')
 //   * the garment's initial cleaning turnaround, for a garment that has never
 //     reached its laundry (data.code 'booking-before-initial-cleaning')
 
 const LISTING_ID = { uuid: 'listing-1' };
 
+// The two fixed periods a Cocloset garment is offered for. Opted into per-test rather than
+// defaulted, so the initial-cleaning tests below can go on booking arbitrary lengths without
+// the period gate refusing them first — each describe exercises ONE rule.
+const PERIODS = [
+  { name: '7-days', bookingLengthInDays: 7, priceInSubunits: 10000 },
+  { name: '14-days', bookingLengthInDays: 14, priceInSubunits: 18000 },
+];
+
 const listingEntity = ({
-  minimumBookingDays,
+  priceVariants = [],
   initialCleaningDays,
   onLaundry,
   assignedLaundryId,
@@ -53,7 +62,10 @@ const listingEntity = ({
     availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
     publicData: {
       unitType: 'day',
-      ...(minimumBookingDays === undefined ? {} : { minimumBookingDays }),
+      // The alias is what api-util/rentalPeriods.js keys on: it is baked onto a listing at
+      // creation, so the rule is per-listing rather than per-listing-type.
+      transactionProcessAlias: 'cocloset-booking/release-1',
+      priceVariants,
     },
     // Server-written only (Integration API). `initialCleaningDays` here is the SNAPSHOT
     // taken when the laundry was assigned; the gate prefers the studio's live turnaround
@@ -95,10 +107,10 @@ const mockRes = () => ({
 
 // A booking of `days` days, starting `startsInDays` days from today. The end date is
 // EXCLUSIVE, as it is on the wire.
-const req = ({ days, startsInDays = 0, isSpeculative = false }) => ({
+const req = ({ days, startsInDays = 0, isSpeculative = false, priceVariantName = '7-days' }) => ({
   body: {
     isSpeculative,
-    orderData: { currency: 'EUR' },
+    orderData: { currency: 'EUR', priceVariantName },
     bodyParams: {
       transition: 'transition/request-payment',
       params: {
@@ -112,7 +124,7 @@ const req = ({ days, startsInDays = 0, isSpeculative = false }) => ({
 });
 
 const setup = ({
-  minimumBookingDays,
+  priceVariants,
   initialCleaningDays,
   onLaundry,
   assignedLaundryId,
@@ -126,7 +138,7 @@ const setup = ({
     Promise.resolve({
       data: {
         data: listingEntity({
-          minimumBookingDays,
+          priceVariants,
           initialCleaningDays,
           onLaundry,
           assignedLaundryId,
@@ -175,33 +187,56 @@ beforeEach(() => {
   });
 });
 
-describe('initiate-privileged: the minimum booking length gate', () => {
-  it('refuses a booking shorter than the listing minimum', async () => {
-    const { initiate } = setup({ minimumBookingDays: 3 });
+describe('initiate-privileged: the rental period gate', () => {
+  it('refuses dates that do not match the period being charged for', async () => {
+    // The attack: name the cheap period, book a long range. The line-item builder prices
+    // from the named period and never looks at the dates.
+    const { initiate } = setup({ priceVariants: PERIODS });
 
-    const res = await run({ days: 2 });
+    const res = await run({ days: 60, priceVariantName: '7-days' });
 
     expect(res.statusCode).toBe(400);
     expect(handleError).toHaveBeenCalled();
     const error = handleError.mock.calls[0][1];
-    expect(error.data.code).toBe('booking-below-minimum-days');
-    // The refusal must come BEFORE pricing and BEFORE the charge. A 400 that
-    // arrives after the transaction was initiated is not a refusal.
+    expect(error.data.code).toBe('rental-period-length-mismatch');
+    // The refusal must come BEFORE pricing and BEFORE the charge. A 400 that arrives after
+    // the transaction was initiated is not a refusal.
     expect(buildLineItemsForListing).not.toHaveBeenCalled();
     expect(initiate).not.toHaveBeenCalled();
   });
 
-  it('lets a booking of exactly the minimum through to pricing', async () => {
-    const { initiate } = setup({ minimumBookingDays: 3 });
+  it('refuses a period the listing does not offer', async () => {
+    const { initiate } = setup({ priceVariants: PERIODS });
 
-    await run({ days: 3 });
+    const res = await run({ days: 30, priceVariantName: '30-days' });
+
+    expect(res.statusCode).toBe(400);
+    expect(handleError.mock.calls[0][1].data.code).toBe('rental-period-unknown');
+    expect(initiate).not.toHaveBeenCalled();
+  });
+
+  it('lets a booking of exactly the named period through to pricing', async () => {
+    const { initiate } = setup({ priceVariants: PERIODS });
+
+    await run({ days: 7, priceVariantName: '7-days' });
 
     expect(buildLineItemsForListing).toHaveBeenCalled();
     expect(initiate).toHaveBeenCalled();
   });
 
-  it('leaves a listing with no minimum completely unaffected', async () => {
-    const { initiate } = setup({});
+  it('lets the longer period through as well', async () => {
+    const { initiate } = setup({ priceVariants: PERIODS });
+
+    await run({ days: 14, priceVariantName: '14-days' });
+
+    expect(buildLineItemsForListing).toHaveBeenCalled();
+    expect(initiate).toHaveBeenCalled();
+  });
+
+  it('leaves a listing with no priced periods completely unaffected', async () => {
+    // Pricing fails on its own with a message about the missing price; relabelling that as
+    // a period fault would point the owner at the wrong thing.
+    const { initiate } = setup({ priceVariants: [] });
 
     await run({ days: 1 });
 
@@ -308,10 +343,10 @@ describe('initiate-privileged: the initial cleaning gate', () => {
   });
 
   it('keeps the two refusals distinguishable', async () => {
-    // Same request, two different faults. The browser has to be able to say "wait a
-    // few days" and "book more days" - they are not the same instruction.
-    setup({ minimumBookingDays: 3, initialCleaningDays: 3 });
-    await run({ days: 5, startsInDays: 1 });
+    // Same request, two different faults. The browser has to be able to say "wait a few
+    // days" and "those dates are not a 7-day rental" - not the same instruction.
+    setup({ priceVariants: PERIODS, initialCleaningDays: 3 });
+    await run({ days: 7, startsInDays: 1 });
     expect(handleError.mock.calls[0][1].data.code).toBe('booking-before-initial-cleaning');
 
     jest.clearAllMocks();
@@ -320,9 +355,9 @@ describe('initiate-privileged: the initial cleaning gate', () => {
       return res;
     });
 
-    setup({ minimumBookingDays: 3, initialCleaningDays: 3 });
+    setup({ priceVariants: PERIODS, initialCleaningDays: 3 });
     await run({ days: 1, startsInDays: 10 });
-    expect(handleError.mock.calls[0][1].data.code).toBe('booking-below-minimum-days');
+    expect(handleError.mock.calls[0][1].data.code).toBe('rental-period-length-mismatch');
   });
 });
 

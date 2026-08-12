@@ -25,6 +25,7 @@ import {
 import { formatMoney } from '../../util/currency';
 import { createSlug, parse, stringify } from '../../util/urlHelpers';
 import { userDisplayNameAsString } from '../../util/data';
+import { getRentalPeriods, usesFixedRentalPeriods } from '../../util/rentalPeriods';
 import {
   OFFER,
   REQUEST,
@@ -48,6 +49,11 @@ const BookingTimeForm = loadable(() =>
 );
 const BookingDatesForm = loadable(() =>
   import(/* webpackChunkName: "BookingDatesForm" */ './BookingDatesForm/BookingDatesForm')
+);
+const BookingRentalPeriodForm = loadable(() =>
+  import(
+    /* webpackChunkName: "BookingRentalPeriodForm" */ './BookingRentalPeriodForm/BookingRentalPeriodForm'
+  )
 );
 const BookingFixedDurationForm = loadable(() =>
   import(
@@ -323,16 +329,8 @@ const OrderPanel = props => {
   } = props;
 
   const publicData = listing?.attributes?.publicData || {};
-  const {
-    listingType,
-    unitType,
-    transactionProcessAlias = '',
-    priceVariants,
-    startTimeInterval,
-    // Cocloset: the owner's minimum rental length in days, set in the wizard's
-    // PRICE tab. Enforced again server-side (server/api-util/bookingRules.js).
-    minimumBookingDays,
-  } = publicData || {};
+  const { listingType, unitType, transactionProcessAlias = '', priceVariants, startTimeInterval } =
+    publicData || {};
 
   // Cocloset: garment custody, written ONLY by our server through the Integration
   // API (see server/api-util/listingCustody.js and
@@ -379,9 +377,12 @@ const OrderPanel = props => {
   const shouldHaveBookingTime = isBooking && [LINE_ITEM_HOUR].includes(lineItemUnitType);
   const showBookingTimeForm = mounted && shouldHaveBookingTime && !isClosed && timeZone;
 
+  // Cocloset: a garment rented by fixed period is day-based, so it satisfies this condition
+  // too. `isFixedRentalPeriod` (resolved below, next to the listing type config) takes it
+  // away again: rendering the stock date-range form for a garment would let a customer pick
+  // an arbitrary range that the server then refuses, and would price it per day.
   const shouldHaveBookingDates =
     isBooking && [LINE_ITEM_DAY, LINE_ITEM_NIGHT].includes(lineItemUnitType);
-  const showBookingDatesForm = mounted && shouldHaveBookingDates && !isClosed && timeZone;
 
   // The listing resource has a relationship: `currentStock`,
   // which you should include when making API calls.
@@ -407,6 +408,27 @@ const OrderPanel = props => {
   const { pickupEnabled, shippingEnabled } = listing?.attributes?.publicData || {};
 
   const listingTypeConfig = validListingTypes.find(conf => conf.listingType === listingType);
+
+  // Cocloset: a garment is rented for one of two fixed periods (7 or 14 days) at a flat
+  // price, not for an arbitrary range of days. That replaces the date-range form entirely —
+  // see src/util/rentalPeriods.js and BookingRentalPeriodForm.
+  //
+  // `rentalPeriods` empty means the owner has priced nothing yet. The panel then falls
+  // through to the "price missing" branch above, because `handleSubmitValuesForRentalPeriods`
+  // only writes `listing.price` alongside the periods, so a listing with no periods has no
+  // price either.
+  const isFixedRentalPeriod = usesFixedRentalPeriods(listingTypeConfig);
+  const rentalPeriods = isFixedRentalPeriod ? getRentalPeriods(publicData) : [];
+  const showBookingRentalPeriodForm =
+    mounted && isFixedRentalPeriod && !isClosed && timeZone && rentalPeriods.length > 0;
+  // A garment whose owner has priced no period cannot be booked. `listing.price` may still
+  // be set - a listing priced before this feature kept it - so the stock "price missing"
+  // check does not catch this, and without it the panel would render nothing at all.
+  const showRentalPeriodsMissing = isFixedRentalPeriod && rentalPeriods.length === 0;
+
+  const showBookingDatesForm =
+    mounted && shouldHaveBookingDates && !isFixedRentalPeriod && !isClosed && timeZone;
+
   const displayShipping = displayDeliveryShipping(listingTypeConfig);
   const displayPickup = displayDeliveryPickup(listingTypeConfig);
   const allowOrdersOfMultipleItems = [STOCK_MULTIPLE_ITEMS, STOCK_INFINITE_MULTIPLE_ITEMS].includes(
@@ -517,12 +539,27 @@ const OrderPanel = props => {
           </div>
         )}
 
-        {showPriceMissing ? (
+        {showPriceMissing || showRentalPeriodsMissing ? (
           <PriceMissing />
         ) : showInvalidCurrency ? (
           <InvalidCurrency />
         ) : showInvalidPriceVariantsMessage ? (
           <InvalidPriceVariants />
+        ) : showBookingRentalPeriodForm ? (
+          <BookingRentalPeriodForm
+            className={css.bookingForm}
+            formId="OrderPanelBookingRentalPeriodForm"
+            rentalPeriods={rentalPeriods}
+            onLaundry={onLaundry}
+            initialCleaningDays={initialCleaningDays}
+            liveInitialCleaningDays={liveInitialCleaningDays}
+            dayCountAvailableForBooking={dayCountAvailableForBooking}
+            monthlyTimeSlots={monthlyTimeSlots}
+            onFetchTimeSlots={onFetchTimeSlots}
+            timeZone={timeZone}
+            finePrintComponent={SubmitFinePrint}
+            {...sharedProps}
+          />
         ) : showBookingFixedDurationForm ? (
           <BookingFixedDurationForm
             seatsEnabled={seatsEnabled}
@@ -560,7 +597,6 @@ const OrderPanel = props => {
             seatsEnabled={seatsEnabled}
             className={css.bookingForm}
             formId="OrderPanelBookingDatesForm"
-            minimumBookingDays={minimumBookingDays}
             onLaundry={onLaundry}
             initialCleaningDays={initialCleaningDays}
             liveInitialCleaningDays={liveInitialCleaningDays}

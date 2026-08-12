@@ -19,9 +19,10 @@ import {
   handleSubmitValuesForPriceVariants,
 } from './BookingPriceVariants';
 import {
-  getInitialValuesForMinimumBookingDays,
-  handleSubmitValuesForMinimumBookingDays,
-} from './MinimumBookingDays';
+  getInitialValuesForRentalPeriods,
+  handleSubmitValuesForRentalPeriods,
+} from './RentalPeriodPrices';
+import { usesFixedRentalPeriods } from '../../../../util/rentalPeriods';
 import {
   getInitialValuesForStartTimeInterval,
   handleSubmitValuesForStartTimeInterval,
@@ -46,17 +47,20 @@ const getInitialValues = props => {
   // Note: publicData contains priceVariationsEnabled if listing is created with priceVariations enabled.
   const isPriceVariationsInUse = isPriceVariationsEnabled(publicData, listingTypeConfig);
 
-  // Included in both branches: getInitialValues re-seeds the form from the optimistic
-  // listing after every submit, so a field that is missing here is wiped from the form.
-  const minimumBookingDaysValues = getInitialValuesForMinimumBookingDays(props);
+  // Cocloset: a garment is priced per fixed rental period, one flat price each. Checked
+  // first for the same reason as in EditListingPricingForm — a garment-rental listing also
+  // satisfies the price-variations branch below, and would otherwise be seeded with the
+  // free-form variants the form no longer renders.
+  if (usesFixedRentalPeriods(listingTypeConfig)) {
+    return getInitialValuesForRentalPeriods(props);
+  }
 
   return unitType === FIXED || isPriceVariationsInUse
     ? {
         ...getInitialValuesForPriceVariants(props, isPriceVariationsInUse),
         ...getInitialValuesForStartTimeInterval(props),
-        ...minimumBookingDaysValues,
       }
-    : { price: listing?.attributes?.price, ...minimumBookingDaysValues };
+    : { price: listing?.attributes?.price };
 };
 
 // This is needed to show the listing's price consistently over XHR calls.
@@ -130,6 +134,8 @@ const EditListingPricingPanel = props => {
 
   // Note: publicData contains priceVariationsEnabled if listing is created with priceVariations enabled.
   const isPriceVariationsInUse = isPriceVariationsEnabled(publicData, listingTypeConfig);
+  // Cocloset: fixed 7/14-day rental periods, one flat price each. See RentalPeriodPrices.js.
+  const isFixedRentalPeriod = usesFixedRentalPeriods(listingTypeConfig);
 
   const isCompatibleCurrency = isValidCurrencyForTransactionProcess(
     transactionProcessAlias,
@@ -176,7 +182,11 @@ const EditListingPricingPanel = props => {
             // New values for listing attributes
             let updateValues = {};
 
-            if (unitType === FIXED || isPriceVariationsInUse) {
+            if (isFixedRentalPeriod) {
+              // Cocloset: two flat period prices in, `price` + `priceVariants` out.
+              // See RentalPeriodPrices.js.
+              updateValues = handleSubmitValuesForRentalPeriods(values, {}, marketplaceCurrency);
+            } else if (unitType === FIXED || isPriceVariationsInUse) {
               let publicDataUpdates = { priceVariationsEnabled: isPriceVariationsInUse };
               // NOTE: components that handle price variants and start time interval are currently
               // exporting helper functions that handle the initial values and the submission values.
@@ -195,13 +205,6 @@ const EditListingPricingPanel = props => {
                 unitType,
                 listingTypeConfig
               );
-              // This adds minimumBookingDays to publicData. It reaches this branch when a
-              // day-based listing type also has price variations enabled.
-              const minimumBookingDaysChanges = handleSubmitValuesForMinimumBookingDays(
-                values,
-                publicDataUpdates,
-                publicData
-              );
               updateValues = {
                 ...priceVariantChanges,
                 ...startTimeIntervalChanges,
@@ -209,23 +212,12 @@ const EditListingPricingPanel = props => {
                   priceVariationsEnabled: isPriceVariationsInUse,
                   ...startTimeIntervalChanges.publicData,
                   ...priceVariantChanges.publicData,
-                  ...minimumBookingDaysChanges.publicData,
                 },
               };
             } else {
-              // This is the branch a day-unit listing takes. Collect publicData additions
-              // into one object instead of writing publicData in a single shot, so that
-              // minimumBookingDays and priceVariationsEnabled don't clobber each other.
-              const priceVariationsEnabledMaybe = isBooking
-                ? { priceVariationsEnabled: false }
+              const publicDataMaybe = isBooking
+                ? { publicData: { priceVariationsEnabled: false } }
                 : {};
-              const publicDataUpdates = handleSubmitValuesForMinimumBookingDays(
-                values,
-                priceVariationsEnabledMaybe,
-                publicData
-              ).publicData;
-              const publicDataMaybe =
-                Object.keys(publicDataUpdates).length > 0 ? { publicData: publicDataUpdates } : {};
               updateValues = { price, ...publicDataMaybe };
             }
 
@@ -235,6 +227,7 @@ const EditListingPricingPanel = props => {
               initialValues: getInitialValues({
                 listing: getOptimisticListing(listing, updateValues),
                 listingTypes,
+                marketplaceCurrency,
               }),
             });
             onSubmit(updateValues);

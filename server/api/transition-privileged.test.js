@@ -38,8 +38,16 @@ const transitionPrivileged = require('./transition-privileged');
 const LISTING_ID = { uuid: 'listing-1' };
 const TX_ID = { uuid: 'tx-1' };
 
+// The two fixed periods a Cocloset garment is offered for. Opted into per-test, so the
+// initial-cleaning tests can book arbitrary lengths without the period gate refusing them
+// first — each test exercises ONE rule.
+const PERIODS = [
+  { name: '7-days', bookingLengthInDays: 7, priceInSubunits: 10000 },
+  { name: '14-days', bookingLengthInDays: 14, priceInSubunits: 18000 },
+];
+
 const listingEntity = ({
-  minimumBookingDays,
+  priceVariants = [],
   initialCleaningDays,
   onLaundry,
   assignedLaundryId,
@@ -51,7 +59,10 @@ const listingEntity = ({
     availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
     publicData: {
       unitType: 'day',
-      ...(minimumBookingDays === undefined ? {} : { minimumBookingDays }),
+      // What api-util/rentalPeriods.js keys on: the alias is baked onto a listing at
+      // creation, so the rule is per-listing rather than per-listing-type.
+      transactionProcessAlias: 'cocloset-booking/release-1',
+      priceVariants,
     },
     // `include: ['listing']` returns the full listing resource - no `fields.listing`
     // restriction is sent - so `metadata` is present here for the same reason
@@ -85,10 +96,10 @@ const mockRes = () => ({
   end: jest.fn().mockReturnThis(),
 });
 
-const req = ({ days, startsInDays = 0 }) => ({
+const req = ({ days, startsInDays = 0, priceVariantName = '7-days' }) => ({
   body: {
     isSpeculative: false,
-    orderData: { currency: 'EUR' },
+    orderData: { currency: 'EUR', priceVariantName },
     bodyParams: {
       id: TX_ID,
       transition: 'transition/request-payment-after-inquiry',
@@ -174,21 +185,24 @@ describe('transition-privileged: the booking gates are reached on this door too'
     expect(transition).not.toHaveBeenCalled();
   });
 
-  it('refuses a booking shorter than the listing minimum', async () => {
-    const { transition } = setup({ minimumBookingDays: 3 });
+  it('refuses dates that do not match the period being charged for', async () => {
+    // `request-payment-after-inquiry` is the second door into the same booking, so the
+    // period rule has to be here too - otherwise the cheap-period-long-range request just
+    // moves to this endpoint.
+    const { transition } = setup({ priceVariants: PERIODS });
 
-    const res = await run({ days: 2, startsInDays: 5 });
+    const res = await run({ days: 60, startsInDays: 5, priceVariantName: '7-days' });
 
     expect(res.statusCode).toBe(400);
-    expect(handleError.mock.calls[0][1].data.code).toBe('booking-below-minimum-days');
+    expect(handleError.mock.calls[0][1].data.code).toBe('rental-period-length-mismatch');
     expect(buildLineItemsForListing).not.toHaveBeenCalled();
     expect(transition).not.toHaveBeenCalled();
   });
 
   it('lets a legal booking through to pricing and the transition', async () => {
-    const { transition } = setup({ minimumBookingDays: 3, initialCleaningDays: 3 });
+    const { transition } = setup({ priceVariants: PERIODS, initialCleaningDays: 3 });
 
-    await run({ days: 3, startsInDays: 3 });
+    await run({ days: 7, startsInDays: 3, priceVariantName: '7-days' });
 
     expect(buildLineItemsForListing).toHaveBeenCalled();
     expect(transition).toHaveBeenCalled();

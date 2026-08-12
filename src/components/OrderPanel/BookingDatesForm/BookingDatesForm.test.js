@@ -9,8 +9,6 @@ import { renderWithProviders as render, testingLibrary } from '../../../util/tes
 
 import EstimatedCustomerBreakdownMaybe from '../EstimatedCustomerBreakdownMaybe';
 import {
-  resolveMinimumDays,
-  minimumNightsForMinimumDays,
   resolveInitialCleaningDays,
   earliestBookableDate,
   isOutsideRangeFn,
@@ -97,35 +95,6 @@ describe('EstimatedCustomerBreakdownMaybe', () => {
     expect(total).toBeInTheDocument();
     const totalPayIn = within(total.parentNode.parentNode);
     expect(totalPayIn.getByText('$21.98')).toBeInTheDocument();
-  });
-});
-
-describe('the minimum rental length, in days, becomes the picker floor, in nights', () => {
-  // The picker holds an INCLUSIVE end date for daily bookings, so these two
-  // numbers are deliberately different. Asserting the mapping directly is the
-  // point: an off-by-one here blocks the shortest booking the owner allows, and
-  // presents as a broken calendar rather than as a rule.
-  it('maps an n-day minimum onto an (n-1)-night floor', () => {
-    expect(minimumNightsForMinimumDays(resolveMinimumDays(3, true))).toBe(2);
-    expect(minimumNightsForMinimumDays(resolveMinimumDays(2, true))).toBe(1);
-    expect(minimumNightsForMinimumDays(resolveMinimumDays(30, true))).toBe(29);
-  });
-
-  it('leaves the picker default alone when the listing sets no real minimum', () => {
-    // undefined means "do not override", so a 1-day minimum keeps the stock
-    // behaviour of allowing single-day bookings.
-    expect(minimumNightsForMinimumDays(resolveMinimumDays(1, true))).toBeUndefined();
-    expect(minimumNightsForMinimumDays(resolveMinimumDays(0, true))).toBeUndefined();
-    expect(minimumNightsForMinimumDays(resolveMinimumDays(undefined, true))).toBeUndefined();
-    // null is what the wizard writes when an owner clears the field.
-    expect(minimumNightsForMinimumDays(resolveMinimumDays(null, true))).toBeUndefined();
-    expect(minimumNightsForMinimumDays(resolveMinimumDays(2.5, true))).toBeUndefined();
-    expect(minimumNightsForMinimumDays(resolveMinimumDays('3', true))).toBeUndefined();
-  });
-
-  it('ignores the minimum entirely for a non-daily booking', () => {
-    expect(resolveMinimumDays(3, false)).toBeNull();
-    expect(minimumNightsForMinimumDays(resolveMinimumDays(3, false))).toBeUndefined();
   });
 });
 

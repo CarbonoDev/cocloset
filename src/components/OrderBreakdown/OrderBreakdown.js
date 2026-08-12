@@ -14,9 +14,12 @@ import {
   LINE_ITEM_FIXED,
   LINE_ITEM_HOUR,
   LINE_ITEM_PROVIDER_COMMISSION,
+  LINE_ITEM_DAY,
+  LINE_ITEM_NIGHT,
   LISTING_UNIT_TYPES,
   propTypes,
 } from '../../util/types';
+import { daysBetween } from '../../util/dates';
 
 import LineItemBookingPeriod from './LineItemBookingPeriod';
 import LineItemBasePriceMaybe from './LineItemBasePriceMaybe';
@@ -59,6 +62,36 @@ export const OrderBreakdownComponent = props => {
   const dateType = [LINE_ITEM_HOUR, LINE_ITEM_FIXED].includes(lineItemUnitType)
     ? DATE_TYPE_DATETIME
     : DATE_TYPE_DATE;
+
+  // Cocloset: a garment rented for a fixed period (7 or 14 days) is charged a FLAT price
+  // for the whole period, so its base line item carries `quantity: 1` while the booking
+  // spans many days (server/api-util/lineItems.js). Rendering that through the stock
+  // "{unitPrice} × {quantity} days" template would read "$100.00 × 1 day" against a booking
+  // that visibly runs a week — the same confusion the flat price exists to remove.
+  //
+  // The condition is the fact itself rather than a listing-type lookup: a day/night unit
+  // line item whose quantity is 1 across a booking longer than one day IS a flat rate, by
+  // arithmetic, and OrderBreakdown has no access to the listing (it is rendered for a
+  // speculative estimate and for a stored transaction alike). Bookings of exactly one day
+  // are untouched — there is nothing to disambiguate there.
+  const isDateRangeUnit = [LINE_ITEM_DAY, LINE_ITEM_NIGHT].includes(lineItemUnitType);
+  // daysBetween throws on a reversed range, and this is a display component: a transaction
+  // with impossible dates must still render its price, not blank the whole page.
+  let bookedDays = null;
+  try {
+    bookedDays =
+      isDateRangeUnit && booking?.attributes?.start && booking?.attributes?.end
+        ? daysBetween(booking.attributes.start, booking.attributes.end)
+        : null;
+  } catch (e) {
+    bookedDays = null;
+  }
+  // `quantity` arrives as a decimal.js Decimal on a stored transaction and as a plain
+  // number on the speculative estimate, so it is coerced before comparing. A bare
+  // `quantity === 1` is false for the Decimal in every case, which would silently disable
+  // this whole branch on real transactions while passing in the estimate.
+  const unitQuantity = unitLineItem?.quantity != null ? Number(unitLineItem.quantity) : null;
+  const flatRatePeriodDays = unitQuantity === 1 && bookedDays > 1 ? bookedDays : null;
 
   const hasCommissionLineItem = lineItems.find(item => {
     const hasCustomerCommission = isCustomer && item.code === LINE_ITEM_CUSTOMER_COMMISSION;
@@ -113,7 +146,12 @@ export const OrderBreakdownComponent = props => {
         timeZone={timeZone}
       />
 
-      <LineItemBasePriceMaybe lineItems={lineItems} code={lineItemUnitType} intl={intl} />
+      <LineItemBasePriceMaybe
+        lineItems={lineItems}
+        code={lineItemUnitType}
+        flatRatePeriodDays={flatRatePeriodDays}
+        intl={intl}
+      />
       <LineItemShippingFeeMaybe lineItems={lineItems} intl={intl} />
       <LineItemPickupFeeMaybe lineItems={lineItems} intl={intl} />
       <LineItemUnknownItemsMaybe lineItems={lineItems} isProvider={isProvider} intl={intl} />

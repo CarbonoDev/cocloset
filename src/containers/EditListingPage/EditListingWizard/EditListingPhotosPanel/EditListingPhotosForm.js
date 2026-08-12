@@ -9,7 +9,7 @@ import classNames from 'classnames';
 // Import configs and util modules
 import { FormattedMessage, useIntl } from '../../../../util/reactIntl';
 import { propTypes } from '../../../../util/types';
-import { nonEmptyArray, composeValidators } from '../../../../util/validators';
+import { nonEmptyArray, minCountArray, composeValidators } from '../../../../util/validators';
 import { isUploadImageOverLimitError } from '../../../../util/errors';
 
 // Import shared components
@@ -20,6 +20,16 @@ import ListingImage from './ListingImage';
 import css from './EditListingPhotosForm.module.css';
 
 const ACCEPT_IMAGES = 'image/*';
+
+/**
+ * The smallest number of photos a listing may be published with.
+ *
+ *   > "el mínimo de imagenes es de dos, si sube solo 1 no puede continuar"
+ *
+ * Exported so the test asserts against the same number the form enforces rather than a
+ * literal 2 written twice.
+ */
+export const MIN_LISTING_IMAGES = 2;
 
 const ImageUploadError = props => {
   return props.uploadOverLimit ? (
@@ -231,6 +241,17 @@ export const EditListingPhotosForm = props => {
                     intl.formatMessage({
                       id: 'EditListingPhotosForm.imageRequired',
                     })
+                  ),
+                  // A garment needs more than one photo to be rentable — a renter is
+                  // deciding on a physical object they cannot inspect. Both validators are
+                  // kept: `nonEmptyArray` names the empty case ("add a photo"), which is a
+                  // different instruction from "add one more".
+                  minCountArray(
+                    MIN_LISTING_IMAGES,
+                    intl.formatMessage(
+                      { id: 'EditListingPhotosForm.minimumImagesRequired' },
+                      { minCount: MIN_LISTING_IMAGES }
+                    )
                   )
                 )}
               >
