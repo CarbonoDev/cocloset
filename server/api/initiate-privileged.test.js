@@ -107,16 +107,37 @@ const mockRes = () => ({
 
 // A booking of `days` days, starting `startsInDays` days from today. The end date is
 // EXCLUSIVE, as it is on the wire.
-const req = ({ days, startsInDays = 0, isSpeculative = false, priceVariantName = '7-days' }) => ({
+// WHERE `priceVariantName` LIVES ON THE WIRE, and why this fixture has two shapes.
+//
+// CheckoutPage.duck.js sends it in DIFFERENT places on its two paths:
+//   * `speculateTransaction` destructures it into `orderData`;
+//   * `initiateOrder` — the real "Request to book" — does not, so it stays in
+//     `otherOrderParams` and arrives inside `bodyParams.params`, with `orderData` empty.
+//
+// The endpoint has to accept both, and the second is the one that matters: a fixture that
+// only ever used `orderData` is exactly how the period gate shipped refusing every real
+// booking with `rental period "undefined"` while its tests passed. Default to the real
+// shape here; `variantIn: 'orderData'` covers the speculative one.
+const req = ({
+  days,
+  startsInDays = 0,
+  isSpeculative = false,
+  priceVariantName = '7-days',
+  variantIn = 'params',
+}) => ({
   body: {
     isSpeculative,
-    orderData: { currency: 'EUR', priceVariantName },
+    orderData: {
+      currency: 'EUR',
+      ...(variantIn === 'orderData' ? { priceVariantName } : {}),
+    },
     bodyParams: {
       transition: 'transition/request-payment',
       params: {
         listingId: LISTING_ID,
         bookingStart: daysFromToday(startsInDays),
         bookingEnd: daysFromToday(startsInDays + days),
+        ...(variantIn === 'params' ? { priceVariantName } : {}),
       },
     },
     queryParams: {},
@@ -233,6 +254,32 @@ describe('initiate-privileged: the rental period gate', () => {
     expect(initiate).toHaveBeenCalled();
   });
 
+  it('accepts the period from bodyParams.params, which is where the real booking path puts it', async () => {
+    // THE REGRESSION. Reported from Dev as `This garment is not offered for the rental
+    // period "undefined"` on a payload whose `orderData` was `{}` and whose
+    // `bodyParams.params.priceVariantName` was '7-days'. Every real booking was refused.
+    const { initiate } = setup({ priceVariants: PERIODS });
+
+    const res = await run({ days: 7, priceVariantName: '7-days', variantIn: 'params' });
+
+    expect(res.statusCode).not.toBe(400);
+    expect(initiate).toHaveBeenCalled();
+  });
+
+  it('accepts the period from orderData, which is where the speculative path puts it', async () => {
+    const { initiateSpeculative } = setup({ priceVariants: PERIODS });
+
+    const res = await run({
+      days: 7,
+      priceVariantName: '7-days',
+      variantIn: 'orderData',
+      isSpeculative: true,
+    });
+
+    expect(res.statusCode).not.toBe(400);
+    expect(initiateSpeculative).toHaveBeenCalled();
+  });
+
   it('leaves a listing with no priced periods completely unaffected', async () => {
     // Pricing fails on its own with a message about the missing price; relabelling that as
     // a period fault would point the owner at the wrong thing.
@@ -280,11 +327,11 @@ describe('initiate-privileged: the initial cleaning gate', () => {
   });
 
   it('lets a booking starting exactly on the boundary day through to pricing', async () => {
-    // day + n is the first day the garment is READY. Refusing it would cost the
-    // owner a day on every new garment.
+    // Cleaning runs on days +1..+3, so +4 is the first day the garment is READY.
+    // Refusing it would cost the owner a day on every new garment.
     const { initiate } = setup({ initialCleaningDays: 3 });
 
-    await run({ days: 2, startsInDays: 3 });
+    await run({ days: 2, startsInDays: 4 });
 
     expect(buildLineItemsForListing).toHaveBeenCalled();
     expect(initiate).toHaveBeenCalled();
@@ -390,14 +437,15 @@ describe('initiate-privileged: the gate resolves the laundry live turnaround', (
   });
 
   it('allows a day the stale snapshot would have refused', async () => {
-    // Snapshot says 7 days; the studio has got faster and now needs 2.
+    // Snapshot says 7 days; the studio has got faster and now needs 2, so the floor moves
+    // from +8 to +3.
     const { initiate } = setup({
       initialCleaningDays: 7,
       assignedLaundryId: 'laundry-1',
       laundryTurnaroundDays: 2,
     });
 
-    await run({ days: 2, startsInDays: 2 });
+    await run({ days: 2, startsInDays: 3 });
 
     expect(buildLineItemsForListing).toHaveBeenCalled();
     expect(initiate).toHaveBeenCalled();

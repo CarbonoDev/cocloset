@@ -207,9 +207,16 @@ describe("the calendar's lower bound honours the garment's initial cleaning time
   });
 
   describe('earliestBookableDate', () => {
-    it('pushes the floor forward by whole days when the block applies', () => {
-      expect(earliestBookableDate(3, TZ, NOW).toISOString()).toBe('2026-08-13T00:00:00.000Z');
-      expect(earliestBookableDate(1, TZ, NOW).toISOString()).toBe('2026-08-11T00:00:00.000Z');
+    // NOW is the 10th. Cleaning cannot start today - the garment still has to get to the
+    // studio - so it runs 11..13 for a 3-day turnaround and the floor is the 14th.
+    //
+    // The +1 is the whole point of the one-day case: without it a 1-day turnaround puts the
+    // floor on the 11th, which is where it already was (today is unbookable anyway, because
+    // the availability slot for the current day starts at the moment of the query). A rule
+    // with no observable effect is the bug the client reported.
+    it('pushes the floor past the cleaning days, which start tomorrow', () => {
+      expect(earliestBookableDate(3, TZ, NOW).toISOString()).toBe('2026-08-14T00:00:00.000Z');
+      expect(earliestBookableDate(1, TZ, NOW).toISOString()).toBe('2026-08-12T00:00:00.000Z');
     });
 
     // The floor is a DAY, not `now` plus n * 24h: 09:30 must not leak into it, or
@@ -218,15 +225,15 @@ describe("the calendar's lower bound honours the garment's initial cleaning time
     it('is a start-of-day, not an offset instant', () => {
       expect(earliestBookableDate(2, TZ, NOW).getUTCHours()).toBe(0);
       expect(earliestBookableDate(2, TZ, new Date('2026-08-10T23:59:00.000Z')).toISOString()).toBe(
-        '2026-08-12T00:00:00.000Z'
+        '2026-08-13T00:00:00.000Z'
       );
     });
 
     it('counts the days in the LISTING time zone', () => {
-      // 09:30 UTC on the 10th is 03:30 on the 10th in Mexico City, so +2 days is
-      // midnight on the 12th there - 06:00 UTC.
+      // 09:30 UTC on the 10th is 03:30 on the 10th in Mexico City, so two cleaning days
+      // starting tomorrow put the floor at midnight on the 13th there - 06:00 UTC.
       expect(earliestBookableDate(2, 'America/Mexico_City', NOW).toISOString()).toBe(
-        '2026-08-12T06:00:00.000Z'
+        '2026-08-13T06:00:00.000Z'
       );
     });
 
@@ -247,7 +254,7 @@ describe("the calendar's lower bound honours the garment's initial cleaning time
       const floorFor = (days, onLaundry) =>
         earliestBookableDate(resolveInitialCleaningDays(days, onLaundry), TZ, NOW).toISOString();
 
-      expect(floorFor(5, false)).toBe('2026-08-15T00:00:00.000Z');
+      expect(floorFor(5, false)).toBe('2026-08-16T00:00:00.000Z');
       expect(floorFor(5, true)).toBe('2026-08-10T00:00:00.000Z');
       expect(floorFor(2.5, false)).toBe('2026-08-10T00:00:00.000Z');
     });
@@ -275,11 +282,13 @@ describe("the calendar's lower bound honours the garment's initial cleaning time
       return isOutside(timeOfDayFromTimeZoneToLocal(dayInTz(offset), TZ));
     };
 
-    it('refuses today and tomorrow, and allows the boundary day, for a 3-day block', () => {
+    it('refuses today and the three cleaning days, and allows the day after them', () => {
+      // Cleaning runs on days +1, +2 and +3; the garment is bookable from +4.
       expect(probe(3, 0)).toBe(true);
       expect(probe(3, 1)).toBe(true);
       expect(probe(3, 2)).toBe(true);
-      expect(probe(3, 3)).toBe(false);
+      expect(probe(3, 3)).toBe(true);
+      expect(probe(3, 4)).toBe(false);
       expect(probe(3, 10)).toBe(false);
     });
 

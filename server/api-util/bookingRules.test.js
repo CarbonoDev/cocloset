@@ -171,23 +171,24 @@ describe('resolveInitialCleaningBlockDays', () => {
 
 describe('earliestBookingStart', () => {
   it('is start of day in the listing time zone plus n days, not now + n*24h', () => {
-    // 09:30 UTC on the 10th. A 2-day lead time means the 12th at 00:00, not the 12th
-    // at 09:30 - the hour the customer happens to be shopping must not move the floor.
+    // 09:30 UTC on the 10th. Cleaning starts TOMORROW - today is already half gone - so a
+    // 2-day lead time runs on the 11th and 12th and the floor is the 13th at 00:00, not the
+    // 13th at 09:30: the hour the customer happens to be shopping must not move the floor.
     expect(
       earliestBookingStart({ initialCleaningDays: 2, timeZone: 'Etc/UTC', now: NOW }).toISOString()
-    ).toBe('2026-08-12T00:00:00.000Z');
+    ).toBe('2026-08-13T00:00:00.000Z');
   });
 
   it('counts days in the listing time zone, not UTC', () => {
-    // 09:30 UTC on the 10th is 03:30 on the 10th in Mexico City, so +2 days is the
-    // 12th LOCAL there - which is 06:00 UTC.
+    // 09:30 UTC on the 10th is 03:30 on the 10th in Mexico City, so two cleaning days
+    // starting tomorrow put the floor on the 13th LOCAL there - which is 06:00 UTC.
     expect(
       earliestBookingStart({
         initialCleaningDays: 2,
         timeZone: 'America/Mexico_City',
         now: NOW,
       }).toISOString()
-    ).toBe('2026-08-12T06:00:00.000Z');
+    ).toBe('2026-08-13T06:00:00.000Z');
   });
 
   it('does not lose a day in a zone that changes DST at midnight', () => {
@@ -199,13 +200,13 @@ describe('earliestBookingStart', () => {
         timeZone: 'Atlantic/Azores',
         now: new Date('2026-03-29T12:00:00.000Z'),
       }).toISOString()
-    ).toBe('2026-03-30T00:00:00.000Z');
+    ).toBe('2026-03-31T00:00:00.000Z');
   });
 
   it('falls back to UTC for a missing or unknown time zone', () => {
     // The server's own TZ is an accident of deployment and must never decide this.
     expect(earliestBookingStart({ initialCleaningDays: 1, now: NOW }).toISOString()).toBe(
-      '2026-08-11T00:00:00.000Z'
+      '2026-08-12T00:00:00.000Z'
     );
     expect(
       earliestBookingStart({
@@ -213,7 +214,7 @@ describe('earliestBookingStart', () => {
         timeZone: 'Not/AZone',
         now: NOW,
       }).toISOString()
-    ).toBe('2026-08-11T00:00:00.000Z');
+    ).toBe('2026-08-12T00:00:00.000Z');
   });
 });
 
@@ -225,7 +226,9 @@ describe('assertInitialCleaningLeadTime', () => {
       now: NOW,
     });
 
-  // NOW is the 10th, so a 3-day turnaround makes the 13th the first bookable day.
+  // NOW is the 10th. Cleaning starts TOMORROW - today is already half over and the garment
+  // still has to reach the studio - so a 3-day turnaround runs on the 11th, 12th and 13th,
+  // and the 14th is the first bookable day.
   it('REFUSES tomorrow - the bug this exists to fix', () => {
     expect(() => assertAt(cleaningListing({ initialCleaningDays: 3 }), '2026-08-11')).toThrow(
       /initial cleaning/i
@@ -234,6 +237,7 @@ describe('assertInitialCleaningLeadTime', () => {
 
   it('refuses the last day inside the window', () => {
     expect(() => assertAt(cleaningListing({ initialCleaningDays: 3 }), '2026-08-12')).toThrow();
+    expect(() => assertAt(cleaningListing({ initialCleaningDays: 3 }), '2026-08-13')).toThrow();
   });
 
   it('refuses today, and any date in the past', () => {
@@ -241,20 +245,28 @@ describe('assertInitialCleaningLeadTime', () => {
     expect(() => assertAt(cleaningListing({ initialCleaningDays: 3 }), '2026-08-01')).toThrow();
   });
 
-  // THE BOUNDARY. `initialCleaningDays` counts days of cleaning, so day + n is the
-  // first day the garment is READY, not the last day it is not. Off by one here
-  // costs the owner a day on every new garment and reads as a broken calendar.
+  // THE BOUNDARY. `initialCleaningDays` counts days of CLEANING, and the first of them is
+  // tomorrow, so the first bookable day is today + n + 1 - the day after the last wash day,
+  // not the last wash day itself. Off by one either way is visible: one direction costs the
+  // owner a day on every new garment, the other promises a garment that is still in the wash.
   it('ALLOWS a booking starting exactly on the boundary day', () => {
-    expect(() => assertAt(cleaningListing({ initialCleaningDays: 3 }), '2026-08-13')).not.toThrow();
+    expect(() => assertAt(cleaningListing({ initialCleaningDays: 3 }), '2026-08-14')).not.toThrow();
   });
 
   it('allows a booking well after the window', () => {
     expect(() => assertAt(cleaningListing({ initialCleaningDays: 3 }), '2026-09-01')).not.toThrow();
   });
 
-  it('allows tomorrow for a 1-day turnaround, which is the tightest boundary', () => {
-    expect(() => assertAt(cleaningListing({ initialCleaningDays: 1 }), '2026-08-11')).not.toThrow();
+  // The client's worked example, in the form he gave it:
+  //   > "hoy es 12 de agosto, si un listing tiene un periodo de 1 día de laundry (...) el
+  //   >  próximo día disponible debe ser el 14 de agosto, ya que es un día de lavado (13 de
+  //   >  agosto) y el siguiente día disponible es 14"
+  // This is also the case that has to move: counting from today made a 1-day turnaround
+  // indistinguishable from no turnaround at all, since today is unbookable regardless.
+  it('refuses tomorrow for a 1-day turnaround - tomorrow is the wash day', () => {
     expect(() => assertAt(cleaningListing({ initialCleaningDays: 1 }), '2026-08-10')).toThrow();
+    expect(() => assertAt(cleaningListing({ initialCleaningDays: 1 }), '2026-08-11')).toThrow();
+    expect(() => assertAt(cleaningListing({ initialCleaningDays: 1 }), '2026-08-12')).not.toThrow();
   });
 
   // The client's own carve-out, and the half of this rule easiest to break by
@@ -287,7 +299,7 @@ describe('assertInitialCleaningLeadTime', () => {
       expect(e.data).toEqual({
         code: 'booking-before-initial-cleaning',
         initialCleaningDays: 3,
-        earliestBookingStart: '2026-08-13T00:00:00.000Z',
+        earliestBookingStart: '2026-08-14T00:00:00.000Z',
       });
     }
   });
@@ -299,7 +311,7 @@ describe('assertInitialCleaningLeadTime', () => {
     expect(() =>
       assertInitialCleaningLeadTime({
         listing: boundaryListing,
-        bookingStart: new Date('2026-08-13T23:59:00.000Z'),
+        bookingStart: new Date('2026-08-14T23:59:00.000Z'),
         now: NOW,
       })
     ).not.toThrow();
@@ -307,28 +319,28 @@ describe('assertInitialCleaningLeadTime', () => {
     expect(() =>
       assertInitialCleaningLeadTime({
         listing: boundaryListing,
-        bookingStart: new Date('2026-08-13T00:00:00.000Z'),
+        bookingStart: new Date('2026-08-14T00:00:00.000Z'),
         now: new Date('2026-08-10T23:59:00.000Z'),
       })
     ).not.toThrow();
   });
 
   it('resolves the boundary in the listing time zone', () => {
-    // Mexico City is UTC-6 in August, so midnight on the 13th LOCAL is 06:00 UTC and
-    // 2026-08-13T00:00Z is still the 12th there. The same instant that a UTC listing
+    // Mexico City is UTC-6 in August, so midnight on the 14th LOCAL is 06:00 UTC and
+    // 2026-08-14T00:00Z is still the 13th there. The same instant that a UTC listing
     // accepts must therefore be refused here.
     const tzListing = cleaningListing({ initialCleaningDays: 3, timeZone: 'America/Mexico_City' });
     expect(() =>
       assertInitialCleaningLeadTime({
         listing: tzListing,
-        bookingStart: new Date('2026-08-13T00:00:00.000Z'),
+        bookingStart: new Date('2026-08-14T00:00:00.000Z'),
         now: NOW,
       })
     ).toThrow();
     expect(() =>
       assertInitialCleaningLeadTime({
         listing: tzListing,
-        bookingStart: new Date('2026-08-13T06:00:00.000Z'),
+        bookingStart: new Date('2026-08-14T06:00:00.000Z'),
         now: NOW,
       })
     ).not.toThrow();
@@ -357,25 +369,25 @@ describe('assertInitialCleaningLeadTime', () => {
       });
 
     it('refuses a day the SNAPSHOT would have allowed', () => {
-      // Snapshot 1 day (floor = the 11th), studio now needs 5 (floor = the 15th).
+      // Snapshot 1 day (floor = the 12th), studio now needs 5 (floor = the 16th).
       const listingEntity = cleaningListing({ initialCleaningDays: 1 });
-      expect(() => assertLive(listingEntity, '2026-08-11', 5)).toThrow(/initial cleaning/i);
-      expect(() => assertLive(listingEntity, '2026-08-15', 5)).not.toThrow();
+      expect(() => assertLive(listingEntity, '2026-08-12', 5)).toThrow(/initial cleaning/i);
+      expect(() => assertLive(listingEntity, '2026-08-16', 5)).not.toThrow();
     });
 
     it('allows a day the SNAPSHOT would have refused', () => {
-      // Snapshot 7 days (floor = the 17th), studio now needs 2 (floor = the 12th).
+      // Snapshot 7 days (floor = the 18th), studio now needs 2 (floor = the 13th).
       const listingEntity = cleaningListing({ initialCleaningDays: 7 });
-      expect(() => assertLive(listingEntity, '2026-08-12', 2)).not.toThrow();
+      expect(() => assertLive(listingEntity, '2026-08-13', 2)).not.toThrow();
     });
 
     it('reports the live number in the error, not the stale one', () => {
       try {
-        assertLive(cleaningListing({ initialCleaningDays: 1 }), '2026-08-11', 5);
+        assertLive(cleaningListing({ initialCleaningDays: 1 }), '2026-08-12', 5);
         throw new Error('expected a rejection');
       } catch (e) {
         expect(e.data.initialCleaningDays).toBe(5);
-        expect(e.data.earliestBookingStart).toBe('2026-08-15T00:00:00.000Z');
+        expect(e.data.earliestBookingStart).toBe('2026-08-16T00:00:00.000Z');
       }
     });
 
@@ -383,7 +395,7 @@ describe('assertInitialCleaningLeadTime', () => {
       // null is what api-util/liveInitialCleaning.js returns for every failure it has.
       const listingEntity = cleaningListing({ initialCleaningDays: 3 });
       expect(() => assertLive(listingEntity, '2026-08-11', null)).toThrow(/initial cleaning/i);
-      expect(() => assertLive(listingEntity, '2026-08-13', null)).not.toThrow();
+      expect(() => assertLive(listingEntity, '2026-08-14', null)).not.toThrow();
     });
 
     it('is unchanged for every existing caller that passes no live value', () => {
@@ -426,6 +438,6 @@ describe('assertInitialCleaningLeadTime', () => {
     const noPlan = cleaningListing({ initialCleaningDays: 3 });
     delete noPlan.attributes.availabilityPlan;
     expect(() => assertAt(noPlan, '2026-08-11')).toThrow();
-    expect(() => assertAt(noPlan, '2026-08-13')).not.toThrow();
+    expect(() => assertAt(noPlan, '2026-08-14')).not.toThrow();
   });
 });

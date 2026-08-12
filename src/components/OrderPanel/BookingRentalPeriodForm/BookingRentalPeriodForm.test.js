@@ -1,5 +1,6 @@
 import {
   bookingEndForPeriod,
+  dateFormatOptionsIn,
   inclusiveEndForPeriod,
   isWindowAvailableFn,
   latestBookableStartDate,
@@ -104,5 +105,40 @@ describe('isWindowAvailableFn', () => {
     expect(isAvailable(null, 7)).toBe(false);
     expect(isAvailable(day(1), 0)).toBe(false);
     expect(isAvailable(day(1), undefined)).toBe(false);
+  });
+});
+
+describe('dateFormatOptionsIn', () => {
+  // THE BUG THIS PREVENTS, reported from Dev: the picker read "Thu, Aug 13", the sentence
+  // under it read "Tue, Aug 11", and the price breakdown read "Aug 12". Three renderings of
+  // one booking. Two faults combined - a double time-zone conversion (fixed by reading the
+  // field's already-parsed value) and this one: every date in this form is a MIDNIGHT
+  // INSTANT IN THE LISTING'S ZONE, and `intl.formatDate` defaults to the browser's, so for
+  // any customer west of the listing it renders as the previous day.
+  //
+  // Asserted through a real Intl formatter rather than by inspecting the returned object,
+  // so what is checked is that the option actually changes the rendered day - the reason it
+  // has to be there at all.
+  const render = (instant, options) => new Intl.DateTimeFormat('en-US', options).format(instant);
+
+  // Midnight on 13 August in a UTC listing's calendar.
+  const midnightUtc = new Date('2026-08-13T00:00:00.000Z');
+
+  it('renders a listing-time-zone midnight as that day', () => {
+    expect(render(midnightUtc, dateFormatOptionsIn('Etc/UTC'))).toContain('Aug 13');
+  });
+
+  it('renders the SAME instant as the previous day in a zone behind the listing', () => {
+    // Not a quirk of the test: this is precisely what the customer saw. It is here so that
+    // dropping the timeZone option again fails loudly instead of silently.
+    expect(render(midnightUtc, dateFormatOptionsIn('America/Mexico_City'))).toContain('Aug 12');
+  });
+
+  it('omits the option entirely when the listing has no time zone', () => {
+    // A listing with no availabilityPlan has none. Passing `timeZone: undefined` to Intl
+    // throws in some engines; leaving the key out falls back to the browser's zone, which is
+    // the best available answer.
+    expect('timeZone' in dateFormatOptionsIn(undefined)).toBe(false);
+    expect(() => render(midnightUtc, dateFormatOptionsIn(undefined))).not.toThrow();
   });
 });

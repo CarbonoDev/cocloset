@@ -55,7 +55,21 @@ import css from './BookingRentalPeriodForm.module.css';
  * the rule still has exactly one implementation.
  */
 
-const dateFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+/**
+ * Every date in this form is a MIDNIGHT INSTANT IN THE LISTING'S TIME ZONE, so it must be
+ * rendered in that zone too. `intl.formatDate` defaults to the browser's, and for any
+ * customer west of the listing a midnight instant then renders as the PREVIOUS day — which
+ * is how a booking picked for Aug 13 came out as "Aug 11" in the sentence under the picker
+ * while the calendar above it and the breakdown below it said something else again.
+ *
+ * The same `timeZone` the picker parses with, so the whole form speaks one calendar.
+ */
+export const dateFormatOptionsIn = timeZone => ({
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  ...(timeZone ? { timeZone } : {}),
+});
 
 /**
  * Availability for a whole window, not for a single day.
@@ -318,12 +332,14 @@ export const BookingRentalPeriodForm = props => {
         const periodDays = selectedPeriod?.bookingLengthInDays || null;
         const windowDays = periodDays ? periodDays + cleaningWindowDays : null;
 
+        // ALREADY start-of-day in the LISTING's time zone: the field's `parse` did that
+        // conversion when the day was picked. Converting again here was a real bug — the
+        // picker said "Thu, Aug 13", this said Aug 12, and the sentence below (formatted
+        // without a time zone, so rendered in the browser's) said Aug 11. Three dates for
+        // one booking.
         const startDate = values?.bookingStartDate?.date || null;
-        const startDateInTz = startDate
-          ? getStartOf(timeOfDayFromLocalToTimeZone(startDate, timeZone), 'day', timeZone)
-          : null;
-        const bookingEnd = bookingEndForPeriod(startDateInTz, periodDays, timeZone);
-        const inclusiveEnd = inclusiveEndForPeriod(startDateInTz, periodDays, timeZone);
+        const bookingEnd = bookingEndForPeriod(startDate, periodDays, timeZone);
+        const inclusiveEnd = inclusiveEndForPeriod(startDate, periodDays, timeZone);
 
         const isWindowAvailable = isWindowAvailableFn(allTimeSlots, timeZone);
         const latestStart = windowDays
@@ -362,7 +378,7 @@ export const BookingRentalPeriodForm = props => {
         );
 
         const breakdownData =
-          startDateInTz && bookingEnd ? { startDate: startDateInTz, endDate: bookingEnd } : null;
+          startDate && bookingEnd ? { startDate: startDate, endDate: bookingEnd } : null;
         const showEstimatedBreakdown =
           breakdownData && lineItems && !fetchLineItemsInProgress && !fetchLineItemsError;
 
@@ -392,7 +408,7 @@ export const BookingRentalPeriodForm = props => {
                   id="BookingDatesForm.initialCleaningNotice"
                   values={{
                     days: initialCleaningBlockDays,
-                    date: intl.formatDate(earliestStartDate, dateFormatOptions),
+                    date: intl.formatDate(earliestStartDate, dateFormatOptionsIn(timeZone)),
                   }}
                 />
               </p>
@@ -421,7 +437,7 @@ export const BookingRentalPeriodForm = props => {
               name="bookingStartDate"
               id={`${formId}_bookingStartDate`}
               label={intl.formatMessage({ id: 'BookingRentalPeriodForm.startDateLabel' })}
-              placeholderText={intl.formatDate(earliestStartDate, dateFormatOptions)}
+              placeholderText={intl.formatDate(earliestStartDate, dateFormatOptionsIn(timeZone))}
               format={value => {
                 // The form holds the day in the LISTING's time zone; the picker works in the
                 // browser's. Skipping this shifts the highlighted day by one for any
@@ -472,13 +488,13 @@ export const BookingRentalPeriodForm = props => {
             {/* The end date is derived, so it is stated rather than asked for.
                   > "el cliente va a seleccionar el día de inicio por lo que verá la fecha
                   >  final" */}
-            {startDateInTz && inclusiveEnd ? (
+            {startDate && inclusiveEnd ? (
               <p className={css.derivedEndDate}>
                 <FormattedMessage
                   id="BookingRentalPeriodForm.rentalRange"
                   values={{
-                    startDate: intl.formatDate(startDateInTz, dateFormatOptions),
-                    endDate: intl.formatDate(inclusiveEnd, dateFormatOptions),
+                    startDate: intl.formatDate(startDate, dateFormatOptionsIn(timeZone)),
+                    endDate: intl.formatDate(inclusiveEnd, dateFormatOptionsIn(timeZone)),
                     days: periodDays,
                   }}
                 />
