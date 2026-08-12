@@ -14,6 +14,7 @@ const {
   assertInitialCleaningLeadTime,
   assertMinimumBookingDays,
 } = require('../api-util/bookingRules');
+const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
 const { ensureHandoverQr } = require('../api-util/handoverQr');
 const log = require('../log');
 
@@ -134,28 +135,44 @@ module.exports = (req, res) => {
       });
 
       // The initial cleaning turnaround, for a garment that has never reached its
-      // laundry. Same argument as above for why it is here and not only in the
-      // calendar, plus one specific to this rule: it reads `metadata` only
-      // (`onLaundry`, `initialCleaningDays`), which the Marketplace API forbids the
-      // listing's own owner from writing, so no Integration API call is needed to
-      // check it and none is made. Applied on the speculative path too, for the
-      // same reason - a preview must not quote dates the charge will refuse.
-      assertInitialCleaningLeadTime({
-        listing,
-        bookingStart: bodyParams?.params?.bookingStart,
-      });
+      // laundry. Same argument as above for why it is here and not only in the calendar.
+      // Applied on the speculative path too, for the same reason - a preview must not
+      // quote dates the charge will refuse.
+      //
+      // WHY THIS NOW RESOLVES THE LAUNDRY'S LIVE TURNAROUND.
+      // `metadata.initialCleaningDays` is a snapshot from assignment time. The booking
+      // calendar was changed to consult the laundry's CURRENT number (per the client, so
+      // that a studio changing its turnaround takes effect on garments already assigned
+      // to it), and if this gate kept reading only the snapshot the two could disagree -
+      // the calendar offering a date checkout then refuses, which is exactly what
+      // src/components/OrderPanel/BookingDatesForm/initialCleaningAgreement.test.js was
+      // written to prevent. So both sides resolve from the same input.
+      //
+      // AND WHY THAT DOES NOT PUT AN INTEGRATION API CALL BACK ON THE COMMON PATH.
+      // resolveLiveInitialCleaningDays returns immediately, with no API call at all, when
+      // `metadata.onLaundry === true` - which is every rental after the first. The extra
+      // round trip happens only for a garment that has never reached a studio. A failed
+      // resolution returns null, which falls back to the SNAPSHOT rather than to "no
+      // block": a read error must not open the gate.
+      return resolveLiveInitialCleaningDays({ listing }).then(liveInitialCleaningDays => {
+        assertInitialCleaningLeadTime({
+          listing,
+          bookingStart: bodyParams?.params?.bookingStart,
+          liveInitialCleaningDays,
+        });
 
-      return buildLineItemsForListing({
-        listing,
-        orderData: getFullOrderData(orderData, bodyParams, currency),
-        providerCommission,
-        customerCommission,
-        currency,
-      }).then(builtLineItems => {
-        lineItems = builtLineItems;
-        metadataMaybe = getMetadata(orderData, transitionName);
+        return buildLineItemsForListing({
+          listing,
+          orderData: getFullOrderData(orderData, bodyParams, currency),
+          providerCommission,
+          customerCommission,
+          currency,
+        }).then(builtLineItems => {
+          lineItems = builtLineItems;
+          metadataMaybe = getMetadata(orderData, transitionName);
 
-        return getTrustedSdk(req);
+          return getTrustedSdk(req);
+        });
       });
     })
     .then(trustedSdk => {

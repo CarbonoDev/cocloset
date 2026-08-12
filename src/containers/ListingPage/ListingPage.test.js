@@ -359,6 +359,10 @@ describe('Duck', () => {
         sendInquiryInProgress: false,
         sendInquiryError: null,
         inquiryModalOpenForListingId: null,
+        // Cocloset: the assigned laundry's live initial-cleaning turnaround. null means
+        // "no live answer", which is what makes the calendar fall back to the
+        // `metadata.initialCleaningDays` snapshot - see ListingPage.duck.test.js.
+        initialCleaningDays: null,
       });
     });
 

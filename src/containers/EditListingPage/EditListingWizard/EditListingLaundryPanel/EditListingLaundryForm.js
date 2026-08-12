@@ -10,7 +10,7 @@ import { getCategoryLabels, isCategoryAcceptedByLaundry } from '../../../../util
 import { useConfiguration } from '../../../../context/configurationContext';
 
 // Import shared components
-import { Form, Button } from '../../../../components';
+import { Form, Button, NamedLink } from '../../../../components';
 
 // Import modules from this directory
 import css from './EditListingLaundryForm.module.css';
@@ -130,9 +130,16 @@ const LaundryCard = props => {
  *   set, i.e. the garment is physically at the laundry. Locks the picker (the
  *   assigned laundry may not be changed until the garment is back with its owner)
  *   while leaving Save enabled, so re-saving the same laundry still passes the tab.
+ * @param {boolean} [props.filesRequired] - Whether the listing type requires verified file
+ *   attachments before publishing
+ * @param {boolean} [props.allFilesUploadedAndVerified] - Whether every uploaded file has
+ *   passed verification
+ * @param {Object} [props.filesTabParams] - Path params for a link to the Files tab
  * @param {Object} props.errors - The errors object
  * @param {propTypes.error} props.errors.showListingsError - The show listings error
  * @param {propTypes.error} props.errors.updateListingError - The update listing error
+ * @param {propTypes.error} props.errors.publishListingError - The publish listing error,
+ *   shown here because this is the last panel of the cocloset-booking new-listing flow
  * @returns {JSX.Element}
  */
 export const EditListingLaundryForm = props => (
@@ -156,6 +163,9 @@ export const EditListingLaundryForm = props => (
         fetchLaundriesInProgress,
         listingCategories,
         laundryLocked = false,
+        allFilesUploadedAndVerified,
+        filesTabParams,
+        filesRequired,
         values,
       } = formRenderProps;
 
@@ -166,7 +176,7 @@ export const EditListingLaundryForm = props => (
         id: 'EditListingLaundryForm.laundryRequired',
       });
 
-      const { updateListingError, showListingsError } = fetchErrors || {};
+      const { updateListingError, showListingsError, publishListingError } = fetchErrors || {};
 
       const classes = classNames(rootClassName || css.root, className);
       const submitReady = (updated && pristine) || ready;
@@ -249,6 +259,36 @@ export const EditListingLaundryForm = props => (
               <FormattedMessage
                 id="EditListingLaundryForm.categoryWarning"
                 values={{ category: listingCategoryLabel }}
+              />
+            </p>
+          ) : null}
+
+          {/* Publish-time surfaces. These used to live only in EditListingPhotosForm,
+              which was the last panel of the new-listing flow; for cocloset-booking this
+              panel is. `publishListingError` in particular has no other rendering
+              surface here, so without it a failed publish would leave the owner pressing
+              a button that appears to do nothing. See Note 4 on `tabsForListingType`. */}
+          {publishListingError ? (
+            <p className={css.error}>
+              <FormattedMessage id="EditListingLaundryForm.publishListingFailed" />
+            </p>
+          ) : null}
+
+          {/* Why the publish button is disabled while file verification is pending. The
+              wizard disables the last tab's submit for exactly this reason
+              (EditListingWizardTab's panelProps), and a disabled button with no
+              explanation is the failure Note 4 exists to prevent. */}
+          {filesRequired && !allFilesUploadedAndVerified ? (
+            <p className={css.filesNotReady}>
+              <FormattedMessage
+                id="EditListingLaundryForm.filesNotReady"
+                values={{
+                  filesTabLink: (
+                    <NamedLink name="EditListingPage" params={filesTabParams}>
+                      <FormattedMessage id="EditListingLaundryForm.filesTabLinkText" />
+                    </NamedLink>
+                  ),
+                }}
               />
             </p>
           ) : null}

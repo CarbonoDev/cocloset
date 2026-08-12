@@ -1,4 +1,8 @@
-import { getPickupLocation, getListingPickupLocation } from './listingLocation';
+import {
+  getAssignedLaundryLocation,
+  getPickupLocation,
+  getListingPickupLocation,
+} from './listingLocation';
 
 describe('getPickupLocation()', () => {
   // THE REGRESSION TEST FOR B7. Repurposing EditListingLocationPanel stopped
@@ -47,6 +51,52 @@ describe('getPickupLocation()', () => {
     expect(getPickupLocation({ pickupAddress: '', location: { address: 'legacy' } })).toEqual({
       address: 'legacy',
     });
+  });
+});
+
+describe('getAssignedLaundryLocation()', () => {
+  it('returns the studio name and address when a laundry has been assigned', () => {
+    expect(
+      getAssignedLaundryLocation({
+        pickupAddress: '21 Rue Frochot, Paris',
+        assignedLaundryName: 'Studio Pigalle',
+      })
+    ).toEqual({ address: '21 Rue Frochot, Paris', building: 'Studio Pigalle' });
+  });
+
+  it('returns the address alone when the studio has no name', () => {
+    expect(getAssignedLaundryLocation({ pickupAddress: '21 Rue Frochot, Paris' })).toEqual({
+      address: '21 Rue Frochot, Paris',
+    });
+  });
+
+  // THE PRIVACY TEST. `publicData.location` on a pre-repurposing listing is the
+  // OWNER'S OWN HOME ADDRESS. getPickupLocation falls back to it on purpose so
+  // legacy listings keep rendering; a reader that prints the address as text on a
+  // public page must NOT inherit that fallback.
+  it('refuses to surface a legacy publicData.location as a public address', () => {
+    expect(
+      getAssignedLaundryLocation({
+        location: { address: '4 Owner Street, Lyon', building: 'Apt 3' },
+      })
+    ).toBeNull();
+    // Same value, read through the lenient helper — proving the two disagree on
+    // purpose rather than the fixture simply being empty.
+    expect(getPickupLocation({ location: { address: '4 Owner Street, Lyon' } })).toEqual({
+      address: '4 Owner Street, Lyon',
+    });
+  });
+
+  it('returns null when there is no address at all', () => {
+    expect(getAssignedLaundryLocation({})).toBeNull();
+    expect(getAssignedLaundryLocation(undefined)).toBeNull();
+    expect(getAssignedLaundryLocation(null)).toBeNull();
+  });
+
+  it('does not treat an empty-string pickupAddress as an assigned laundry', () => {
+    expect(
+      getAssignedLaundryLocation({ pickupAddress: '', location: { address: 'legacy' } })
+    ).toBeNull();
   });
 });
 

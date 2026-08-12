@@ -37,3 +37,48 @@ describe('process-namespaced translations', () => {
     expect(blank).toEqual([]);
   });
 });
+
+describe('cocloset-booking wizard save buttons', () => {
+  // These are the subtler failure: every key exists, so nothing renders as a literal key -
+  // the buttons simply lie. cocloset-booking now runs Photos → Details → Pricing → Laundry
+  // (see tabsForListingType), so the button that used to publish (Photos) has to say "next"
+  // and the one that used to say "next" (Laundry) has to publish. Getting this wrong ships
+  // a "Publish listing" button on step 1 that saves nothing and advances, and a "Next" on
+  // the final step that publishes - both indistinguishable from a working wizard until
+  // someone uses it.
+  //
+  // Asserted on wording rather than on an exact string so a copy edit does not fail here,
+  // while a swapped pair still does.
+  const savePhotos = en['EditListingWizard.cocloset-booking.new.savePhotos'];
+  const saveLaundry = en['EditListingWizard.cocloset-booking.new.saveLaundry'];
+  const saveStyle = en['EditListingWizard.cocloset-booking.new.saveStyle'];
+
+  it('does not promise publication on the first step', () => {
+    expect(savePhotos.toLowerCase()).not.toContain('publish');
+    // The alternative first step, used when the listing type does not require images.
+    expect(saveStyle.toLowerCase()).not.toContain('publish');
+  });
+
+  it('promises publication on the last step', () => {
+    expect(saveLaundry.toLowerCase()).toContain('publish');
+  });
+
+  it('keeps the stock booking process untouched', () => {
+    // default-booking still ends on Photos, so its labels must NOT have been swapped along
+    // with cocloset's.
+    expect(en['EditListingWizard.default-booking.new.savePhotos'].toLowerCase()).toContain(
+      'publish'
+    );
+    expect(en['EditListingWizard.default-booking.new.saveLaundry'].toLowerCase()).not.toContain(
+      'publish'
+    );
+  });
+
+  it('keeps the now-orphaned location and availability keys', () => {
+    // cocloset-booking no longer has those steps, but the keys must stay: the coverage test
+    // above requires a cocloset counterpart for every default-booking key, and those two
+    // processes still use them.
+    expect(en['EditListingWizard.cocloset-booking.new.saveLocation']).toBeTruthy();
+    expect(en['EditListingWizard.cocloset-booking.new.saveAvailability']).toBeTruthy();
+  });
+});

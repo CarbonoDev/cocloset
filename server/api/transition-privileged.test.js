@@ -20,6 +20,7 @@ jest.mock('../api-util/handoverQr', () => ({
 
 const { getSdk, getTrustedSdk, fetchCommission, handleError } = require('../api-util/sdk');
 const { buildLineItemsForListing } = require('../api-util/lineItems');
+const { getIntegrationSdk } = require('../api-util/integrationSdk');
 
 const transitionPrivileged = require('./transition-privileged');
 
@@ -37,7 +38,12 @@ const transitionPrivileged = require('./transition-privileged');
 const LISTING_ID = { uuid: 'listing-1' };
 const TX_ID = { uuid: 'tx-1' };
 
-const listingEntity = ({ minimumBookingDays, initialCleaningDays, onLaundry } = {}) => ({
+const listingEntity = ({
+  minimumBookingDays,
+  initialCleaningDays,
+  onLaundry,
+  assignedLaundryId,
+} = {}) => ({
   id: LISTING_ID,
   type: 'listing',
   attributes: {
@@ -53,6 +59,7 @@ const listingEntity = ({ minimumBookingDays, initialCleaningDays, onLaundry } = 
     metadata: {
       ...(initialCleaningDays === undefined ? {} : { initialCleaningDays }),
       ...(onLaundry === undefined ? {} : { onLaundry }),
+      ...(assignedLaundryId === undefined ? {} : { assignedLaundryId }),
     },
   },
 });
@@ -95,8 +102,25 @@ const req = ({ days, startsInDays = 0 }) => ({
   },
 });
 
-const setup = (listingParams = {}) => {
+const setup = ({ laundryTurnaroundDays, ...listingParams } = {}) => {
   const listing = listingEntity(listingParams);
+
+  // The laundry's CURRENT turnaround, as the Integration API would return it. Left
+  // rejecting when the fixture does not supply one, so "the live lookup failed" is the
+  // default and the snapshot fallback is exercised by every pre-existing test here.
+  const laundryShow = jest.fn(() =>
+    laundryTurnaroundDays === undefined
+      ? Promise.reject(new Error('no laundry configured in this fixture'))
+      : Promise.resolve({
+          data: {
+            data: {
+              attributes: { profile: { privateData: { turnaroundDays: laundryTurnaroundDays } } },
+            },
+          },
+        })
+  );
+  getIntegrationSdk.mockReturnValue({ users: { show: laundryShow } });
+
   const show = jest.fn(() =>
     Promise.resolve({
       data: {
@@ -118,7 +142,7 @@ const setup = (listingParams = {}) => {
 
   const transition = jest.fn(() => Promise.resolve({ data: { data: { id: TX_ID } } }));
   getTrustedSdk.mockResolvedValue({ transactions: { transition } });
-  return { transition };
+  return { transition, laundryShow };
 };
 
 const run = async params => {
@@ -186,5 +210,65 @@ describe('transition-privileged: the booking gates are reached on this door too'
 
     expect(buildLineItemsForListing).toHaveBeenCalled();
     expect(transition).toHaveBeenCalled();
+  });
+
+  // The live turnaround has to be resolved on THIS door as well. A gate that reads the
+  // laundry's current number on one entrance and the stale snapshot on the other is the
+  // same bypass this whole file exists to rule out - and the customer-visible symptom is
+  // the one the calendar/gate agreement test guards: an offered date that checkout refuses.
+  describe('the live laundry turnaround', () => {
+    it('refuses a day the stale snapshot would have allowed', async () => {
+      const { transition } = setup({
+        initialCleaningDays: 1,
+        assignedLaundryId: 'laundry-1',
+        laundryTurnaroundDays: 5,
+      });
+
+      const res = await run({ days: 2, startsInDays: 1 });
+
+      expect(res.statusCode).toBe(400);
+      expect(handleError.mock.calls[0][1].data.initialCleaningDays).toBe(5);
+      expect(transition).not.toHaveBeenCalled();
+    });
+
+    it('allows a day the stale snapshot would have refused', async () => {
+      const { transition } = setup({
+        initialCleaningDays: 7,
+        assignedLaundryId: 'laundry-1',
+        laundryTurnaroundDays: 2,
+      });
+
+      await run({ days: 2, startsInDays: 2 });
+
+      expect(transition).toHaveBeenCalled();
+    });
+
+    // Most transitions through this endpoint act on a booking that already exists, on a
+    // garment long since delivered. None of those may pay for an Integration API round trip.
+    it('makes no Integration API call once the garment is at its laundry', async () => {
+      const { laundryShow } = setup({
+        initialCleaningDays: 3,
+        onLaundry: true,
+        assignedLaundryId: 'laundry-1',
+        laundryTurnaroundDays: 30,
+      });
+
+      await run({ days: 1, startsInDays: 1 });
+
+      expect(laundryShow).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the snapshot when the lookup fails, and still refuses', async () => {
+      const { transition } = setup({
+        initialCleaningDays: 3,
+        assignedLaundryId: 'laundry-1',
+      });
+
+      const res = await run({ days: 2, startsInDays: 1 });
+
+      expect(res.statusCode).toBe(400);
+      expect(handleError.mock.calls[0][1].data.initialCleaningDays).toBe(3);
+      expect(transition).not.toHaveBeenCalled();
+    });
   });
 });

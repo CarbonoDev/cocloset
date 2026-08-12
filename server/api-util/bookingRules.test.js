@@ -289,6 +289,72 @@ describe('resolveInitialCleaningBlockDays', () => {
     );
     expect(MAX_INITIAL_CLEANING_DAYS).toBe(365);
   });
+
+  // The LIVE value, resolved from the laundry's current profile at request time (see
+  // api-util/liveInitialCleaning.js). The stored `metadata.initialCleaningDays` is only a
+  // snapshot from the day the laundry was assigned, and the client asked for the studio's
+  // current turnaround to be honoured on garments already assigned to it.
+  describe('the live turnaround takes precedence over the stored snapshot', () => {
+    it('uses the live value when there is one', () => {
+      expect(resolveInitialCleaningBlockDays({ initialCleaningDays: 2 }, 5)).toBe(5);
+    });
+
+    it('uses the live value even when it is SHORTER than the snapshot', () => {
+      // A studio that has got faster must free up the days it no longer needs, or the
+      // owner loses availability the laundry is not asking for.
+      expect(resolveInitialCleaningBlockDays({ initialCleaningDays: 7 }, 2)).toBe(2);
+    });
+
+    it('applies with no snapshot at all', () => {
+      // Every listing assigned before `initialCleaningDays` existed has no snapshot. The
+      // live lookup is what gives those a correct floor for the first time.
+      expect(resolveInitialCleaningBlockDays({}, 3)).toBe(3);
+    });
+
+    it('clamps the live value too', () => {
+      expect(resolveInitialCleaningBlockDays({ initialCleaningDays: 2 }, 4000)).toBe(
+        MAX_INITIAL_CLEANING_DAYS
+      );
+    });
+
+    // THE FAILURE DIRECTION THAT MATTERS. Null is what the resolver returns for a deleted
+    // laundry, an Integration API outage, an unreadable profile. Falling back to "no
+    // block" would let a transient read error open the gate on a garment that has never
+    // left its owner's wardrobe. Stale is survivable; open is not.
+    it.each([
+      ['null', null],
+      ['undefined', undefined],
+      ['0', 0],
+      ['-1', -1],
+      ['2.5', 2.5],
+      ['garbage', 'nope'],
+      ['an object', {}],
+    ])(
+      'falls back to the SNAPSHOT, not to "no block", when the live value is %s',
+      (_label, live) => {
+        expect(resolveInitialCleaningBlockDays({ initialCleaningDays: 4 }, live)).toBe(4);
+      }
+    );
+
+    it('still means no block when neither the live value nor the snapshot is usable', () => {
+      expect(resolveInitialCleaningBlockDays({}, null)).toBeNull();
+      expect(resolveInitialCleaningBlockDays({ initialCleaningDays: 0 }, 0)).toBeNull();
+    });
+
+    // `onLaundry` is checked FIRST, before the live value is even looked at. It is the one
+    // condition that retires this rule, and a live turnaround must not resurrect it: a
+    // garment in the studio's hands is available tomorrow no matter how slow the studio is.
+    it('is still switched off entirely by onLaundry === true', () => {
+      expect(resolveInitialCleaningBlockDays({ onLaundry: true }, 9)).toBeNull();
+      expect(
+        resolveInitialCleaningBlockDays({ onLaundry: true, initialCleaningDays: 3 }, 9)
+      ).toBeNull();
+    });
+
+    it('accepts a live value that arrives as a numeric string', () => {
+      expect(resolveInitialCleaningBlockDays({ initialCleaningDays: 2 }, '5')).toBe(5);
+    });
+  });
 });
 
 describe('earliestBookingStart', () => {
@@ -464,6 +530,65 @@ describe('assertInitialCleaningLeadTime', () => {
         now: NOW,
       })
     ).toThrow(/initial cleaning/i);
+  });
+
+  // The gate reading the laundry's LIVE turnaround rather than only the snapshot. This is
+  // what keeps it in step with the calendar, which now does the same - a gate on the stale
+  // number would refuse a date the calendar had just offered.
+  describe('with a live turnaround supplied', () => {
+    const assertLive = (listingEntity, isoDay, liveInitialCleaningDays) =>
+      assertInitialCleaningLeadTime({
+        listing: listingEntity,
+        bookingStart: new Date(`${isoDay}T00:00:00.000Z`),
+        now: NOW,
+        liveInitialCleaningDays,
+      });
+
+    it('refuses a day the SNAPSHOT would have allowed', () => {
+      // Snapshot 1 day (floor = the 11th), studio now needs 5 (floor = the 15th).
+      const listingEntity = cleaningListing({ initialCleaningDays: 1 });
+      expect(() => assertLive(listingEntity, '2026-08-11', 5)).toThrow(/initial cleaning/i);
+      expect(() => assertLive(listingEntity, '2026-08-15', 5)).not.toThrow();
+    });
+
+    it('allows a day the SNAPSHOT would have refused', () => {
+      // Snapshot 7 days (floor = the 17th), studio now needs 2 (floor = the 12th).
+      const listingEntity = cleaningListing({ initialCleaningDays: 7 });
+      expect(() => assertLive(listingEntity, '2026-08-12', 2)).not.toThrow();
+    });
+
+    it('reports the live number in the error, not the stale one', () => {
+      try {
+        assertLive(cleaningListing({ initialCleaningDays: 1 }), '2026-08-11', 5);
+        throw new Error('expected a rejection');
+      } catch (e) {
+        expect(e.data.initialCleaningDays).toBe(5);
+        expect(e.data.earliestBookingStart).toBe('2026-08-15T00:00:00.000Z');
+      }
+    });
+
+    it('falls back to the snapshot when the live resolution failed', () => {
+      // null is what api-util/liveInitialCleaning.js returns for every failure it has.
+      const listingEntity = cleaningListing({ initialCleaningDays: 3 });
+      expect(() => assertLive(listingEntity, '2026-08-11', null)).toThrow(/initial cleaning/i);
+      expect(() => assertLive(listingEntity, '2026-08-13', null)).not.toThrow();
+    });
+
+    it('is unchanged for every existing caller that passes no live value', () => {
+      const listingEntity = cleaningListing({ initialCleaningDays: 3 });
+      expect(() =>
+        assertInitialCleaningLeadTime({
+          listing: listingEntity,
+          bookingStart: new Date('2026-08-11T00:00:00.000Z'),
+          now: NOW,
+        })
+      ).toThrow(/initial cleaning/i);
+    });
+
+    it('still allows everything once the garment is at its laundry', () => {
+      const atLaundry = cleaningListing({ initialCleaningDays: 3, onLaundry: true });
+      expect(() => assertLive(atLaundry, '2026-08-10', 30)).not.toThrow();
+    });
   });
 
   // Somebody else's complaint. Relabelling it would tell the customer to wait a few

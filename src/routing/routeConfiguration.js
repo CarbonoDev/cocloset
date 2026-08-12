@@ -178,10 +178,17 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       path: '/l/new',
       name: 'NewListingPage',
       auth: true,
+      // The first tab of the wizard. Cocloset runs a single listing type
+      // (garment-rental -> cocloset-booking), whose tab order starts with PHOTOS
+      // rather than DETAILS - see `tabsForListingType` in EditListingWizard.js.
+      // Route config has no access to listingTypes, so this is a constant; the
+      // wizard corrects a mismatch either way (an inactive tab redirects to the
+      // nearest active one), but pointing it at the real first tab avoids a
+      // needless redirect and a console message on every "create listing" click.
       component: () => (
         <NamedRedirect
           name="EditListingPage"
-          params={{ slug: draftSlug, id: draftId, type: 'new', tab: 'details' }}
+          params={{ slug: draftSlug, id: draftId, type: 'new', tab: 'photos' }}
         />
       ),
     },

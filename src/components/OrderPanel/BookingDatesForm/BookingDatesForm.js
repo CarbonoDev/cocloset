@@ -176,6 +176,20 @@ export const minimumNightsForMinimumDays = minimumDays =>
   minimumDays ? minimumDays - 1 : undefined;
 
 /**
+ * The upper bound on an initial-cleaning block, in days.
+ *
+ * Mirrors MAX_INITIAL_CLEANING_DAYS in server/api-util/bookingRules.js, and it is the
+ * same number for the same reason: the value is DERIVED from a figure a laundry types
+ * into its own profile, so a studio that fat-fingers 4000 would otherwise take every
+ * garment assigned to it off the market for a decade with nothing saying so.
+ *
+ * Duplicated rather than imported because src/ and server/ cannot import each other
+ * (ESM/transpiled versus plain CommonJS). initialCleaningAgreement.test.js asserts the
+ * two constants are equal, so the duplication is checked rather than trusted.
+ */
+export const MAX_INITIAL_CLEANING_DAYS = 365;
+
+/**
  * How many days must pass before this garment can be rented at all?
  *
  *   > "Al hacer booking, el calendario muestra el siguiente día como disponible,
@@ -184,28 +198,62 @@ export const minimumNightsForMinimumDays = minimumDays =>
  *   >  laundry, si la prenda ya esta en laundry entonces si debe aparecer
  *   >  disponible al siguiente día"
  *
- * Both inputs come from `listing.attributes.metadata`, which only our server can
- * write. `onLaundry === true` means the garment has physically reached its laundry,
- * and from then on tomorrow is correct: this must return null and the calendar must
- * behave EXACTLY as it did before this feature existed. That single condition is
- * also what makes the rule first-time-only - once a studio has taken delivery,
- * `onLaundry` never goes back to false without the garment having been cleaned.
+ * `onLaundry === true` means the garment has physically reached its laundry, and from
+ * then on tomorrow is correct: this must return null and the calendar must behave EXACTLY
+ * as it did before this feature existed. That single condition is also what makes the rule
+ * first-time-only - once a studio has taken delivery, `onLaundry` never goes back to false
+ * without the garment having been cleaned. It is checked FIRST, before the live value is
+ * looked at, so a live turnaround cannot resurrect a spent rule.
  *
- * An ABSENT `initialCleaningDays` means no block, deliberately: every listing
- * assigned before the field existed has none, and there is no migration (per the
- * client, "en producción iniciaremos limpio"). Anything malformed - fractional, a
- * string, 0, negative - is treated the same way, because a bad value must not be
- * able to take a listing off the market. The server applies the identical rule; see
- * server/api-util/bookingRules.js `resolveInitialCleaningBlockDays`.
+ * PRECEDENCE: LIVE FIRST, SNAPSHOT SECOND.
+ *
+ *   > "desde el momento de la carga de listingPage, se debe consultar las propiedades de
+ *   >  la laundry seleccionada para este listing para obtener los días que se necesiten
+ *   >  para el lavado siempre que onLaundry sea false"
+ *
+ * `metadata.initialCleaningDays` records what the laundry's turnaround was on the day it
+ * was assigned; `liveInitialCleaningDays` is what it is now, resolved at page load through
+ * /api/listing-initial-cleaning (the number lives in the laundry USER's `privateData`, so
+ * the browser cannot read it itself). A null live value means "no answer yet, or the
+ * lookup failed" and falls back to the snapshot - NEVER to "no block", or a flaky network
+ * would quietly offer a garment that is still in its owner's wardrobe.
+ *
+ * An ABSENT value at both levels means no block, deliberately: every listing assigned
+ * before the field existed has none, and there is no migration (per the client, "en
+ * producción iniciaremos limpio"). Anything malformed - fractional, a string, 0, negative -
+ * is treated the same way, because a bad value must not be able to take a listing off the
+ * market.
+ *
+ * The server applies the identical rule, on the identical inputs; see
+ * server/api-util/bookingRules.js `resolveInitialCleaningBlockDays`. They MUST agree - a
+ * calendar floor and a checkout gate that disagree by a day present as "the calendar
+ * offered me a date and then payment refused it". initialCleaningAgreement.test.js exists
+ * to hold them together.
  *
  * @param {number} [initialCleaningDays] - listing.attributes.metadata.initialCleaningDays
  * @param {boolean} [onLaundry] - listing.attributes.metadata.onLaundry
+ * @param {number} [liveInitialCleaningDays] - the assigned laundry's current turnaround,
+ *   from state.ListingPage.initialCleaningDays
  * @returns {number|null}
  */
-export const resolveInitialCleaningDays = (initialCleaningDays, onLaundry) =>
-  onLaundry !== true && Number.isInteger(initialCleaningDays) && initialCleaningDays > 0
+export const resolveInitialCleaningDays = (
+  initialCleaningDays,
+  onLaundry,
+  liveInitialCleaningDays
+) => {
+  if (onLaundry === true) {
+    return null;
+  }
+
+  const isUsable = value => Number.isInteger(value) && value > 0;
+  const resolved = isUsable(liveInitialCleaningDays)
+    ? liveInitialCleaningDays
+    : isUsable(initialCleaningDays)
     ? initialCleaningDays
     : null;
+
+  return resolved === null ? null : Math.min(resolved, MAX_INITIAL_CLEANING_DAYS);
+};
 
 /**
  * The first day the picker may offer.
@@ -620,7 +668,9 @@ const onPriceVariantChange = props => value => {
  * @param {number} [props.minimumBookingDays] - Cocloset: the owner's minimum rental length in days
  * @param {boolean} [props.onLaundry] - Cocloset: true once the garment has reached its laundry
  * @param {number} [props.initialCleaningDays] - Cocloset: days needed for the garment's first
- *   cleaning, applied only while `onLaundry` is not true
+ *   cleaning, applied only while `onLaundry` is not true. The assignment-time SNAPSHOT.
+ * @param {number} [props.liveInitialCleaningDays] - Cocloset: the assigned laundry's CURRENT
+ *   turnaround, resolved at ListingPage load. Wins over the snapshot; null falls back to it.
  * @returns {JSX.Element}
  */
 export const BookingDatesForm = props => {
@@ -658,6 +708,11 @@ export const BookingDatesForm = props => {
     // server-side in server/api-util/bookingRules.js.
     onLaundry,
     initialCleaningDays,
+    // Cocloset: the assigned laundry's CURRENT turnaround, resolved at ListingPage load
+    // (ListingPage.duck.js -> /api/listing-initial-cleaning). Takes precedence over the
+    // `initialCleaningDays` snapshot above; null falls back to it. Destructured for the
+    // same reason as the two above - FinalForm must not receive it as a stray prop.
+    liveInitialCleaningDays,
     ...rest
   } = props;
   const intl = useIntl();
@@ -803,8 +858,13 @@ export const BookingDatesForm = props => {
           timeZone,
         });
         // The initial cleaning turnaround, applied only while the garment has not
-        // reached its laundry. null means "behave exactly as before".
-        const initialCleaningBlockDays = resolveInitialCleaningDays(initialCleaningDays, onLaundry);
+        // reached its laundry. null means "behave exactly as before". The laundry's live
+        // turnaround wins over the assignment-time snapshot; see resolveInitialCleaningDays.
+        const initialCleaningBlockDays = resolveInitialCleaningDays(
+          initialCleaningDays,
+          onLaundry,
+          liveInitialCleaningDays
+        );
         const earliestStartDate = earliestBookableDate(initialCleaningBlockDays, timeZone);
 
         const isOutsideRange = isOutsideRangeFn(
@@ -856,6 +916,32 @@ export const BookingDatesForm = props => {
                     days: initialCleaningBlockDays,
                     date: intl.formatDate(earliestStartDate, dateFormatOptions),
                   }}
+                />
+              </p>
+            ) : null}
+
+            {/* The owner's minimum rental length, stated BEFORE the customer tries.
+                  > "hay que mostrar una leyenda donde indique que la prenda necesita
+                  >  ser reservada por un mínimo de n días ... es importante que el
+                  >  cliente vea esta información ya que de otra manera no sabrá por
+                  >  que no le permite reservar por menos días"
+                `minimumNights` makes the second click in the calendar silently do
+                nothing, and the `minimumBookingDays` validator only speaks up after a
+                failed attempt - so without this the rule is discoverable only by
+                bumping into it. This is ADDITIVE: the validator stays, because it also
+                guards the typed-in date inputs and has to name the rule at the moment
+                it is broken.
+
+                `minimumDays` is null unless the effective minimum is genuinely > 1
+                (resolveMinimumDays), so a listing with no minimum, a minimum of 1, or
+                an hourly/fixed listing renders nothing at all - the same condition the
+                picker floor and the validator use, from the same call, so the legend
+                cannot claim a rule the calendar is not enforcing. */}
+            {minimumDays ? (
+              <p className={css.minimumBookingDaysNotice}>
+                <FormattedMessage
+                  id="BookingDatesForm.minimumBookingDaysNotice"
+                  values={{ days: minimumDays }}
                 />
               </p>
             ) : null}

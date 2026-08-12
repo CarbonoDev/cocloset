@@ -244,27 +244,54 @@ const startOfDayInTimeZone = (date, timeZone, offsetDays = 0) => {
 /**
  * How many days must pass before this garment can be rented at all?
  *
+ * PRECEDENCE: the live value wins, the stored snapshot is the fallback.
+ *
+ * `metadata.initialCleaningDays` is a snapshot taken when the laundry was assigned, so
+ * it goes stale the moment that studio changes its turnaround. The client asked for the
+ * laundry's CURRENT number to be honoured, which means the browser's calendar starts
+ * using a live value - and if this gate kept reading only the snapshot the two could
+ * disagree, which is precisely the failure
+ * src/components/OrderPanel/BookingDatesForm/initialCleaningAgreement.test.js exists to
+ * prevent: a calendar that offers a date checkout then refuses. So the caller resolves
+ * the same live number (api-util/liveInitialCleaning.js) and passes it here.
+ *
+ * A NULL LIVE VALUE FALLS BACK TO THE SNAPSHOT, NOT TO "NO BLOCK". `null` is what the
+ * resolver returns for every failure it can have - a deleted laundry, an Integration API
+ * outage, an unreadable profile. Treating a failed read as "no lead time" would let a
+ * transient error open the gate on a garment that is still in its owner's wardrobe. The
+ * snapshot is stale at worst; "no block" is wrong.
+ *
  * @param {Object} [metadata] - the listing's `metadata`
+ * @param {number} [liveInitialCleaningDays] - from
+ *   api-util/liveInitialCleaning.js `resolveLiveInitialCleaningDays`; null/undefined
+ *   means "no live answer available"
  * @returns {number|null} a positive integer, or null when the rule does not apply
  */
-const resolveInitialCleaningBlockDays = metadata => {
+const resolveInitialCleaningBlockDays = (metadata, liveInitialCleaningDays) => {
   // The garment is at the laundry. Per the client, tomorrow is then correct: the
   // rule is spent and this function must be indistinguishable from absent.
   // `=== true` and not truthiness, matching evaluateLaundryAssignment: only a real
   // boolean is custody, and bad data must not be able to switch the rule off.
+  //
+  // Checked FIRST, before the live value is even looked at, so `onLaundry === true`
+  // remains the single condition that retires this rule - a live turnaround must not be
+  // able to resurrect it.
   if (metadata?.onLaundry === true) {
     return null;
   }
 
-  const parsed = parseStrictInteger(metadata?.[INITIAL_CLEANING_DAYS_KEY]);
+  const live = parseStrictInteger(liveInitialCleaningDays);
+  const parsed =
+    live !== null && live > 0 ? live : parseStrictInteger(metadata?.[INITIAL_CLEANING_DAYS_KEY]);
 
   // ABSENT MEANS NO BLOCK, DELIBERATELY. Every listing assigned before this field
   // existed has no value, and there is no migration: per the client, "en producción
   // iniciaremos limpio". Defaulting to some turnaround instead would need this
-  // module to know a laundry's configuration, which is exactly the Integration API
-  // call the checkout path must not make. 0 and negatives are the same non-answer.
-  // A malformed value (fractional, a string of garbage, an object) also means no
-  // block: a bad write must not silently take a listing off the market.
+  // module to know a laundry's configuration, and it deliberately does not - the
+  // Integration API read happens in the caller, only for the first-rental case.
+  // 0 and negatives are the same non-answer. A malformed value (fractional, a string
+  // of garbage, an object) also means no block: a bad write must not silently take a
+  // listing off the market.
   if (parsed === null || parsed <= 0) {
     return null;
   }
@@ -319,10 +346,22 @@ const tooEarlyError = ({ initialCleaningDays, earliestStart }) => {
  * @param {Object} params.listing - a listing API entity
  * @param {Date|string} [params.bookingStart]
  * @param {Date} [params.now] - injectable for tests; production passes nothing
+ * @param {number} [params.liveInitialCleaningDays] - the assigned laundry's CURRENT
+ *   turnaround, resolved by api-util/liveInitialCleaning.js. Omitting it (or passing
+ *   null, which is what a failed resolution returns) falls back to the stored snapshot,
+ *   so every existing caller keeps its previous behaviour.
  * @throws {Error} 400 with data.code 'booking-before-initial-cleaning'
  */
-const assertInitialCleaningLeadTime = ({ listing, bookingStart, now = new Date() }) => {
-  const initialCleaningDays = resolveInitialCleaningBlockDays(listing?.attributes?.metadata);
+const assertInitialCleaningLeadTime = ({
+  listing,
+  bookingStart,
+  now = new Date(),
+  liveInitialCleaningDays,
+}) => {
+  const initialCleaningDays = resolveInitialCleaningBlockDays(
+    listing?.attributes?.metadata,
+    liveInitialCleaningDays
+  );
   if (initialCleaningDays === null) {
     return;
   }

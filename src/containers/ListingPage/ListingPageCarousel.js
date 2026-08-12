@@ -394,6 +394,10 @@ const ListingPage = props => {
     fetchLineItemsInProgress,
     fetchLineItemsError,
     inquiryModalOpenForListingId,
+    // Cocloset: the assigned laundry's CURRENT initial-cleaning turnaround, resolved by
+    // the duck at page load. null until it arrives, and on any failure - OrderPanel then
+    // falls back to the `metadata.initialCleaningDays` snapshot.
+    initialCleaningDays: liveInitialCleaningDays,
   } = useSelector(state => state.ListingPage);
   const currentUser = useSelector(state => state.user?.currentUser);
   const scrollingDisabled = useSelector(state => isScrollingDisabled(state));
@@ -461,6 +465,7 @@ const ListingPage = props => {
       lineItems={lineItems}
       fetchLineItemsInProgress={fetchLineItemsInProgress}
       fetchLineItemsError={fetchLineItemsError}
+      liveInitialCleaningDays={liveInitialCleaningDays}
       sendInquiryInProgress={sendInquiryInProgress}
       sendInquiryError={sendInquiryError}
       onManageDisableScrolling={onManageDisableScrolling}

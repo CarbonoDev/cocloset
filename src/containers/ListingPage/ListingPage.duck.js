@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { types as sdkTypes, createImageVariantConfig } from '../../util/sdkLoader';
 import { storableError } from '../../util/errors';
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
-import { transactionLineItems } from '../../util/api';
+import { fetchListingInitialCleaning, transactionLineItems } from '../../util/api';
 import * as log from '../../util/log';
 import { denormalisedResponseEntities } from '../../util/data';
 import {
@@ -336,6 +336,55 @@ const fetchMonthlyTimeSlots = (dispatch, listing) => {
   return Promise.all([]);
 };
 
+////////////////////////////////////////
+// Fetch live initial cleaning days   //
+////////////////////////////////////////
+//
+//   > "desde el momento de la carga de listingPage, se debe consultar las propiedades
+//   >  de la laundry seleccionada para este listing para obtener los días que se
+//   >  necesiten para el lavado siempre que onLaundry sea false, ya que, si la laundry
+//   >  necesita por ejemplo 2 días para su lavado, la disponibilidad debe estar 2 días
+//   >  despues de hoy"
+//
+// `listing.metadata.initialCleaningDays` is a SNAPSHOT written when the owner assigned a
+// laundry, so a studio that later changes its turnaround does not move the calendar floor
+// on the garments it already holds. This resolves the studio's CURRENT number.
+//
+// IT HAS TO BE A SERVER ENDPOINT. The turnaround lives in the laundry USER's
+// `privateData`, and no user may read another user's privateData - so there is no
+// Marketplace API call the browser could make. See server/api/listing-initial-cleaning.js.
+//
+// IT HAS TO BE IN loadData, NOT A useEffect. This repo loads page data from ducks so that
+// SSR and client navigation take the same path (see src/containers/pageDataLoadingAPI.js).
+// The fetch itself is browser-only for a mundane reason: src/util/api.js builds its base
+// URL from `window.location.origin`. That is the same restriction fetchMonthlyTimeSlots
+// above lives with, and it costs nothing here - OrderPanel renders the booking form only
+// after mount, so the calendar never paints server-side anyway.
+//
+// FAILURE IS NOT AN ERROR STATE. There is no `...Error` field in the slice and no
+// rejected case: every failure - offline, 429, 500, SSR - leaves `initialCleaningDays`
+// null, and the calendar falls back to the `metadata` snapshot it used before this
+// existed. A stale floor is a small wrong; a listing page that will not render is a big
+// one.
+const fetchInitialCleaningDaysPayloadCreator = ({ listingId }) => {
+  return fetchListingInitialCleaning(listingId.uuid)
+    .then(response => {
+      const days = response?.data?.initialCleaningDays;
+      return Number.isInteger(days) && days > 0 ? days : null;
+    })
+    .catch(e => {
+      // Logged, not surfaced. The snapshot fallback is silent on purpose, but a laundry
+      // whose profile has become unreadable is worth knowing about.
+      log.error(e, 'fetching-live-initial-cleaning-days-failed', { listingId: listingId.uuid });
+      return null;
+    });
+};
+
+export const fetchInitialCleaningDaysThunk = createAsyncThunk(
+  'ListingPage/fetchInitialCleaningDays',
+  fetchInitialCleaningDaysPayloadCreator
+);
+
 //////////////////////////////////
 // Fetch Transaction Line Items //
 //////////////////////////////////
@@ -396,6 +445,11 @@ const initialState = {
   sendInquiryInProgress: false,
   sendInquiryError: null,
   inquiryModalOpenForListingId: null,
+  // Cocloset: the assigned laundry's CURRENT initial-cleaning turnaround, resolved at
+  // page load (see fetchInitialCleaningDaysThunk). null means "no live answer" - which is
+  // both the initial state and the outcome of every failure - and the calendar then falls
+  // back to `listing.metadata.initialCleaningDays`. There is deliberately no error field.
+  initialCleaningDays: null,
 };
 
 const listingPageSlice = createSlice({
@@ -515,6 +569,12 @@ const listingPageSlice = createSlice({
       .addCase(fetchTransactionLineItemsThunk.rejected, (state, action) => {
         state.fetchLineItemsInProgress = false;
         state.fetchLineItemsError = action.payload;
+      })
+      // Only `fulfilled`, and the payload creator never rejects: a failed resolution is
+      // reported as a null payload, so there is nothing for a rejected case to do beyond
+      // what the initial state already says.
+      .addCase(fetchInitialCleaningDaysThunk.fulfilled, (state, action) => {
+        state.initialCleaningDays = action.payload;
       });
   },
 });
@@ -566,6 +626,26 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
       // This can happen parallel to loadData.
       // We are not interested to return them from loadData call.
       fetchMonthlyTimeSlots(dispatch, listing);
+
+      // Cocloset: resolve the assigned laundry's CURRENT initial-cleaning turnaround, so
+      // the calendar floor reflects what the studio can do today rather than what it
+      // could do on the day it was assigned. Booking listings only - there is no calendar
+      // to move otherwise.
+      //
+      // GATED ON `onLaundry !== true` HERE AS WELL AS SERVER-SIDE. The server returns no
+      // block for a garment that is already at its laundry, so this call would be
+      // harmless - but it would still be a request, and an Integration API read behind it,
+      // on every view of every garment in the marketplace after its first rental. This is
+      // the same condition that makes the rule first-time-only everywhere else.
+      //
+      // Awaited as little as the time slots are: not part of the returned promise, because
+      // a slow or failing laundry lookup must not hold up (or fail) the listing page. The
+      // calendar renders with the snapshot and moves to the live floor when the answer
+      // arrives - and OrderPanel only mounts the booking form after hydration anyway.
+      const isAtLaundry = listing?.attributes?.metadata?.onLaundry === true;
+      if (typeof window !== 'undefined' && listing?.id && !isAtLaundry) {
+        dispatch(fetchInitialCleaningDaysThunk({ listingId: listing.id }));
+      }
     }
     return response;
   });

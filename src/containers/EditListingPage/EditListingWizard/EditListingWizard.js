@@ -104,6 +104,9 @@ export const tabsForListingType = (processName, listingTypeConfig) => {
   //         and listing publishing happens after last panel.
   // Note 3: The first tab creates a draft listing and title is mandatory attribute for it.
   //         Details tab asks for "title" and is therefore the first tab in the wizard flow.
+  //         EXCEPTION: cocloset-booking puts PHOTOS first (see below). There, creation is
+  //         pinned to the DETAILS tab wherever it sits, not to the first tab - see
+  //         `onCompleteEditListingWizardTab` in EditListingWizardTab.js.
   // Note 4: Ensure that the last panel contains the messaging for not-yet-verified files so
   //         that it is clear to the user why the 'publish' button is disabled during verification
   const tabs = {
@@ -115,19 +118,31 @@ export const tabsForListingType = (processName, listingTypeConfig) => {
       AVAILABILITY,
       ...styleOrPhotosTab,
     ],
-    // Cocloset's own booking process. Without its own entry it fell through to
-    // the `default-inquiry` fallback below, which silently dropped the LAUNDRY
-    // and AVAILABILITY steps from the live wizard even though both panels were
-    // already built and wired. Mirrors `default-booking`; the six steps are the
-    // order the mockups (10-15.jpg) specify.
-    [COCLOSET_BOOKING_PROCESS_NAME]: [
-      DETAILS,
-      ...locationMaybe,
-      PRICING,
-      LAUNDRY,
-      AVAILABILITY,
-      ...styleOrPhotosTab,
-    ],
+    // Cocloset's own booking process. Photos first, Laundry Assignment last.
+    //
+    // This list deliberately DIVERGES from `default-booking` above - it is not a
+    // mirror of it any more, and the divergence is the point:
+    //
+    //   * LOCATION is gone. The listing's public pickup address is the assigned
+    //     laundry's, written server-side by the LAUNDRY step. The owner's OWN private
+    //     shipping address (privateData.ownerAddress) that this tab used to capture
+    //     now lives on the DETAILS panel, so removing the tab does not silently drop
+    //     the data.
+    //   * AVAILABILITY is gone. Every new garment gets a full 24/7 plan written
+    //     automatically when its draft is created (see
+    //     `setFullAvailabilityForCoclosetBooking` in EditListingDetailsPanel.js). That
+    //     is load-bearing, not a nicety: OrderPanel gates its booking form on
+    //     `availabilityPlan.timezone`, so a plan-less listing is not bookable at all.
+    //
+    // Neither panel, constant nor switch case has been deleted - `default-booking` and
+    // the other processes still use both, as does the existing EditListingPage test
+    // suite. Only this array changed.
+    //
+    // PHOTOS being first does NOT mean photos create the draft: `sdk.images.upload`
+    // takes no listing id and the uploaded ids live in Redux, so images can be
+    // collected before a listing exists, and creation stays on DETAILS (which owns
+    // `title` and `listingType`, both required by `ownListings.createDraft`).
+    [COCLOSET_BOOKING_PROCESS_NAME]: [...styleOrPhotosTab, DETAILS, PRICING, LAUNDRY],
     ['default-purchase']: [DETAILS, PRICING_AND_STOCK, ...deliveryMaybe, ...styleOrPhotosTab],
     ['default-negotiation']: [DETAILS, ...locationMaybe, ...pricingMaybe, ...styleOrPhotosTab],
     ['default-inquiry']: [DETAILS, ...locationMaybe, ...pricingMaybe, ...styleOrPhotosTab],
@@ -295,6 +310,14 @@ const hasValidListingFieldsInExtendedData = (publicData, privateData, config) =>
 // Exported for tests. The LAUNDRY case in particular reads a field that recently
 // changed scope, and a regression there does not throw - it silently marks the tab
 // incomplete, which shows up as an owner being bounced back with no message.
+//
+// `options.collectedImages` carries the images the page can currently render -
+// EditListingPage's `pickRenderableImages`, i.e. the listing's own images PLUS the
+// ones uploaded in this session that are still only in Redux
+// (`EditListingPage.uploadedImages`). The PHOTOS case needs it because
+// cocloset-booking puts PHOTOS before the draft exists: `ensureListing` gives an
+// image-less listing until DETAILS creates one, so reading `listing.images` alone
+// would leave the second tab permanently locked.
 export const tabCompleted = (tab, listing, config, options = {}) => {
   const {
     availabilityPlan,
@@ -368,8 +391,12 @@ export const tabCompleted = (tab, listing, config, options = {}) => {
       return !!(geolocation && metadata?.assignedLaundryId);
     case AVAILABILITY:
       return !!availabilityPlan;
-    case PHOTOS:
-      return images && images.length > 0;
+    case PHOTOS: {
+      // Images held in Redux count. See the docblock above: before the draft is
+      // created they are the ONLY place the uploads exist.
+      const collectedImages = options.collectedImages || [];
+      return (images && images.length > 0) || collectedImages.length > 0;
+    }
     case STYLE:
       return !!cardStyle;
     default:
@@ -682,15 +709,39 @@ class EditListingWizard extends Component {
         ? TABS_DETAILS_ONLY
         : tabsForListingType(processName, listingTypeConfig);
 
+    // `privateData.ownerAddress` - the owner's own private shipping address, the
+    // counterpart of the public laundry-derived pickup address - is captured by the
+    // LOCATION panel. cocloset-booking has no LOCATION step any more, so the DETAILS
+    // panel asks for those three fields instead: the client's reason for dropping the tab
+    // ("la dirección viene de laundry") is about the PUBLIC address and says nothing
+    // about the owner's own, and losing the field is the irreversible direction.
+    const captureOwnerAddress =
+      processName === COCLOSET_BOOKING_PROCESS_NAME && !tabs.includes(LOCATION);
+
+    // Images that are renderable right now: the listing's own plus this session's
+    // uploads, which live only in Redux until a listing exists to attach them to.
+    // `images` is intentionally left in `rest` (the tabs need it too), so read it
+    // off props rather than destructuring it out above.
+    const tabCompletedOptions = { collectedImages: this.props.images || [] };
+
     // Check if wizard tab is active / linkable.
     // When creating a new listing, we don't allow users to access next tab until the current one is completed.
-    const tabsStatus = tabsActive(isNewListingFlow, currentListing, tabs, config);
+    const tabsStatus = tabsActive(
+      isNewListingFlow,
+      currentListing,
+      tabs,
+      config,
+      tabCompletedOptions
+    );
 
     // Per-tab completion, used only to draw the tick in the step rail.
     // tabsActive() already calls tabCompleted() for the *previous* tab; this
     // asks the same question about every tab so the rail can show its state.
     const tabsCompleted = tabs.reduce(
-      (acc, tab) => ({ ...acc, [tab]: tabCompleted(tab, currentListing, config) }),
+      (acc, tab) => ({
+        ...acc,
+        [tab]: tabCompleted(tab, currentListing, config, tabCompletedOptions),
+      }),
       {}
     );
 
@@ -856,6 +907,7 @@ class EditListingWizard extends Component {
                 errors={errors}
                 handleCreateFlowTabScrolling={this.handleCreateFlowTabScrolling}
                 handlePublishListing={this.handlePublishListing}
+                captureOwnerAddress={captureOwnerAddress}
                 fetchInProgress={fetchInProgress}
                 onListingTypeChange={selectedListingType => this.setState({ selectedListingType })}
                 onManageDisableScrolling={onManageDisableScrolling}
