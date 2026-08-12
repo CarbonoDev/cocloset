@@ -380,11 +380,17 @@ describe('cocloset-booking wizard: publishing from the laundry tab', () => {
   it('publishes when the garment is at the laundry and the assignment is unchanged', async () => {
     // The trap this guards. LAUNDRY is the last tab, so submitting it publishes. An owner
     // whose garment is physically at the studio cannot change the assignment - the picker
-    // locks - so if a locked panel refused to submit, `metadata.onLaundry === true` would
-    // mean "this garment can never be published", where today it only means "the laundry
+    // locks - so a panel that refused to submit would turn `metadata.onLaundry === true`
+    // into "this garment can never be published", where today it only means "the laundry
     // cannot be changed".
+    //
+    // The server is mocked as REFUSING with the custody 409 even for this re-save. It does
+    // not actually do that - evaluateLaundryAssignment short-circuits on an unchanged id
+    // before the onLaundry check - but pinning the harsher case means this stays true even
+    // if that short-circuit is ever tightened, and it is the exact scenario the tab has to
+    // survive: a refusal arriving on the step that publishes.
     fetchLaundries.mockResolvedValue({ data: [laundry] });
-    assignListingLaundry.mockResolvedValue({ data: { allowed: true, changed: false } });
+    assignListingLaundry.mockRejectedValue({ status: 409, data: { reason: 'on-laundry' } });
 
     const user = userEvent.setup();
     const { view, onUpdateListing, handlePublishListing } = renderLaundryTab(
@@ -401,6 +407,8 @@ describe('cocloset-booking wizard: publishing from the laundry tab', () => {
       expect(handlePublishListing).toHaveBeenCalledTimes(1);
     });
     expect(onUpdateListing).toHaveBeenCalledTimes(1);
+    // And it is not reported as a refusal, because nothing was refused: the owner asked for
+    // no change.
     expect(view.queryByText('EditListingLaundryPanel.laundryLockedError')).not.toBeInTheDocument();
   });
 
@@ -518,7 +526,7 @@ describe('cocloset-booking wizard: the single-listing-type dependency', () => {
     defaultListingFields: { description: true },
   };
 
-  const renderWizard = (listingTypes, tab) => {
+  const renderWizard = (listingTypes, tab, images = []) => {
     const hosted = hostedConfig(listingTypes);
     const config = mergedConfig(listingTypes);
     const routeConfiguration = getRouteConfiguration(config.layout);
@@ -530,7 +538,7 @@ describe('cocloset-booking wizard: the single-listing-type dependency', () => {
         listing={ensureOwnListing(null)}
         errors={{}}
         fetchInProgress={false}
-        images={[]}
+        images={images}
         history={{ push: jest.fn(), replace: jest.fn() }}
         currentUser={createCurrentUser('id-of-me-myself')}
         onManageDisableScrolling={jest.fn()}
@@ -578,5 +586,57 @@ describe('cocloset-booking wizard: the single-listing-type dependency', () => {
     expect(view.queryByText('EditListingWizard.tabLabelPhotos')).not.toBeInTheDocument();
     expect(view.queryByText('EditListingWizard.tabLabelPricing')).not.toBeInTheDocument();
     expect(view.queryByText('EditListingWizard.tabLabelLaundry')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the details tab from images that exist only in Redux', async () => {
+    // The other end of `collectedImages`. `tabsActive` asks whether PHOTOS is complete
+    // before it will let DETAILS render at all, and before the draft exists the answer can
+    // only come from the Redux-held uploads - `ensureListing` reports no images. Without
+    // this the owner uploads photos, presses Next, and is bounced straight back.
+    const view = renderWizard([garmentRentalListingType], DETAILS, [createImage('image-1')]);
+
+    await waitFor(() => {
+      expect(view.getByText('EditListingDetailsPanel.createListingTitle')).toBeInTheDocument();
+    });
+  });
+
+  it('asks for the owner address on the details panel, but only for this process', async () => {
+    // The gate is the process, not the panel: EditListingWizard turns the capture on only
+    // when the resolved process is cocloset-booking AND its tab list has no LOCATION step.
+    // Turning it on unconditionally would ask every marketplace's owners twice and - worse -
+    // overwrite an address saved on the location tab with three undefineds.
+    const cocloset = renderWizard([garmentRentalListingType], DETAILS, [createImage('image-1')]);
+
+    await waitFor(() => {
+      expect(
+        cocloset.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' })
+      ).toBeInTheDocument();
+    });
+    cocloset.unmount();
+
+    // `daily-booking` has no entry in LISTING_TYPE_PROCESS_OVERRIDES, so it stays on
+    // default-booking - which keeps its own LOCATION step and must not gain these fields.
+    const stockBooking = renderWizard(
+      [
+        {
+          id: 'daily-booking',
+          label: 'Daily booking',
+          transactionProcess: { name: 'default-booking', alias: 'default-booking/release-1' },
+          unitType: 'day',
+          availabilityType: 'oneSeat',
+          defaultListingFields: { description: true },
+        },
+      ],
+      DETAILS
+    );
+
+    await waitFor(() => {
+      expect(
+        stockBooking.getByRole('textbox', { name: 'EditListingDetailsForm.title' })
+      ).toBeInTheDocument();
+    });
+    expect(
+      stockBooking.queryByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' })
+    ).not.toBeInTheDocument();
   });
 });
