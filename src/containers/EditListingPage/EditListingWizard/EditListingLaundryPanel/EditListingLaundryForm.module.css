@@ -186,3 +186,10 @@
     margin-top: 32px;
   }
 }
+
+/* Why the publish button is disabled while uploaded files are still being verified.
+   Mirrors EditListingPhotosForm, which carries the same notice for the processes whose
+   last wizard panel is Photos. */
+.filesNotReady {
+  margin: 0 0 24px 0;
+}

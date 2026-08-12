@@ -48,8 +48,9 @@ const getInitialValues = props => {
  * laundry's name and address onto `publicData.assignedLaundryName` /
  * `publicData.pickupAddress`, and its origin onto the listing's top-level
  * `geolocation` - so search/map/listing pages show the laundry's location rather
- * than the owner's own address (that one is captured separately, privately, in
- * EditListingLocationPanel). They are resolved server-side from the laundry's
+ * than the owner's own address (that one is captured separately, privately - by
+ * EditListingLocationPanel for the processes that still have a LOCATION step, and
+ * by EditListingDetailsPanel for cocloset-booking, which does not). They are resolved server-side from the laundry's
  * profile, so this panel must not send them: a client-supplied address is exactly
  * the disagreement the single call exists to prevent.
  *
@@ -117,12 +118,18 @@ const EditListingLaundryPanel = props => {
     errors,
     updatePageTitle: UpdatePageTitle,
     intl,
+    allFilesUploadedAndVerified,
+    filesTabParams,
+    filesRequired,
   } = props;
 
   const classes = classNames(rootClassName || css.root, className);
   const isPublished = listing?.id && listing?.attributes.state !== LISTING_STATE_DRAFT;
   // Physical custody. Server-written metadata; see the docblock above.
   const isOnLaundry = listing?.attributes?.metadata?.onLaundry === true;
+  // The assignment already stored on the listing. Compared against the submitted value
+  // in onSubmit to tell a real change from a re-save; see the comment there.
+  const savedLaundryId = listing?.attributes?.metadata?.assignedLaundryId;
   // Console stores categories as categoryLevel1/2/3, never a single `category` key — reading
   // `publicData.category` meant this was always undefined and the accepted-category check
   // below could never fire. A listing may be categorised at several levels, so compare against
@@ -227,64 +234,105 @@ const EditListingLaundryPanel = props => {
         fetchLaundriesInProgress={fetchLaundriesInProgress}
         listingCategories={listingCategories}
         laundryLocked={isOnLaundry}
+        allFilesUploadedAndVerified={allFilesUploadedAndVerified}
+        filesTabParams={filesTabParams}
+        filesRequired={filesRequired}
         onSubmit={values => {
           const { assignedLaundryId } = values;
           const selectedLaundry = laundries.find(l => l.id === assignedLaundryId);
+          const listingId = listing?.id?.uuid;
+          // Re-submitting the studio that is already saved. This distinction is now
+          // load-bearing, because LAUNDRY is the LAST tab of the cocloset-booking
+          // wizard and submitting the last tab is what PUBLISHES the listing (see
+          // EditListingWizardTab's automaticRedirectsForNewListingFlow). Every
+          // `return` in the changed-assignment branch below leaves `onSubmit`
+          // uncalled, so on the last tab a refusal is not "your laundry change was
+          // rejected" - it is "this garment can never be published at all", which is
+          // a far worse failure than the one the guards were written to prevent.
+          const assignmentUnchanged = !!savedLaundryId && assignedLaundryId === savedLaundryId;
 
-          // The picker's list can go stale between load and submit: the laundry
-          // could have been de-flagged, or the fetch could have failed leaving
-          // `laundries` empty while initialValues still carries a saved id.
-          // Guarding here matters twice over. Without it, `selectedLaundry.id`
-          // throws a TypeError on submit (the form's submitDisabled only checks
-          // `invalid`, and a stale id IS a valid value). And a laundry with no
-          // usable address/origin would write no `geolocation`, which leaves
-          // the wizard's LAUNDRY tab permanently incomplete - the owner saves
-          // successfully, is redirected forward, is bounced straight back, and
-          // is never told why. /api/laundries already filters out
-          // profile-less laundries; this is the second line of defence.
-          if (!selectedLaundry?.origin || !selectedLaundry?.address) {
-            setSelectionError(true);
-            return;
-          }
           setSelectionError(false);
           setLockError(null);
           setSaveError(false);
 
-          // No listing yet would mean the create flow's very first tab, which this
-          // is not (LAUNDRY always follows DETAILS, so a draft already exists).
-          // There is no longer a fallback path for it: without a listing id the
-          // server cannot be asked to write, and the browser cannot write metadata
-          // at all. Surfacing it as a failure is honest; silently writing nothing
-          // and passing the tab is what used to leave owners stuck later.
-          const listingId = listing?.id?.uuid;
-          if (!listingId) {
-            setSaveError(true);
-            return;
+          if (!assignmentUnchanged) {
+            // The picker's list can go stale between load and submit: the laundry
+            // could have been de-flagged, or the fetch could have failed leaving
+            // `laundries` empty while initialValues still carries a saved id.
+            // Guarding here matters twice over. Without it, `selectedLaundry.id`
+            // throws a TypeError on submit (the form's submitDisabled only checks
+            // `invalid`, and a stale id IS a valid value). And a laundry with no
+            // usable address/origin would write no `geolocation`, which leaves
+            // the wizard's LAUNDRY tab permanently incomplete - the owner saves
+            // successfully, is redirected forward, is bounced straight back, and
+            // is never told why. /api/laundries already filters out
+            // profile-less laundries; this is the second line of defence.
+            if (!selectedLaundry?.origin || !selectedLaundry?.address) {
+              setSelectionError(true);
+              return;
+            }
+
+            // No listing yet would mean the create flow's very first tab, which this
+            // is not (LAUNDRY always follows DETAILS, so a draft already exists).
+            // There is no longer a fallback path for it: without a listing id the
+            // server cannot be asked to write, and the browser cannot write metadata
+            // at all. Surfacing it as a failure is honest; silently writing nothing
+            // and passing the tab is what used to leave owners stuck later.
+            if (!listingId) {
+              setSaveError(true);
+              return;
+            }
+
+            // THE WRITE. The server validates ownership, the active-transaction
+            // condition and `onLaundry`, then writes the id plus the three derived
+            // fields. Nothing about the assignment is sent through onSubmit.
+            return assignListingLaundry({
+              listingId,
+              assignedLaundryId: selectedLaundry.id,
+            })
+              .then(() =>
+                // Pure read-back: no attributes, so this writes nothing and returns
+                // the listing with the metadata the server has just set. Lets the
+                // wizard mark the tab updated and run its redirect off a listing
+                // entity that actually reflects the save.
+                onSubmit({})
+              )
+              .catch(e => {
+                if (e?.status === 409) {
+                  // The server names which condition refused it (api-util/sdk.js's
+                  // handleError forwards `error.data` untouched).
+                  setLockError(e?.data?.reason || 'on-laundry');
+                } else {
+                  setSaveError(true);
+                }
+              });
           }
 
-          // THE WRITE. The server validates ownership, the active-transaction
-          // condition and `onLaundry`, then writes the id plus the three derived
-          // fields. Nothing about the assignment is sent through onSubmit.
-          return assignListingLaundry({
-            listingId,
-            assignedLaundryId: selectedLaundry.id,
-          })
-            .then(() =>
-              // Pure read-back: no attributes, so this writes nothing and returns
-              // the listing with the metadata the server has just set. Lets the
-              // wizard mark the tab updated and run its redirect off a listing
-              // entity that actually reflects the save.
-              onSubmit({})
-            )
-            .catch(e => {
-              if (e?.status === 409) {
-                // The server names which condition refused it (api-util/sdk.js's
-                // handleError forwards `error.data` untouched).
-                setLockError(e?.data?.reason || 'on-laundry');
-              } else {
-                setSaveError(true);
-              }
-            });
+          // UNCHANGED ASSIGNMENT. There is nothing to decide and nothing to refuse:
+          // the id the server would store is the one it already stores. Its own
+          // evaluateLaundryAssignment short-circuits on exactly this comparison,
+          // before the `onLaundry` and active-transaction checks, precisely so that
+          // pressing Save twice cannot dead-end the tab - so this branch cannot 409
+          // even when the garment is at the studio.
+          //
+          // The call is still made, because the endpoint re-derives
+          // `publicData.pickupAddress`, `publicData.assignedLaundryName`,
+          // `geolocation` and `metadata.initialCleaningDays` from the studio's live
+          // profile on every request, including a no-op one. But its failure is
+          // swallowed: nothing the owner asked for has been lost (they asked for no
+          // change), and an unrelated network hiccup or an empty laundry directory
+          // must not be what stops a finished garment from being published. Whatever
+          // goes wrong in `onSubmit` itself - the update, or the publish - still
+          // surfaces through updateListingError / publishListingError in the form.
+          const canRefreshDerivedFields =
+            !!listingId && !!selectedLaundry?.origin && !!selectedLaundry?.address;
+          const refreshDerivedFields = canRefreshDerivedFields
+            ? assignListingLaundry({ listingId, assignedLaundryId: savedLaundryId }).catch(
+                () => null
+              )
+            : Promise.resolve(null);
+
+          return refreshDerivedFields.then(() => onSubmit({}));
         }}
         saveActionMsg={submitButtonText}
         disabled={disabled}

@@ -36,6 +36,11 @@ const ImageUploadError = props => {
 // NOTE: PublishListingError and ShowListingsError are here since Photos panel is the last visible panel
 // before creating a new listing. If that order is changed, these should be changed too.
 // Create and show listing errors are shown above submit button
+//
+// That order HAS changed for one process: cocloset-booking runs Photos first and Laundry
+// Assignment last (see `tabsForListingType`), so EditListingLaundryForm carries the same
+// two notices plus the files-not-ready explanation. These stay here because Photos is
+// still the last panel for every other process.
 const PublishListingError = props => {
   return props.error ? (
     <p className={css.error}>

@@ -316,7 +316,18 @@ const EditListingWizardTab = props => {
       return <EditListingLocationPanel {...panelProps(LOCATION)} />;
     }
     case LAUNDRY: {
-      return <EditListingLaundryPanel {...panelProps(LAUNDRY)} />;
+      // The file props are here for the same reason PHOTOS and STYLE get them: this
+      // panel is the LAST one of the cocloset-booking new-listing flow, so it is where
+      // the "files still being verified" explanation for a disabled publish button has
+      // to render. See Note 4 on `tabsForListingType`.
+      return (
+        <EditListingLaundryPanel
+          {...panelProps(LAUNDRY)}
+          allFilesUploadedAndVerified={allFilesUploadedAndVerified}
+          filesTabParams={filesTabParams}
+          filesRequired={filesRequired}
+        />
+      );
     }
     case AVAILABILITY: {
       return (
