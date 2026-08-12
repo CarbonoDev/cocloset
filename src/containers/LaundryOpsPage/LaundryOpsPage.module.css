@@ -192,7 +192,7 @@
 
   @media (--viewportLarge) {
     display: block;
-    margin: 32px 0 0 0;
+    margin: 32px 36px 0 0;
     padding: 14px 16px;
     border: 1px solid var(--coclosetBorder);
     border-radius: var(--coclosetRadius);
