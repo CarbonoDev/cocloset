@@ -7,6 +7,11 @@ const {
   getCleaningFeeLineItemMaybe,
   resolveCleaningFeeInSubunits,
 } = require('./lineItemHelpers');
+const {
+  usesFixedRentalPeriods,
+  resolveRentalPeriodDays,
+  getRentalPeriods,
+} = require('./rentalPeriods');
 const { types } = require('sharetribe-flex-sdk');
 const { Money } = types;
 
@@ -117,6 +122,27 @@ const getDateRangeQuantityAndLineItems = (orderData, code) => {
 };
 
 /**
+ * The base line item for a Cocloset fixed-period rental: one unit, flat price.
+ *
+ *   > "si puso el precio para 7 días en $100, el cliente va a pagar $100, no $700"
+ *
+ * The rental still SPANS the whole period — `bookingStart`/`bookingEnd` are unchanged, and
+ * the garment is genuinely unavailable for those days — but the period is what is being
+ * sold, so it is one unit of it. Feeding the day count in as the quantity is precisely the
+ * $700 bug the client is describing.
+ *
+ * `seats` is not supported and is deliberately ignored: a garment is a single physical
+ * object, the `cocloset-booking` availability plan has one seat, and multiplying a flat
+ * weekly price by a seat count has no meaning here.
+ *
+ * @param {Object} orderData
+ * @param {string} [orderData.priceVariantName]
+ */
+const getRentalPeriodQuantityAndLineItems = () => {
+  return { quantity: 1, extraLineItems: [] };
+};
+
+/**
  * Returns collection of lineItems (max 50)
  *
  * All the line-items dedicated to _customer_ define the "payin total".
@@ -172,8 +198,47 @@ exports.transactionLineItems = (
   const { priceInSubunits } = priceVariantConfig || {};
   const isPriceInSubunitsValid = Number.isInteger(priceInSubunits) && priceInSubunits >= 0;
 
+  // Cocloset: a garment rented for a fixed period (7 or 14 days) is priced from the period
+  // the customer picked, at a flat rate. See api-util/rentalPeriods.js.
+  //
+  // This does NOT go through `priceVariationsEnabled`. That flag is a Console listing-type
+  // setting mirrored into publicData, and every garment created before this feature has it
+  // stored as `false` (the pricing panel wrote it explicitly). Keying the price off it would
+  // mean those listings silently fell back to `listing.price` — the CHEAPEST period — and a
+  // customer picking 14 days would be charged the 7-day price. What decides here is whether
+  // the listing offers the named period at all, which api-util/rentalPeriods.js answers from
+  // the listing's own data.
+  const isFixedRentalPeriodListing = usesFixedRentalPeriods(publicData);
+  const rentalPeriodDays = isFixedRentalPeriodListing
+    ? resolveRentalPeriodDays(publicData, priceVariantName)
+    : null;
+  const rentalPeriodPriceInSubunits =
+    rentalPeriodDays !== null
+      ? getRentalPeriods(publicData).find(p => p.name === priceVariantName)?.priceInSubunits
+      : null;
+
+  // A fixed-period listing whose named period cannot be resolved must NOT fall through to
+  // `listing.price`: that attribute holds the cheapest period, so the fallback would quietly
+  // undercharge instead of failing. api-util/rentalPeriods.js `assertRentalPeriodBooking`
+  // rejects the request before it reaches here on every endpoint that books; this throw is
+  // the backstop for a caller that forgets to run it.
+  if (
+    isFixedRentalPeriodListing &&
+    getRentalPeriods(publicData).length > 0 &&
+    rentalPeriodDays === null
+  ) {
+    const message = `Error: orderData is missing a valid priceVariantName for this listing's rental periods.`;
+    const error = new Error(message);
+    error.status = 400;
+    error.statusText = message;
+    error.data = { code: 'rental-period-unknown', priceVariantName: priceVariantName || null };
+    throw error;
+  }
+
   const unitPrice =
-    isBookable && priceVariationsEnabled && isPriceInSubunitsValid
+    rentalPeriodPriceInSubunits !== null && rentalPeriodPriceInSubunits !== undefined
+      ? new Money(rentalPeriodPriceInSubunits, currency)
+      : isBookable && priceVariationsEnabled && isPriceInSubunitsValid
       ? new Money(priceInSubunits, currency)
       : offer instanceof Money && isNegotiationUnitType
       ? offer
@@ -195,7 +260,9 @@ exports.transactionLineItems = (
   // Here "extra line-items" means line-items that are tied to unit type
   // E.g. by default, "shipping-fee" is tied to 'item' aka buying products.
   const quantityAndExtraLineItems =
-    unitType === 'item'
+    rentalPeriodDays !== null
+      ? getRentalPeriodQuantityAndLineItems(orderData)
+      : unitType === 'item'
       ? getItemQuantityAndLineItems(orderData, publicData, currency)
       : unitType === 'file'
       ? getDigitalItemQuantityAndLineItems(orderData)

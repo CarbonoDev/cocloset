@@ -432,99 +432,6 @@ describe('OrderPanel', () => {
     expect(queryByText('BookingDatesForm.initialCleaningNotice')).not.toBeInTheDocument();
   });
 
-  // ---------------------------------------------------------------------------
-  // Cocloset: the minimum rental length legend.
-  //
-  //   > "hay que mostrar una leyenda donde indique que la prenda necesita ser reservada
-  //   >  por un mínimo de n días, de acuerdo al valor que haya ingresado el provider,
-  //   >  siempre que n sea mayor a 1, es importante que el cliente vea esta información ya
-  //   >  que de otra manera no sabrá por que no le permite reservar por menos días"
-  //
-  // The value lives in `publicData.minimumBookingDays`, which is where the owner's wizard
-  // writes it - so this asserts the same threading the initial-cleaning notice does, and
-  // the "> 1" condition, which is the whole of the client's instruction about when to show
-  // it. The validation message is a different string and is deliberately left alone: it
-  // fires after a failed attempt, which is exactly what the client says is too late.
-  // ---------------------------------------------------------------------------
-  const dailyGarmentListingWithMinimum = (id, minimumBookingDays) =>
-    createListing(id, {
-      title: 'the listing',
-      price: new Money(1000, 'USD'),
-      availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
-      publicData: {
-        listingType: 'rent-bicycles-daily',
-        transactionProcessAlias: 'default-booking/release-1',
-        unitType: 'day',
-        ...(minimumBookingDays === undefined ? {} : { minimumBookingDays }),
-      },
-      metadata: {},
-    });
-
-  const renderWithMinimum = (id, minimumBookingDays) => {
-    const listing = dailyGarmentListingWithMinimum(id, minimumBookingDays);
-    const props = { ...commonProps, listing, isOwnListing: false, validListingTypes };
-    return render(<OrderPanel {...props} />, { config, routeConfiguration });
-  };
-
-  it('Booking: states the minimum rental length up front when there is one', async () => {
-    const { getByText } = renderWithMinimum('listing-minimum-3', 3);
-
-    await waitFor(() => {
-      expect(getByText('BookingDatesForm.minimumBookingDaysNotice')).toBeInTheDocument();
-    });
-  });
-
-  it('Booking: says nothing when the minimum is 1, which is no minimum at all', async () => {
-    // A "minimum of 1 day" is the stock behaviour. Announcing it would be noise on every
-    // listing in the marketplace.
-    const { queryByText, getByText } = renderWithMinimum('listing-minimum-1', 1);
-
-    await waitFor(() => {
-      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
-    });
-    expect(queryByText('BookingDatesForm.minimumBookingDaysNotice')).not.toBeInTheDocument();
-  });
-
-  it('Booking: says nothing when the owner set no minimum', async () => {
-    const { queryByText, getByText } = renderWithMinimum('listing-minimum-none', undefined);
-
-    await waitFor(() => {
-      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
-    });
-    expect(queryByText('BookingDatesForm.minimumBookingDaysNotice')).not.toBeInTheDocument();
-  });
-
-  it.each([['0', 0], ['a fraction', 2.5], ['a string', '3'], ['null', null]])(
-    'Booking: says nothing for the unusable minimum %s rather than guessing',
-    async (_label, minimumBookingDays) => {
-      // A legend claiming a rule the picker is not enforcing is worse than no legend: it
-      // tells the customer the calendar is broken when the calendar is right.
-      const { queryByText, getByText } = renderWithMinimum(
-        `listing-minimum-${String(minimumBookingDays)}`,
-        minimumBookingDays
-      );
-
-      await waitFor(() => {
-        expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
-      });
-      expect(queryByText('BookingDatesForm.minimumBookingDaysNotice')).not.toBeInTheDocument();
-    }
-  );
-
-  it('Booking: leaves the after-the-fact validation message in place', async () => {
-    // The legend is ADDITIVE. The validator still has to exist: `minimumNights` makes the
-    // second calendar click silently do nothing and does not guard the typed-in inputs at
-    // all, so something has to name the rule at the moment it is broken too.
-    const { queryByText } = renderWithMinimum('listing-minimum-additive', 3);
-
-    await waitFor(() => {
-      expect(queryByText('BookingDatesForm.minimumBookingDaysNotice')).toBeInTheDocument();
-    });
-    // Not yet shown - it appears only after a failed attempt, which is the client's whole
-    // complaint and the reason the legend was added alongside it.
-    expect(queryByText('BookingDatesForm.minimumBookingDays')).not.toBeInTheDocument();
-  });
-
   it('Booking: nightly', async () => {
     const listing = createListing('listing-night', {
       title: 'the listing',
@@ -819,5 +726,142 @@ describe('OrderPanel', () => {
       expect(getByText('InquiryWithoutPaymentForm.ctaButton')).toBeInTheDocument();
       expect(getByText('OrderPanel.ctaButtonMessageInquiry')).toBeInTheDocument();
     });
+  });
+  // ---------------------------------------------------------------------------
+  // Cocloset: fixed rental periods.
+  //
+  //   > "las reservas sean por semanas, 7 días y 14 días (...) el customer debe seleccionar
+  //   >  uno de dos botones, estos botones deben parecer mas como chips, una vez
+  //   >  seleccionado debe indicar solo un día, que es donde inicia la reserva"
+  //
+  // What this asserts is the SWITCH: that a garment-rental listing gets the period form
+  // instead of the stock date-range form. The window arithmetic is unit-tested next to the
+  // form itself; a form that is never rendered is indistinguishable from one that is
+  // always right, and this codebase has shipped that twice.
+  // ---------------------------------------------------------------------------
+  const garmentRentalTypes = [
+    ...validListingTypes,
+    {
+      listingType: 'garment-rental',
+      transactionType: {
+        process: 'cocloset-booking',
+        alias: 'cocloset-booking/release-1',
+        unitType: 'day',
+      },
+    },
+  ];
+
+  const garmentRentalListing = (id, publicData = {}) =>
+    createListing(id, {
+      title: 'the listing',
+      price: new Money(10000, 'USD'),
+      availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
+      publicData: {
+        listingType: 'garment-rental',
+        transactionProcessAlias: 'cocloset-booking/release-1',
+        unitType: 'day',
+        priceVariationsEnabled: true,
+        priceVariants: [
+          { name: '7-days', bookingLengthInDays: 7, priceInSubunits: 10000 },
+          { name: '14-days', bookingLengthInDays: 14, priceInSubunits: 18000 },
+        ],
+        ...publicData,
+      },
+      metadata: {},
+    });
+
+  it('Booking: a garment is offered by fixed period, not by date range', async () => {
+    const listing = garmentRentalListing('listing-periods');
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText, queryByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingRentalPeriodForm.periodLabel')).toBeInTheDocument();
+    });
+    // One start date, not a range: the stock form's two labels must be gone.
+    expect(getByText('BookingRentalPeriodForm.startDateLabel')).toBeInTheDocument();
+    expect(queryByText('BookingDatesForm.bookingStartTitle')).not.toBeInTheDocument();
+    expect(queryByText('BookingDatesForm.bookingEndTitle')).not.toBeInTheDocument();
+  });
+
+  it('Booking: renders one chip per priced period, each carrying its own price', async () => {
+    const listing = garmentRentalListing('listing-period-chips');
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getAllByRole, getByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getAllByRole('radio')).toHaveLength(2);
+    });
+    // The price is on the chip because the whole point is that it is NOT a daily rate the
+    // customer has to multiply out.
+    expect(getByText('$100.00')).toBeInTheDocument();
+    expect(getByText('$180.00')).toBeInTheDocument();
+  });
+
+  it('Booking: keeps the start date picker shut until a period is chosen', async () => {
+    //   > "una vez seleccionado debe indicar solo un día"
+    // Before a period is picked there is no window length to test dates against, so
+    // offering the calendar would mean offering days the form cannot validate.
+    const listing = garmentRentalListing('listing-period-order');
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText } = render(<OrderPanel {...props} />, { config, routeConfiguration });
+
+    await waitFor(() => {
+      expect(getByText('BookingRentalPeriodForm.startDateLabel')).toBeInTheDocument();
+    });
+    expect(
+      document.getElementById('OrderPanelBookingRentalPeriodForm_bookingStartDate')
+    ).toBeDisabled();
+  });
+
+  it('Booking: falls back to the price-missing notice when no period is priced', async () => {
+    // `listing.price` and the periods are written together, so a listing with no periods has
+    // no price either. Rendering an empty chip row would be a dead end.
+    const listing = createListing('listing-no-periods', {
+      title: 'the listing',
+      availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
+      publicData: {
+        listingType: 'garment-rental',
+        transactionProcessAlias: 'cocloset-booking/release-1',
+        unitType: 'day',
+      },
+      metadata: {},
+    });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText, queryByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('OrderPanel.listingPriceMissing')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingRentalPeriodForm.periodLabel')).not.toBeInTheDocument();
   });
 });

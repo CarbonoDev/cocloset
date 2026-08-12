@@ -10,10 +10,8 @@ const {
 } = require('../api-util/sdk');
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { isCoclosetBookingListing } = require('../api-util/coclosetBookingProcess');
-const {
-  assertInitialCleaningLeadTime,
-  assertMinimumBookingDays,
-} = require('../api-util/bookingRules');
+const { assertInitialCleaningLeadTime } = require('../api-util/bookingRules');
+const { assertRentalPeriodBooking } = require('../api-util/rentalPeriods');
 const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
 const { ensureHandoverQr } = require('../api-util/handoverQr');
 const log = require('../log');
@@ -118,18 +116,21 @@ module.exports = (req, res) => {
       // transition-privileged.js and transaction-line-items.js so preview and
       // charge cannot drift apart again.
 
-      // The owner's minimum rental length, checked BEFORE anything is priced.
-      // The booking calendar refuses a too-short range, but the dates arrive
-      // here as ordinary request parameters and used to be forwarded to the
-      // Marketplace API unread - so the minimum was, until now, a suggestion.
-      // Sharetribe will not catch this for us: booking LENGTH is not part of the
-      // availability model. See api-util/bookingRules.js.
+      // The rental period, checked BEFORE anything is priced.
       //
-      // Deliberately applied on the speculative path too. A preview that quotes
-      // a booking the charge path will refuse is how a customer gets to the last
-      // step before finding out.
-      assertMinimumBookingDays({
+      // A garment is rented for one of the fixed periods its owner priced, and the price
+      // charged is that period's flat price. The dates and the period name both arrive
+      // here as ordinary request parameters, so without this check a caller could pay the
+      // 7-day price for a 90-day range: the line-item builder prices from the named period
+      // and never looks at the dates. Sharetribe will not catch it for us either - booking
+      // LENGTH is not part of the availability model. See api-util/rentalPeriods.js.
+      //
+      // Deliberately applied on the speculative path too. A preview that quotes a booking
+      // the charge path will refuse is how a customer gets to the last step before finding
+      // out.
+      assertRentalPeriodBooking({
         listing,
+        priceVariantName: orderData?.priceVariantName,
         bookingStart: bodyParams?.params?.bookingStart,
         bookingEnd: bodyParams?.params?.bookingEnd,
       });

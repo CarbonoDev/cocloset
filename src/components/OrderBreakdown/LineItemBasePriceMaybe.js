@@ -21,11 +21,15 @@ import css from './OrderBreakdown.module.css';
  * @param {Object} props
  * @param {Array<propTypes.lineItem>} props.lineItems - The line items to render
  * @param {propTypes.lineItemUnitType} props.code - The code of the line item
+ * @param {number} [props.flatRatePeriodDays] - Cocloset: the length of the booking in days
+ *   when the base line item prices the WHOLE period rather than a day of it (a fixed 7- or
+ *   14-day garment rental). Resolved by OrderBreakdown; see the comment there. Absent on
+ *   every other kind of listing, which keeps the stock per-unit rendering below untouched.
  * @param {intlShape} props.intl - The intl object
  * @returns {JSX.Element}
  */
 const LineItemBasePriceMaybe = props => {
-  const { lineItems, code, intl } = props;
+  const { lineItems, code, flatRatePeriodDays, intl } = props;
   const isDigitalItem = code === LINE_ITEM_FILE;
   const isNightly = code === LINE_ITEM_NIGHT;
   const isDaily = code === LINE_ITEM_DAY;
@@ -62,7 +66,15 @@ const LineItemBasePriceMaybe = props => {
   const unitPrice = unitPurchase ? formatMoney(intl, unitPurchase.unitPrice) : null;
   const total = unitPurchase ? formatMoney(intl, unitPurchase.lineTotal) : null;
 
-  const message = unitPurchase?.seats ? (
+  // Cocloset: the price is for the whole rental period, so say so instead of multiplying it
+  // by a quantity of 1. Placed ahead of the seats branch because a fixed-period garment
+  // rental has no seats — a garment is one physical object.
+  const message = flatRatePeriodDays ? (
+    <FormattedMessage
+      id="OrderBreakdown.baseUnitRentalPeriod"
+      values={{ unitPrice, days: flatRatePeriodDays }}
+    />
+  ) : unitPurchase?.seats ? (
     <FormattedMessage
       id={`${translationKey}Seats`}
       values={{ unitPrice, quantity, seats: unitPurchase.seats }}

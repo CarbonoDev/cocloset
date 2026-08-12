@@ -4,12 +4,7 @@ import classNames from 'classnames';
 
 import appSettings from '../../../config/settings';
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
-import {
-  required,
-  bookingDatesRequired,
-  composeValidators,
-  minimumBookingDays as minimumBookingDaysValidator,
-} from '../../../util/validators';
+import { required, bookingDatesRequired, composeValidators } from '../../../util/validators';
 import {
   getStartOf,
   addTime,
@@ -138,42 +133,6 @@ const isBlockedBetween = (allTimeSlots, timeZone) => ([startDate, endDate]) => {
   const isBlockedBetween = !(isInRange(localizedEndDay, ...timeSlotRange) || isExcludedEnd);
   return isBlockedBetween;
 };
-
-/**
- * The listing's minimum rental length, or null when there is nothing to enforce.
- *
- * Applied to daily bookings only: the field is expressed in days and the two
- * places that enforce it (the picker floor below and
- * server/api-util/bookingRules.js) both key on the day unit. Anything unusable -
- * absent, null (how the Marketplace API deletes an extended-data key, which is
- * what the wizard writes when an owner clears the field), 0, or fractional -
- * means no minimum.
- *
- * @param {number} [minimumBookingDays] - listing.attributes.publicData.minimumBookingDays
- * @param {boolean} isDaily
- * @returns {number|null}
- */
-export const resolveMinimumDays = (minimumBookingDays, isDaily) =>
-  isDaily && Number.isInteger(minimumBookingDays) && minimumBookingDays > 1
-    ? minimumBookingDays
-    : null;
-
-/**
- * Convert a minimum in DAYS into the picker's floor, which is counted in NIGHTS.
- *
- * The date picker holds an INCLUSIVE end date for daily bookings, so a 3-day
- * rental spans 2 nights. Off by one here would block the shortest booking the
- * owner actually allows, which presents as "the calendar is broken" rather than
- * as a rule being applied.
- *
- * Exported and tested separately because it is the one piece of arithmetic in
- * this feature that has a plausible wrong answer.
- *
- * @param {number|null} minimumDays
- * @returns {number|undefined} undefined leaves the picker's own default in place
- */
-export const minimumNightsForMinimumDays = minimumDays =>
-  minimumDays ? minimumDays - 1 : undefined;
 
 /**
  * The upper bound on an initial-cleaning block, in days.
@@ -665,7 +624,6 @@ const onPriceVariantChange = props => value => {
  * @param {Array<Object>} [props.priceVariants] - The price variants
  * @param {ReactNode} [props.priceVariantFieldComponent] - The component to use for the price variant field
  * @param {boolean} props.isPublishedListing - Whether the listing is published
- * @param {number} [props.minimumBookingDays] - Cocloset: the owner's minimum rental length in days
  * @param {boolean} [props.onLaundry] - Cocloset: true once the garment has reached its laundry
  * @param {number} [props.initialCleaningDays] - Cocloset: days needed for the garment's first
  *   cleaning, applied only while `onLaundry` is not true. The assignment-time SNAPSHOT.
@@ -694,13 +652,6 @@ export const BookingDatesForm = props => {
     priceVariantFieldComponent: PriceVariantFieldComponent,
     preselectedPriceVariant,
     isPublishedListing,
-    // Cocloset: the owner's per-listing minimum rental length, in days
-    // (publicData.minimumBookingDays, set in the wizard's PRICE tab). Destructured
-    // rather than left in `rest` so it does not reach FinalForm as a stray prop.
-    // Absent means no minimum. The server re-checks this - see
-    // server/api-util/bookingRules.js - because these dates are just request
-    // parameters and a calendar-only rule is not a rule.
-    minimumBookingDays,
     // Cocloset: garment custody, from `listing.metadata` (server-written only).
     // Destructured for the same reason as above - FinalForm would otherwise receive
     // them as stray props. Together they answer "has this garment ever been at its
@@ -887,12 +838,6 @@ export const BookingDatesForm = props => {
         const isDaily = lineItemUnitType === LINE_ITEM_DAY;
         const submitDisabled = isPriceVariationsInUse && !isPublishedListing;
 
-        // The owner's minimum rental length, applied only to day bookings: the
-        // field is expressed in days, and Cocloset's garment-rental type is
-        // day-based. Anything unusable (absent, 0, fractional) means no minimum.
-        const minimumDays = resolveMinimumDays(minimumBookingDays, isDaily);
-        const minimumNights = minimumNightsForMinimumDays(minimumDays);
-
         return (
           <Form onSubmit={handleSubmit} className={classes} enforcePagePreloadFor="CheckoutPage">
             {PriceVariantFieldComponent ? (
@@ -916,32 +861,6 @@ export const BookingDatesForm = props => {
                     days: initialCleaningBlockDays,
                     date: intl.formatDate(earliestStartDate, dateFormatOptions),
                   }}
-                />
-              </p>
-            ) : null}
-
-            {/* The owner's minimum rental length, stated BEFORE the customer tries.
-                  > "hay que mostrar una leyenda donde indique que la prenda necesita
-                  >  ser reservada por un mínimo de n días ... es importante que el
-                  >  cliente vea esta información ya que de otra manera no sabrá por
-                  >  que no le permite reservar por menos días"
-                `minimumNights` makes the second click in the calendar silently do
-                nothing, and the `minimumBookingDays` validator only speaks up after a
-                failed attempt - so without this the rule is discoverable only by
-                bumping into it. This is ADDITIVE: the validator stays, because it also
-                guards the typed-in date inputs and has to name the rule at the moment
-                it is broken.
-
-                `minimumDays` is null unless the effective minimum is genuinely > 1
-                (resolveMinimumDays), so a listing with no minimum, a minimum of 1, or
-                an hourly/fixed listing renders nothing at all - the same condition the
-                picker floor and the validator use, from the same call, so the legend
-                cannot claim a rule the calendar is not enforcing. */}
-            {minimumDays ? (
-              <p className={css.minimumBookingDaysNotice}>
-                <FormattedMessage
-                  id="BookingDatesForm.minimumBookingDaysNotice"
-                  values={{ days: minimumDays }}
                 />
               </p>
             ) : null}
@@ -979,21 +898,13 @@ export const BookingDatesForm = props => {
                 return v ? getStartAndEndOnTimeZone(startDate, endDate, isDaily, timeZone) : v;
               }}
               useMobileMargins
-              minimumNights={minimumNights}
               validate={composeValidators(
                 required(
                   intl.formatMessage({
                     id: 'BookingDatesForm.requiredDate',
                   })
                 ),
-                bookingDatesRequired(startDateErrorMessage, endDateErrorMessage),
-                // Carries the message the picker cannot: minimumNights makes the
-                // second click do nothing, silently, and does not guard the
-                // typed-in date inputs at all.
-                minimumBookingDaysValidator(
-                  minimumDays,
-                  intl.formatMessage({ id: 'BookingDatesForm.minimumBookingDays' }, { minimumDays })
-                )
+                bookingDatesRequired(startDateErrorMessage, endDateErrorMessage)
               )}
               isDayBlocked={isDayBlocked}
               isOutsideRange={isOutsideRange}

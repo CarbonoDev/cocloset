@@ -38,21 +38,6 @@
   }
 }
 
-/* The minimum-rental-length legend. Same treatment as the initial-cleaning notice
-   above: both are standing statements about what the calendar will accept, read
-   before the first click, so they must not look like two different kinds of thing.
-   Kept as its own class rather than reusing that one because the two are shown
-   independently - a garment can have either, both, or neither. */
-.minimumBookingDaysNotice {
-  composes: marketplaceTinyFontStyles from global;
-  color: var(--colorGrey700);
-  margin: 0 24px 12px 24px;
-
-  @media (--viewportMedium) {
-    margin: 0 0 16px 0;
-  }
-}
-
 .bookingDates {
   flex-shrink: 0;
 

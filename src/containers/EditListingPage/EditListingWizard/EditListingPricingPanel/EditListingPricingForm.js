@@ -9,13 +9,14 @@ import { FormattedMessage, useIntl } from '../../../../util/reactIntl';
 import * as validators from '../../../../util/validators';
 import { formatMoney } from '../../../../util/currency';
 import { types as sdkTypes } from '../../../../util/sdkLoader';
-import { DAY, FIXED, isBookingProcess } from '../../../../transactions/transaction';
+import { FIXED, isBookingProcess } from '../../../../transactions/transaction';
+import { usesFixedRentalPeriods } from '../../../../util/rentalPeriods';
 
 // Import shared components
 import { Button, Form, FieldCurrencyInput } from '../../../../components';
 
 import BookingPriceVariants from './BookingPriceVariants';
-import MinimumBookingDays from './MinimumBookingDays';
+import RentalPeriodPrices from './RentalPeriodPrices';
 import StartTimeInterval from './StartTimeInverval';
 
 // Import modules from this directory
@@ -136,26 +137,29 @@ export const EditListingPricingForm = props => (
 
       const isFixedLengthBooking = isBooking && unitType === FIXED;
       const isBookingPriceVariationsInUse = isBooking && isPriceVariationsInUse;
-      const isUsingPriceVariants = isFixedLengthBooking || isBookingPriceVariationsInUse;
 
-      // A minimum rental length in days only makes sense when the booking is measured in
-      // days. Cocloset's garment rentals use unitType 'day'.
-      //
-      // NIGHT is deliberately excluded, even though the arithmetic happens to match.
-      // The minimum is enforced in two places that both key on 'day' - the booking
-      // calendar's floor (src/components/OrderPanel/BookingDatesForm) and
-      // server/api-util/bookingRules.js - and for a nightly listing the picker holds a
-      // different end date, so the day-count-to-nights conversion is not the same
-      // expression. Offering the field here without extending both of those would give
-      // an owner a control that stores a value nothing ever reads: the failure would be
-      // a rental shorter than the minimum they set, with no error anywhere.
-      const isDayBasedBooking = isBooking && unitType === DAY;
+      // Cocloset: a garment is rented for one of two fixed periods, each with a flat price.
+      // Checked FIRST, because a garment-rental listing type would otherwise also satisfy
+      // `isBookingPriceVariationsInUse` and get the stock free-form variants editor, which
+      // lets an owner rename, delete and add periods the booking form cannot interpret.
+      // See RentalPeriodPrices.js for the full argument.
+      const isFixedRentalPeriod = usesFixedRentalPeriods(listingTypeConfig);
+      const isUsingPriceVariants =
+        !isFixedRentalPeriod && (isFixedLengthBooking || isBookingPriceVariationsInUse);
 
       return (
         <Form onSubmit={handleSubmit} className={classes}>
           <ErrorMessages fetchErrors={fetchErrors} />
 
-          {isUsingPriceVariants ? (
+          {isFixedRentalPeriod ? (
+            <RentalPeriodPrices
+              formId={formId}
+              className={css.input}
+              autoFocus={autoFocus}
+              marketplaceCurrency={marketplaceCurrency}
+              listingMinimumPriceSubUnits={listingMinimumPriceSubUnits}
+            />
+          ) : isUsingPriceVariants ? (
             <BookingPriceVariants
               formId={formId}
               formApi={formApi}
@@ -184,14 +188,6 @@ export const EditListingPricingForm = props => (
               validate={priceValidators}
             />
           )}
-
-          {isDayBasedBooking ? (
-            <MinimumBookingDays
-              id={`${formId}minimumBookingDays`}
-              name="minimumBookingDays"
-              className={css.input}
-            />
-          ) : null}
 
           {isFixedLengthBooking ? (
             <StartTimeInterval

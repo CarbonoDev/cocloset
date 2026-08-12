@@ -1,9 +1,7 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
 const { buildLineItemsForListing } = require('../api-util/lineItems');
-const {
-  assertInitialCleaningLeadTime,
-  assertMinimumBookingDays,
-} = require('../api-util/bookingRules');
+const { assertInitialCleaningLeadTime } = require('../api-util/bookingRules');
+const { assertRentalPeriodBooking } = require('../api-util/rentalPeriods');
 const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
 const {
   addOfferToMetadata,
@@ -190,18 +188,20 @@ module.exports = (req, res) => {
       const { providerCommission, customerCommission } =
         commissionAsset?.type === 'jsonAsset' ? commissionAsset.attributes.data : {};
 
-      // The owner's minimum rental length. A no-op unless this transition
-      // actually carries booking dates (most do not - they act on a booking that
-      // already exists), but this endpoint is one of the two that can CREATE a
-      // reservation, so it needs the same gate as initiate-privileged.js.
+      // The rental period. A no-op unless this transition actually carries booking
+      // dates (most do not - they act on a booking that already exists), but this
+      // endpoint is one of the two that can CREATE a reservation, so it needs the
+      // same gate as initiate-privileged.js: the period name decides the price, and
+      // nothing else checks that the dates match it.
       //
       // `listing` here comes from the transaction's `include: ['listing']`, and
       // that included resource does carry `publicData`: the line-item builder
       // below already reads `publicData.unitType` off this very object and
       // refuses to price the booking when it is missing. So this check cannot
       // silently skip for want of the field.
-      assertMinimumBookingDays({
+      assertRentalPeriodBooking({
         listing,
+        priceVariantName: orderData?.priceVariantName,
         bookingStart: bodyParams?.params?.bookingStart,
         bookingEnd: bodyParams?.params?.bookingEnd,
       });
