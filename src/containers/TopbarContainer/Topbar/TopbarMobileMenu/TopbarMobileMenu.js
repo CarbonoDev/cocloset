@@ -5,7 +5,7 @@
 import React from 'react';
 import classNames from 'classnames';
 
-import { ACCOUNT_SETTINGS_PAGES } from '../../../../routing/routeConfiguration';
+import { ACCOUNT_SETTINGS_PAGES, LAUNDRY_OPS_PAGES } from '../../../../routing/routeConfiguration';
 import { FormattedMessage } from '../../../../util/reactIntl';
 import { ensureCurrentUser } from '../../../../util/data';
 import { isLaundryUser } from '../../../../util/userHelpers';
@@ -152,7 +152,8 @@ const TopbarMobileMenu = props => {
     const isAccountSettingsPage =
       page === 'AccountSettingsPage' && ACCOUNT_SETTINGS_PAGES.includes(currentPage);
     const isInboxPage = currentPage?.indexOf('InboxPage') === 0 && page?.indexOf('InboxPage') === 0;
-    return currentPage === page || isAccountSettingsPage || isInboxPage ? css.currentPage : null;
+    const isLaundryOpsPage = page === 'LaundryProfilePage' && LAUNDRY_OPS_PAGES.includes(currentPage);
+    return currentPage === page || isAccountSettingsPage || isInboxPage || isLaundryOpsPage ? css.currentPage : null;
   };
 
   const manageListingsLinkMaybe = showCreateListingsLink ? (

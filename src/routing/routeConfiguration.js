@@ -54,6 +54,16 @@ export const ACCOUNT_SETTINGS_PAGES = [
   'ManageAccountPage'
 ];
 
+export const LAUNDRY_OPS_PAGES = [
+  'LaundryProfilePage',
+  'LaundryOpsDashboardPage',
+  'LaundryOpsOrdersPage',
+  'LaundryOpsPickupsPage',
+  'LaundryOpsReturnsPage',
+  'LaundryOpsCleaningPage',
+  'LaundryOpsInventoryPage',
+];
+
 // https://en.wikipedia.org/wiki/Universally_unique_identifier#Nil_UUID
 const draftId = '00000000-0000-0000-0000-000000000000';
 const draftSlug = 'draft';

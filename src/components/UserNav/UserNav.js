@@ -1,7 +1,7 @@
 import React from 'react';
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import classNames from 'classnames';
-import { ACCOUNT_SETTINGS_PAGES } from '../../routing/routeConfiguration';
+import { ACCOUNT_SETTINGS_PAGES, LAUNDRY_OPS_PAGES } from '../../routing/routeConfiguration';
 import { LinkTabNavHorizontal } from '../../components';
 
 import css from './UserNav.module.css';
@@ -37,7 +37,7 @@ const UserNav = props => {
     ? [
         {
           text: <FormattedMessage id="UserNav.laundryProfile" />,
-          selected: currentPage === 'LaundryProfilePage',
+          selected: LAUNDRY_OPS_PAGES.includes(currentPage),
           linkProps: {
             name: 'LaundryProfilePage',
           },
