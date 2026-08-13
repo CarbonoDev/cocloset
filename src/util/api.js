@@ -251,6 +251,21 @@ export const updateLaundryTransactionStatus = body => {
   return post('/api/laundry-transaction-status', body);
 };
 
+// What a scanned handover QR resolves to: the next step at the laundry counter, who it is
+// with, and whether THIS caller may confirm it.
+//
+// Authenticated, and answers only the assigned laundry, the customer and the provider. The
+// laundry is not a party to the transaction in the Sharetribe sense, so it cannot read it
+// through the SDK at all - which is why the scan page reads through our server rather than
+// through `transactions.show`. See `server/api/handover-status.js`.
+//
+// Returns `{ data: { processState, viewerRole, canConfirm, step, listingTitle, ... } }`.
+export const fetchHandoverStatus = transactionId => {
+  return request(`/api/handover-status?transactionId=${encodeURIComponent(transactionId)}`, {
+    method: methods.GET,
+  });
+};
+
 // Update a listing's physical readiness state
 // (`listing.metadata.readinessStatus`, `listing.privateData.currentRack`),
 // independent of any specific booking - e.g. a garment just shipped in by

@@ -3,7 +3,10 @@ import classNames from 'classnames';
 
 import { FormattedMessage } from '../../../util/reactIntl';
 import { HandoverQrCode, Heading } from '../../../components';
-import { isHandoverQrVisibleState } from '../../../transactions/transactionProcessCoclosetBooking';
+import {
+  isHandoverQrVisibleState,
+  states,
+} from '../../../transactions/transactionProcessCoclosetBooking';
 import { resolveHandoverQrPayload } from '../../../util/handoverQr';
 
 import css from './HandoverQrMaybe.module.css';
@@ -75,13 +78,32 @@ const HandoverQrMaybe = props => {
   const ticketCode = metadata?.ticketCode;
   const classes = classNames(rootClassName || css.root, className);
 
+  // "Not collectable yet" is every state before the studio has the garment ready.
+  const isWaitingForGarment = [states.PREAUTHORIZED, states.ACCEPTED].includes(processState);
+  const descriptionId = isWaitingForGarment
+    ? 'TransactionPanel.handoverQr.descriptionWaiting'
+    : 'TransactionPanel.handoverQr.description';
+
   return (
     <section className={classes}>
       <Heading as="h3" rootClassName={css.heading}>
         <FormattedMessage id="TransactionPanel.handoverQr.heading" />
       </Heading>
+      {/* The code now appears the moment the payment is confirmed, which is BEFORE the
+          garment has gone anywhere:
+
+            > "el QR debe mostrarse al cliente desde que se confirma el pago pero con la
+            >  instrucción de que debe esperar a que el provider entregue la prenda y la
+            >  lavandería haga su proceso y que debe acudir a la lavandería por su prenda"
+
+          So the copy has to change with the state, not just exist. Before the garment is at
+          the studio the customer is told what has to happen first and that the code is not
+          usable yet; from `ready-for-pickup` onwards it is the ordinary "show this at the
+          counter". One sentence covering both would have to be vague enough to be useless at
+          the moment it matters most - just after paying, which is exactly when the client
+          says the customer needs to be told. */}
       <p className={css.description}>
-        <FormattedMessage id="TransactionPanel.handoverQr.description" />
+        <FormattedMessage id={descriptionId} />
       </p>
       <div className={css.body}>
         <HandoverQrCode

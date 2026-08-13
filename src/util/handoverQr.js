@@ -17,6 +17,28 @@
 export const HANDOVER_QR_METADATA_KEY = 'handoverQr';
 
 /**
+ * The path a scanned code opens.
+ *
+ * Must match HANDOVER_PATH in server/api-util/handoverQr.js (which builds the encoded URL)
+ * AND the route in src/routing/routeConfiguration.js (which resolves it). Three places, one
+ * string, and a mismatch is a QR that scans to a 404 with nothing to reveal it from either
+ * side - so handoverQrUrlAgreement.test.js checks all three against each other.
+ */
+export const HANDOVER_PATH = 'handover';
+
+/**
+ * The in-app path for a transaction's handover page.
+ *
+ * Relative, because the browser already knows the origin; the server builds the absolute
+ * form for the QR image. Both derive from HANDOVER_PATH so they cannot drift.
+ *
+ * @param {string} transactionUuid
+ * @returns {string|null}
+ */
+export const handoverPathFor = transactionUuid =>
+  transactionUuid ? `/${HANDOVER_PATH}/${transactionUuid}` : null;
+
+/**
  * The payload to render, given a `handoverQr` record (or nothing).
  *
  * The fallback to the bare transaction id is not a guess: design §11 fixes the

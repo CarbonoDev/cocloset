@@ -93,11 +93,40 @@ describe('HandoverQrMaybe', () => {
     });
   });
 
-  it('renders nothing before the booking is accepted', () => {
-    // The provider can still decline; a collection code would be premature.
-    ['inquiry', 'pending-payment', 'preauthorized'].forEach(state => {
+  it('renders nothing before the payment is confirmed', () => {
+    // There is no rental to collect until the customer has actually paid.
+    ['inquiry', 'pending-payment'].forEach(state => {
       const { container } = renderPanel({ processState: state });
       expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  // The client moved this floor:
+  //   > "el QR debe mostrarse al cliente desde que se confirma el pago pero con la
+  //   >  instrucción de que debe esperar a que el provider entregue la prenda"
+  // The old worry - a code for a booking the provider might still decline - is answered by
+  // the COPY, so the copy is what this asserts alongside the code being there at all.
+  // Matched on the real strings, not the keys: this suite renders with `messages: en`, and
+  // the point is which SENTENCE the customer reads.
+  const WAITING_COPY = /still has to bring the garment to the laundry/i;
+  const READY_COPY = /Show this code at the laundry counter/i;
+
+  it('shows the code as soon as the payment is confirmed, with the waiting instructions', () => {
+    ['preauthorized', 'accepted'].forEach(state => {
+      const { queryByText, getByRole, unmount } = renderPanel({ processState: state });
+      expect(getByRole('img')).toBeInTheDocument();
+      expect(queryByText(WAITING_COPY)).toBeInTheDocument();
+      expect(queryByText(READY_COPY)).not.toBeInTheDocument();
+      unmount();
+    });
+  });
+
+  it('switches to the collect-it-now copy once the garment is ready', () => {
+    ['ready-for-pickup', 'picked-up', 'overdue'].forEach(state => {
+      const { queryByText, unmount } = renderPanel({ processState: state });
+      expect(queryByText(READY_COPY)).toBeInTheDocument();
+      expect(queryByText(WAITING_COPY)).not.toBeInTheDocument();
+      unmount();
     });
   });
 

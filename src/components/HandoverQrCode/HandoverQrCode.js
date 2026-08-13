@@ -25,6 +25,17 @@ const LARGE_PX = 180;
  * no fetch, no loading state, and correct output on the first server-rendered
  * paint.
  *
+ * WHAT `payload` IS, AND WHAT THE CODE ACTUALLY ENCODES. `payload` is the transaction id -
+ * that is what this component sends to the endpoint and what it prints as selectable text.
+ * The endpoint encodes something slightly different: the handover URL built from that id
+ * (server/api-util/handoverQr.js `buildHandoverQrScanUrl`), so that scanning the code opens
+ * the handover page rather than yielding a string a phone can do nothing with.
+ *
+ * The two are deliberately not the same. The printed text is the MANUAL fallback for a
+ * studio whose scanner is down, and what that studio needs to type is the id - it is what
+ * the ops search box matches on. A URL printed under the image would be long, unreadable
+ * aloud, and useless in that box.
+ *
  * ACCESSIBILITY
  * A QR code is a picture of a string: useless to a screen reader, and useless to
  * a laundry whose scanner is broken - which still has to be able to process the

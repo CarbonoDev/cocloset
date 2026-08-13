@@ -27,6 +27,7 @@ const listingInitialCleaning = require('./api/listing-initial-cleaning');
 const laundryAddress = require('./api/laundry-address');
 const laundryOrders = require('./api/laundry-orders');
 const transactionQr = require('./api/transaction-qr');
+const handoverStatus = require('./api/handover-status');
 const initUserRole = require('./api/init-user-role');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
@@ -101,6 +102,13 @@ router.get('/listing-initial-cleaning', listingInitialCleaning);
 // Unauthenticated by design - it echoes back only the transaction id it was
 // given. See the header of server/api/transaction-qr.js before changing that.
 router.get('/transaction-qr', transactionQr);
+
+// What a scanned handover QR resolves to. Authenticated, and answers only the three roles
+// that have business with the garment - the assigned laundry (which alone gets an action),
+// the customer and the provider. The laundry is not a party to the transaction, so it cannot
+// read it through the Marketplace API at all; see the header of
+// server/api/handover-status.js.
+router.get('/handover-status', handoverStatus);
 
 // Applies the `metadata.isLaundry = false` default to the CALLING user, right
 // after signup. Takes no request parameters at all - the target is the

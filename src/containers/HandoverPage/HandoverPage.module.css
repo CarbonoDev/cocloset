@@ -1,0 +1,92 @@
+.root {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 24px;
+
+  @media (--viewportMedium) {
+    padding: 48px 24px;
+  }
+}
+
+.heading {
+  margin: 0 0 24px 0;
+}
+
+.card {
+  background-color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.garment {
+  composes: marketplaceDefaultFontStyles from global;
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0;
+}
+
+.ticket {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 4px 0 16px 0;
+}
+
+.ticketCode {
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
+.stepTitle {
+  margin: 0 0 4px 0;
+}
+
+.counterparty {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetBrandDark);
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0 0 16px 0;
+}
+
+/* A late return is not decoration: the operator needs to see it before confirming, because
+   it changes nothing they can do but everything they should say. Carried by an icon-free
+   tinted block rather than by colour alone. */
+.late {
+  composes: marketplaceTinyFontStyles from global;
+  background-color: var(--coclosetToneAmberBg);
+  color: var(--coclosetToneAmberFg);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 0 0 16px 0;
+}
+
+.instruction {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0 0 24px 0;
+}
+
+.confirmButton {
+  margin: 0;
+}
+
+.status {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+}
+
+.errorBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.error {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--colorFail);
+  margin: 0 0 12px 0;
+}
+
+.link {
+  composes: marketplaceDefaultFontStyles from global;
+}
