@@ -10,11 +10,22 @@ import { fetchHandoverStatus, updateLaundryTransactionStatus } from '../../util/
 // role that can act - is not a party to the transaction and therefore cannot read it through
 // the SDK at all. See server/api/handover-status.js.
 
+// `request()` in util/api.js returns the PARSED BODY, so the endpoint's `{ data: {...} }`
+// arrives here whole and `response.data` is already the handover object. Reading `.data` a
+// second time in the reducer is what produced a completely blank page in production: the
+// thunk fulfilled, the reducer stored `undefined`, and a component that renders nothing for
+// "no handover" had nothing to render and no error to explain it.
+//
+// `Promise.resolve().then(...)` so a SYNCHRONOUS throw inside `fetchHandoverStatus` lands in
+// the same `.catch` as a rejected request. Without it such a throw escapes the payload
+// creator, createAsyncThunk rejects with `action.error` instead of `action.payload`, and the
+// slice stores `undefined` as its error - blank page again, by a different route.
 export const fetchHandoverThunk = createAsyncThunk(
   'HandoverPage/fetchHandover',
   ({ transactionId }, { rejectWithValue }) =>
-    fetchHandoverStatus(transactionId)
-      .then(response => response.data)
+    Promise.resolve()
+      .then(() => fetchHandoverStatus(transactionId))
+      .then(response => response?.data || null)
       .catch(e => rejectWithValue(storableError(e)))
 );
 
@@ -63,7 +74,8 @@ const handoverPageSlice = createSlice({
       })
       .addCase(fetchHandoverThunk.fulfilled, (state, action) => {
         state.fetchInProgress = false;
-        state.handover = action.payload?.data || null;
+        // The payload IS the handover object - see the note on the thunk.
+        state.handover = action.payload || null;
         // A successful refetch clears a previous confirm failure: the state on screen is now
         // the server's, so a stale error next to it would describe a world that no longer
         // exists.
