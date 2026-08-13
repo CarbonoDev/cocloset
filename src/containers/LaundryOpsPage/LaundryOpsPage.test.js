@@ -90,6 +90,40 @@ describe('LaundryOpsPage', () => {
       expect(screen.getByText('LaundryOpsPage.status.picked-up')).toBeInTheDocument();
     });
 
+    // ---------------------------------------------------------------------------
+    //   > "podemos quitar el QR para los laundries? solamente un provider o un customer
+    //   >  pueden ver el QR, laundry solo va a escanear"
+    //
+    // The studio must not be able to render a customer's code on its own screen: doing so
+    // would let it advance a handover with nobody at the counter, which is the whole of what
+    // the scan is supposed to attest. Asserted at the DOM level rather than by checking a
+    // prop, because the failure that matters is a code appearing on this page at all -
+    // through this component or any future one.
+    // ---------------------------------------------------------------------------
+    it('never renders a handover QR anywhere on the ops screens', async () => {
+      const user = userEvent.setup();
+      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+
+      expect(
+        screen.queryByRole('img', { name: 'HandoverQrCode.imageAlt' })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText('LaundryOpsPage.table.qr')).not.toBeInTheDocument();
+
+      // Nor in the expanded detail panel, which used to carry a large one.
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      expect(
+        screen.queryByRole('img', { name: 'HandoverQrCode.imageAlt' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('still shows the transaction id, which is what a broken scanner falls back to', async () => {
+      const user = userEvent.setup();
+      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      expect(screen.getByText('LaundryOpsPage.detail.transactionId')).toBeInTheDocument();
+    });
+
     it('renders the filter tabs on the Orders screen only', () => {
       const { unmount } = render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
       expect(screen.getByText('LaundryOpsPage.tab.damaged')).toBeInTheDocument();

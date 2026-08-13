@@ -3,10 +3,8 @@ import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { laundryActionsFor, statusLabelKey } from '../../util/laundryStatuses';
-import { handoverQrPayloadFromRecord } from '../../util/handoverQr';
-import { isHandoverQrVisibleState } from '../../transactions/transactionProcessCoclosetBooking';
 import { isLate } from './LaundryOpsPage.helpers';
-import { HandoverQrCode, InlineTextButton, PrimaryButton } from '../../components';
+import { InlineTextButton, PrimaryButton } from '../../components';
 
 import { statusTone } from './LaundryOpsPage.helpers';
 import css from './LaundryOpsPage.module.css';
@@ -56,18 +54,21 @@ const LaundryOrderRow = props => {
   // the Inventory screen instead.
   const action = laundryActionsFor(row)[0] || null;
 
-  // The handover QR. Same single code for both scans - the laundry uses it to
-  // hand the garment over and to take it back - so there is one payload here and
-  // no notion of "which" QR. It stops being rendered once the return has been
-  // confirmed (`isHandoverQrVisibleState`, derived from the row's real process
-  // state, never from a metadata flag): from `returned` onwards there is no
-  // handover left to scan, and a stale code on the worklist invites a
-  // pointless scan that Sharetribe would 409 anyway.
+  // NO QR ON THE LAUNDRY'S SCREENS.
   //
-  // Inventory-only rows (§8: an assigned garment with no booking) have no
-  // transaction and therefore no handover.
-  const qrPayload = handoverQrPayloadFromRecord(row.handoverQr, row.transactionId);
-  const showQr = !!qrPayload && isHandoverQrVisibleState(row.state);
+  //   > "podemos quitar el QR para los laundries? solamente un provider o un customer pueden
+  //   >  ver el QR, laundry solo va a escanear"
+  //
+  // The code belongs to the two people who carry it. A studio rendering its own copy of a
+  // customer's code can advance a handover without anyone being at the counter, which is
+  // exactly the attestation the scan is supposed to be. The studio scans what the person in
+  // front of them is holding, and the scan opens /handover/<id> with the right transaction
+  // and the right action already resolved.
+  //
+  // The transaction id is still shown in the detail panel: a studio whose scanner is down
+  // needs something to type into the search box, and that has always been the id rather than
+  // the code.
+  //
   // Rows share a table, so the input's id has to be per-row or every label in the
   // table would point at the first one.
   const cleaningDaysInputId = `LaundryOrderRow.cleaningDays.${row.id}`;
@@ -92,17 +93,6 @@ const LaundryOrderRow = props => {
   return (
     <>
       <tr className={css.row}>
-        {/* Design §11 fixes the QR payload as the raw transaction id. The image
-            itself is rendered server-side by /api/transaction-qr. */}
-        <td className={css.cellQr}>
-          {showQr ? (
-            <HandoverQrCode payload={qrPayload} size="small" id={`opsQr-${row.id}`} />
-          ) : (
-            // Same '—' every other empty cell in this table uses. The expanded
-            // detail panel says why it is gone.
-            <span className={css.secondaryText}>—</span>
-          )}
-        </td>
         <td className={css.cellNoWrap}>
           <span className={css.primaryText}>{row.ticketCode || '—'}</span>
           <span className={css.secondaryText}>{row.currentRack || '—'}</span>
@@ -163,7 +153,7 @@ const LaundryOrderRow = props => {
       </tr>
       {isOpen ? (
         <tr>
-          <td className={css.detailCell} colSpan={7}>
+          <td className={css.detailCell} colSpan={6}>
             <div className={css.detailPanel}>
               {/* The endpoint denormalizes the listing's first image down to a
                   plain URL, so this is a bare <img> rather than
@@ -179,41 +169,18 @@ const LaundryOrderRow = props => {
                 )}
               </div>
               <div className={css.detailInfo}>
-                {/* The scannable code, big enough to scan off the operator's own
-                    screen, with the payload still shown as selectable text
-                    underneath (HandoverQrCode showPayload) - a studio whose
-                    scanner is down needs to be able to read or copy it. */}
-                {showQr ? (
-                  <div className={css.detailQr}>
-                    <HandoverQrCode
-                      payload={qrPayload}
-                      size="large"
-                      showPayload={true}
-                      id={`opsQrDetail-${row.id}`}
+                {/* The transaction id, as selectable text. This is what a studio types into
+                    the search box when the scanner is down - it is not a code to be scanned
+                    off the operator's own screen, which is the point of removing the QR from
+                    here. Inventory-only rows (an assigned garment with no booking) have no
+                    transaction and so no id. */}
+                {row.transactionId ? (
+                  <p className={css.detailLine}>
+                    <FormattedMessage
+                      id="LaundryOpsPage.detail.transactionId"
+                      values={{ id: row.transactionId }}
                     />
-                    <p className={css.detailLine}>
-                      <FormattedMessage id="LaundryOpsPage.detail.qrBothHandovers" />
-                    </p>
-                  </div>
-                ) : null}
-
-                {/* No code left to scan - usually because both handovers are
-                    done, but also for a cancelled or expired order, so the copy
-                    stays state-neutral. The transaction id is still how this
-                    order is looked up, so it stays readable. Inventory-only rows
-                    have neither. */}
-                {!showQr && row.transactionId ? (
-                  <>
-                    <p className={css.detailLine}>
-                      <FormattedMessage id="LaundryOpsPage.detail.qrInactive" />
-                    </p>
-                    <p className={css.detailLine}>
-                      <FormattedMessage
-                        id="LaundryOpsPage.detail.qrPayload"
-                        values={{ id: row.transactionId }}
-                      />
-                    </p>
-                  </>
+                  </p>
                 ) : null}
                 {row.damageReported?.flag ? (
                   <p className={css.detailDamage}>
