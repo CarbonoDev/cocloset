@@ -116,3 +116,38 @@
   font-weight: var(--fontWeightSemiBold);
   margin: 0;
 }
+
+/* The cleaning-days box, shown to the studio at the moment the garment comes back. */
+.cleaningDaysField {
+  margin: 0 0 20px 0;
+}
+
+.cleaningDaysLabel {
+  composes: marketplaceDefaultFontStyles from global;
+  display: block;
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0 0 4px 0;
+  padding: 0;
+}
+
+.cleaningDaysInput {
+  composes: marketplaceDefaultFontStyles from global;
+  width: 100%;
+  max-width: 140px;
+  padding: 8px 12px;
+  border: 1px solid var(--coclosetBorderStrong);
+  border-radius: 4px;
+  background-color: var(--coclosetSurface);
+  color: var(--coclosetInk);
+}
+
+.cleaningDaysInput:focus {
+  border-color: var(--coclosetBrand);
+  outline: none;
+}
+
+.cleaningDaysHelp {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 4px 0 0 0;
+}

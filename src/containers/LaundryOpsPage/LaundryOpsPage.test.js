@@ -42,6 +42,7 @@ const orderRow = (overrides = {}) => ({
   readinessStatus: 'stored',
   damageReported: null,
   returnedLate: false,
+  defaultCleaningDays: 3,
   ...overrides,
 });
 
@@ -122,6 +123,21 @@ describe('LaundryOpsPage', () => {
 
       await user.click(screen.getByText('LaundryOpsPage.table.open'));
       expect(screen.getByText('LaundryOpsPage.detail.transactionId')).toBeInTheDocument();
+    });
+
+    it('pre-fills the cleaning-days box with the studio own turnaround', async () => {
+      //   > "estos días deben tener un default de los días que indique la laundry, pero
+      //   >  pueden modificarse al recibir"
+      //
+      // It used to start blank under "leave it blank to use your configured turnaround",
+      // which asked the operator to accept a number they could not see.
+      const user = userEvent.setup();
+      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      const input = document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1');
+
+      expect(input).toHaveValue(3);
     });
 
     it('renders the filter tabs on the Orders screen only', () => {
@@ -246,6 +262,9 @@ describe('LaundryOpsPage', () => {
       expect(onAdvanceStatus).toHaveBeenCalledWith({
         transactionId: 'tx-1',
         status: 'returned',
+        // The pre-filled turnaround rides along untouched; this test is about the damage
+        // report, and the operator did not change the days.
+        cleaningDays: 3,
         damaged: true,
         damageNote: 'Small pull at left cuff.',
       });
@@ -268,23 +287,28 @@ describe('LaundryOpsPage', () => {
         <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
       );
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
-      await userEvent.type(screen.getByRole('spinbutton'), '3');
+      // Cleared first: the box now arrives pre-filled with the studio's configured
+      // turnaround, so typing into it would append rather than replace.
+      await userEvent.clear(screen.getByRole('spinbutton'));
+      await userEvent.type(screen.getByRole('spinbutton'), '5');
       await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'returned', cleaningDays: 3 })
+        expect.objectContaining({ status: 'returned', cleaningDays: 5 })
       );
     });
 
-    it('sends NO cleaning-days when the field is left blank', async () => {
-      // Absent means "apply the turnaround this studio configured for the
-      // category", which only the server can resolve. Sending 0 instead would
-      // mean "ready today" and would block nothing at all.
+    it('sends NO cleaning-days when the operator clears the field', async () => {
+      // Absent means "apply the turnaround this studio configured for the category", which
+      // only the server can resolve. Sending 0 instead would mean "ready today" and would
+      // block nothing at all. The box now arrives pre-filled, so reaching this state takes a
+      // deliberate clear - which is the honest version of the old "leave it blank".
       const onAdvanceStatus = jest.fn();
       render(
         <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
       );
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
 
       expect(onAdvanceStatus.mock.calls[0][0]).not.toHaveProperty('cleaningDays');
@@ -296,6 +320,7 @@ describe('LaundryOpsPage', () => {
         <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
       );
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.type(screen.getByRole('spinbutton'), '0');
       await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
 

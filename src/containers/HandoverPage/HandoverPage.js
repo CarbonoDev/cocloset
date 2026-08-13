@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { compose } from 'redux';
 import { connect } from 'react-redux';
 
@@ -100,6 +100,30 @@ export const HandoverPageComponent = props => {
     confirmError,
     onConfirm,
   } = props;
+
+  // How long the studio will need to clean this garment, asked for at the moment it comes
+  // back over the counter.
+  //
+  //   > "al momento de recibir la prenda, laundry puede seleccionar cuantos dias necesita
+  //   >  para lavar, pero en mobile no aparece esta opción, estos días deben tener un default
+  //   >  de los días que indique la laundry, pero pueden modificarse al recibir"
+  //
+  // The desktop ops table has had this box; this page - the one a studio actually uses on a
+  // phone, because it is what a scan opens - did not, so a return confirmed from a phone
+  // silently fell back to the configured turnaround with nothing on screen to say so.
+  //
+  // WHETHER TO ASK AT ALL IS THE SERVER'S ANSWER, not a state check here: the endpoint sends
+  // `defaultCleaningDays` only for the laundry, and only at the step that consumes it. One
+  // place decides, and it is the same place that decides whether there is a button.
+  const [cleaningDays, setCleaningDays] = useState('');
+  const defaultCleaningDays = handover?.defaultCleaningDays;
+
+  useEffect(() => {
+    // Seeded from the server's answer, and re-seeded when it changes (the page refetches
+    // after every confirm). An empty string until it arrives, so the field is never a
+    // controlled input flipping to uncontrolled.
+    setCleaningDays(Number.isInteger(defaultCleaningDays) ? String(defaultCleaningDays) : '');
+  }, [defaultCleaningDays]);
 
   const title = intl.formatMessage({ id: 'HandoverPage.title' });
 
@@ -245,6 +269,30 @@ export const HandoverPageComponent = props => {
             <p className={css.instruction}>
               <FormattedMessage id={handoverStepMessageId(step, 'laundry')} />
             </p>
+
+            {Number.isInteger(defaultCleaningDays) ? (
+              <div className={css.cleaningDaysField}>
+                <label className={css.cleaningDaysLabel} htmlFor="handoverCleaningDays">
+                  <FormattedMessage id="HandoverPage.cleaningDays.label" />
+                </label>
+                <input
+                  id="handoverCleaningDays"
+                  className={css.cleaningDaysInput}
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  value={cleaningDays}
+                  onChange={e => setCleaningDays(e.target.value)}
+                />
+                <p className={css.cleaningDaysHelp}>
+                  <FormattedMessage
+                    id="HandoverPage.cleaningDays.help"
+                    values={{ days: defaultCleaningDays }}
+                  />
+                </p>
+              </div>
+            ) : null}
             {confirmError ? (
               <p className={css.error}>
                 <FormattedMessage id="HandoverPage.error.confirmFailed" />
@@ -256,7 +304,17 @@ export const HandoverPageComponent = props => {
               inProgress={confirmInProgress}
               disabled={confirmInProgress}
               onClick={() =>
-                onConfirm({ transactionId: handover.transactionId, status: step.status })
+                onConfirm({
+                  transactionId: handover.transactionId,
+                  status: step.status,
+                  // Only sent when this step takes it AND the box holds a usable whole
+                  // number. A blank box is NOT a zero: the server reads "absent" as "apply
+                  // the configured turnaround", while 0 means "ready today" and would block
+                  // nothing at all.
+                  ...(Number.isInteger(defaultCleaningDays) && /^\d+$/.test(cleaningDays.trim())
+                    ? { cleaningDays: Number.parseInt(cleaningDays, 10) }
+                    : {}),
+                })
               }
             >
               <FormattedMessage id={handoverStepMessageId(step, 'confirm')} />

@@ -5,7 +5,7 @@ import { renderWithProviders as render, testingLibrary } from '../../util/testHe
 
 import { HandoverPageComponent } from './HandoverPage';
 
-const { screen } = testingLibrary;
+const { screen, fireEvent } = testingLibrary;
 
 // WHY THIS FILE EXISTS
 //
@@ -188,6 +188,97 @@ describe('HandoverPage: the full current status, for a party', () => {
     expect(screen.queryByText('HandoverPage.fact.ticket')).not.toBeInTheDocument();
     expect(screen.queryByText('HandoverPage.fact.rental')).not.toBeInTheDocument();
     expect(screen.getByText('HandoverPage.fact.status')).toBeInTheDocument();
+  });
+});
+
+describe('HandoverPage: the cleaning-days box at a return', () => {
+  //   > "al momento de recibir la prenda, laundry puede seleccionar cuantos dias necesita
+  //   >  para lavar, pero en mobile no aparece esta opción, estos días deben tener un default
+  //   >  de los días que indique la laundry, pero pueden modificarse al recibir"
+  //
+  // This page IS the studio's phone screen - it is what a scan opens - so a return confirmed
+  // here used to fall back to the configured turnaround with nothing on screen to say so.
+
+  const returnStep = {
+    state: 'picked-up',
+    status: 'returned',
+    counterparty: 'customer',
+    direction: 'in',
+    isLate: false,
+  };
+
+  const returning = (overrides = {}) =>
+    handoverFor({
+      processState: 'picked-up',
+      step: returnStep,
+      defaultCleaningDays: 3,
+      ...overrides,
+    });
+
+  const daysInput = () => document.getElementById('handoverCleaningDays');
+
+  it('offers the box, pre-filled with the studio configured turnaround', () => {
+    renderPage({ handover: returning() });
+    expect(daysInput()).toHaveValue(3);
+  });
+
+  it('sends the number the operator actually typed', () => {
+    const onConfirm = jest.fn();
+    renderPage({ handover: returning(), onConfirm });
+
+    fireEvent.change(daysInput(), { target: { value: '5' } });
+    confirmButton().click();
+
+    expect(onConfirm).toHaveBeenCalledWith({
+      transactionId: TX_ID,
+      status: 'returned',
+      cleaningDays: 5,
+    });
+  });
+
+  it('sends NO cleaningDays when the box is cleared', () => {
+    // A blank box is not a zero. Absent means "apply the configured turnaround"; 0 would mean
+    // "ready today" and would block nothing at all.
+    const onConfirm = jest.fn();
+    renderPage({ handover: returning(), onConfirm });
+
+    fireEvent.change(daysInput(), { target: { value: '' } });
+    confirmButton().click();
+
+    expect(onConfirm).toHaveBeenCalledWith({ transactionId: TX_ID, status: 'returned' });
+  });
+
+  it('sends a real zero when the operator types one', () => {
+    // "Ready today" is a legitimate answer, and it has to survive the blank-is-not-zero rule.
+    const onConfirm = jest.fn();
+    renderPage({ handover: returning(), onConfirm });
+
+    fireEvent.change(daysInput(), { target: { value: '0' } });
+    confirmButton().click();
+
+    expect(onConfirm).toHaveBeenCalledWith({
+      transactionId: TX_ID,
+      status: 'returned',
+      cleaningDays: 0,
+    });
+  });
+
+  it('does not offer the box at a step that does not take it', () => {
+    // WHETHER TO ASK is the server's answer - it omits `defaultCleaningDays` except for the
+    // laundry at a return - and this component does not re-derive it.
+    renderPage();
+    expect(daysInput()).toBeNull();
+  });
+
+  it('does not offer the box to a party who cannot confirm', () => {
+    renderPage({
+      handover: returning({
+        viewerRole: 'customer',
+        canConfirm: false,
+        defaultCleaningDays: undefined,
+      }),
+    });
+    expect(daysInput()).toBeNull();
   });
 });
 

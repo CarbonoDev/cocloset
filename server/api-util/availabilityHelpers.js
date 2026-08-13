@@ -25,12 +25,37 @@ const HARDCODED_DEFAULT_BUFFER_DAYS = 2;
  *     start before the laundry has actually finished cleaning. (The ceiling
  *     matters for a fractional value, which only an env var or a hand-written
  *     profile can produce - the form takes integers.)
- *   - The total is then split as evenly as possible between "before" and
- *     "after". On an odd total, the extra day is assigned to the AFTER side:
- *     the before-buffer only covers pickup logistics (laundry hasn't
- *     received the garment yet), while the after-buffer is when the actual
- *     cleaning work happens once the garment is back - that's the side more
- *     likely to need the extra day if turnaround doesn't divide evenly.
+ *   - THE WHOLE TURNAROUND GOES AFTER THE BOOKING. `bufferBeforeDays` is 0.
+ *
+ *     It used to be split down the middle, half before and half after, on the
+ *     reasoning that the before-half covered "pickup logistics - the laundry
+ *     hasn't received the garment yet". That reasoning belonged to the original
+ *     design, where a garment lived with its owner between rentals. It no longer
+ *     does: a Cocloset garment sits AT the studio (`metadata.onLaundry`), the
+ *     renter collects it there on day one, and there is nothing to arrange before
+ *     a booking starts.
+ *
+ *     Splitting it did active harm, and the client reported the symptom:
+ *
+ *       > "esto afecta al tiempo de disponibilidad de la prenda, ya que despues de
+ *       >  este tiempo es cuando la prenda debe estar disponible, no antes y
+ *       >  actualmente la disponibilidad inicia cuando termina el tiempo de reserva
+ *       >  que el cliente seleccionó"
+ *
+ *     Cleaning happens after the garment comes BACK, so half a turnaround blocked
+ *     before the booking is half a turnaround NOT blocked after it - a 3-day
+ *     turnaround released the garment 2 days after the rental ended instead of 3,
+ *     and a 1-day turnaround blocked nothing after it at all.
+ *
+ *     It also put this function out of step with the booking calendar, which
+ *     requires the rental period PLUS the full turnaround to be free before it
+ *     offers a start date (src/components/OrderPanel/BookingRentalPeriodForm.js
+ *     `isWindowAvailableFn`). The calendar reserved one window and the buffer
+ *     blocked a different one.
+ *
+ *     `bufferBeforeDays` is kept in the return value, as 0, rather than removed:
+ *     callers destructure it, and a field that silently disappears is worse than
+ *     one that is explicitly nothing.
  *
  * @param {number} turnaroundDays - total laundry turnaround time, in days.
  *   Must be a positive finite number; callers are responsible for resolving
@@ -46,8 +71,8 @@ const computeBufferDays = turnaroundDays => {
   }
 
   const totalBufferDays = Math.ceil(turnaroundDays);
-  const bufferBeforeDays = Math.floor(totalBufferDays / 2);
-  const bufferAfterDays = totalBufferDays - bufferBeforeDays;
+  const bufferBeforeDays = 0;
+  const bufferAfterDays = totalBufferDays;
 
   return { totalBufferDays, bufferBeforeDays, bufferAfterDays };
 };

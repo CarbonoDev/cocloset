@@ -57,10 +57,18 @@ const mockRes = () => ({
   end: jest.fn().mockReturnThis(),
 });
 
-const currentUserEntity = (id, isLaundry = false) => ({
+const currentUserEntity = (id, isLaundry = false, privateData = {}) => ({
   id: { uuid: id },
   type: 'currentUser',
-  attributes: { profile: { metadata: isLaundry ? { isLaundry: true } : {} } },
+  attributes: {
+    profile: {
+      metadata: isLaundry ? { isLaundry: true } : {},
+      // The studio's own turnaround table. Readable through the ordinary Marketplace API
+      // because it belongs to the caller, which is why pre-filling the box costs no extra
+      // round trip.
+      privateData,
+    },
+  },
 });
 
 const transactionEntity = lastTransition => ({
@@ -79,6 +87,7 @@ const listingEntity = (assignedLaundryId = LAUNDRY_ID) => ({
   type: 'listing',
   attributes: {
     title: 'A silk frock',
+    publicData: { categoryLevel1: 'dresses' },
     metadata: assignedLaundryId ? { assignedLaundryId } : {},
   },
 });
@@ -89,11 +98,14 @@ const setup = ({
   lastTransition = 'transition/laundry-mark-ready',
   assignedLaundryId = LAUNDRY_ID,
   currentUserFails = false,
+  laundryPrivateData = { turnaroundDays: 4 },
 } = {}) => {
   const show = jest.fn(() =>
     currentUserFails
       ? Promise.reject(new Error('no session'))
-      : Promise.resolve({ data: { data: currentUserEntity(callerId, isLaundry) } })
+      : Promise.resolve({
+          data: { data: currentUserEntity(callerId, isLaundry, laundryPrivateData) },
+        })
   );
   getSdk.mockReturnValue({ currentUser: { show } });
 
@@ -241,6 +253,55 @@ describe('handover-status: what it says is next', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.data.step).toBeNull();
       expect(res.body.data.canConfirm).toBe(false);
+    });
+  });
+});
+
+describe('handover-status: the cleaning-days default', () => {
+  //   > "estos días deben tener un default de los días que indique la laundry, pero pueden
+  //   >  modificarse al recibir"
+
+  it('tells the laundry its own turnaround at the return step', () => {
+    setup({ lastTransition: 'transition/laundry-confirm-pickup' }); // -> picked-up, next: returned
+
+    return run().then(res => {
+      expect(res.body.data.step.status).toBe('returned');
+      expect(res.body.data.defaultCleaningDays).toBe(4);
+    });
+  });
+
+  it('omits it at every other step', () => {
+    // Nothing else consumes the number, and a field that is sometimes meaningless is a field
+    // the client has to guess about.
+    setup({ lastTransition: 'transition/laundry-mark-ready' }); // -> ready-for-pickup
+
+    return run().then(res => {
+      expect(res.body.data).not.toHaveProperty('defaultCleaningDays');
+    });
+  });
+
+  it('never tells the CUSTOMER a studio turnaround', () => {
+    // A studio's configuration is not a renter's business, and the renter cannot act on it.
+    setup({
+      callerId: CUSTOMER_ID,
+      isLaundry: false,
+      lastTransition: 'transition/laundry-confirm-pickup',
+    });
+
+    return run().then(res => {
+      expect(res.body.data.viewerRole).toBe('customer');
+      expect(res.body.data).not.toHaveProperty('defaultCleaningDays');
+    });
+  });
+
+  it('falls back to a usable number when the studio has configured nothing', () => {
+    // The chain bottoms out in a hardcoded default: a studio that has set nothing still needs
+    // time to clean, and an empty box would be worse than a defensible guess.
+    setup({ lastTransition: 'transition/laundry-confirm-pickup', laundryPrivateData: {} });
+
+    return run().then(res => {
+      expect(Number.isInteger(res.body.data.defaultCleaningDays)).toBe(true);
+      expect(res.body.data.defaultCleaningDays).toBeGreaterThan(0);
     });
   });
 });

@@ -223,6 +223,34 @@ describe('laundry-orders', () => {
     expect(row.bookingEnd).toBe('2026-08-11T00:00:00.000Z');
   });
 
+  it('pre-fills the cleaning-days box with the studio own turnaround', async () => {
+    //   > "estos días deben tener un default de los días que indique la laundry"
+    //
+    // Resolved from the CALLER's own privateData, which this endpoint already fetched to
+    // authorize the request - so the default costs no extra API call.
+    setupSdk({
+      listingPages: [page([listing('listing-mine')], listingIncluded)],
+      transactionsByListing: {
+        'listing-mine': {
+          data: {
+            data: [
+              transaction('tx-1', { ticketCode: 'PIG-2032' }, 'transition/laundry-confirm-pickup'),
+            ],
+            included: txIncluded,
+          },
+        },
+      },
+    });
+
+    const res = mockRes();
+    await laundryOrders({}, res);
+    await new Promise(setImmediate);
+
+    const row = res.body.data.orders[0];
+    expect(Number.isInteger(row.defaultCleaningDays)).toBe(true);
+    expect(row.defaultCleaningDays).toBeGreaterThan(0);
+  });
+
   it('does not send the handover QR record to the laundry', async () => {
     //   > "podemos quitar el QR para los laundries? solamente un provider o un customer
     //   >  pueden ver el QR, laundry solo va a escanear"
