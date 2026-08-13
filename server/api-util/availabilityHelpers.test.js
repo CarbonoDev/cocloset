@@ -13,31 +13,42 @@ const {
 describe('computeBufferDays()', () => {
   // The input is DAYS. It used to be hours divided by 24 here; the unit moved to days
   // end to end, so these are the same windows stated in the unit the studio types.
-  it('splits an even turnaround exactly in half', () => {
-    // 2 days total -> 1 before, 1 after
+  // THE WHOLE TURNAROUND GOES AFTER THE BOOKING. It used to be split down the middle, on
+  // the reasoning that the before-half covered collecting the garment from its owner. A
+  // Cocloset garment lives at the studio, so there is nothing to arrange before a booking -
+  // and cleaning happens after the garment comes BACK, so every day spent on the before-side
+  // was a day NOT blocked on the side that needs it. The client reported exactly that: the
+  // garment became bookable again before it had been cleaned.
+  it('puts the whole turnaround after the booking, never before it', () => {
     expect(computeBufferDays(2)).toEqual({
       totalBufferDays: 2,
-      bufferBeforeDays: 1,
-      bufferAfterDays: 1,
+      bufferBeforeDays: 0,
+      bufferAfterDays: 2,
     });
-  });
-
-  it('rounds a fractional day UP before splitting (never under-blocks)', () => {
-    // Only an env var or a hand-written profile can produce a fraction; the form takes
-    // integers. 1.1 days -> 2 days total -> 1 before, 1 after.
-    expect(computeBufferDays(1.1)).toEqual({
-      totalBufferDays: 2,
-      bufferBeforeDays: 1,
-      bufferAfterDays: 1,
-    });
-  });
-
-  it('gives the extra day to the AFTER side on an odd total', () => {
-    // 3 days total -> odd split: 1 before, 2 after
     expect(computeBufferDays(3)).toEqual({
       totalBufferDays: 3,
-      bufferBeforeDays: 1,
+      bufferBeforeDays: 0,
+      bufferAfterDays: 3,
+    });
+  });
+
+  it('rounds a fractional day UP (never under-blocks)', () => {
+    // Only an env var or a hand-written profile can produce a fraction; the form takes
+    // integers.
+    expect(computeBufferDays(1.1)).toEqual({
+      totalBufferDays: 2,
+      bufferBeforeDays: 0,
       bufferAfterDays: 2,
+    });
+  });
+
+  // The case that used to vanish entirely: a 1-day turnaround split as 0 before / 1 after
+  // was the ONLY value that happened to be right. Restated here as the general rule.
+  it('blocks a one-day turnaround for the full day after the booking', () => {
+    expect(computeBufferDays(1)).toEqual({
+      totalBufferDays: 1,
+      bufferBeforeDays: 0,
+      bufferAfterDays: 1,
     });
   });
 
@@ -59,11 +70,10 @@ describe('computeBufferDays()', () => {
   });
 
   it('handles a large turnaround (e.g. a week)', () => {
-    // 7 days total -> 3 before, 4 after
     expect(computeBufferDays(7)).toEqual({
       totalBufferDays: 7,
-      bufferBeforeDays: 3,
-      bufferAfterDays: 4,
+      bufferBeforeDays: 0,
+      bufferAfterDays: 7,
     });
   });
 
@@ -148,31 +158,53 @@ describe('floorToUtcDay() / ceilToUtcDay()', () => {
 });
 
 describe('computeAvailabilityBufferWindow()', () => {
-  it('computes buffer-before + rental dates + buffer-after around a booking (2-day turnaround)', () => {
+  it('blocks the rental dates plus the whole turnaround after them', () => {
     const bookingStart = new Date('2026-08-10T00:00:00.000Z');
     const bookingEnd = new Date('2026-08-13T00:00:00.000Z'); // 3-day rental, exclusive end
 
     const result = computeAvailabilityBufferWindow(bookingStart, bookingEnd, 2);
 
     expect(result).toEqual({
-      start: new Date('2026-08-09T00:00:00.000Z'), // 1 day before
-      end: new Date('2026-08-14T00:00:00.000Z'), // 1 day after
-      bufferBeforeDays: 1,
-      bufferAfterDays: 1,
+      // The window opens ON the rental, not before it: the garment is already at the studio.
+      start: new Date('2026-08-10T00:00:00.000Z'),
+      end: new Date('2026-08-15T00:00:00.000Z'), // 2 cleaning days after the rental ends
+      bufferBeforeDays: 0,
+      bufferAfterDays: 2,
       totalBufferDays: 2,
     });
   });
 
-  it('matches the design doc "2 before / N rental / 2 after" shape at a 4-day turnaround', () => {
+  // THE REGRESSION THE CLIENT REPORTED. A 4-day turnaround used to block 2 days before the
+  // rental and 2 after, so the garment came back on the market two days before it had been
+  // cleaned. Every day on the before-side was a day missing from the side that needs it.
+  it('gives the full turnaround to the after-side, not half of it', () => {
     const bookingStart = new Date('2026-08-10T00:00:00.000Z');
     const bookingEnd = new Date('2026-08-13T00:00:00.000Z');
 
     const result = computeAvailabilityBufferWindow(bookingStart, bookingEnd, 4);
 
-    expect(result.bufferBeforeDays).toBe(2);
-    expect(result.bufferAfterDays).toBe(2);
-    expect(result.start).toEqual(new Date('2026-08-08T00:00:00.000Z'));
-    expect(result.end).toEqual(new Date('2026-08-15T00:00:00.000Z'));
+    expect(result.bufferBeforeDays).toBe(0);
+    expect(result.bufferAfterDays).toBe(4);
+    expect(result.start).toEqual(bookingStart);
+    expect(result.end).toEqual(new Date('2026-08-17T00:00:00.000Z'));
+  });
+
+  // The window the buffer blocks must be the window the booking calendar reserved before it
+  // offered the start date, or the calendar promises one thing and the block does another.
+  // See src/components/OrderPanel/BookingRentalPeriodForm.js `isWindowAvailableFn`.
+  it('blocks exactly the window the booking calendar requires to be free', () => {
+    const bookingStart = new Date('2026-08-10T00:00:00.000Z');
+    const periodDays = 7;
+    const cleaningDays = 3;
+    const bookingEnd = new Date('2026-08-17T00:00:00.000Z'); // start + 7
+
+    const result = computeAvailabilityBufferWindow(bookingStart, bookingEnd, cleaningDays);
+    const calendarWindowEnd = new Date(
+      bookingStart.getTime() + (periodDays + cleaningDays) * 24 * 60 * 60 * 1000
+    );
+
+    expect(result.start).toEqual(bookingStart);
+    expect(result.end).toEqual(calendarWindowEnd);
   });
 
   it('handles a single-day rental with a one-day turnaround', () => {

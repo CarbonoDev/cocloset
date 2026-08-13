@@ -11,7 +11,12 @@ import css from './LaundryOpsPage.module.css';
 
 const formatBookingDate = (isoString, intl) =>
   isoString
-    ? intl.formatDate(new Date(isoString), { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
+    ? intl.formatDate(new Date(isoString), {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      })
     : null;
 
 const lastBookedDayIso = isoString => {
@@ -50,7 +55,18 @@ const LaundryOrderRow = props => {
   // studio configured for this category", which the server resolves. Pre-filling
   // a number here would mean guessing that turnaround client-side, and would turn
   // the studio's configured default into a value the client had asserted.
-  const [cleaningDays, setCleaningDays] = useState('');
+  // Pre-filled with the turnaround this studio configured for the garment's category, from
+  // the endpoint (`row.defaultCleaningDays`).
+  //
+  //   > "estos días deben tener un default de los días que indique la laundry, pero pueden
+  //   >  modificarse al recibir"
+  //
+  // It used to start blank, with "leave it blank to use your configured turnaround"
+  // underneath - which asked the operator to accept a number they could not see, and to know
+  // their own configuration by heart to judge whether it fitted this garment.
+  const [cleaningDays, setCleaningDays] = useState(
+    Number.isInteger(row?.defaultCleaningDays) ? String(row.defaultCleaningDays) : ''
+  );
 
   const labelKey = statusLabelKey(row);
   const start = formatBookingDate(row.bookingStart, intl);

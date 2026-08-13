@@ -1,7 +1,10 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { getSdk, handleError } = require('../api-util/sdk');
 const { isLaundryUser } = require('../api-util/laundryAuth');
-const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
+const {
+  readAssignedLaundryId,
+  resolveInitialCleaningDays,
+} = require('../api-util/laundryAssignment');
 const { stateFromLastTransition } = require('../api-util/coclosetBookingProcess');
 const { handoverStepFor } = require('../api-util/handoverSteps');
 const { createRateLimiter } = require('../api-util/rateLimit');
@@ -174,6 +177,31 @@ module.exports = (req, res) => {
       const processState = stateFromLastTransition(transaction?.attributes?.lastTransition);
       const step = handoverStepFor(processState);
 
+      // How many days this studio needs to clean THIS garment, so the confirm screen can
+      // pre-fill the box instead of asking the operator to remember their own configuration.
+      //
+      //   > "estos días deben tener un default de los días que indique la laundry, pero
+      //   >  pueden modificarse al recibir"
+      //
+      // Only for the laundry, and only at the step that takes the number - the return. A
+      // customer has no business reading a studio's turnaround table, and no other step
+      // does anything with it.
+      //
+      // Read off the caller's OWN privateData, which `currentUser.show()` already returned:
+      // a user may read their own, so this costs no extra round trip. Same resolution chain
+      // that sizes the availability block, so the number shown is the number that would have
+      // been applied.
+      const takesCleaningDays = viewerRole === ROLE_LAUNDRY && step?.status === 'returned';
+      const defaultCleaningDaysMaybe = takesCleaningDays
+        ? {
+            defaultCleaningDays: resolveInitialCleaningDays({
+              laundryPrivateData: currentUser?.attributes?.profile?.privateData,
+              listingPublicData: listing?.attributes?.publicData,
+              envDefaultBufferDays: process.env.DEFAULT_LAUNDRY_BUFFER_DAYS,
+            }),
+          }
+        : {};
+
       res
         .status(200)
         .set('Content-Type', 'application/json')
@@ -195,6 +223,7 @@ module.exports = (req, res) => {
                   isLate: !!step.isLate,
                 }
               : null,
+            ...defaultCleaningDaysMaybe,
             listingTitle: listing?.attributes?.title || null,
             bookingStart: booking?.attributes?.displayStart || booking?.attributes?.start || null,
             bookingEnd: booking?.attributes?.displayEnd || booking?.attributes?.end || null,

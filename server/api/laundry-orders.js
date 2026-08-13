@@ -1,6 +1,7 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { requireLaundryCaller } = require('../api-util/laundryAuth');
+const { resolveInitialCleaningDays } = require('../api-util/laundryAssignment');
 const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
 const {
   TRANSITIONS,
@@ -202,7 +203,12 @@ const listingImageUrl = (listing, included) => {
 const displayNameOf = user => user?.attributes?.profile?.displayName || null;
 
 // Shape shared by both row kinds - everything that comes from the listing.
-const listingFields = (listing, included) => {
+//
+// `laundryPrivateData` is the CALLING studio's own profile privateData, which is where the
+// per-category turnaround table lives. It comes off the `currentUser` this endpoint already
+// fetched to authorize the request - a user may read their own privateData through the
+// ordinary Marketplace API - so pre-filling the cleaning-days box costs no extra round trip.
+const listingFields = (listing, included, laundryPrivateData) => {
   const attrs = listing.attributes || {};
   const publicData = attrs.publicData || {};
   const author = findIncluded(included, 'user', listing.relationships?.author?.data?.id?.uuid);
@@ -223,6 +229,21 @@ const listingFields = (listing, included) => {
     // "this garment is still in the studio" matters most.
     onLaundry: attrs.metadata?.onLaundry === true,
     readyAt: attrs.metadata?.readyAt || null,
+    // How many days THIS studio has said it needs for THIS garment's category.
+    //
+    //   > "estos días deben tener un default de los días que indique la laundry, pero pueden
+    //   >  modificarse al recibir"
+    //
+    // The box used to start blank, with "leave blank to use the configured turnaround"
+    // underneath - which meant the operator could not see the number they were accepting, and
+    // had to know their own configuration by heart to tell whether it was right for this
+    // garment. The same resolution chain that sizes the availability block, so what is shown
+    // is what would have been applied.
+    defaultCleaningDays: resolveInitialCleaningDays({
+      laundryPrivateData,
+      listingPublicData: publicData,
+      envDefaultBufferDays: process.env.DEFAULT_LAUNDRY_BUFFER_DAYS,
+    }),
   };
 };
 
@@ -292,6 +313,7 @@ module.exports = (req, res) => {
   requireLaundryCaller(req, res)
     .then(currentUser => {
       const laundryId = currentUser.id.uuid;
+      const laundryPrivateData = currentUser?.attributes?.profile?.privateData;
 
       return fetchAllListingPages(integrationSdk, laundryId).then(({ pages, truncated }) => {
         // Apply the real filter here (see the no-op note at the top).
@@ -322,16 +344,16 @@ module.exports = (req, res) => {
                 transactions: response.data.data,
                 txIncluded: response.data.included || [],
               }))
-        ).then(perListing => ({ laundryId, perListing, truncated }));
+        ).then(perListing => ({ laundryId, laundryPrivateData, perListing, truncated }));
       });
     })
-    .then(({ laundryId, perListing, truncated }) => {
+    .then(({ laundryId, laundryPrivateData, perListing, truncated }) => {
       const orders = [];
       const inventory = [];
       let transactionCount = 0;
 
       perListing.forEach(({ listing, included, transactions, txIncluded }) => {
-        const base = listingFields(listing, included);
+        const base = listingFields(listing, included, laundryPrivateData);
         const rows = transactions.map(tx => transactionRow(tx, txIncluded, base));
         transactionCount += rows.length;
 
