@@ -55,7 +55,8 @@ const LARGE_PX = 180;
  * @param {string} [props.rootClassName] - replaces css.root
  * @param {string} props.payload - the QR payload (the transaction id); renders
  *   nothing without it
- * @param {'small'|'large'} [props.size='large'] - 'small' is the ops table cell
+ * @param {'small'|'large'} [props.size='large'] - 'small' is for a dense list; the only
+ *   caller today is the transaction panel, which uses 'large'
  * @param {boolean} [props.showPayload=false] - also render the payload as
  *   selectable text
  * @param {string} [props.id] - DOM id prefix, needed when several are on one page
@@ -88,7 +89,7 @@ const HandoverQrCode = props => {
         aria-describedby={showPayload ? payloadId : undefined}
         width={pixels}
         height={pixels}
-        // The ops table renders one per row; no reason to fetch the ones below
+        // No reason to fetch one that is below
         // the fold.
         loading="lazy"
       />

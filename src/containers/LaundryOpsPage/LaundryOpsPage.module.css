@@ -481,12 +481,6 @@
   vertical-align: top;
 }
 
-.cellQr {
-  width: 64px;
-  padding: 12px 10px;
-  vertical-align: top;
-}
-
 /* Ticket codes, rack codes and dates are atomic values - wrapping them mid
    token ("MAR-\n1192") makes them slower to scan than a little extra width
    costs, and the table already scrolls horizontally when space runs out. */
@@ -566,14 +560,6 @@
   font-size: 13px;
   line-height: 18px;
   word-break: break-all;
-}
-
-/* The scannable handover code in the expanded row. */
-.detailQr {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0 0 12px 0;
 }
 
 /* Damage copy is red AND prefixed by its own label in the translation string,

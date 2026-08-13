@@ -223,6 +223,36 @@ describe('laundry-orders', () => {
     expect(row.bookingEnd).toBe('2026-08-11T00:00:00.000Z');
   });
 
+  it('does not send the handover QR record to the laundry', async () => {
+    //   > "podemos quitar el QR para los laundries? solamente un provider o un customer
+    //   >  pueden ver el QR, laundry solo va a escanear"
+    //
+    // Removing the QR from the ops SCREENS is not enough on its own: while the payload still
+    // carried the record, any later component could render one again, and a payload that
+    // contains it is a payload that has already disclosed it. The studio scans what the
+    // person at the counter is holding; it never needs its own copy.
+    setupSdk({
+      listingPages: [page([listing('listing-mine')], listingIncluded)],
+      transactionsByListing: {
+        'listing-mine': {
+          data: {
+            data: [transaction('tx-1', { ticketCode: 'PIG-2032' }, 'transition/accept')],
+            included: txIncluded,
+          },
+        },
+      },
+    });
+
+    const res = mockRes();
+    await laundryOrders({}, res);
+    await new Promise(setImmediate);
+
+    const row = res.body.data.orders[0];
+    expect(row).not.toHaveProperty('handoverQr');
+    // The transaction id stays: it is what a studio with a broken scanner types into search.
+    expect(row.transactionId).toBe('tx-1');
+  });
+
   it('emits a listing-only row for an assigned garment with no transaction (design §8 union)', async () => {
     setupSdk({
       listingPages: [page([listing('listing-idle')], listingIncluded)],

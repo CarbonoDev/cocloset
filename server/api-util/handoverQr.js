@@ -47,8 +47,8 @@
 //     `transactions.query`. server/api/laundry-orders.js queries transactions
 //     for every listing assigned to a laundry, so an embedded image would
 //     multiply the ops dashboard payload by an order of magnitude - for an
-//     image that response does not even use (the ops table renders its own
-//     thumbnail from the endpoint).
+//     image no consumer would use - and since the client's "quitar el QR para los
+//     laundries", that response does not carry the record at all.
 //   - It is fully derivable from `payload`, so storing it is a cache in the
 //     wrong tier: immutable, unversioned, and impossible to re-render at a
 //     different size or error-correction level without a data migration.
@@ -254,7 +254,7 @@ const buildHandoverQrScanUrl = (
 
   // No configured root URL means we cannot build an absolute link, and a relative one is not
   // scannable. Fall back to the bare id rather than to a broken URL: the code still
-  // identifies the transaction, the ops table can still read it, and the manual fallback
+  // identifies the transaction, and the manual fallback
   // (typing the id into the ops search) still works. Silently emitting `/handover/<id>` with
   // no host would produce a code that looks fine and resolves nowhere.
   return trimmed ? `${trimmed}/${HANDOVER_PATH}/${id}` : id;
@@ -300,8 +300,7 @@ const resolveHandoverQrPayload = (metadata, transactionUuid) => {
 // Rendering
 // ---------------------------------------------------------------------------
 // Rendered server-side, not in the browser, so that ONE implementation serves
-// the customer's screen, the laundry ops table, a future laundry email and
-// printing. `renderHandoverQrDataUrl` is defined in terms of
+// the customer's screen, a future laundry email and printing. `renderHandoverQrDataUrl` is defined in terms of
 // `renderHandoverQrPngBuffer` rather than calling `QRCode.toDataURL`
 // separately, so the two forms cannot drift.
 //

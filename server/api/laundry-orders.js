@@ -246,11 +246,6 @@ const transactionRow = (transaction, txIncluded, listingBase) => {
     // The ticket code is written by transition/laundry-mark-ready, so it is
     // null until the laundry has prepared the garment.
     ticketCode: metadata.ticketCode || null,
-    // The handover QR record, written once when the reservation was created
-    // (server/api-util/handoverQr.js). Null for bookings that predate the
-    // feature; the ops table then falls back to `transactionId`, which is the
-    // payload by design (§11).
-    handoverQr: metadata.handoverQr || null,
     customerName: displayNameOf(customer),
     // Prefer the transaction's own provider (always the listing author, but
     // present even when the listing page's `included` didn't resolve).
@@ -280,7 +275,6 @@ const listingOnlyRow = listingBase => ({
   rowType: 'listing',
   transactionId: null,
   ticketCode: null,
-  handoverQr: null,
   customerName: null,
   bookingStart: null,
   bookingEnd: null,

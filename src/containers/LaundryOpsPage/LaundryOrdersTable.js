@@ -65,15 +65,12 @@ const LaundryOrdersTable = props => {
           <FormattedMessage id="LaundryOpsPage.table.empty" />
         </p>
       ) : (
-        // Seven columns can't compress to a phone width, so the table gets its
-        // own horizontal scroll container rather than being reflowed.
+        // Six columns can't compress to a phone width, so the table gets its own
+        // horizontal scroll container rather than being reflowed.
         <div className={css.tableScroll}>
           <table className={css.table}>
             <thead>
               <tr>
-                <th className={css.th}>
-                  <FormattedMessage id="LaundryOpsPage.table.qr" />
-                </th>
                 <th className={css.th}>
                   <FormattedMessage id="LaundryOpsPage.table.ticket" />
                 </th>
