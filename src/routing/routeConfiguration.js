@@ -19,6 +19,7 @@ const ContactDetailsPage = loadable(() => import(/* webpackChunkName: "ContactDe
 const EditListingPage = loadable(() => import(/* webpackChunkName: "EditListingPage" */ '../containers/EditListingPage/EditListingPage'));
 const EmailVerificationPage = loadable(() => import(/* webpackChunkName: "EmailVerificationPage" */ '../containers/EmailVerificationPage/EmailVerificationPage'));
 const InboxPage = loadable(() => import(/* webpackChunkName: "InboxPage" */ '../containers/InboxPage/InboxPage'));
+const HandoverPage = loadable(() => import(/* webpackChunkName: "HandoverPage" */ '../containers/HandoverPage/HandoverPage'));
 const LaundryOpsPage = loadable(() => import(/* webpackChunkName: "LaundryOpsPage" */ '../containers/LaundryOpsPage/LaundryOpsPage'));
 const LaundryProfilePage = loadable(() => import(/* webpackChunkName: "LaundryProfilePage" */ '../containers/LaundryProfilePage/LaundryProfilePage'));
 const MakeOfferPage = loadable(() => import(/* webpackChunkName: "MakeOfferPage" */ '../containers/MakeOfferPage/MakeOfferPage'));
@@ -416,6 +417,23 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       name: 'PartnerLandingPage',
       component: PartnerLandingPage,
       loadData: pageDataLoadingAPI.PartnerLandingPage.loadData,
+    },
+    {
+      // Where a scanned handover QR lands. The path is half of a contract - the other half
+      // is HANDOVER_PATH in server/api-util/handoverQr.js, which builds the URL that gets
+      // encoded into the image - so changing it here alone produces a code that scans to a
+      // 404. handoverQrUrlAgreement.test.js checks the two against each other.
+      //
+      // `auth: true` because the page has to know who is reading before it can decide what
+      // to show them; an anonymous scan is sent to log in and comes back here. Which of the
+      // three roles the reader is, and therefore whether they get an action at all, is
+      // decided by GET /api/handover-status - not here, and not in the browser.
+      path: '/handover/:id',
+      name: 'HandoverPage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: HandoverPage,
+      loadData: pageDataLoadingAPI.HandoverPage.loadData,
     },
     {
       // Laundry-only studio profile settings. Gated inside LaundryProfilePage

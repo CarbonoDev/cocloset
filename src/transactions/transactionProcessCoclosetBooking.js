@@ -408,7 +408,17 @@ export const HANDOVER_QR_TRANSITIONS = [
   transitions.LAUNDRY_CONFIRM_RETURN_LATE,
 ];
 
+// Starts at PREAUTHORIZED - the moment the customer's payment is confirmed - per the client:
+//
+//   > "el QR debe mostrarse al cliente desde que se confirma el pago pero con la instrucción
+//   >  de que debe esperar a que el provider entregue la prenda y la lavandería haga su
+//   >  proceso y que debe acudir a la lavandería por su prenda"
+//
+// The old floor was ACCEPTED, on the argument that a code for a booking the provider might
+// still decline is worse than no code. The answer to that is the copy, not the absence: see
+// HandoverQrMaybe, which says what has to happen before the garment can be collected.
 export const HANDOVER_QR_VISIBLE_STATES = [
+  states.PREAUTHORIZED,
   states.ACCEPTED,
   states.READY_FOR_PICKUP,
   states.PICKED_UP,

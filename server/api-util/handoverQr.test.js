@@ -85,10 +85,16 @@ describe('isHandoverQrVisibleState', () => {
     expect(isHandoverQrVisibleState(STATES.REVIEWED)).toBe(false);
   });
 
-  it('hides the code before the booking is accepted, and in dead-end states', () => {
+  it('shows the code from the moment the payment is confirmed', () => {
+    //   > "el QR debe mostrarse al cliente desde que se confirma el pago"
+    // The floor used to be `accepted`; a code for a booking the provider might still decline
+    // is now answered by the copy rather than by hiding it (see HandoverQrMaybe).
+    expect(isHandoverQrVisibleState(STATES.PREAUTHORIZED)).toBe(true);
+  });
+
+  it('hides the code before the payment is confirmed, and in dead-end states', () => {
     expect(isHandoverQrVisibleState(STATES.INQUIRY)).toBe(false);
     expect(isHandoverQrVisibleState(STATES.PENDING_PAYMENT)).toBe(false);
-    expect(isHandoverQrVisibleState(STATES.PREAUTHORIZED)).toBe(false);
     expect(isHandoverQrVisibleState(STATES.DECLINED)).toBe(false);
     expect(isHandoverQrVisibleState(STATES.CANCELED)).toBe(false);
     expect(isHandoverQrVisibleState(STATES.EXPIRED)).toBe(false);
@@ -96,10 +102,11 @@ describe('isHandoverQrVisibleState', () => {
     expect(isHandoverQrVisibleState(undefined)).toBe(false);
   });
 
-  it('covers exactly the states between accept and the return, inclusive', () => {
+  it('covers exactly the states between payment confirmation and the return, inclusive', () => {
     // Restates the rule as a set, so widening or narrowing the window is a
     // deliberate edit rather than a side effect.
     expect(HANDOVER_QR_VISIBLE_STATES).toEqual([
+      'preauthorized',
       'accepted',
       'ready-for-pickup',
       'picked-up',

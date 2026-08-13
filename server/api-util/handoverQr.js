@@ -86,11 +86,11 @@
 // ("al momento de crear la reservación" - when the reservation is created,
 // which is checkout, not provider acceptance).
 //
-// Consequence, stated plainly: a reservation whose payment expires or is
-// declined also gets a QR record. That is one wasted Integration API write on
-// an abandoned checkout, and the record is never displayed (see
-// HANDOVER_QR_VISIBLE_STATES, which starts at `accepted`). Cheap, and far
-// preferable to a QR that is sometimes missing.
+// Consequence, stated plainly: a reservation whose payment expires also gets a QR record.
+// That is one wasted Integration API write on an abandoned checkout, and the record is never
+// displayed for such a transaction (see HANDOVER_QR_VISIBLE_STATES, which starts at
+// `preauthorized` - i.e. once the payment is confirmed). Cheap, and far preferable to a QR
+// that is sometimes missing.
 
 const QRCode = require('qrcode');
 
@@ -147,9 +147,19 @@ const transitionsServedByHandoverQr = scope => HANDOVER_QR_SCOPES[scope] || [];
 // ---------------------------------------------------------------------------
 // WHEN THE QR IS SHOWN - derived from process state, never from a flag
 // ---------------------------------------------------------------------------
-// Visible from `accepted` (the booking is confirmed and a garment has been
-// committed to) up to and including `overdue` (the garment is still out and
-// still has to come back).
+// Visible from `preauthorized` - the moment the customer's payment is confirmed - up to and
+// including `overdue` (the garment is still out and still has to come back).
+//
+//   > "el QR debe mostrarse al cliente desde que se confirma el pago pero con la instrucción
+//   >  de que debe esperar a que el provider entregue la prenda y la lavandería haga su
+//   >  proceso y que debe acudir a la lavandería por su prenda"
+//
+// It used to start at `accepted`, on the argument that showing a collection code for a
+// booking the provider might still decline would be worse than showing none. The client
+// overrode that, and the answer to the original worry is the COPY rather than the absence of
+// the code: the panel now states what has to happen before the garment can be collected. A
+// customer who has just paid wants to see that something exists; an empty panel reads as a
+// broken purchase.
 //
 // Hidden from `returned` onwards, because entering `returned` IS the second
 // handover: `laundry-confirm-return` / `-late` are the only ways in, and both
@@ -157,10 +167,8 @@ const transitionsServedByHandoverQr = scope => HANDOVER_QR_SCOPES[scope] || [];
 // therefore complete and the code has nothing left to do - "debe desaparecer
 // despues de este evento".
 //
-// Also hidden before `accepted` (`inquiry`, `pending-payment`,
-// `preauthorized`): the record exists from checkout, but the provider can
-// still decline, and showing a collection code for a booking that may never
-// be accepted would be worse than not showing one.
+// Still hidden before `preauthorized` (`inquiry`, `pending-payment`): the record exists
+// from checkout, but until the payment is confirmed there is no rental to collect.
 //
 // NOTE ON WHAT HIDING DOES AND DOES NOT BUY: the QR is an IDENTIFIER, not a
 // credential - it encodes a transaction id and nothing secret. Hiding it does
@@ -170,6 +178,7 @@ const transitionsServedByHandoverQr = scope => HANDOVER_QR_SCOPES[scope] || [];
 // re-scanned code after the return simply cannot advance anything. Hiding is a
 // UI affordance on top of an enforcement that already exists.
 const HANDOVER_QR_VISIBLE_STATES = [
+  STATES.PREAUTHORIZED,
   STATES.ACCEPTED,
   STATES.READY_FOR_PICKUP,
   STATES.PICKED_UP,
@@ -205,6 +214,50 @@ const buildHandoverQrPayload = transactionUuid => {
     throw new Error('buildHandoverQrPayload: transactionUuid is required');
   }
   return transactionUuid;
+};
+
+// The path the scanned code opens. Mirrored by HANDOVER_PATH in src/util/handoverQr.js and
+// by the route in src/routing/routeConfiguration.js; handoverQrUrlAgreement.test.js keeps
+// the three in step, because a mismatch is a QR that scans to a 404 and there is no way to
+// notice that from either side alone.
+const HANDOVER_PATH = 'handover';
+
+/**
+ * The string actually ENCODED into the image: a URL that opens the handover page.
+ *
+ *   > "al escanear debe llevar al paso siguiente con un button para confirmar y avanzar"
+ *
+ * A bare UUID is not scannable *to* anywhere - a phone camera reads it and offers nothing to
+ * do with it, which is why the code could be shown but never acted on. Wrapping the same id
+ * in a URL is what turns the scan into a navigation.
+ *
+ * DERIVED AT RENDER TIME, NOT PERSISTED. The record keeps storing the transaction id (see
+ * `buildHandoverQrRecord`), and this function is applied when the image is drawn. That is
+ * deliberate: the root URL is a property of the ENVIRONMENT, and a record written in Dev
+ * would otherwise carry a Dev URL for the life of the transaction - including after the
+ * marketplace is promoted. Deriving also means every booking made before this change gets a
+ * working, navigable code with no migration, since the id it stored is all this needs.
+ *
+ * The id remains the canonical identity (design §11), so nothing that reads `payload` had to
+ * change.
+ *
+ * @param {string} transactionUuid
+ * @param {string} [rootUrl] - defaults to REACT_APP_MARKETPLACE_ROOT_URL
+ * @returns {string} an absolute URL, or the bare id when no root URL is configured
+ */
+const buildHandoverQrScanUrl = (
+  transactionUuid,
+  rootUrl = process.env.REACT_APP_MARKETPLACE_ROOT_URL
+) => {
+  const id = buildHandoverQrPayload(transactionUuid);
+  const trimmed = typeof rootUrl === 'string' ? rootUrl.trim().replace(/\/+$/, '') : '';
+
+  // No configured root URL means we cannot build an absolute link, and a relative one is not
+  // scannable. Fall back to the bare id rather than to a broken URL: the code still
+  // identifies the transaction, the ops table can still read it, and the manual fallback
+  // (typing the id into the ops search) still works. Silently emitting `/handover/<id>` with
+  // no host would produce a code that looks fine and resolves nowhere.
+  return trimmed ? `${trimmed}/${HANDOVER_PATH}/${id}` : id;
 };
 
 /**
@@ -368,6 +421,7 @@ const ensureHandoverQr = ({ integrationSdk, transactionId, existingMetadata, log
 };
 
 module.exports = {
+  HANDOVER_PATH,
   HANDOVER_QR_METADATA_KEY,
   HANDOVER_QR_VERSION,
   HANDOVER_QR_ENCODING,
@@ -378,6 +432,7 @@ module.exports = {
   transitionsServedByHandoverQr,
   isHandoverQrVisibleState,
   buildHandoverQrPayload,
+  buildHandoverQrScanUrl,
   buildHandoverQrRecord,
   resolveHandoverQrPayload,
   renderHandoverQrPngBuffer,

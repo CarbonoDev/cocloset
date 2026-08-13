@@ -40,10 +40,11 @@
  * ---------------------------------------------------------------------------
  * Read this before "fixing" it.
  *
- * The response encodes EXACTLY the transaction id the caller supplied and
- * nothing else (design §11: the QR payload is the transaction id). So the
- * endpoint discloses no information the caller did not already have; there is
- * nothing for an authorization check to protect. Confirming that the caller is
+ * The response encodes EXACTLY the handover URL for the transaction id the caller supplied
+ * and nothing else - our own origin plus that id (see `buildHandoverQrScanUrl`). So the
+ * endpoint discloses no information the caller did not already have; there is nothing for an
+ * authorization check to protect. The page that URL opens does its own authorization, and
+ * only the assigned laundry is offered an action there. Confirming that the caller is
  * a party to the transaction would cost an Integration API
  * `transactions.show` per image, and even a bare authentication check costs a
  * Marketplace `currentUser.show()` per image - i.e. one per ops-table row,
@@ -52,10 +53,11 @@
  *
  * What IS enforced:
  *
- *   - `id` must be a well-formed UUID. This is the control that matters: it
- *     stops the endpoint being a general-purpose QR generator for
- *     attacker-chosen payloads (a phishing URL rendered on the marketplace's
- *     own domain), which is the only real abuse this shape has.
+ *   - `id` must be a well-formed UUID. This is the control that matters, and it matters
+ *     MORE now that the encoded string is a URL: the caller supplies only a UUID and the
+ *     host comes from our own configuration, so the endpoint still cannot be turned into a
+ *     generator for attacker-chosen payloads - a phishing link rendered as a QR on the
+ *     marketplace's own domain, which is the only real abuse this shape has.
  *   - Per-IP and global rate limits, so it cannot be used as a CPU/bandwidth
  *     amplifier.
  *
@@ -72,7 +74,7 @@
  */
 
 const { createRateLimiter } = require('../api-util/rateLimit');
-const { buildHandoverQrPayload, renderHandoverQrPngBuffer } = require('../api-util/handoverQr');
+const { buildHandoverQrScanUrl, renderHandoverQrPngBuffer } = require('../api-util/handoverQr');
 const log = require('../log');
 
 // Sharetribe ids are UUIDs. Anchored, case-insensitive, no version pinning
@@ -115,7 +117,11 @@ module.exports = (req, res) => {
     return Promise.resolve();
   }
 
-  return renderHandoverQrPngBuffer(buildHandoverQrPayload(id))
+  // What gets ENCODED is the handover URL for this transaction, not the bare id: a scanned
+  // code has to take whoever scanned it somewhere. The id is still the whole of the caller's
+  // input, and the URL is built here from it plus the marketplace's own root URL - see
+  // api-util/handoverQr.js `buildHandoverQrScanUrl`.
+  return renderHandoverQrPngBuffer(buildHandoverQrScanUrl(id))
     .then(buffer => {
       res
         .status(200)
