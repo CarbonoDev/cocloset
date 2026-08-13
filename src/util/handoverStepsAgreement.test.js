@@ -104,6 +104,22 @@ describe('every message the page will ask for exists', () => {
   );
 });
 
+describe('the page can name every status and every role it may be handed', () => {
+  //   > "si soy un actor, debo poder ver la información completa del status actual"
+  //
+  // The page renders `HandoverPage.status.<processState>` for whatever state the endpoint
+  // reports, and `HandoverPage.role.<viewerRole>` for whichever of the three roles the
+  // reader is. A state with no message renders the raw key at the customer - and fakeIntl
+  // makes that invisible in a component test, since it renders the key either way.
+  it.each(ALL_STATES)('has a status message for %s', state => {
+    expect(en[`HandoverPage.status.${state}`]).toBeDefined();
+  });
+
+  it.each([['customer'], ['provider'], ['laundry']])('has a role message for %s', role => {
+    expect(en[`HandoverPage.role.${role}`]).toBeDefined();
+  });
+});
+
 describe('isViewerTheCounterparty', () => {
   it('is true only for the party the studio is actually dealing with', () => {
     const collection = handoverStepFor(states.READY_FOR_PICKUP);

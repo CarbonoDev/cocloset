@@ -40,6 +40,17 @@ import css from './HandoverPage.module.css';
  * that `server/api-util/laundryAuth.js` performs again on the write itself.
  */
 
+const DATE_FORMAT = { year: 'numeric', month: 'short', day: 'numeric' };
+
+/**
+ * The customer's last day, from the API's exclusive booking end.
+ *
+ * Same convention as `LineItemBookingPeriod` for `line-item/day`, so the date here and the
+ * date in the order breakdown are the same date. Whole-day arithmetic on the instant is
+ * enough: both ends are midnights in the listing's zone.
+ */
+const inclusiveEnd = isoEnd => new Date(new Date(isoEnd).getTime() - 24 * 60 * 60 * 1000);
+
 const CounterpartyLine = props => {
   const { step } = props;
   if (!step) {
@@ -127,23 +138,89 @@ export const HandoverPageComponent = props => {
       );
     }
 
+    // NEVER RENDER NOTHING. This branch used to `return null`, and a duck bug that stored
+    // `undefined` instead of the handover turned the whole page into a heading over empty
+    // space - no data, no error, nothing to report. A page with no answer still owes the
+    // reader a sentence.
     if (!handover) {
-      return null;
+      return (
+        <p className={css.error}>
+          <FormattedMessage id="HandoverPage.error.generic" />
+        </p>
+      );
     }
 
-    const { step, viewerRole, canConfirm, listingTitle, ticketCode } = handover;
+    const {
+      step,
+      viewerRole,
+      canConfirm,
+      processState,
+      listingTitle,
+      ticketCode,
+      bookingStart,
+      bookingEnd,
+    } = handover;
 
     return (
       <div className={css.card}>
         {listingTitle ? <p className={css.garment}>{listingTitle}</p> : null}
-        {ticketCode ? (
-          <p className={css.ticket}>
-            <FormattedMessage
-              id="HandoverPage.ticketCode"
-              values={{ code: <span className={css.ticketCode}>{ticketCode}</span> }}
-            />
-          </p>
-        ) : null}
+
+        {/* THE CURRENT STATUS, stated outright.
+              > "si soy un actor, debo poder ver la información completa del status actual"
+            The step below says what happens NEXT; this says where the rental IS. They are
+            different questions, and a page that only answered the second one left a customer
+            unable to tell whether their garment had been dropped off yet. */}
+        <dl className={css.facts}>
+          {processState ? (
+            <div className={css.fact}>
+              <dt className={css.factLabel}>
+                <FormattedMessage id="HandoverPage.fact.status" />
+              </dt>
+              <dd className={css.factValue}>
+                <FormattedMessage id={`HandoverPage.status.${processState}`} />
+              </dd>
+            </div>
+          ) : null}
+
+          {bookingStart && bookingEnd ? (
+            <div className={css.fact}>
+              <dt className={css.factLabel}>
+                <FormattedMessage id="HandoverPage.fact.rental" />
+              </dt>
+              <dd className={css.factValue}>
+                <FormattedMessage
+                  id="HandoverPage.fact.rentalRange"
+                  values={{
+                    startDate: intl.formatDate(new Date(bookingStart), DATE_FORMAT),
+                    // The API's end is EXCLUSIVE; the customer's last day is the one before.
+                    // Same convention as LineItemBookingPeriod, so the two screens agree.
+                    endDate: intl.formatDate(inclusiveEnd(bookingEnd), DATE_FORMAT),
+                  }}
+                />
+              </dd>
+            </div>
+          ) : null}
+
+          {ticketCode ? (
+            <div className={css.fact}>
+              <dt className={css.factLabel}>
+                <FormattedMessage id="HandoverPage.fact.ticket" />
+              </dt>
+              <dd className={css.factValue}>
+                <span className={css.ticketCode}>{ticketCode}</span>
+              </dd>
+            </div>
+          ) : null}
+
+          <div className={css.fact}>
+            <dt className={css.factLabel}>
+              <FormattedMessage id="HandoverPage.fact.yourRole" />
+            </dt>
+            <dd className={css.factValue}>
+              <FormattedMessage id={`HandoverPage.role.${viewerRole}`} />
+            </dd>
+          </div>
+        </dl>
 
         {step ? (
           <>

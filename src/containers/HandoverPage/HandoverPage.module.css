@@ -25,12 +25,6 @@
   margin: 0;
 }
 
-.ticket {
-  composes: marketplaceTinyFontStyles from global;
-  color: var(--coclosetInkMuted);
-  margin: 4px 0 16px 0;
-}
-
 .ticketCode {
   font-family: monospace;
   letter-spacing: 0.05em;
@@ -89,4 +83,36 @@
 
 .link {
   composes: marketplaceDefaultFontStyles from global;
+}
+
+/* The "what is the situation" block: status, dates, ticket, and which party the reader is.
+   A <dl> rather than paragraphs because these are genuinely label/value pairs, and a screen
+   reader announces them as such. */
+.facts {
+  margin: 0 0 20px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 0;
+}
+
+.factLabel {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+  min-width: 120px;
+}
+
+.factValue {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0;
 }

@@ -143,6 +143,54 @@ describe('HandoverPage: what it says is next', () => {
   });
 });
 
+describe('HandoverPage: the full current status, for a party', () => {
+  //   > "si soy un actor, debo poder ver la información completa del status actual"
+  //
+  // The step says what happens NEXT; these say where the rental IS. A page that answered
+  // only the first left a customer unable to tell whether their garment had been dropped
+  // off yet.
+  it('states the current status in words', () => {
+    renderPage();
+    expect(screen.getByText('HandoverPage.status.ready-for-pickup')).toBeInTheDocument();
+  });
+
+  it('states the rental dates, with the customer-facing inclusive end', () => {
+    renderPage({
+      handover: handoverFor({
+        bookingStart: '2026-09-01T00:00:00.000Z',
+        // Exclusive on the wire; the renter's last day is the 7th.
+        bookingEnd: '2026-09-08T00:00:00.000Z',
+      }),
+    });
+
+    expect(screen.getByText('HandoverPage.fact.rentalRange')).toBeInTheDocument();
+  });
+
+  it('tells the reader which party they are', () => {
+    renderPage({ handover: handoverFor({ viewerRole: 'customer', canConfirm: false }) });
+    expect(screen.getByText('HandoverPage.role.customer')).toBeInTheDocument();
+  });
+
+  it('still states the status when nothing is due at the counter', () => {
+    // `cleaning` has no handover step, but it is exactly the status a customer wants to read.
+    renderPage({
+      handover: handoverFor({ processState: 'cleaning', step: null, canConfirm: false }),
+    });
+
+    expect(screen.getByText('HandoverPage.status.cleaning')).toBeInTheDocument();
+  });
+
+  it('omits the rows it has no data for rather than rendering empty labels', () => {
+    renderPage({
+      handover: handoverFor({ ticketCode: null, bookingStart: null, bookingEnd: null }),
+    });
+
+    expect(screen.queryByText('HandoverPage.fact.ticket')).not.toBeInTheDocument();
+    expect(screen.queryByText('HandoverPage.fact.rental')).not.toBeInTheDocument();
+    expect(screen.getByText('HandoverPage.fact.status')).toBeInTheDocument();
+  });
+});
+
 describe('HandoverPage: failures', () => {
   it('tells a stranger they are not part of this rental', () => {
     renderPage({ handover: null, fetchError: { status: 403 } });
@@ -163,6 +211,16 @@ describe('HandoverPage: failures', () => {
     renderPage({ handover: null, fetchError: { status: 500 } });
 
     expect(screen.getByText('HandoverPage.error.generic')).toBeInTheDocument();
+  });
+
+  it('never renders an empty page', () => {
+    // THE REGRESSION THIS PAGE SHIPPED WITH: a duck bug stored `undefined` instead of the
+    // handover, and this branch returned null - a heading over empty space, no data and no
+    // error. A page with no answer still owes the reader a sentence.
+    const { container } = renderPage({ handover: null, fetchError: null, fetchInProgress: false });
+
+    expect(screen.getByText('HandoverPage.error.generic')).toBeInTheDocument();
+    expect(container).not.toBeEmptyDOMElement();
   });
 
   it('keeps the button after a failed confirm, with the failure explained', () => {
