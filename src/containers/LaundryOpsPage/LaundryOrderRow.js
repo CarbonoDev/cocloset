@@ -11,8 +11,15 @@ import css from './LaundryOpsPage.module.css';
 
 const formatBookingDate = (isoString, intl) =>
   isoString
-    ? intl.formatDate(new Date(isoString), { year: 'numeric', month: 'short', day: 'numeric' })
+    ? intl.formatDate(new Date(isoString), { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
     : null;
+
+const lastBookedDayIso = isoString => {
+  if (!isoString) return null;
+  const d = new Date(isoString);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString();
+};
 
 /**
  * One row of the laundry ops orders table (mockups 05-08.jpg), plus the
@@ -47,7 +54,7 @@ const LaundryOrderRow = props => {
 
   const labelKey = statusLabelKey(row);
   const start = formatBookingDate(row.bookingStart, intl);
-  const end = formatBookingDate(row.bookingEnd, intl);
+  const end = formatBookingDate(lastBookedDayIso(row.bookingEnd), intl);
 
   // Only transaction rows have a process state to advance. Inventory-only
   // rows (§8's listings with no booking) move via the readiness endpoint on
