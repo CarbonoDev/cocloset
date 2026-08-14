@@ -29,7 +29,9 @@ import {
 } from '../booking.shared';
 import {
   earliestBookableDate,
+  earliestBookableStart,
   resolveInitialCleaningDays,
+  resolveReadyAt,
 } from '../BookingDatesForm/BookingDatesForm';
 
 import RentalPeriodChips from './RentalPeriodChips';
@@ -255,6 +257,9 @@ export const BookingRentalPeriodForm = props => {
     onLaundry,
     initialCleaningDays,
     liveInitialCleaningDays,
+    // Cocloset: when the wash this garment is in right now finishes. See
+    // earliestBookableStart in BookingDatesForm.
+    readyAt,
     onSubmit,
     ...rest
   } = props;
@@ -281,7 +286,26 @@ export const BookingRentalPeriodForm = props => {
     onLaundry,
     liveInitialCleaningDays
   );
-  const earliestStartDate = earliestBookableDate(initialCleaningBlockDays, timeZone);
+  // The floor the picker enforces: the later of that lead time and the end of the wash the
+  // garment is in RIGHT NOW (`metadata.readyAt`, written by the studio when it took the
+  // garment back and said how many days it needed).
+  //
+  //   > "esto debe apartar dias para que la prenda vuelva a estar disponible (...) la prenda
+  //   >  debe estar disponible el 18, 4 días despues, no antes"
+  //
+  // Belt and braces with the availability exception the same return writes, on purpose: that
+  // write is best-effort and swallows its failures (it runs after a transition that already
+  // succeeded), so it cannot be the only thing holding the days. This floor and the server
+  // gate in api-util/bookingRules.js both read a field that is written before it.
+  const earliestStartDate = earliestBookableStart(initialCleaningBlockDays, readyAt, timeZone);
+
+  // Which of the two floors is binding, so the notice above the picker names the right
+  // reason. A `readyAt` that has already passed moves nothing and is not announced.
+  const cleaningReadyDate =
+    resolveReadyAt(readyAt) &&
+    earliestStartDate.getTime() > earliestBookableDate(initialCleaningBlockDays, timeZone).getTime()
+      ? earliestStartDate
+      : null;
 
   // The laundry's turnaround, which has to fit AFTER the rental. Note this is the same
   // number as the initial cleaning lead time and is deliberately read even once
@@ -409,6 +433,15 @@ export const BookingRentalPeriodForm = props => {
                   values={{
                     days: initialCleaningBlockDays,
                     date: intl.formatDate(earliestStartDate, dateFormatOptionsIn(timeZone)),
+                  }}
+                />
+              </p>
+            ) : cleaningReadyDate ? (
+              <p className={css.initialCleaningNotice}>
+                <FormattedMessage
+                  id="BookingDatesForm.cleaningReadyNotice"
+                  values={{
+                    date: intl.formatDate(cleaningReadyDate, dateFormatOptionsIn(timeZone)),
                   }}
                 />
               </p>

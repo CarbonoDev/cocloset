@@ -10,7 +10,10 @@ const {
 } = require('../api-util/sdk');
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { isCoclosetBookingListing } = require('../api-util/coclosetBookingProcess');
-const { assertInitialCleaningLeadTime } = require('../api-util/bookingRules');
+const {
+  assertInitialCleaningLeadTime,
+  assertCleaningReadiness,
+} = require('../api-util/bookingRules');
 const { assertRentalPeriodBooking } = require('../api-util/rentalPeriods');
 const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
 const { ensureHandoverQr } = require('../api-util/handoverQr');
@@ -167,6 +170,13 @@ module.exports = (req, res) => {
       // round trip happens only for a garment that has never reached a studio. A failed
       // resolution returns null, which falls back to the SNAPSHOT rather than to "no
       // block": a read error must not open the gate.
+      // The garment is in a wash RIGHT NOW, from a return the studio has already confirmed
+      // and sized. Free (the value is on the listing entity above), and deliberately
+      // checked alongside the first-cleaning gate rather than left to the availability
+      // exception alone - see assertCleaningReadiness for why one best-effort calendar
+      // write is not enough places to enforce this.
+      assertCleaningReadiness({ listing, bookingStart: bodyParams?.params?.bookingStart });
+
       return resolveLiveInitialCleaningDays({ listing }).then(liveInitialCleaningDays => {
         assertInitialCleaningLeadTime({
           listing,

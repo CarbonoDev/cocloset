@@ -1,6 +1,9 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
 const { buildLineItemsForListing } = require('../api-util/lineItems');
-const { assertInitialCleaningLeadTime } = require('../api-util/bookingRules');
+const {
+  assertInitialCleaningLeadTime,
+  assertCleaningReadiness,
+} = require('../api-util/bookingRules');
 const { assertRentalPeriodBooking } = require('../api-util/rentalPeriods');
 const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
 const {
@@ -234,6 +237,11 @@ module.exports = (req, res) => {
       // `metadata.onLaundry !== true` (first rental only - see
       // api-util/liveInitialCleaning.js), and a failed read falls back to the snapshot
       // rather than to "no block".
+      // Same post-rental cleaning gate as initiate-privileged.js. Present here too because
+      // this endpoint prices and fires a booking on its own - a rule enforced on only one
+      // of the two paths into a transaction is a rule with a documented way around it.
+      assertCleaningReadiness({ listing, bookingStart: bodyParams?.params?.bookingStart });
+
       return resolveLiveInitialCleaningDays({ listing }).then(liveInitialCleaningDays => {
         assertInitialCleaningLeadTime({
           listing,

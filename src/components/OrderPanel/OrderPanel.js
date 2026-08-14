@@ -342,6 +342,8 @@ const OrderPanel = props => {
   //   onLaundry           - true once a laundry has physically received the garment
   //   initialCleaningDays - how long its FIRST wash takes, so the calendar can stop
   //                         offering tomorrow for a garment that is not there yet
+  //   readyAt             - when the wash it is in RIGHT NOW finishes, written by the
+  //                         studio at the counter from the days it asked for at the return
   //
   // `initialCleaningDays` here is a SNAPSHOT from the moment the laundry was assigned. It
   // is still read, and still needed, because it is the FALLBACK: `liveInitialCleaningDays`
@@ -350,7 +352,7 @@ const OrderPanel = props => {
   // same precedence the server gate does (see resolveInitialCleaningDays there and
   // server/api-util/bookingRules.js `resolveInitialCleaningBlockDays`) - live first,
   // snapshot second, never "no block" just because a read failed.
-  const { onLaundry, initialCleaningDays } = listing?.attributes?.metadata || {};
+  const { onLaundry, initialCleaningDays, readyAt } = listing?.attributes?.metadata || {};
 
   const processName = resolveLatestProcessName(transactionProcessAlias.split('/')[0]);
   const lineItemUnitType = lineItemUnitTypeMaybe || `line-item/${unitType}`;
@@ -553,6 +555,7 @@ const OrderPanel = props => {
             onLaundry={onLaundry}
             initialCleaningDays={initialCleaningDays}
             liveInitialCleaningDays={liveInitialCleaningDays}
+            readyAt={readyAt}
             dayCountAvailableForBooking={dayCountAvailableForBooking}
             monthlyTimeSlots={monthlyTimeSlots}
             onFetchTimeSlots={onFetchTimeSlots}
@@ -600,6 +603,7 @@ const OrderPanel = props => {
             onLaundry={onLaundry}
             initialCleaningDays={initialCleaningDays}
             liveInitialCleaningDays={liveInitialCleaningDays}
+            readyAt={readyAt}
             dayCountAvailableForBooking={dayCountAvailableForBooking}
             monthlyTimeSlots={monthlyTimeSlots}
             onFetchTimeSlots={onFetchTimeSlots}

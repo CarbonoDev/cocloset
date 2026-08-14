@@ -3,6 +3,7 @@ const {
   resolveInitialCleaningBlockDays,
   earliestBookingStart,
   assertInitialCleaningLeadTime,
+  assertCleaningReadiness,
 } = require('./bookingRules');
 
 // This module is the ONLY thing standing between a posted booking and a charge that
@@ -439,5 +440,123 @@ describe('assertInitialCleaningLeadTime', () => {
     delete noPlan.attributes.availabilityPlan;
     expect(() => assertAt(noPlan, '2026-08-11')).toThrow();
     expect(() => assertAt(noPlan, '2026-08-14')).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE POST-RENTAL CLEANING WINDOW
+//
+//   > "al momento en que un laundry recibe la prenda, puede ingresar cuantos dias necesita
+//   >  para la lavada, esto debe apartar dias para que la prenda vuelva a estar disponible
+//   >  (...) la prenda debe estar disponible el 18, 4 días despues, no antes"
+//
+// The rule above is the FIRST cleaning and retires itself for good once a studio has taken
+// delivery. This one runs after every rental, and is why the reported symptom survived the
+// last fix: the only thing enforcing it was an availability exception written by a
+// best-effort, failure-swallowing code path. This gate reads the field that path writes
+// FIRST, so a calendar write that comes up short no longer puts the garment back on the
+// market a week early and silently.
+// ---------------------------------------------------------------------------
+
+const readyListing = ({ readyAt, timeZone = 'Etc/UTC' } = {}) => ({
+  id: { uuid: 'listing-2' },
+  type: 'listing',
+  attributes: {
+    publicData: { unitType: 'day' },
+    availabilityPlan: { type: 'availability-plan/time', timezone: timeZone },
+    metadata: { onLaundry: true, ...(readyAt === undefined ? {} : { readyAt }) },
+  },
+});
+
+const assertReady = (listing, startDay) =>
+  assertCleaningReadiness({ listing, bookingStart: new Date(`${startDay}T00:00:00.000Z`) });
+
+describe('assertCleaningReadiness', () => {
+  // The client's own worked example: returned on the 13th, four days of washing, bookable
+  // on the 18th. `readyAt` is what listingCustody wrote for exactly that return.
+  const READY_AT = '2026-08-18T00:00:00.000Z';
+
+  it('refuses every day before the garment is out of the wash', () => {
+    const listing = readyListing({ readyAt: READY_AT });
+    ['2026-08-13', '2026-08-14', '2026-08-16', '2026-08-17'].forEach(day => {
+      expect(() => assertReady(listing, day)).toThrow(/being cleaned/i);
+    });
+  });
+
+  it('allows the readiness day itself, and everything after it', () => {
+    // Off by one here costs the owner a day of availability after EVERY rental, not once.
+    const listing = readyListing({ readyAt: READY_AT });
+    expect(() => assertReady(listing, '2026-08-18')).not.toThrow();
+    expect(() => assertReady(listing, '2026-08-19')).not.toThrow();
+  });
+
+  it('carries its own error code, distinct from the first-cleaning one', () => {
+    // Both refuse a start date for a cleaning reason, but "this garment has never been to a
+    // laundry" and "it is in a wash right now" need different sentences in front of a
+    // customer - one of them is asking them to wait for something that already happened.
+    try {
+      assertReady(readyListing({ readyAt: READY_AT }), '2026-08-14');
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect(e.status).toBe(400);
+      expect(e.data.code).toBe('booking-before-cleaning-ready');
+      expect(e.data.readyAt).toBe(READY_AT);
+    }
+  });
+
+  it('is a no-op for a garment that is not in a wash', () => {
+    // Which is almost every listing, almost all the time.
+    expect(() => assertReady(readyListing(), '2026-08-11')).not.toThrow();
+  });
+
+  it('is a no-op once the readiness date has passed', () => {
+    // `readyAt` is never cleared - it just stops mattering. A stale value must not refuse
+    // bookings forever.
+    expect(() =>
+      assertReady(readyListing({ readyAt: '2026-08-01T00:00:00.000Z' }), '2026-08-11')
+    ).not.toThrow();
+  });
+
+  it.each([['not-a-date'], [''], [0], [{}], [[]]])(
+    'treats %p as absent rather than taking the listing off the market',
+    value => {
+      // Same direction resolveInitialCleaningBlockDays errs in: a bad write must not be able
+      // to make a garment unbookable, because nothing would ever say why.
+      expect(() => assertReady(readyListing({ readyAt: value }), '2026-08-11')).not.toThrow();
+    }
+  );
+
+  it('compares days in the LISTING time zone, not the server one', () => {
+    // Both values here are Mexico City midnights, which is what the API actually stores for
+    // a day-unit booking and what listingCustody writes. Comparing raw instants instead of
+    // days would make the answer depend on the hour, and the picker offers whole days.
+    const listing = readyListing({
+      readyAt: '2026-08-18T06:00:00.000Z',
+      timeZone: 'America/Mexico_City',
+    });
+    const startsOn = day =>
+      assertCleaningReadiness({ listing, bookingStart: new Date(`${day}T06:00:00.000Z`) });
+
+    expect(() => startsOn('2026-08-18')).not.toThrow();
+    expect(() => startsOn('2026-08-17')).toThrow(/being cleaned/i);
+    // ...and the last minute of the readiness day is still on the readiness day.
+    expect(() =>
+      assertCleaningReadiness({ listing, bookingStart: new Date('2026-08-19T05:59:00.000Z') })
+    ).not.toThrow();
+  });
+
+  it('stays silent on a missing or unparseable bookingStart', () => {
+    // Somebody else's complaint; the line-item builder reports it with a message about the
+    // actual problem.
+    const listing = readyListing({ readyAt: READY_AT });
+    expect(() => assertCleaningReadiness({ listing })).not.toThrow();
+    expect(() => assertCleaningReadiness({ listing, bookingStart: 'nope' })).not.toThrow();
+  });
+
+  it('does not fall over on a listing with no availabilityPlan', () => {
+    const noPlan = readyListing({ readyAt: READY_AT });
+    delete noPlan.attributes.availabilityPlan;
+    expect(() => assertReady(noPlan, '2026-08-14')).toThrow();
+    expect(() => assertReady(noPlan, '2026-08-18')).not.toThrow();
   });
 });

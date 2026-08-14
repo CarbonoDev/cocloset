@@ -230,7 +230,11 @@ const handleRealReturn = ({
     requestedDays: requestedCleaningDays,
     turnaroundDays,
   });
-  const { readyAt, blockWindow } = computeReadiness({ returnedAt, cleaningDays });
+  // The listing's own zone, not the server's and not UTC. The days the operator typed are
+  // days on the studio's wall calendar; counting them in UTC put the whole window a day out
+  // for any studio west of Greenwich confirming a return in the evening.
+  const timeZone = listing.attributes?.availabilityPlan?.timezone;
+  const { readyAt, blockWindow } = computeReadiness({ returnedAt, cleaningDays, timeZone });
 
   // Custody first, availability second. Custody is the fact the client asked to
   // be recorded ("se queda en estatus onLaundry true"); the calendar block is a

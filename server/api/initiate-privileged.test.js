@@ -53,6 +53,7 @@ const listingEntity = ({
   initialCleaningDays,
   onLaundry,
   assignedLaundryId,
+  readyAt,
 } = {}) => ({
   id: LISTING_ID,
   type: 'listing',
@@ -75,6 +76,10 @@ const listingEntity = ({
       ...(initialCleaningDays === undefined ? {} : { initialCleaningDays }),
       ...(onLaundry === undefined ? {} : { onLaundry }),
       ...(assignedLaundryId === undefined ? {} : { assignedLaundryId }),
+      // When the wash this garment is in RIGHT NOW finishes. Written at the return counter
+      // by api-util/listingCustody.js; unrelated to initialCleaningDays, which is about a
+      // garment that has never been to a laundry at all.
+      ...(readyAt === undefined ? {} : { readyAt }),
     },
   },
 });
@@ -149,6 +154,7 @@ const setup = ({
   initialCleaningDays,
   onLaundry,
   assignedLaundryId,
+  readyAt,
   // The laundry's CURRENT turnaround, as it would come back from the Integration API.
   // `undefined` leaves the Integration API mock unconfigured, which makes the live lookup
   // fail - and a failed lookup must fall back to the snapshot, so that is a case worth
@@ -163,6 +169,7 @@ const setup = ({
           initialCleaningDays,
           onLaundry,
           assignedLaundryId,
+          readyAt,
         }),
       },
     })
@@ -529,5 +536,90 @@ describe('initiate-privileged: the gate resolves the laundry live turnaround', (
 
     expect(res.statusCode).toBe(400);
     expect(initiateSpeculative).not.toHaveBeenCalled();
+  });
+});
+
+describe('initiate-privileged: the post-rental cleaning gate', () => {
+  //   > "al momento en que un laundry recibe la prenda, puede ingresar cuantos dias necesita
+  //   >  para la lavada, esto debe apartar dias para que la prenda vuelva a estar disponible
+  //   >  (...) la prenda debe estar disponible el 18, 4 días despues, no antes"
+  //
+  // WHY THIS GATE IS HERE AND NOT ONLY ON THE CALENDAR.
+  // The cleaning window used to be held by exactly one thing: an availability exception
+  // written at the return. That write runs after a transition that has ALREADY succeeded, so
+  // it swallows its own failures by design - failing the request would make the ops UI retry
+  // a step Sharetribe answers 409 for. Every way it can come up short (a rejected exception
+  // query, an owner-blocked week overlapping with seats > 0, a garment returned before the
+  // feature shipped) ended with the listing bookable the day the rental ended, silently.
+  //
+  // `metadata.readyAt` is written BEFORE the calendar and read fresh here on every booking,
+  // and it is Integration-API-only so an owner cannot clear it to get back on the market
+  // early. Two independent mechanisms, and the authoritative one is the one that cannot
+  // quietly write nothing.
+
+  it('refuses a booking that starts while the garment is still in the wash', async () => {
+    const { initiate } = setup({ readyAt: daysFromToday(5).toISOString(), onLaundry: true });
+
+    const res = await run({ days: 2, startsInDays: 3 });
+
+    expect(res.statusCode).toBe(400);
+    const error = handleError.mock.calls[0][1];
+    expect(error.data.code).toBe('booking-before-cleaning-ready');
+    // A 400 that arrives after the transaction was initiated is not a refusal.
+    expect(buildLineItemsForListing).not.toHaveBeenCalled();
+    expect(initiate).not.toHaveBeenCalled();
+  });
+
+  it('lets the readiness day itself through to pricing', async () => {
+    // Off by one here costs the owner a day of availability after every single rental.
+    const { initiate } = setup({ readyAt: daysFromToday(5).toISOString(), onLaundry: true });
+
+    await run({ days: 2, startsInDays: 5 });
+
+    expect(buildLineItemsForListing).toHaveBeenCalled();
+    expect(initiate).toHaveBeenCalled();
+  });
+
+  it('leaves a garment that is not in a wash entirely alone', async () => {
+    // Which is almost every listing, almost all of the time.
+    const { initiate } = setup({ onLaundry: true });
+
+    await run({ days: 2, startsInDays: 1 });
+
+    expect(initiate).toHaveBeenCalled();
+  });
+
+  it('ignores a readiness date that has already passed', async () => {
+    // `readyAt` is never cleared - it just stops mattering. A stale one must not refuse
+    // bookings for the rest of the listing's life.
+    const { initiate } = setup({ readyAt: daysFromToday(-3).toISOString(), onLaundry: true });
+
+    await run({ days: 2, startsInDays: 1 });
+
+    expect(initiate).toHaveBeenCalled();
+  });
+
+  it('refuses on the speculative path too, so the preview cannot quote a refused date', async () => {
+    // A preview that quotes a booking the charge path will reject is how a customer gets to
+    // the last step before finding out.
+    const { initiateSpeculative } = setup({
+      readyAt: daysFromToday(5).toISOString(),
+      onLaundry: true,
+    });
+
+    const res = await run({ days: 2, startsInDays: 3, isSpeculative: true });
+
+    expect(res.statusCode).toBe(400);
+    expect(initiateSpeculative).not.toHaveBeenCalled();
+  });
+
+  it('does not treat a malformed readyAt as a block', async () => {
+    // A bad write must not be able to take a listing off the market - nothing would ever
+    // say why. Same direction the initial-cleaning rule errs in.
+    const { initiate } = setup({ readyAt: 'sometime next week', onLaundry: true });
+
+    await run({ days: 2, startsInDays: 1 });
+
+    expect(initiate).toHaveBeenCalled();
   });
 });

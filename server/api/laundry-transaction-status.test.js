@@ -549,10 +549,12 @@ describe('laundry-transaction-status', () => {
       expect(params.metadata.onLaundry).toBe(true);
       expect(typeof params.metadata.readyAt).toBe('string');
 
-      // Default readiness = now + the laundry's configured turnaround in days.
+      // Default readiness: the wash runs for the laundry's configured turnaround starting
+      // the day AFTER the handover, so the garment is ready at the start of the day after
+      // those. Asserted exactly rather than as a range - `readyAt` is now a midnight by
+      // construction, and it is the field the checkout gate compares against.
       const readyAt = new Date(params.metadata.readyAt).getTime();
-      expect(readyAt).toBeGreaterThan(Date.now() + (DEFAULT_DAYS - 1) * dayMs);
-      expect(readyAt).toBeLessThanOrEqual(Date.now() + DEFAULT_DAYS * dayMs);
+      expect(readyAt).toBe(utcMidnight(new Date()) + (DEFAULT_DAYS + 1) * dayMs);
 
       expect(res.body.data.custody).toMatchObject({
         onLaundry: true,
@@ -579,15 +581,29 @@ describe('laundry-transaction-status', () => {
       expect(call.end.getTime()).toBeGreaterThan(call.start.getTime());
     });
 
-    it('blocks exactly cleaningDays worth of whole UTC days', async () => {
+    it('blocks the handover day plus every wash day the studio asked for', async () => {
+      //   > "devuelven la prenda hoy 13, y la laundry ingresa que necesita 4 días de lavado,
+      //   >  entonces la prenda debe estar disponible el 18, 4 días despues, no antes"
+      //
+      // 13th -> 18th is five calendar days blocked for four days of washing: the day the
+      // garment is handed back over the counter is not a wash day.
       setupSdk({ lastTransition: 'transition/laundry-confirm-pickup' });
-      await run({ transactionId: TX_ID, status: 'returned', cleaningDays: 3 });
+      await run({ transactionId: TX_ID, status: 'returned', cleaningDays: 4 });
 
       const call = reconcileBufferWindow.mock.calls[0][0];
-      const days = (call.end.getTime() - call.start.getTime()) / dayMs;
-      // 3 days of cleaning starting mid-day spans 4 calendar days: the day it came
-      // back, two full days, and the day it becomes ready.
-      expect(days).toBe(4);
+      expect(call.start.getTime()).toBe(utcMidnight(new Date()));
+      expect((call.end.getTime() - call.start.getTime()) / dayMs).toBe(5);
+    });
+
+    it('blocks two days for a single wash day', async () => {
+      // The case the old implementation got closest to wrong: with the window computed
+      // from the exact return instant, a one-day turnaround only ever blocked the tail of
+      // today and the whole of tomorrow when the clock happened to cooperate.
+      setupSdk({ lastTransition: 'transition/laundry-confirm-pickup' });
+      await run({ transactionId: TX_ID, status: 'returned', cleaningDays: 1 });
+
+      const call = reconcileBufferWindow.mock.calls[0][0];
+      expect((call.end.getTime() - call.start.getTime()) / dayMs).toBe(2);
     });
 
     it('treats an on-time and a late return identically', async () => {

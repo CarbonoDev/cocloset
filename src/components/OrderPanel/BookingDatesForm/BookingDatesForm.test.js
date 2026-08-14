@@ -268,7 +268,7 @@ describe("the calendar's lower bound honours the garment's initial cleaning time
     // The picker hands its predicate LOCAL dates and the component converts them
     // back; this is that conversion, so the test exercises the same path the
     // calendar does rather than a shortcut past it.
-    const probe = (blockDays, offset) => {
+    const probe = (blockDays, offset, readyAt) => {
       const isOutside = isOutsideRangeFn(
         [],
         { [monthIdString(new Date(), TZ)]: { timeSlots: [] } },
@@ -277,7 +277,8 @@ describe("the calendar's lower bound honours the garment's initial cleaning time
         LINE_ITEM_DAY,
         90,
         TZ,
-        blockDays
+        blockDays,
+        readyAt
       );
       return isOutside(timeOfDayFromTimeZoneToLocal(dayInTz(offset), TZ));
     };
@@ -298,6 +299,43 @@ describe("the calendar's lower bound honours the garment's initial cleaning time
       expect(probe(null, 0)).toBe(false);
       expect(probe(null, 1)).toBe(false);
       expect(probe(null, -1)).toBe(true);
+    });
+
+    it('refuses every day before the wash the garment is in now finishes', () => {
+      //   > "esto debe apartar dias para que la prenda vuelva a estar disponible (...) la
+      //   >  prenda debe estar disponible el 18, 4 días despues, no antes"
+      //
+      // `readyAt` reaches the picker with `initialCleaningDays` already null, because a
+      // garment can only have one after a studio has taken delivery - and that retires the
+      // first-cleaning rule for good. So this is the floor on its own, not on top of one.
+      const readyAt = dayInTz(5).toISOString();
+
+      expect(probe(null, 1, readyAt)).toBe(true);
+      expect(probe(null, 4, readyAt)).toBe(true);
+      expect(probe(null, 5, readyAt)).toBe(false);
+      expect(probe(null, 6, readyAt)).toBe(false);
+    });
+
+    it('takes whichever of the two cleaning floors is later', () => {
+      // They are independent facts and either alone is a reason the garment cannot be handed
+      // over, so the picker has to satisfy both rather than the most recently added one.
+      const soon = dayInTz(2).toISOString();
+      const late = dayInTz(9).toISOString();
+
+      // Initial cleaning binds (floor +4), readiness has already passed it.
+      expect(probe(3, 3, soon)).toBe(true);
+      expect(probe(3, 4, soon)).toBe(false);
+
+      // Readiness binds (floor +9), well past the initial-cleaning floor.
+      expect(probe(3, 4, late)).toBe(true);
+      expect(probe(3, 9, late)).toBe(false);
+    });
+
+    it('is unmoved by a readiness date that has already passed', () => {
+      // `readyAt` is never cleared, so almost every listing that has ever been rented
+      // carries a stale one. It must change nothing.
+      expect(probe(null, 1, dayInTz(-4).toISOString())).toBe(false);
+      expect(probe(null, 0, dayInTz(-4).toISOString())).toBe(false);
     });
   });
 });
