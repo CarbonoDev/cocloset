@@ -28,6 +28,7 @@ const laundryAddress = require('./api/laundry-address');
 const laundryOrders = require('./api/laundry-orders');
 const transactionQr = require('./api/transaction-qr');
 const handoverStatus = require('./api/handover-status');
+const autoAcceptBooking = require('./api/auto-accept-booking');
 const initUserRole = require('./api/init-user-role');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
@@ -109,6 +110,12 @@ router.get('/transaction-qr', transactionQr);
 // read it through the Marketplace API at all; see the header of
 // server/api/handover-status.js.
 router.get('/handover-status', handoverStatus);
+
+// Accept a paid booking on the operator's behalf when the garment is already at its laundry -
+// there is nobody to wait for. Uses `transition/operator-accept`, which the process has always
+// had; no EDN change was needed. Does nothing, loudly, for a garment that is not at its studio.
+// See the header of server/api/auto-accept-booking.js.
+router.post('/auto-accept-booking', autoAcceptBooking);
 
 // Applies the `metadata.isLaundry = false` default to the CALLING user, right
 // after signup. Takes no request parameters at all - the target is the

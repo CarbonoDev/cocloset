@@ -1,18 +1,8 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { getSdk, handleError } = require('../api-util/sdk');
 const log = require('../log');
-const {
-  computeAvailabilityBufferWindow,
-  resolveTurnaroundDays,
-} = require('../api-util/availabilityHelpers');
-const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
-const {
-  getListingCategoryValues,
-  resolveCategoryTurnaroundDays,
-} = require('../api-util/categoryPricing');
+const { buildBufferForAcceptedTransaction } = require('../api-util/availabilityBuffer');
 const { ACCEPT_TRANSITIONS } = require('../api-util/coclosetBookingProcess');
-const { notifyPickupScheduled } = require('../api-util/laundryMailer');
-const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
 
 // Creates the "buffer window" availability exception (seats: 0, i.e.
 // unavailable) around a booking once it's been accepted, so the listing
@@ -207,74 +197,15 @@ module.exports = (req, res) => {
         );
       }
 
-      const listingRef = data.relationships?.listing?.data;
-      const bookingRef = data.relationships?.booking?.data;
-
-      const listing = listingRef
-        ? included.find(i => i.type === 'listing' && i.id.uuid === listingRef.id.uuid)
-        : null;
-      const booking = bookingRef
-        ? included.find(i => i.type === 'booking' && i.id.uuid === bookingRef.id.uuid)
-        : null;
-
-      if (!listing) {
-        throw httpError(
-          422,
-          `create-availability-buffer: transaction ${txIdForLog} has no listing relationship.`
-        );
-      }
-      if (!booking || !booking.attributes?.start || !booking.attributes?.end) {
-        throw httpError(
-          422,
-          `create-availability-buffer: transaction ${txIdForLog} has no booking dates.`
-        );
-      }
-
-      const assignedLaundryId = readAssignedLaundryId(listing);
-      const { start: bookingStart, end: bookingEnd } = booking.attributes;
-
-      if (!assignedLaundryId) {
-        // Not every listing is guaranteed to have a laundry assigned (e.g.
-        // partial rollout, or listings created before this feature). This
-        // is a valid "nothing to do" state, not a server error.
-        return { skipped: true, reason: 'no-laundry-assigned' };
-      }
-
-      const customerRef = data.relationships?.customer?.data;
-      const customer = customerRef
-        ? included.find(i => i.type === 'user' && i.id.uuid === customerRef.id.uuid)
-        : null;
-
-      return integrationSdk.users.show({ id: assignedLaundryId }).then(userResponse => {
-        const laundryUser = userResponse.data.data;
-        const laundryProfile = laundryUser.attributes?.profile || {};
-        // Size the buffer from the turnaround for the garment ACTUALLY being cleaned,
-        // not a studio-wide average: a laundry sets DAYS per top-level category
-        // (privateData.categoryPricing), and the listing's own top-level category
-        // selects one. Falls back to the studio-wide privateData.turnaroundDays, and
-        // then (inside resolveTurnaroundDays) to DEFAULT_LAUNDRY_BUFFER_DAYS.
-        const turnaroundDays = resolveTurnaroundDays(
-          resolveCategoryTurnaroundDays(
-            laundryProfile.privateData,
-            getListingCategoryValues(listing.attributes?.publicData)
-          ),
-          process.env.DEFAULT_LAUNDRY_BUFFER_DAYS
-        );
-
-        return {
-          skipped: false,
-          listing,
-          bookingStart,
-          bookingEnd,
-          turnaroundDays,
-          laundry: {
-            // `users.show` on the Integration API returns the account email,
-            // which the Marketplace API would not expose for a third party.
-            email: laundryUser.attributes?.email,
-            studioName: laundryProfile.publicData?.laundryProfile?.studioName,
-          },
-          customerName: customer?.attributes?.profile?.displayName,
-        };
+      // Everything from here - resolving the studio's turnaround, sending the §3.12 Pickup
+      // Scheduled mail, and blocking the window - is shared with
+      // server/api/auto-accept-booking.js, which reaches the same point by a different door.
+      // One copy, in api-util/availabilityBuffer.js.
+      return buildBufferForAcceptedTransaction({
+        integrationSdk,
+        transaction: data,
+        included,
+        txIdForLog,
       });
     })
     .then(result => {
@@ -287,54 +218,13 @@ module.exports = (req, res) => {
         return null;
       }
 
-      const { listing, bookingStart, bookingEnd, turnaroundDays, laundry, customerName } = result;
-      const {
-        start,
-        end,
-        bufferBeforeDays,
-        bufferAfterDays,
-        totalBufferDays,
-      } = computeAvailabilityBufferWindow(bookingStart, bookingEnd, turnaroundDays);
-
-      // §3.12 Pickup Scheduled. Fired before the calendar work rather than
-      // after it, and never awaited: the laundry needs to know a rental is
-      // confirmed regardless of whether an exception write succeeds, and this
-      // promise cannot reject (see api-util/laundryMailer.js).
-      notifyPickupScheduled({
-        to: laundry.email,
-        laundryName: laundry.studioName,
-        garmentTitle: listing.attributes?.title,
-        customerName,
-        pickupDate: bookingStart,
-        rack: listing.attributes?.privateData?.currentRack,
-        transactionId: txIdForLog,
-      });
-
-      // Reconcile against what is already blocked, rather than blindly
-      // creating (which 400s on any overlap - see the header comment).
-      return reconcileBufferWindow({
-        integrationSdk,
-        listingId: listing.id,
-        start,
-        end,
-        txIdForLog,
-      }).then(exceptionResult => {
-        res
-          .status(200)
-          .set('Content-Type', 'application/json')
-          .send({
-            data: {
-              ...exceptionResult,
-              listingId: listing.id.uuid,
-              start,
-              end,
-              bufferBeforeDays,
-              bufferAfterDays,
-              totalBufferDays,
-            },
-          })
-          .end();
-      });
+      const { skipped, ...data } = result;
+      res
+        .status(200)
+        .set('Content-Type', 'application/json')
+        .send({ data })
+        .end();
+      return null;
     })
     .catch(e => {
       // A failure here means the listing may be double-bookable during the
