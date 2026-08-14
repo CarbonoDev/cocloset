@@ -39,6 +39,7 @@
   "BookingDateRangeFilter.labelSelectedPopup": "{dates}",
   "BookingDatesForm.bookingEndTitle": "End date",
   "BookingDatesForm.bookingStartTitle": "Start date",
+  "BookingDatesForm.cleaningReadyNotice": "This garment is being cleaned after its last rental, so the earliest date you can book is {date}.",
   "BookingDatesForm.initialCleaningNotice": "This garment is on its way to its laundry and needs {days, plural, one {# day} other {# days}} for its first cleaning, so the earliest date you can book is {date}.",
   "BookingDatesForm.priceBreakdownTitle": "Booking breakdown",
   "BookingDatesForm.requestToBook": "Request to book",

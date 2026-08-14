@@ -272,11 +272,161 @@ const assertInitialCleaningLeadTime = ({
   }
 };
 
+// ---------------------------------------------------------------------------
+// THE POST-RENTAL CLEANING WINDOW
+// ---------------------------------------------------------------------------
+//
+//   > "al momento en que un laundry recibe la prenda, puede ingresar cuantos dias necesita
+//   >  para la lavada, esto debe apartar dias para que la prenda vuelva a estar disponible
+//   >  (...) la prenda debe estar disponible el 18, 4 días despues, no antes"
+//
+// The rule above is the FIRST cleaning and retires itself the moment a studio takes
+// delivery (`onLaundry === true`). This one is every cleaning after that: it is written by
+// the studio at the counter, from the days it actually needs for the garment in its hands,
+// and it applies for the rest of the listing's life.
+//
+// ── WHY THIS GATE EXISTS AT ALL, GIVEN THE CALENDAR IS ALREADY BLOCKED ──────
+// Until now the cleaning window was enforced by ONE mechanism: an availability exception
+// written at the return (api-util/availabilityBuffer.js). That write is best-effort by
+// design - it runs after a transition that has already succeeded, so its failures are
+// swallowed and logged rather than surfaced, because failing the request would make the ops
+// UI retry a step Sharetribe now answers 409 for. That is the right call for a transition
+// that already happened. It is the wrong number of places to enforce a rule.
+//
+// So every way the calendar write can come up short - the exception query rejecting, an
+// owner-blocked week overlapping with `seats > 0` (findBookableOverlaps), a transient
+// Integration API failure, a garment returned before this code shipped - ended with the
+// listing bookable the day the rental ended and nothing anywhere saying so. Which is
+// exactly the symptom reported, twice.
+//
+// `metadata.readyAt` is not best-effort in the same way: it is written BEFORE the calendar
+// (custody first, availability second - see handleRealReturn), it is a single field rather
+// than a reconciliation against whatever else is on the calendar, and it is read fresh on
+// every checkout. Two independent mechanisms, and the authoritative one is the one that
+// cannot silently write nothing.
+//
+// It is also unforgeable for the same reason `initialCleaningDays` is: `metadata` is
+// Integration-API-writable only, so a garment owner cannot clear their own cleaning window
+// to put the listing back on the market early (400 `validation-disallowed-key`).
+//
+// This costs the checkout path NO extra API call: `readyAt` is on the listing entity the
+// privileged endpoints have already fetched.
+
+const READY_AT_KEY = 'readyAt';
+
+/**
+ * The moment this garment finishes cleaning, if it is currently in one.
+ *
+ * Written by api-util/listingCustody.js `writeCustodyMetadata` as an ISO string; a Date is
+ * accepted too, since the SDK would hand one back if it were ever stored as a transit
+ * timestamp. Anything unparseable is treated as absent - a malformed write must not be able
+ * to take a listing off the market, the same direction
+ * `resolveInitialCleaningBlockDays` errs in.
+ *
+ * @param {Object} [metadata] - the listing's `metadata`
+ * @returns {Date|null}
+ */
+const resolveReadyAt = metadata => {
+  const raw = metadata?.[READY_AT_KEY];
+  if (!raw) {
+    return null;
+  }
+  const date = raw instanceof Date ? raw : new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+/**
+ * The first day a garment in cleaning can be rented again.
+ *
+ * `readyAt` is already a midnight in the listing's zone when listingCustody wrote it, so
+ * this is normally the identity. It floors anyway, because a value written before that was
+ * true (or by a future caller passing an instant) must still resolve to a whole day - the
+ * comparison below is day against day, and half a day of skew here is a whole day of
+ * disagreement with the calendar.
+ *
+ * MUST MATCH `earliestBookableStart` in src/components/OrderPanel/BookingDatesForm.
+ * cleaningReadinessAgreement.test.js holds them together, for the same reason
+ * initialCleaningAgreement.test.js holds the other pair together: a calendar floor and a
+ * checkout gate that disagree by a day present to the customer as "it let me pick this date
+ * and then refused my card".
+ *
+ * @param {Object} params
+ * @param {Date|string} params.readyAt
+ * @param {string} [params.timeZone]
+ * @returns {Date|null}
+ */
+const earliestStartAfterCleaning = ({ readyAt, timeZone }) => {
+  const resolved = readyAt instanceof Date ? readyAt : new Date(readyAt);
+  return Number.isNaN(resolved?.getTime?.()) ? null : startOfDayInTimeZone(resolved, timeZone);
+};
+
+const notReadyError = ({ earliestStart }) => {
+  const message =
+    `This garment is being cleaned after its last rental. The earliest date it can be ` +
+    `booked from is ${earliestStart.toISOString().slice(0, 10)}.`;
+  const error = new Error(message);
+  error.status = 400;
+  error.statusText = message;
+  // Its own code, distinct from 'booking-before-initial-cleaning'. Both refuse a start date
+  // for a cleaning reason, but one means "this garment has never been to a laundry yet" and
+  // the other means "it is in a wash right now"; a customer told the wrong one is told to
+  // wait for something that already happened.
+  error.data = {
+    code: 'booking-before-cleaning-ready',
+    readyAt: earliestStart.toISOString(),
+  };
+  return error;
+};
+
+/**
+ * Throw when a booking would start before the garment's current cleaning is finished.
+ *
+ * A no-op for the overwhelming majority of listings: `readyAt` only exists between a return
+ * and the end of the cleaning days the studio asked for, and a value in the past can never
+ * refuse a start date, since starts are not in the past either.
+ *
+ * Missing or unparseable booking dates are not this rule's complaint - the line-item builder
+ * already reports that fault with a message about the actual problem.
+ *
+ * @param {Object} params
+ * @param {Object} params.listing - a listing API entity
+ * @param {Date|string} [params.bookingStart]
+ * @throws {Error} 400 with data.code 'booking-before-cleaning-ready'
+ */
+const assertCleaningReadiness = ({ listing, bookingStart }) => {
+  const readyAt = resolveReadyAt(listing?.attributes?.metadata);
+  if (!readyAt) {
+    return;
+  }
+
+  const timeZone = listing?.attributes?.availabilityPlan?.timezone;
+  const earliestStart = earliestStartAfterCleaning({ readyAt, timeZone });
+  if (!earliestStart) {
+    return;
+  }
+
+  const start = bookingStart instanceof Date ? bookingStart : new Date(bookingStart);
+  if (isNaN(start)) {
+    return;
+  }
+
+  // Strictly earlier, matching assertInitialCleaningLeadTime: `readyAt` is the first day the
+  // garment IS ready, not the last day it is not. Off by one here costs the owner a day of
+  // availability after every single rental.
+  if (startOfDayInTimeZone(start, timeZone).getTime() < earliestStart.getTime()) {
+    throw notReadyError({ earliestStart });
+  }
+};
+
 module.exports = {
   INITIAL_CLEANING_DAYS_KEY,
   MAX_INITIAL_CLEANING_DAYS,
+  READY_AT_KEY,
   startOfDayInTimeZone,
   resolveInitialCleaningBlockDays,
   earliestBookingStart,
   assertInitialCleaningLeadTime,
+  resolveReadyAt,
+  earliestStartAfterCleaning,
+  assertCleaningReadiness,
 };

@@ -3,12 +3,8 @@ const {
   ACTIVE_STATES,
   stateFromLastTransition,
 } = require('./coclosetBookingProcess');
-const {
-  addDays,
-  ceilToUtcDay,
-  computeBufferDays,
-  floorToUtcDay,
-} = require('./availabilityHelpers');
+const { computeBufferDays } = require('./availabilityHelpers');
+const { startOfDayInTimeZone } = require('./bookingRules');
 
 // Garment CUSTODY: `listing.metadata.onLaundry`, and the readiness moment
 // `listing.metadata.readyAt` that a real return produces.
@@ -109,32 +105,53 @@ const resolveCleaningDays = ({ requestedDays, turnaroundDays }) => {
 /**
  * The readiness moment, and the whole-day window to block until it.
  *
- * `readyAt` is exact (returnedAt + n days, UTC day arithmetic so DST cannot
- * shift it). The BLOCK is snapped outwards to whole UTC days, because a listing
- * booked by the day is unbookable for any day an exception touches: the day the
- * garment came back must be blocked in full even though it came back at 14:37,
- * and the day it becomes ready must stay blocked unless it becomes ready at
- * midnight. See ceilToUtcDay for why that is a ceiling and not floor + 1.
+ *   > "imagina que devuelven la prenda hoy 13, y la laundry ingresa que necesita 4 días
+ *   >  de lavado, entonces la prenda debe estar disponible el 18, 4 días despues, no antes"
  *
- * `blockWindow` is null when cleaningDays is 0 - "ready today" means there is
- * nothing to block, and an empty range would throw in subtractBlockedRanges.
+ * THE WASH STARTS TOMORROW, NOT TODAY - hence `cleaningDays + 1`.
+ *
+ * This is the same rule, and the same +1, as the initial-cleaning floor in
+ * api-util/bookingRules.js `earliestBookingStart`, stated by the client in the same
+ * shape ("hoy es 12 ... un día de lavado (13 de agosto) y el siguiente día disponible
+ * es 14"). The day the garment is handed back over the counter is already half spent
+ * and is not a wash day; it is the day the studio takes delivery. So a garment returned
+ * on the 13th with 4 cleaning days is washed on the 14th-17th and is bookable on the
+ * 18th, which is exactly the arithmetic above.
+ *
+ * ── WHY THE LISTING'S TIME ZONE AND NOT UTC ─────────────────────────────────
+ * This used to be `returnedAt + n days` as an exact instant, floored/ceiled to whole
+ * UTC days. Both halves of that were wrong for the same reason: the inputs are a wall
+ * clock reading ("the operator pressed the button") and a day count a human typed, and
+ * neither means anything in UTC. A studio in Mexico City (UTC-6) confirming a return at
+ * 19:00 on the 13th stamps 01:00 UTC on the 14th, so the block started on the 14th and
+ * the 13th - the day the garment was demonstrably on a rack, not available - stayed
+ * bookable, while the far end over-blocked by a day to compensate. The window now
+ * lands on the days the operator counted, at every hour of the day.
+ *
+ * The result is also EXACT rather than snapped: both boundaries are midnights in the
+ * listing's zone by construction, so there is no rounding left to get wrong. A listing
+ * booked by the day is unbookable for any day an exception touches, and this window
+ * touches precisely the return day and the wash days.
+ *
+ * `blockWindow` is null when cleaningDays is 0 - "ready today" means there is nothing to
+ * block, and an empty range would throw in subtractBlockedRanges.
  *
  * @param {Object} params
  * @param {Date} params.returnedAt - when the garment physically came back
  * @param {number} params.cleaningDays
+ * @param {string} [params.timeZone] - the listing's IANA zone; UTC when unknown
  * @returns {{readyAt: Date, blockWindow: {start: Date, end: Date}|null}}
  */
-const computeReadiness = ({ returnedAt, cleaningDays }) => {
-  const readyAt = addDays(returnedAt, cleaningDays);
+const computeReadiness = ({ returnedAt, cleaningDays, timeZone }) => {
+  const returnDay = startOfDayInTimeZone(returnedAt, timeZone);
 
   if (cleaningDays <= 0) {
-    return { readyAt, blockWindow: null };
+    return { readyAt: returnDay, blockWindow: null };
   }
 
-  return {
-    readyAt,
-    blockWindow: { start: floorToUtcDay(returnedAt), end: ceilToUtcDay(readyAt) },
-  };
+  const readyAt = startOfDayInTimeZone(returnedAt, timeZone, cleaningDays + 1);
+
+  return { readyAt, blockWindow: { start: returnDay, end: readyAt } };
 };
 
 /**

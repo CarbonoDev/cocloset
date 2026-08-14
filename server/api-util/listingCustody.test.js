@@ -91,43 +91,102 @@ describe('resolveCleaningDays', () => {
 });
 
 describe('computeReadiness', () => {
-  it('puts readyAt exactly n days after the return, to the minute', () => {
-    const returnedAt = new Date('2026-08-08T14:37:00.000Z');
-    const { readyAt } = computeReadiness({ returnedAt, cleaningDays: 3 });
-    expect(readyAt.toISOString()).toBe('2026-08-11T14:37:00.000Z');
+  //   > "imagina que devuelven la prenda hoy 13, y la laundry ingresa que necesita 4 días
+  //   >  de lavado, entonces la prenda debe estar disponible el 18, 4 días despues, no antes"
+  //
+  // The client's own arithmetic, and the case every test below is a variation of. Note the
+  // shape: the RETURN day is not a wash day (the garment is being handed over on it), the n
+  // wash days run from the day after, and the garment is bookable on the day after those.
+  // Same +1 as the initial-cleaning floor in bookingRules, stated by the client in the same
+  // form ("hoy es 12 ... un día de lavado (13) y el siguiente día disponible es 14").
+
+  const MEXICO = 'America/Mexico_City';
+
+  it('frees the garment the day after the wash days the studio asked for', () => {
+    // Mid-morning on the 13th in Mexico City.
+    const returnedAt = new Date('2026-08-13T16:00:00.000Z');
+    const { readyAt, blockWindow } = computeReadiness({
+      returnedAt,
+      cleaningDays: 4,
+      timeZone: MEXICO,
+    });
+
+    // 13th (handover) + 14th-17th (four wash days) blocked; bookable on the 18th.
+    expect(blockWindow.start.toISOString()).toBe('2026-08-13T06:00:00.000Z');
+    expect(blockWindow.end.toISOString()).toBe('2026-08-18T06:00:00.000Z');
+    expect(readyAt.toISOString()).toBe('2026-08-18T06:00:00.000Z');
   });
 
-  it('blocks whole UTC days, starting with the day the garment came back', () => {
-    const returnedAt = new Date('2026-08-08T14:37:00.000Z');
-    const { blockWindow } = computeReadiness({ returnedAt, cleaningDays: 3 });
-    // The 8th is blocked in full even though the garment arrived mid-afternoon,
-    // and the 11th stays blocked because it is not ready until 14:37 that day.
-    expect(blockWindow.start.toISOString()).toBe('2026-08-08T00:00:00.000Z');
-    expect(blockWindow.end.toISOString()).toBe('2026-08-12T00:00:00.000Z');
+  it('gives the same answer whatever time of day the operator pressed the button', () => {
+    // THE BUG THIS PINS. The window used to be `returnedAt + n` floored/ceiled to whole UTC
+    // days, so a studio in Mexico City (UTC-6) confirming a return in the EVENING stamped
+    // the next UTC day: the block started on the 14th, the 13th stayed bookable, and the
+    // far end ran a day long to compensate. The inputs are a wall clock and a day count a
+    // human typed; neither means anything in UTC.
+    const windows = [
+      '2026-08-13T06:01:00.000Z', // 00:01 local
+      '2026-08-13T16:00:00.000Z', // 10:00 local
+      '2026-08-14T04:59:00.000Z', // 22:59 local, still the 13th in Mexico City
+    ].map(iso =>
+      computeReadiness({ returnedAt: new Date(iso), cleaningDays: 4, timeZone: MEXICO })
+    );
+
+    windows.forEach(({ blockWindow }) => {
+      expect(blockWindow.start.toISOString()).toBe('2026-08-13T06:00:00.000Z');
+      expect(blockWindow.end.toISOString()).toBe('2026-08-18T06:00:00.000Z');
+    });
   });
 
-  it('does not round the end up when readiness lands exactly on midnight', () => {
-    const returnedAt = new Date('2026-08-08T00:00:00.000Z');
-    const { blockWindow } = computeReadiness({ returnedAt, cleaningDays: 2 });
-    expect(blockWindow.start.toISOString()).toBe('2026-08-08T00:00:00.000Z');
-    expect(blockWindow.end.toISOString()).toBe('2026-08-10T00:00:00.000Z');
+  it('blocks two days for a one-day wash: the handover day and the wash day', () => {
+    const returnedAt = new Date('2026-08-13T16:00:00.000Z');
+    const { blockWindow } = computeReadiness({
+      returnedAt,
+      cleaningDays: 1,
+      timeZone: MEXICO,
+    });
+
+    expect(blockWindow.start.toISOString()).toBe('2026-08-13T06:00:00.000Z');
+    expect(blockWindow.end.toISOString()).toBe('2026-08-15T06:00:00.000Z');
+  });
+
+  it('falls back to UTC days when the listing has no time zone', () => {
+    // An availability plan with no timezone is not something to guess about, and the
+    // server's own TZ is an accident of deployment.
+    const returnedAt = new Date('2026-08-13T14:37:00.000Z');
+    const { blockWindow } = computeReadiness({ returnedAt, cleaningDays: 4 });
+
+    expect(blockWindow.start.toISOString()).toBe('2026-08-13T00:00:00.000Z');
+    expect(blockWindow.end.toISOString()).toBe('2026-08-18T00:00:00.000Z');
   });
 
   it('produces no window at all for 0 days', () => {
-    // An empty range would throw in subtractBlockedRanges; "ready today" means
-    // there is nothing to block, which is a different thing from a zero-length
-    // block.
-    const returnedAt = new Date('2026-08-08T14:37:00.000Z');
-    const { readyAt, blockWindow } = computeReadiness({ returnedAt, cleaningDays: 0 });
+    // An empty range would throw in subtractBlockedRanges; "ready today" means there is
+    // nothing to block, which is a different thing from a zero-length block.
+    const returnedAt = new Date('2026-08-13T16:00:00.000Z');
+    const { readyAt, blockWindow } = computeReadiness({
+      returnedAt,
+      cleaningDays: 0,
+      timeZone: MEXICO,
+    });
+
     expect(blockWindow).toBeNull();
-    expect(readyAt.toISOString()).toBe('2026-08-08T14:37:00.000Z');
+    // Still the start of the return day, so the checkout gate reading this field refuses
+    // nothing - "ready today" has to mean bookable today.
+    expect(readyAt.toISOString()).toBe('2026-08-13T06:00:00.000Z');
   });
 
-  it('crosses a DST boundary without shifting by an hour', () => {
-    // Europe/Madrid loses an hour on 2026-03-29. UTC day arithmetic must not care.
-    const returnedAt = new Date('2026-03-28T23:30:00.000Z');
-    const { readyAt } = computeReadiness({ returnedAt, cleaningDays: 2 });
-    expect(readyAt.toISOString()).toBe('2026-03-30T23:30:00.000Z');
+  it('crosses a DST boundary without losing or gaining a day', () => {
+    // Europe/Madrid springs forward on 2026-03-29, so 02:00 does not exist that night. A
+    // three-day window across it is still three days.
+    const returnedAt = new Date('2026-03-28T22:30:00.000Z'); // 23:30 local on the 28th
+    const { blockWindow } = computeReadiness({
+      returnedAt,
+      cleaningDays: 2,
+      timeZone: 'Europe/Madrid',
+    });
+
+    expect(blockWindow.start.toISOString()).toBe('2026-03-27T23:00:00.000Z'); // 28th, 00:00 CET
+    expect(blockWindow.end.toISOString()).toBe('2026-03-30T22:00:00.000Z'); // 31st, 00:00 CEST
   });
 });
 
