@@ -161,6 +161,9 @@
    that assumes exactly this. A third line would be clipped, not scrolled. */
 .editorialTitle {
   composes: marketplaceDefaultFontStyles from global;
+  font-family: var(--fontFamilyDisplay);
+  font-size: 17px;
+  line-height: 20px;
   font-weight: var(--fontWeightSemiBold);
   color: var(--coclosetInk);
   margin: 0;

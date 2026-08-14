@@ -51,6 +51,7 @@
 }
 
 .headline {
+  font-family: var(--fontFamilyDisplay);
   font-size: 40px;
   line-height: 1.05;
   letter-spacing: -0.02em;

@@ -16,6 +16,25 @@
     <!--!ssrStyles-->
     <!--!ssrLinks-->
 
+    <!--
+      Cocloset's display serif, for headings. Inter (below) stays the text face.
+
+      `display=swap` on purpose: a heading that is invisible until a third-party font arrives
+      is worse than one that reflows. The serif fallbacks in --fontFamilyDisplay carry the
+      first paint, so the page reads as designed even if this request never lands.
+
+      Loaded from Google Fonts rather than self-hosted alongside Inter because the family is
+      still provisional - see --fontFamilyDisplay in src/styles/marketplaceDefaults.css. If it
+      is confirmed, moving it next to Inter's self-hosted @font-face rules drops the
+      third-party request.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..800;1,400..800&display=swap"
+    />
+
     <style>
 
      /**
