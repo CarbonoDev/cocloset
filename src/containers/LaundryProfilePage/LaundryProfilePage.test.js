@@ -591,10 +591,15 @@ describe('LaundryProfilePage per-category turnaround', () => {
     });
   });
 
-  it('RETAINS a stored turnaround for a category the studio no longer accepts', async () => {
-    // The form renders no input for `pants` here, and a form that rebuilds the table only
-    // from what it rendered would silently delete a value the studio configured.
-    // Un-ticking a category is not a request to destroy its turnaround.
+  it('DROPS a stored turnaround for a category the studio un-ticked', async () => {
+    //   > "si luego hace uncheck, el dato de turnaround aun se guarda, pero debe ser el
+    //   >  default, no el que haya escrito ya que la propiedad se desmarcó"
+    //
+    // `pants` is in the tree, so the studio saw its checkbox and left it un-ticked. That is
+    // a decision, and the value goes - the garment falls back to the studio-wide turnaround.
+    // It survived before because the input UNMOUNTS while its final-form value does not, so
+    // the abandoned number was rebuilt into the table and saved, and came back as the
+    // pre-filled default when the garment was returned.
     const onUpdateProfile = jest.fn();
     await act(async () => {
       renderPage(
@@ -617,7 +622,38 @@ describe('LaundryProfilePage per-category turnaround', () => {
 
     expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({
       dresses: { turnaroundDays: 4 },
-      pants: { turnaroundDays: 1 },
+    });
+  });
+
+  it('RETAINS a stored turnaround for a category that is not in the tree at all', async () => {
+    // The distinction that keeps the pruning safe. `blazers` is not in this marketplace's
+    // category tree, so the studio never saw a checkbox for it and its absence from the
+    // accepted list is not a decision. Deleting it would mean one empty hosted-asset fetch
+    // could wipe a studio's whole table - the failure server/api-util/categoryPricing.js has
+    // warned about since it was written. It stays, and the form surfaces it as orphaned.
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(
+        withPricing(['dresses'], {
+          dresses: { turnaroundDays: 5 },
+          blazers: { turnaroundDays: 6 },
+        }),
+        onUpdateProfile
+      );
+    });
+
+    await act(async () => {
+      await userEvent.clear(daysInput('dresses'));
+      await userEvent.type(daysInput('dresses'), '4');
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile.mock.calls[0][0].privateData.categoryPricing).toEqual({
+      dresses: { turnaroundDays: 4 },
+      blazers: { turnaroundDays: 6 },
     });
   });
 

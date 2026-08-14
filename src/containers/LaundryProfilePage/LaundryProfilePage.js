@@ -8,9 +8,11 @@ import { canChangeLaundryAddress, hasUsableLaundryAddressForUser } from '../../u
 import {
   categoryPricingFromFormValues,
   categoryPricingToFormValues,
+  flattenCategoryTree,
 } from '../../util/fieldHelpers';
 import { types as sdkTypes } from '../../util/sdkLoader';
 
+import { useConfiguration } from '../../context/configurationContext';
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 
 import { H3, Page, UserNav, LayoutSideNavigation } from '../../components';
@@ -121,6 +123,9 @@ const LaundryProfileFormSection = props => {
   } = props;
 
   const [state, setState] = useState({ initialValues: getInitialValues(currentUser) });
+  // The category tree, so the submit handler can tell "the studio un-ticked this" apart from
+  // "this category was never on screen" - see categoryPricingFromFormValues.
+  const config = useConfiguration();
 
   const storedLaundryProfile = currentUser?.attributes?.profile?.publicData?.laundryProfile || {};
   const hasUsableAddress = hasUsableLaundryAddressForUser(currentUser);
@@ -156,7 +161,21 @@ const LaundryProfileFormSection = props => {
     // Rebuild the nested table from the flat fields. Cleared inputs drop out entirely
     // rather than being stored as null: an empty box means "use the studio-wide value",
     // and that is expressed by the key's absence, not by a row full of nulls.
-    const nextCategoryPricing = categoryPricingFromFormValues(values);
+    //
+    // Un-ticking a category drops its value too - the input unmounts but its final-form
+    // value does not, so without this the number the studio just abandoned would be saved
+    // and would come back as the pre-filled default when the garment is returned. Pruned
+    // only for categories the form actually DREW a checkbox for; see the docblock on
+    // categoryPricingFromFormValues for why that distinction protects the table from an
+    // empty hosted-asset fetch.
+    const renderableCategoryIds = flattenCategoryTree(
+      config?.categoryConfiguration?.categories || []
+    ).map(entry => entry.id);
+
+    const nextCategoryPricing = categoryPricingFromFormValues(values, {
+      acceptedCategoryIds: acceptedCategoriesArray,
+      renderableCategoryIds,
+    });
 
     // ── THE ADDRESS DOES NOT TRAVEL WITH THIS WRITE ────────────────────────────
     //   > "Igual podemos hacer una llamada secundaria que solo guarde la dirección,
@@ -346,7 +365,11 @@ export const LaundryProfilePageComponent = props => {
               desktopClassName={css.desktopTopbar}
               mobileClassName={css.mobileTopbar}
             />
-            <UserNav currentPage="LaundryProfilePage" showLaundryProfileLink showManageListingsLink />
+            <UserNav
+              currentPage="LaundryProfilePage"
+              showLaundryProfileLink
+              showManageListingsLink
+            />
           </>
         }
         sideNav={<LaundryOpsNav currentPage="LaundryProfilePage" studioName={studioName} />}

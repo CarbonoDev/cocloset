@@ -8,6 +8,10 @@ import {
   pickCategoryFields,
   pickCustomFieldProps,
 } from '../../util/fieldHelpers.js';
+import {
+  isSearchableListingField,
+  listingFieldSearchParams,
+} from '../../util/listingFieldSearch.js';
 
 import CustomExtendedDataSection from '../../components/CustomExtendedDataSection/CustomExtendedDataSection.js';
 
@@ -36,13 +40,28 @@ const CustomListingFields = props => {
     const isTargetCategory = isFieldForCategory(currentCategories, fieldConfig);
     return isTargetCategory;
   };
-  const propsForCustomFields =
+  // Some field values are worth browsing by - the brand, today. Attaching the search params
+  // here rather than inside the shared pick helpers keeps this listing-page behaviour out of
+  // ProfilePage, which renders custom fields through the same components and has no search to
+  // link to. See util/listingFieldSearch.js for how the query is derived from the field's own
+  // config, so a free-text brand and a multi-select brand each get the right one.
+  const withSearchParams = (fieldProps, key) => {
+    if (!isSearchableListingField(key)) {
+      return fieldProps;
+    }
+    const config = displayableFieldConfigs.find(candidate => candidate.key === key);
+    const searchParams = listingFieldSearchParams(config, publicData?.[key]);
+    return searchParams ? { ...fieldProps, searchParams } : fieldProps;
+  };
+
+  const propsForCustomFields = (
     pickCustomFieldProps(
       { publicData, metadata },
       displayableFieldConfigs,
       'listingType',
       isFieldForSelectedCategories
-    ) || [];
+    ) || []
+  ).map(fieldProps => withSearchParams(fieldProps, fieldProps.key));
 
   const sectionDetailsProps = {
     ...props,
@@ -73,7 +92,9 @@ const CustomListingFields = props => {
         'ListingPage'
       );
 
-      return detailValue ? filteredConfigs.concat(detailValue) : filteredConfigs;
+      return detailValue
+        ? filteredConfigs.concat(withSearchParams(detailValue, key))
+        : filteredConfigs;
     }
     return filteredConfigs;
   };

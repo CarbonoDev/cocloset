@@ -1,7 +1,8 @@
 import React from 'react';
 import classNames from 'classnames';
-import { Heading } from '../../components';
+import { Heading, NamedLink } from '../../components';
 import { richText } from '../../util/richText';
+import { stringify } from '../../util/urlHelpers';
 
 import css from './CustomExtendedDataSection.module.css';
 
@@ -15,6 +16,10 @@ const SectionText = props => {
     className,
     rootClassName,
     showAsIngress = false,
+    // Present only for fields the listing page marked as worth browsing by (the brand). A
+    // free-text field links to a keyword search and a multi-select one to a real filter; both
+    // are decided in util/listingFieldSearch.js, not here.
+    searchParams,
   } = props;
   const textClass = showAsIngress ? css.ingress : css.text;
   const content = richText(text, {
@@ -33,7 +38,15 @@ const SectionText = props => {
           {heading}
         </Heading>
       ) : null}
-      <p className={textClass}>{content}</p>
+      <p className={textClass}>
+        {searchParams ? (
+          <NamedLink name="SearchPage" to={{ search: stringify(searchParams) }}>
+            {content}
+          </NamedLink>
+        ) : (
+          content
+        )}
+      </p>
     </section>
   ) : null;
 };

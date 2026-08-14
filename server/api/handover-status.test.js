@@ -306,6 +306,38 @@ describe('handover-status: the cleaning-days default', () => {
   });
 });
 
+describe('handover-status: the damage report flag', () => {
+  it('asks for one at the return, where the garment is actually inspected', () => {
+    setup({ lastTransition: 'transition/laundry-confirm-pickup' });
+
+    return run().then(res => {
+      expect(res.body.data.step.status).toBe('returned');
+      expect(res.body.data.takesDamageReport).toBe(true);
+    });
+  });
+
+  it('does not at any other step', () => {
+    // Offering it at a collection would invite a report on a garment nobody has inspected.
+    setup({ lastTransition: 'transition/laundry-mark-ready' });
+
+    return run().then(res => {
+      expect(res.body.data.takesDamageReport).toBe(false);
+    });
+  });
+
+  it('never asks the customer for one', () => {
+    setup({
+      callerId: CUSTOMER_ID,
+      isLaundry: false,
+      lastTransition: 'transition/laundry-confirm-pickup',
+    });
+
+    return run().then(res => {
+      expect(res.body.data.takesDamageReport).toBe(false);
+    });
+  });
+});
+
 describe('handover-status: what it discloses', () => {
   it('returns the garment and the step, and nothing about the money', () => {
     setup();
@@ -320,6 +352,7 @@ describe('handover-status: what it discloses', () => {
           'listingTitle',
           'processState',
           'step',
+          'takesDamageReport',
           'ticketCode',
           'transactionId',
           'viewerRole',

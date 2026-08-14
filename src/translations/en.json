@@ -555,6 +555,8 @@
   "HandoverPage.cleaningDays.label": "Days needed to clean",
   "HandoverPage.counterparty.customer": "With the renter",
   "HandoverPage.counterparty.provider": "With the garment owner",
+  "HandoverPage.damage.label": "Report damage on this garment",
+  "HandoverPage.damage.notePlaceholder": "What is damaged, and where? The owner and the renter both see this.",
   "HandoverPage.error.confirmFailed": "We could not confirm this step. It may already have been done — reload the page to see where the rental is now.",
   "HandoverPage.error.forbidden": "We could not find that handover, or it is not yours. Only the garment owner, the renter and the assigned laundry can open it.",
   "HandoverPage.error.generic": "We could not load this handover. Please try again.",

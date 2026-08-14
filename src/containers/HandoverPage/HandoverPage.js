@@ -118,6 +118,19 @@ export const HandoverPageComponent = props => {
   const [cleaningDays, setCleaningDays] = useState('');
   const defaultCleaningDays = handover?.defaultCleaningDays;
 
+  // The damage report, at the same moment.
+  //
+  //   > "cuando esta el form en que ingreso esos días, ya sea que venga de qr, o no, no me
+  //   >  aparece la opción para reportar daños"
+  //
+  // The desktop worklist has had this; this page never did, so a studio taking a garment back
+  // from a phone had no way to record damage at the one moment it is physically inspected -
+  // and by the next step the payout has fired and a cancel-with-refund is no longer
+  // expressible. Whether to ask is the SERVER's answer, same as the days box.
+  const [damaged, setDamaged] = useState(false);
+  const [damageNote, setDamageNote] = useState('');
+  const takesDamageReport = handover?.takesDamageReport === true;
+
   useEffect(() => {
     // Seeded from the server's answer, and re-seeded when it changes (the page refetches
     // after every confirm). An empty string until it arrives, so the field is never a
@@ -270,6 +283,31 @@ export const HandoverPageComponent = props => {
               <FormattedMessage id={handoverStepMessageId(step, 'laundry')} />
             </p>
 
+            {takesDamageReport ? (
+              <div className={css.damageField}>
+                <label className={css.damageCheckboxLabel} htmlFor="handoverDamaged">
+                  <input
+                    id="handoverDamaged"
+                    type="checkbox"
+                    checked={damaged}
+                    onChange={e => setDamaged(e.target.checked)}
+                  />
+                  <span>
+                    <FormattedMessage id="HandoverPage.damage.label" />
+                  </span>
+                </label>
+                {damaged ? (
+                  <textarea
+                    className={css.damageNote}
+                    value={damageNote}
+                    onChange={e => setDamageNote(e.target.value)}
+                    placeholder={intl.formatMessage({ id: 'HandoverPage.damage.notePlaceholder' })}
+                    rows={3}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+
             {Number.isInteger(defaultCleaningDays) ? (
               <div className={css.cleaningDaysField}>
                 <label className={css.cleaningDaysLabel} htmlFor="handoverCleaningDays">
@@ -314,6 +352,10 @@ export const HandoverPageComponent = props => {
                   ...(Number.isInteger(defaultCleaningDays) && /^\d+$/.test(cleaningDays.trim())
                     ? { cleaningDays: Number.parseInt(cleaningDays, 10) }
                     : {}),
+                  // The note only travels when damage was actually reported: a note left
+                  // behind after un-ticking the box would attach a description of damage to a
+                  // garment recorded as fine.
+                  ...(takesDamageReport ? { damaged, damageNote: damaged ? damageNote : '' } : {}),
                 })
               }
             >
