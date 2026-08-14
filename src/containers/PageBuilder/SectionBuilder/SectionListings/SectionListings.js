@@ -76,7 +76,8 @@ const calculateCarouselHeight = (
   carouselWidth,
   isMobileBreakpoint = false,
   error,
-  noListingsFound
+  noListingsFound,
+  isEditorial = false
 ) => {
   const errorMessageHeight = 250;
   const noListingsFoundHeight = 220;
@@ -116,8 +117,28 @@ const calculateCarouselHeight = (
   const cardImageHeight = cardWidth / parsedAspectRatio;
   const cardInfoHeight = priceHeight + titleHeightSingleLine + authorInfoHeight + cardInfoPadding;
 
-  const totalCardHeight =
-    cardImageHeight + (isMobileBreakpoint ? cardInfoHeightMobile : cardInfoHeight);
+  // ⚠️ Cocloset: the editorial card is a different stack - a brand eyebrow, then a title of
+  // up to TWO lines with the price beside it, then the size/collection-point line. Same
+  // hardcoded-pixel bargain the rest of this function makes, and the same maintenance rule
+  // applies: these mirror .editorial* in ListingCard.module.css.
+  //
+  // The two-line bound is not an assumption, it is enforced - .editorialTitle clamps at two
+  // lines - because this container's height is set in JS and anything taller is CLIPPED. A
+  // card that grows past the estimate loses its bottom row with nothing to say why.
+  const editorialBrandHeight = 16 + 4; // line + margin-bottom
+  const editorialTitleHeight = 2 * 20; // clamped at two lines
+  const editorialMetaHeight = 16 + 4; // line + margin-top
+  const editorialPaddingTop = 12;
+  const editorialInfoHeight =
+    editorialBrandHeight + editorialTitleHeight + editorialMetaHeight + editorialPaddingTop;
+
+  const infoHeight = isEditorial
+    ? editorialInfoHeight
+    : isMobileBreakpoint
+    ? cardInfoHeightMobile
+    : cardInfoHeight;
+
+  const totalCardHeight = cardImageHeight + infoHeight;
   const totalWithPaddings = totalCardHeight + containerPaddingTop + containerPaddingBottom;
 
   return Math.ceil(totalWithPaddings);
@@ -148,6 +169,9 @@ const ListingCarouselComponent = props => {
     error,
     allSections,
     isInsideContainer,
+    // Cocloset: which ListingCard layout to render. Undefined - every stock caller - keeps
+    // the default card, so the search page and the map are untouched.
+    listingCardVariant,
   } = props;
 
   const listingImageConfig = config.layout.listingImage;
@@ -197,6 +221,7 @@ const ListingCarouselComponent = props => {
             darkMode={darkMode}
             renderSizes={getResponsiveImageSizes(numColumns)}
             lazyLoadImage={!isInsideContainer}
+            variant={listingCardVariant}
           />
         </li>
       ))}
@@ -327,7 +352,8 @@ const SectionListings = props => {
     carouselWidthConstant,
     isMobileBreakpoint,
     error,
-    noListingsFound
+    noListingsFound,
+    options?.listingCardVariant === 'editorial'
   );
 
   return (
@@ -375,6 +401,7 @@ const SectionListings = props => {
               config={config}
               allSections={allSections}
               isInsideContainer={isInsideContainer}
+              listingCardVariant={options?.listingCardVariant}
             />
           ) : (
             <LazyListingCarouselComponent
@@ -391,6 +418,7 @@ const SectionListings = props => {
               config={config}
               allSections={allSections}
               isInsideContainer={isInsideContainer}
+              listingCardVariant={options?.listingCardVariant}
             />
           )}
         </div>

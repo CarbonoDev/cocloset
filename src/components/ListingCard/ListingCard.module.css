@@ -127,3 +127,64 @@
   word-break: break-word;
   hyphens: auto;
 }
+
+/* ================ Cocloset: the editorial card ================ */
+/* Used by the landing page's "New & noteworthy" carousel. The stock `.info` block above is
+   untouched — the search page and the map still render exactly as they did. */
+
+.editorialInfo {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 0 0;
+}
+
+.editorialBrand {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 4px 0;
+  padding: 0;
+}
+
+/* Garment on the left, price on the right, baselines aligned. `align-items: baseline` rather
+   than `center` so a two-line title still lines its FIRST line up with the price. */
+.editorialHeadline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ⚠️ Clamped at two lines, and that is load-bearing rather than cosmetic: the carousel sets
+   its container height in JS (calculateCarouselHeight in SectionListings.js) from an estimate
+   that assumes exactly this. A third line would be clipped, not scrolled. */
+.editorialTitle {
+  composes: marketplaceDefaultFontStyles from global;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
+  margin: 0;
+  padding: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Never lets a long price wrap under itself or get squeezed by the title. */
+.editorialPrice {
+  composes: marketplaceDefaultFontStyles from global;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.editorialMeta {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 4px 0 0 0;
+  padding: 0;
+}
