@@ -1,0 +1,83 @@
+@import '../../../../styles/customMediaQueries.css';
+
+/* A band a shade darker than the hero above it, which is what separates the two - there is
+   no rule between them in the design. */
+.root {
+  background-color: var(--coclosetSubtle);
+  border-top: 1px solid var(--coclosetBorder);
+  border-bottom: 1px solid var(--coclosetBorder);
+}
+
+.layout {
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+  padding: 40px 24px;
+
+  @media (--viewportLarge) {
+    padding: 56px 36px;
+  }
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetBrand);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin: 0;
+}
+
+.sectionDescription {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 8px 0 0 0;
+}
+
+/* An <ol> because these are ordered steps, and the numerals are content. The list markers
+   are suppressed - the authored "01"/"02"/"03" are the visible numbering. */
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+
+  @media (--viewportMedium) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
+  }
+}
+
+.step {
+  margin: 0;
+  padding: 0;
+}
+
+.numeral {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--coclosetBrandTint);
+  margin: 0 0 12px 0;
+}
+
+.stepTitle {
+  composes: marketplaceDefaultFontStyles from global;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
+  margin: 0 0 8px 0;
+  padding: 0;
+}
+
+.stepBody {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+}
+
+.stepBody > p {
+  margin: 0;
+}

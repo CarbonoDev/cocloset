@@ -1,0 +1,199 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  background-color: var(--coclosetCanvas);
+}
+
+/* Type left, imagery right. Stacked below the large breakpoint, because the floating card
+   needs room to overlap the image without covering the model's face. */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  padding: 48px 24px 56px 24px;
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+
+  /* Slightly more room to the type than to the imagery: at an even split the headline broke
+     across "Borrow the / dress.", which reads as two statements instead of one. */
+  @media (--viewportLarge) {
+    grid-template-columns: 1.08fr 1fr;
+    align-items: center;
+    gap: 56px;
+    padding: 96px 36px 104px 36px;
+  }
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* The section title + description, set as one small tracked line. Both are Fields, so the
+   markdown processor wraps each in its own block element - hence the child reset. */
+.eyebrow {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetBrand);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin: 0 0 20px 0;
+}
+
+.eyebrow > * {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.headline {
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px 0;
+  color: var(--coclosetInk);
+
+  /* Peaks at the medium breakpoint, where the hero is still one full-width column, and comes
+     back DOWN once it has to share the row with the imagery. Sized so "Borrow the dress."
+     holds one line in the narrower column rather than breaking mid-phrase. */
+  @media (--viewportMedium) {
+    font-size: 60px;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 52px;
+  }
+
+  @media (--viewportLargeWithPaddings) {
+    font-size: 56px;
+  }
+}
+
+.headlineLead,
+.headlineAccent {
+  display: block;
+}
+
+/* The second line of the headline. Colour AND italics, never colour alone - the distinction
+   is decorative here, but a reader who cannot see the terracotta still gets the shift. */
+.headlineAccent {
+  color: var(--coclosetBrandTint);
+  font-style: italic;
+}
+
+.standfirst {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  max-width: 460px;
+  margin: 0 0 32px 0;
+}
+
+.standfirst > p {
+  margin: 0 0 12px 0;
+}
+
+.standfirst > p:last-child {
+  margin-bottom: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Both actions are the same pill; only the fill differs. Sized off the text rather than
+   stretched, so a long label in Console grows the button instead of wrapping it. */
+.primaryAction,
+.secondaryAction {
+  composes: marketplaceDefaultFontStyles from global;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font-weight: var(--fontWeightSemiBold);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all var(--transitionStyleButton);
+}
+
+.primaryAction {
+  background-color: var(--coclosetInk);
+  color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetInk);
+}
+
+.primaryAction:hover,
+.primaryAction:focus {
+  background-color: var(--coclosetBrandDark);
+  border-color: var(--coclosetBrandDark);
+  text-decoration: none;
+}
+
+.secondaryAction {
+  background-color: transparent;
+  color: var(--coclosetInk);
+  border: 1px solid var(--coclosetBorderStrong);
+}
+
+.secondaryAction:hover,
+.secondaryAction:focus {
+  border-color: var(--coclosetInk);
+  text-decoration: none;
+}
+
+.showcase {
+  position: relative;
+}
+
+.media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+/* The "how it works" card. It lies ACROSS the lower edge of the image on wide viewports and
+   sits under it on narrow ones, where an overlap would eat most of the picture. */
+.card {
+  background-color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 6px;
+  padding: 16px 20px;
+  box-shadow: var(--boxShadowPopup);
+  margin-top: 16px;
+}
+
+.cardFloating {
+  @media (--viewportLarge) {
+    position: absolute;
+    left: -32px;
+    right: -24px;
+    bottom: -28px;
+    margin-top: 0;
+  }
+}
+
+.cardLabel {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin: 0 0 4px 0;
+}
+
+.cardBody {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  margin: 0;
+}
+
+.cardBody > p {
+  margin: 0;
+}

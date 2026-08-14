@@ -5,7 +5,7 @@ import classNames from 'classnames';
 
 import { useConfiguration } from '../../context/configurationContext';
 
-import { useIntl } from '../../util/reactIntl';
+import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { requireListingImage } from '../../util/configHelpers';
 import { lazyLoadWithDimensions } from '../../util/uiHelpers';
 import { createSlug } from '../../util/urlHelpers';
@@ -82,6 +82,70 @@ const ListingCardImage = props => {
 };
 
 /**
+ * THE EDITORIAL CARD.
+ *
+ * The layout the landing page's "New & noteworthy" carousel uses: the brand as a tracked
+ * eyebrow, the garment as the headline, then size and collection point on one line with the
+ * price set against them.
+ *
+ * A VARIANT RATHER THAN A REPLACEMENT. This same component renders every card on the search
+ * page and the map, and those are a different job - a browsing grid wants the price first
+ * and the seller named, because the reader is comparing. Restyling the default would have
+ * changed both surfaces to suit one of them.
+ *
+ * Every field degrades on its own. A garment with no brand, no size or no laundry assigned
+ * yet renders the rows it has and drops the rest - none of these are required to publish, so
+ * all of them are absent on some real listing.
+ *
+ * `assignedLaundryName` is the collection point: server-written when a laundry is assigned
+ * (see server/api-util/laundryAssignment.js), and the same name the listing page shows.
+ */
+const EditorialInfo = props => {
+  const { listing, titleFormatted, showPrice, priceMessage, priceTooltip, darkMode } = props;
+  const { brand, size, assignedLaundryName } = listing?.attributes?.publicData || {};
+
+  const meta = [
+    size ? <FormattedMessage key="size" id="ListingCard.editorialSize" values={{ size }} /> : null,
+    assignedLaundryName ? (
+      <FormattedMessage
+        key="pickup"
+        id="ListingCard.editorialPickup"
+        values={{ name: assignedLaundryName }}
+      />
+    ) : null,
+  ].filter(Boolean);
+
+  return (
+    <div className={classNames(css.editorialInfo, { [css.lightText]: darkMode })}>
+      {brand ? <p className={css.editorialBrand}>{brand}</p> : null}
+
+      <div className={css.editorialHeadline}>
+        <p className={css.editorialTitle}>{titleFormatted}</p>
+        {showPrice ? (
+          <p className={css.editorialPrice} title={priceTooltip}>
+            {priceMessage}
+          </p>
+        ) : null}
+      </div>
+
+      {meta.length > 0 ? (
+        <p className={css.editorialMeta}>
+          {meta.map((entry, index) => (
+            <React.Fragment key={index}>
+              {/* A middot separator rather than a list, because these read as one line of
+                  provenance. Rendered between entries only, so a garment with just one of
+                  the two does not trail a stray dot. */}
+              {index > 0 ? <span aria-hidden="true"> · </span> : null}
+              {entry}
+            </React.Fragment>
+          ))}
+        </p>
+      ) : null}
+    </div>
+  );
+};
+
+/**
  * ListingCard
  *
  * @component
@@ -93,6 +157,7 @@ const ListingCardImage = props => {
  * @param {string?} props.renderSizes for img/srcset
  * @param {Function?} props.setActiveListing
  * @param {boolean?} props.showAuthorInfo
+ * @param {'editorial'?} props.variant Cocloset: the landing page's carousel layout
  * @returns {JSX.Element} listing card to be used in search result panel etc.
  */
 export const ListingCard = props => {
@@ -109,7 +174,12 @@ export const ListingCard = props => {
     setActiveListing,
     showAuthorInfo = true,
     lazyLoadImage = true,
+    // Cocloset: 'editorial' is the landing page's carousel card. Anything else - including
+    // nothing, which is every existing call site - keeps the stock layout untouched.
+    variant,
   } = props;
+
+  const isEditorial = variant === 'editorial';
 
   const translations = getListingCardTranslations(listing, config, intl);
   const {
@@ -177,25 +247,36 @@ export const ListingCard = props => {
           setActivePropsMaybe={setActivePropsMaybe}
         />
       )}
-      <div className={css.info}>
-        {showPrice ? (
-          <div className={css.price} title={priceTooltip}>
-            {priceMessage}
-          </div>
-        ) : null}
-        <div className={css.mainInfo}>
-          {showListingImage && (
-            <div className={classNames(css.title, { [css.lightText]: darkMode })}>
-              {titleFormatted}
-            </div>
-          )}
-          {showAuthorInfo ? (
-            <div className={classNames(css.authorInfo, { [css.lightText]: darkMode })}>
-              {authorName}
+      {isEditorial ? (
+        <EditorialInfo
+          listing={listing}
+          titleFormatted={titleFormatted}
+          showPrice={showPrice}
+          priceMessage={priceMessage}
+          priceTooltip={priceTooltip}
+          darkMode={darkMode}
+        />
+      ) : (
+        <div className={css.info}>
+          {showPrice ? (
+            <div className={css.price} title={priceTooltip}>
+              {priceMessage}
             </div>
           ) : null}
+          <div className={css.mainInfo}>
+            {showListingImage && (
+              <div className={classNames(css.title, { [css.lightText]: darkMode })}>
+                {titleFormatted}
+              </div>
+            )}
+            {showAuthorInfo ? (
+              <div className={classNames(css.authorInfo, { [css.lightText]: darkMode })}>
+                {authorName}
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
     </NamedLink>
   );
 };

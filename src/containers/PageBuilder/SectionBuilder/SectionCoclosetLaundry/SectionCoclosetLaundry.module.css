@@ -1,0 +1,133 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  background-color: var(--coclosetCanvas);
+}
+
+/* One bordered card floating on the page's canvas, per the design - the pitch on the left,
+   the tile grid on the right. */
+.panel {
+  max-width: var(--contentMaxWidthPages);
+  margin: 40px auto;
+  padding: 28px 24px;
+  background-color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 8px;
+
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+
+  @media (--viewportLarge) {
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    margin: 64px auto;
+    padding: 48px;
+  }
+}
+
+.eyebrow {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetBrand);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin: 0 0 16px 0;
+}
+
+.eyebrow > * {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.headline {
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--coclosetInk);
+  margin: 0 0 16px 0;
+
+  @media (--viewportMedium) {
+    font-size: 34px;
+  }
+}
+
+.body {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0 0 24px 0;
+}
+
+.body > p {
+  margin: 0 0 12px 0;
+}
+
+.body > p:last-child {
+  margin-bottom: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.action {
+  composes: marketplaceDefaultFontStyles from global;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font-weight: var(--fontWeightSemiBold);
+  background-color: var(--coclosetInk);
+  color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetInk);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all var(--transitionStyleButton);
+}
+
+.action:hover,
+.action:focus {
+  background-color: var(--coclosetBrandDark);
+  border-color: var(--coclosetBrandDark);
+  text-decoration: none;
+}
+
+.tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.tile {
+  background-color: var(--coclosetSurfaceRaised);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin: 0;
+}
+
+.tileLabel {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 2px 0;
+}
+
+.tileTitle {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightMedium);
+  margin: 0;
+}

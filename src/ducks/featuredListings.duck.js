@@ -67,6 +67,13 @@ const fetchFeaturedListingsPayloadCreator = async (arg, thunkAPI) => {
           'publicData.shippingEnabled',
           'publicData.priceVariationsEnabled',
           'publicData.priceVariants',
+          // Cocloset: the editorial card's three lines of provenance - the brand as an
+          // eyebrow, then size and collection point under the garment. `fields.listing` is
+          // an allowlist, so a key that is not named here is simply absent from the
+          // response and the card silently renders without it.
+          'publicData.brand',
+          'publicData.size',
+          'publicData.assignedLaundryName',
         ],
         'fields.image': [
           'variants.listing-card',

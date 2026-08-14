@@ -1,0 +1,83 @@
+@import '../../../styles/customMediaQueries.css';
+
+/* The Cocloset voice, applied to the stock section components.
+   Mirrors SectionBuilder.module.css key for key — see coclosetSkin.js for why these are
+   passed in as `defaultClasses` rather than written as a page-level stylesheet. */
+
+.section {
+  background-color: var(--coclosetCanvas);
+}
+
+.sectionDetails {
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+  padding: 40px 24px 8px 24px;
+
+  @media (--viewportMedium) {
+    padding: 64px 36px 8px 36px;
+  }
+}
+
+/* The section heading. Left-aligned and set in ink, matching the landing page's own sections
+   rather than the template's centred default. */
+.title {
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--coclosetInk);
+  margin: 0;
+  padding: 0;
+
+  @media (--viewportMedium) {
+    font-size: 34px;
+  }
+}
+
+.description {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  max-width: 640px;
+  margin: 12px 0 0 0;
+  padding: 0;
+}
+
+/* Same pill as the landing page's primary action, so a CTA authored on any hosted page comes
+   out looking like the ones on the front page. */
+.ctaButton {
+  composes: marketplaceDefaultFontStyles from global;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 20px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font-weight: var(--fontWeightSemiBold);
+  background-color: var(--coclosetInk);
+  color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetInk);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all var(--transitionStyleButton);
+}
+
+.ctaButton:hover,
+.ctaButton:focus {
+  background-color: var(--coclosetBrandDark);
+  border-color: var(--coclosetBrandDark);
+  text-decoration: none;
+}
+
+.blockContainer {
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+  padding: 24px;
+
+  @media (--viewportMedium) {
+    padding: 32px 36px 56px 36px;
+  }
+}
+
+.defaultLink {
+  color: var(--coclosetBrandDark);
+}

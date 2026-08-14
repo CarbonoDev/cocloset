@@ -9,6 +9,8 @@ import { withRouter } from 'react-router-dom';
 import { fetchFeaturedListings } from '../../ducks/featuredListings.duck';
 import { getListingsById } from '../../ducks/marketplaceData.duck';
 import { getFeaturedListingsProps } from '../../util/data';
+import { mapCoclosetSections } from '../../util/coclosetLandingSections';
+import { coclosetPageOptions } from '../PageBuilder/coclosetPageOptions';
 
 import NotFoundPage from '../../containers/NotFoundPage/NotFoundPage';
 const PageBuilder = loadable(() =>
@@ -25,7 +27,11 @@ export const CMSPageComponent = props => {
 
   return (
     <PageBuilder
-      pageAssetsData={pageAssetsData?.[pageId]?.data}
+      // Cocloset: every hosted page gets the same treatment as the landing page - the named
+      // sections that have a bespoke layout get it, and everything else renders through the
+      // stock component for its type, in the Cocloset skin.
+      pageAssetsData={mapCoclosetSections(pageAssetsData?.[pageId]?.data)}
+      options={coclosetPageOptions}
       inProgress={inProgress}
       schemaType="Article"
       featuredListings={getFeaturedListingsProps(pageId, props)}
