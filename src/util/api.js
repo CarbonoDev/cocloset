@@ -251,6 +251,20 @@ export const updateLaundryTransactionStatus = body => {
   return post('/api/laundry-transaction-status', body);
 };
 
+// Accept a paid booking on the operator's behalf when the garment is already at its laundry.
+//
+// The SERVER decides whether to: it reads the listing's `metadata.onLaundry`, which is
+// Integration-API-only and therefore the only trustworthy copy. This call is a trigger, not an
+// instruction - it carries no argument that changes the outcome, and it is idempotent, so a
+// reload or a retry costs nothing.
+//
+// Returns `{ data: { accepted: true, ... } }`, or `{ data: null, reason }` when there was
+// nothing to do (garment not at the studio, already accepted, not a cocloset booking).
+// See `server/api/auto-accept-booking.js`.
+export const autoAcceptBooking = body => {
+  return post('/api/auto-accept-booking', body);
+};
+
 // What a scanned handover QR resolves to: the next step at the laundry counter, who it is
 // with, and whether THIS caller may confirm it.
 //
