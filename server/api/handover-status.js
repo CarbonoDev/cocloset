@@ -191,6 +191,12 @@ module.exports = (req, res) => {
       // a user may read their own, so this costs no extra round trip. Same resolution chain
       // that sizes the availability block, so the number shown is the number that would have
       // been applied.
+      // The return is also the ONLY step that takes a damage report - it is the moment the
+      // garment is physically inspected, and the last one at which a cancel-with-refund is
+      // still expressible (see laundryActionsFor). Sent as its own flag rather than letting
+      // the page infer it from `defaultCleaningDays`: they happen to coincide today, and a
+      // client that assumed they always would is a client that breaks silently the first time
+      // they do not.
       const takesCleaningDays = viewerRole === ROLE_LAUNDRY && step?.status === 'returned';
       const defaultCleaningDaysMaybe = takesCleaningDays
         ? {
@@ -224,6 +230,7 @@ module.exports = (req, res) => {
                 }
               : null,
             ...defaultCleaningDaysMaybe,
+            takesDamageReport: takesCleaningDays,
             listingTitle: listing?.attributes?.title || null,
             bookingStart: booking?.attributes?.displayStart || booking?.attributes?.start || null,
             bookingEnd: booking?.attributes?.displayEnd || booking?.attributes?.end || null,

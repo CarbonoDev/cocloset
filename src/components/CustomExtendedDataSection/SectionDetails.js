@@ -4,8 +4,9 @@ import classNames from 'classnames';
 import { FormattedMessage } from '../../util/reactIntl';
 
 import { richText } from '../../util/richText';
+import { stringify } from '../../util/urlHelpers';
 
-import { Heading } from '../../components';
+import { Heading, NamedLink } from '../../components';
 
 import css from './CustomExtendedDataSection.module.css';
 
@@ -35,10 +36,20 @@ const SectionDetails = props => {
           const valueContent = richText(detail.value, {
             linkify: true,
           });
+          // Some values are worth browsing by (the brand). The params are computed by the
+          // page that knows the field's config - see util/listingFieldSearch.js - so this
+          // component only has to decide whether it was handed any.
+          const linked = detail.searchParams ? (
+            <NamedLink name="SearchPage" to={{ search: stringify(detail.searchParams) }}>
+              {valueContent}
+            </NamedLink>
+          ) : (
+            valueContent
+          );
           return (
             <li key={detail.key} className={css.detailsRow}>
               <span className={css.detailLabel}>{detail.label}</span>
-              <span>{valueContent}</span>
+              <span>{linked}</span>
             </li>
           );
         })}

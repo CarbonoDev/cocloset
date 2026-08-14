@@ -282,6 +282,83 @@ describe('HandoverPage: the cleaning-days box at a return', () => {
   });
 });
 
+describe('HandoverPage: the damage report at a return', () => {
+  //   > "cuando esta el form en que ingreso esos días, ya sea que venga de qr, o no, no me
+  //   >  aparece la opción para reportar daños"
+  //
+  // The return is the one moment the garment is physically inspected, and by the next step
+  // the payout has fired and a cancel-with-refund is no longer expressible. A studio working
+  // from a phone had no way to record damage at all.
+
+  const returning = (overrides = {}) =>
+    handoverFor({
+      processState: 'picked-up',
+      step: {
+        state: 'picked-up',
+        status: 'returned',
+        counterparty: 'customer',
+        direction: 'in',
+        isLate: false,
+      },
+      defaultCleaningDays: 3,
+      takesDamageReport: true,
+      ...overrides,
+    });
+
+  const damageCheckbox = () => document.getElementById('handoverDamaged');
+
+  it('offers the damage checkbox at a return', () => {
+    renderPage({ handover: returning() });
+    expect(damageCheckbox()).toBeInTheDocument();
+  });
+
+  it('asks for a note only once damage is actually reported', () => {
+    renderPage({ handover: returning() });
+    expect(screen.queryByPlaceholderText('HandoverPage.damage.notePlaceholder')).toBeNull();
+
+    fireEvent.click(damageCheckbox());
+    expect(screen.getByPlaceholderText('HandoverPage.damage.notePlaceholder')).toBeInTheDocument();
+  });
+
+  it('sends the report with the confirmation', () => {
+    const onConfirm = jest.fn();
+    renderPage({ handover: returning(), onConfirm });
+
+    fireEvent.click(damageCheckbox());
+    fireEvent.change(screen.getByPlaceholderText('HandoverPage.damage.notePlaceholder'), {
+      target: { value: 'Small pull at left cuff.' },
+    });
+    confirmButton().click();
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ damaged: true, damageNote: 'Small pull at left cuff.' })
+    );
+  });
+
+  it('drops a note left behind after the box is un-ticked', () => {
+    // A description of damage attached to a garment recorded as fine is worse than no note.
+    const onConfirm = jest.fn();
+    renderPage({ handover: returning(), onConfirm });
+
+    fireEvent.click(damageCheckbox());
+    fireEvent.change(screen.getByPlaceholderText('HandoverPage.damage.notePlaceholder'), {
+      target: { value: 'Actually it is fine' },
+    });
+    fireEvent.click(damageCheckbox());
+    confirmButton().click();
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ damaged: false, damageNote: '' })
+    );
+  });
+
+  it('does not offer it at a step that does not take one', () => {
+    // WHETHER TO ASK is the server's answer, and this component does not re-derive it.
+    renderPage();
+    expect(damageCheckbox()).toBeNull();
+  });
+});
+
 describe('HandoverPage: failures', () => {
   it('tells a stranger they are not part of this rental', () => {
     renderPage({ handover: null, fetchError: { status: 403 } });

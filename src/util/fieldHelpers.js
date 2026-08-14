@@ -381,14 +381,51 @@ export const categoryPricingToFormValues = categoryPricing => {
  * @param {Object} values the form's submitted values
  * @returns {Object} `categoryPricing`, keyed by category id
  */
-export const categoryPricingFromFormValues = values => {
-  return Object.entries(values || {}).reduce((table, [name, value]) => {
+export const categoryPricingFromFormValues = (values, options = {}) => {
+  const { acceptedCategoryIds, renderableCategoryIds } = options;
+
+  const table = Object.entries(values || {}).reduce((collected, [name, value]) => {
     const parsed = parseCategoryPricingFieldName(name);
     if (!parsed || typeof value !== 'number' || !Number.isFinite(value)) {
-      return table;
+      return collected;
     }
     const { field, categoryId } = parsed;
-    return { ...table, [categoryId]: { ...table[categoryId], [field]: value } };
+    return { ...collected, [categoryId]: { ...collected[categoryId], [field]: value } };
+  }, {});
+
+  // Un-ticking a category drops its stored value, so the garment falls back to the
+  // studio-wide turnaround.
+  //
+  //   > "si luego hace uncheck, el dato de turnaround aun se guarda, pero debe ser el
+  //   >  default, no el que haya escrito ya que la propiedad se desmarcó"
+  //
+  // The value survived because the input UNMOUNTS when the box is un-ticked while its
+  // final-form value does not: it stays in `values`, gets rebuilt into the table, and is
+  // saved. The studio then meets it again as the pre-filled default when the garment comes
+  // back - which is exactly where the client noticed it.
+  //
+  // PRUNED ONLY FOR CATEGORIES THE STUDIO COULD ACTUALLY SEE. `renderableCategoryIds` is
+  // every category the form drew a checkbox for; an id outside it was never on screen, so
+  // its absence from `acceptedCategoryIds` is not a decision anyone made. That distinction
+  // is load-bearing: the category tree comes from a hosted Console asset, and one empty
+  // fetch would otherwise wipe a studio's whole table - the failure
+  // server/api-util/categoryPricing.js has warned about since it was written. Entries for
+  // categories Console has dropped stay retained and are surfaced by
+  // `getOrphanedPricingCategories` instead.
+  //
+  // Both lists are required to prune anything. A caller that passes neither (the form, which
+  // uses this to FIND orphans rather than to save) gets the raw table.
+  const canPrune = Array.isArray(acceptedCategoryIds) && Array.isArray(renderableCategoryIds);
+  if (!canPrune) {
+    return table;
+  }
+
+  const accepted = new Set(acceptedCategoryIds);
+  const renderable = new Set(renderableCategoryIds);
+
+  return Object.keys(table).reduce((kept, categoryId) => {
+    const wasDeliberatelyUnticked = renderable.has(categoryId) && !accepted.has(categoryId);
+    return wasDeliberatelyUnticked ? kept : { ...kept, [categoryId]: table[categoryId] };
   }, {});
 };
 

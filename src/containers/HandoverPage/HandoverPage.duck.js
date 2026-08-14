@@ -41,7 +41,7 @@ export const fetchHandoverThunk = createAsyncThunk(
 // page ever showing a step the transaction has already left.
 export const confirmHandoverThunk = createAsyncThunk(
   'HandoverPage/confirmHandover',
-  ({ transactionId, status, cleaningDays }, { dispatch, rejectWithValue }) =>
+  ({ transactionId, status, cleaningDays, damaged, damageNote }, { dispatch, rejectWithValue }) =>
     // `cleaningDays` is forwarded only when the caller supplied a number. Omitting it is
     // MEANINGFUL: the server then applies the turnaround this studio configured for the
     // garment's category. Sending 0 would mean "ready today" and block nothing at all, so a
@@ -50,6 +50,8 @@ export const confirmHandoverThunk = createAsyncThunk(
       transactionId,
       status,
       ...(typeof cleaningDays === 'number' ? { cleaningDays } : {}),
+      ...(typeof damaged === 'boolean' ? { damaged } : {}),
+      ...(damageNote ? { damageNote } : {}),
     })
       .then(response => {
         dispatch(fetchHandoverThunk({ transactionId }));
