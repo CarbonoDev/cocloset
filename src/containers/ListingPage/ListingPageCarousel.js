@@ -52,6 +52,7 @@ import Notifications from './Notifications/Notifications';
 import SectionReviews from './SectionReviews';
 import SectionAuthorMaybe from './SectionAuthorMaybe';
 import SectionMapMaybe from './SectionMapMaybe';
+import SectionListingHeader from './SectionListingHeader';
 import SectionCleaningWorks from './SectionCleaningWorks';
 import SectionRentalTimeline from './SectionRentalTimeline';
 import SectionGallery from './SectionGallery';
@@ -265,19 +266,19 @@ export const ListingPageComponent = props => {
                 variantPrefix={config.layout.listingImage.variantPrefix}
               />
             )}
-            <div
-              className={showListingImage ? css.mobileHeading : css.noListingImageHeadingProduct}
-            >
-              {showListingImage ? (
-                <H2 as="h1" className={css.orderPanelTitle}>
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H2>
-              ) : (
-                <H3 as="h1" className={css.orderPanelTitle}>
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H3>
-              )}
-            </div>
+            {/* The garment's own heading: brand, title, provenance.
+                  Replaces the template's mobile-only "ListingPage.orderTitle" block, which
+                  existed to repeat the sticky panel's title on a narrow screen. The design
+                  gives the main column a heading of its own at every width, so repeating the
+                  panel's is now a duplicate h1 rather than a fallback. */}
+            <SectionListingHeader
+              publicData={publicData}
+              listingFieldConfigs={listingConfig.listingFields}
+              title={richTitle}
+              completedRentals={completedRentals}
+              reviews={reviews}
+              authorDisplayName={authorDisplayName}
+            />
             {showDescription && <SectionText text={description} showAsIngress />}
 
             <CustomListingFields

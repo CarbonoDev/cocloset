@@ -241,9 +241,14 @@ describe('ListingPage variants', () => {
       expect(screen.getByTestId('hero')).toBeInTheDocument();
       expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
 
-      // Has order title (rendered for )
+      // Has order title. TWO, not three: the main column used to repeat the order panel's
+      // title, and now carries the garment's OWN heading instead - brand, title, provenance
+      // (SectionListingHeader). What is left is the panel's mobile and desktop copies.
       const orderTitle = queryAllByRole('heading', { name: 'ListingPage.orderTitle' });
-      expect(orderTitle).toHaveLength(3);
+      expect(orderTitle).toHaveLength(2);
+
+      // ...and that own heading is the listing's real title, not a message key.
+      expect(getByRole('heading', { level: 1, name: 'listing1 title' })).toBeInTheDocument();
 
       // Has details section title and selected category info
       expect(getByRole('heading', { name: 'ListingPage.detailsTitle' })).toBeInTheDocument();
@@ -296,9 +301,14 @@ describe('ListingPage variants', () => {
       expect(screen.getByTestId('carousel')).toBeInTheDocument();
       expect(screen.queryByTestId('hero')).not.toBeInTheDocument();
 
-      // Has order title (rendered for )
+      // Has order title. TWO, not three: the main column used to repeat the order panel's
+      // title, and now carries the garment's OWN heading instead - brand, title, provenance
+      // (SectionListingHeader). What is left is the panel's mobile and desktop copies.
       const orderTitle = queryAllByRole('heading', { name: 'ListingPage.orderTitle' });
-      expect(orderTitle).toHaveLength(3);
+      expect(orderTitle).toHaveLength(2);
+
+      // ...and that own heading is the listing's real title, not a message key.
+      expect(getByRole('heading', { level: 1, name: 'listing1 title' })).toBeInTheDocument();
 
       // Has details section title and selected category info
       expect(getByRole('heading', { name: 'ListingPage.detailsTitle' })).toBeInTheDocument();

@@ -52,6 +52,7 @@ import SectionHero from './SectionHero';
 import SectionReviews from './SectionReviews';
 import SectionAuthorMaybe from './SectionAuthorMaybe';
 import SectionMapMaybe from './SectionMapMaybe';
+import SectionListingHeader from './SectionListingHeader';
 import SectionCleaningWorks from './SectionCleaningWorks';
 import SectionRentalTimeline from './SectionRentalTimeline';
 import CustomListingFields from './CustomListingFields';
@@ -287,23 +288,20 @@ export const ListingPageComponent = props => {
         )}
         <div className={css.contentWrapperForHeroLayout}>
           <div className={css.mainColumnForHeroLayout}>
-            <div className={showListingImage ? css.mobileHeading : css.noListingImageHeadingHero}>
-              {showListingImage ? (
-                // add css logic here that applies larger margin on mobile view to push down title
-                <H2 as="h1" className={css.orderPanelTitle}>
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H2>
-              ) : (
-                <H3
-                  as="h1"
-                  className={classNames(css.orderPanelTitle, {
-                    [css.titleMarginForOwnListingNoImage]: isOwnListing,
-                  })}
-                >
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H3>
-              )}
-            </div>
+            {/* The garment's own heading: brand, title, provenance. See the twin in
+                  ListingPageCarousel.js for why it replaces the template's mobile-only
+                  repeat of the order panel's title. */}
+            <SectionListingHeader
+              className={classNames({
+                [css.titleMarginForOwnListingNoImage]: isOwnListing && !showListingImage,
+              })}
+              publicData={publicData}
+              listingFieldConfigs={listingConfig.listingFields}
+              title={richTitle}
+              completedRentals={completedRentals}
+              reviews={reviews}
+              authorDisplayName={authorDisplayName}
+            />
             {showDescription && <SectionText text={description} showAsIngress />}
 
             <CustomListingFields
