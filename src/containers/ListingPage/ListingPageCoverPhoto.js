@@ -423,6 +423,9 @@ const ListingPage = props => {
     // the duck at page load. null until it arrives, and on any failure - OrderPanel then
     // falls back to the `metadata.initialCleaningDays` snapshot.
     initialCleaningDays: liveInitialCleaningDays,
+    // Cocloset: day ranges another rental's wash has already claimed, so the picker does
+    // not offer them as a start date. See server/api-util/cleaningGaps.js.
+    cleaningGaps,
   } = useSelector(state => state.ListingPage);
   const currentUser = useSelector(state => state.user?.currentUser);
   const scrollingDisabled = useSelector(state => isScrollingDisabled(state));
@@ -491,6 +494,7 @@ const ListingPage = props => {
       fetchLineItemsInProgress={fetchLineItemsInProgress}
       fetchLineItemsError={fetchLineItemsError}
       liveInitialCleaningDays={liveInitialCleaningDays}
+      cleaningGaps={cleaningGaps}
       sendInquiryInProgress={sendInquiryInProgress}
       sendInquiryError={sendInquiryError}
       onManageDisableScrolling={onManageDisableScrolling}

@@ -363,6 +363,10 @@ describe('Duck', () => {
         // "no live answer", which is what makes the calendar fall back to the
         // `metadata.initialCleaningDays` snapshot - see ListingPage.duck.test.js.
         initialCleaningDays: null,
+        // Cocloset: day ranges another rental's wash has already claimed. null is "not
+        // known" and is deliberately NOT the same as `[]`, which would tell the picker
+        // there is nothing to block.
+        cleaningGaps: null,
       });
     });
 

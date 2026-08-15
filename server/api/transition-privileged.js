@@ -4,8 +4,11 @@ const {
   assertInitialCleaningLeadTime,
   assertCleaningReadiness,
 } = require('../api-util/bookingRules');
+const {
+  assertCleaningGapForListing,
+  liveInitialCleaningDaysFrom,
+} = require('../api-util/listingCleaningGaps');
 const { assertRentalPeriodBooking } = require('../api-util/rentalPeriods');
-const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
 const {
   addOfferToMetadata,
   getAmountFromPreviousOffer,
@@ -242,11 +245,24 @@ module.exports = (req, res) => {
       // of the two paths into a transaction is a rule with a documented way around it.
       assertCleaningReadiness({ listing, bookingStart: bodyParams?.params?.bookingStart });
 
-      return resolveLiveInitialCleaningDays({ listing }).then(liveInitialCleaningDays => {
+      // And the cleaning owed between two rentals, which `readyAt` cannot express because it
+      // only knows about a wash that has already started. See api-util/cleaningGaps.js.
+      //
+      // `bodyParams.id` is this transaction, and it is excluded from the comparison: a
+      // transition that re-prices an existing booking must not find that booking's own dates
+      // and refuse them as a conflict with itself.
+      return assertCleaningGapForListing({
+        listing,
+        bookingStart: bodyParams?.params?.bookingStart,
+        bookingEnd: bodyParams?.params?.bookingEnd,
+        excludeTransactionId: bodyParams?.id?.uuid || bodyParams?.id,
+      }).then(constraints => {
+        // The same live turnaround the gap gate just read, not a second fetch of it. One
+        // number, one round trip, and no way for the two gates to see different values.
         assertInitialCleaningLeadTime({
           listing,
           bookingStart: bodyParams?.params?.bookingStart,
-          liveInitialCleaningDays,
+          liveInitialCleaningDays: liveInitialCleaningDaysFrom(listing, constraints),
         });
 
         // Cleaning fee is sourced from the assigned laundry's privateData

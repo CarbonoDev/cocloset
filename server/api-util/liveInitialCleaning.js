@@ -65,6 +65,32 @@ const resolveLiveInitialCleaningDays = ({ listing, integrationSdk, envDefaultBuf
     return Promise.resolve(null);
   }
 
+  return resolveLiveTurnaroundDays({ listing, integrationSdk, envDefaultBufferDays });
+};
+
+/**
+ * The assigned studio's CURRENT turnaround for this garment, whatever its custody state.
+ *
+ * THE SAME NUMBER, ASKED WITHOUT THE FIRST-RENTAL CONDITION. `resolveLiveInitialCleaningDays`
+ * above is this function plus one rule: it declines to answer once the garment has reached its
+ * studio, because the INITIAL cleaning lead time is spent at that point and must change
+ * nothing. That rule belongs to the lead time, not to the number.
+ *
+ * The cleaning gap between two rentals needs the number with no such condition - a garment
+ * still has to be washed between its second and third rentals, long after `onLaundry` went
+ * true. Splitting the two apart, rather than passing a flag, keeps "when does the lead time
+ * apply" in exactly one place and stops the gap rule from having to know about it at all.
+ *
+ * Same failure contract: null for every failure, never a throw and never an invented default.
+ * Callers treat null as "fall back to the `metadata.initialCleaningDays` snapshot".
+ *
+ * @param {Object} params
+ * @param {Object} params.listing - a listing API entity
+ * @param {Object} [params.integrationSdk] - injectable for tests
+ * @param {*} [params.envDefaultBufferDays] - defaults to DEFAULT_LAUNDRY_BUFFER_DAYS
+ * @returns {Promise<number|null>} a positive integer, or null for "no live answer"
+ */
+const resolveLiveTurnaroundDays = ({ listing, integrationSdk, envDefaultBufferDays }) => {
   const assignedLaundryId = readAssignedLaundryId(listing);
   if (!assignedLaundryId || typeof assignedLaundryId !== 'string') {
     // No laundry assigned, so there is no studio to ask. The snapshot cannot exist
@@ -111,4 +137,5 @@ const resolveLiveInitialCleaningDays = ({ listing, integrationSdk, envDefaultBuf
 
 module.exports = {
   resolveLiveInitialCleaningDays,
+  resolveLiveTurnaroundDays,
 };

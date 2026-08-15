@@ -149,6 +149,31 @@ const req = ({
   },
 });
 
+// The listing's other rentals, in the shape the Integration API returns them: transactions
+// with a `booking` relationship, plus the bookings themselves in `included`.
+const cleaningGapFixtures = (rentals = []) =>
+  rentals.reduce(
+    (acc, rental, index) => {
+      const bookingId = `booking-${index}`;
+      return {
+        transactions: acc.transactions.concat({
+          id: { uuid: `other-tx-${index}` },
+          attributes: { lastTransition: rental.lastTransition || 'transition/accept' },
+          relationships: { booking: { data: { id: { uuid: bookingId } } } },
+        }),
+        bookings: acc.bookings.concat({
+          id: { uuid: bookingId },
+          type: 'booking',
+          attributes: {
+            start: daysFromToday(rental.startsInDays),
+            end: daysFromToday(rental.startsInDays + rental.days),
+          },
+        }),
+      };
+    },
+    { transactions: [], bookings: [] }
+  );
+
 const setup = ({
   priceVariants,
   initialCleaningDays,
@@ -160,7 +185,13 @@ const setup = ({
   // fail - and a failed lookup must fall back to the snapshot, so that is a case worth
   // being the default rather than a special one.
   laundryTurnaroundDays,
+  // Other rentals of the same garment, as the Integration API would return them. Given as
+  // `[{ lastTransition, startsInDays, days }]`; see cleaningGapFixtures below.
+  otherRentals = [],
 } = {}) => {
+  const { transactions: otherTransactions, bookings: otherBookings } = cleaningGapFixtures(
+    otherRentals
+  );
   const show = jest.fn(() =>
     Promise.resolve({
       data: {
@@ -187,7 +218,16 @@ const setup = ({
           },
         })
   );
-  getIntegrationSdk.mockReturnValue({ users: { show: laundryShow } });
+  // The listing's OTHER bookings, for the cleaning-gap gate. Empty by default: every test
+  // above this point is about a rule that has nothing to do with other rentals, and a fixture
+  // that silently added one would make those tests fail for the wrong reason.
+  const transactionsQuery = jest.fn(() =>
+    Promise.resolve({ data: { data: otherTransactions, included: otherBookings } })
+  );
+  getIntegrationSdk.mockReturnValue({
+    users: { show: laundryShow },
+    transactions: { query: transactionsQuery },
+  });
   fetchCommission.mockResolvedValue({
     data: { data: [{ type: 'jsonAsset', attributes: { data: {} } }] },
   });
@@ -196,7 +236,7 @@ const setup = ({
   const initiate = jest.fn(() => Promise.resolve({ data: { data: { id: { uuid: 'tx-1' } } } }));
   const initiateSpeculative = jest.fn(() => Promise.resolve({ data: { data: null } }));
   getTrustedSdk.mockResolvedValue({ transactions: { initiate, initiateSpeculative } });
-  return { initiate, initiateSpeculative, laundryShow };
+  return { initiate, initiateSpeculative, laundryShow, transactionsQuery };
 };
 
 const run = async (params = {}) => {
@@ -458,33 +498,19 @@ describe('initiate-privileged: the gate resolves the laundry live turnaround', (
     expect(initiate).toHaveBeenCalled();
   });
 
-  // THE COST CONSTRAINT, asserted rather than promised. A previous change deliberately
-  // removed the Integration API from the checkout path; this puts it back only for a
-  // garment that has never reached a studio, i.e. its first rental.
-  it('makes NO Integration API call once the garment is at its laundry', async () => {
-    const { initiate, laundryShow } = setup({
-      initialCleaningDays: 3,
-      onLaundry: true,
-      assignedLaundryId: 'laundry-1',
-      laundryTurnaroundDays: 30,
-    });
-
-    await run({ days: 1, startsInDays: 1 });
-
-    expect(laundryShow).not.toHaveBeenCalled();
-    expect(initiate).toHaveBeenCalled();
-  });
-
-  it('makes NO Integration API call when no laundry is assigned', async () => {
-    const { laundryShow } = setup({ initialCleaningDays: 3, laundryTurnaroundDays: 9 });
-
-    await run({ days: 1, startsInDays: 5 });
-
-    expect(laundryShow).not.toHaveBeenCalled();
-  });
-
-  it('asks the laundry exactly once, for the listing assigned laundry', async () => {
+  // THE COST, asserted rather than promised - and it has CHANGED, deliberately.
+  //
+  // This used to assert that a garment already at its studio cost no Integration API call at
+  // all, because the initial-cleaning lead time is spent by then. The cleaning-gap gate needs
+  // the same studio's turnaround for every rental, not just the first, so that is no longer
+  // true and pretending otherwise would be a test asserting a comment.
+  //
+  // What IS still worth holding, and is what these assert: the turnaround is fetched ONCE per
+  // request and shared by both gates - two fetches would be two chances for them to disagree -
+  // and a listing with no studio assigned still costs nothing.
+  it('asks the laundry exactly once, and shares the answer between both gates', async () => {
     const { laundryShow } = setup({
+      onLaundry: true,
       assignedLaundryId: 'laundry-7',
       laundryTurnaroundDays: 2,
     });
@@ -493,6 +519,33 @@ describe('initiate-privileged: the gate resolves the laundry live turnaround', (
 
     expect(laundryShow).toHaveBeenCalledTimes(1);
     expect(laundryShow).toHaveBeenCalledWith({ id: 'laundry-7' });
+  });
+
+  it('still lets a garment at its laundry be booked for tomorrow', async () => {
+    // The lead time is spent once a studio has taken delivery, and the turnaround read must
+    // not resurrect it - `onLaundry === true` remains the single condition that retires it.
+    const { initiate } = setup({
+      initialCleaningDays: 3,
+      onLaundry: true,
+      assignedLaundryId: 'laundry-1',
+      laundryTurnaroundDays: 30,
+    });
+
+    await run({ days: 1, startsInDays: 1 });
+
+    expect(initiate).toHaveBeenCalled();
+  });
+
+  it('makes NO Integration API call when no laundry is assigned', async () => {
+    const { laundryShow, transactionsQuery } = setup({
+      initialCleaningDays: 3,
+      laundryTurnaroundDays: 9,
+    });
+
+    await run({ days: 1, startsInDays: 5 });
+
+    expect(laundryShow).not.toHaveBeenCalled();
+    expect(transactionsQuery).not.toHaveBeenCalled();
   });
 
   // A READ ERROR MUST NOT OPEN THE GATE. Falling back to "no block" would let an
@@ -621,5 +674,125 @@ describe('initiate-privileged: the post-rental cleaning gate', () => {
     await run({ days: 2, startsInDays: 1 });
 
     expect(initiate).toHaveBeenCalled();
+  });
+});
+
+describe('initiate-privileged: the cleaning gap between two rentals', () => {
+  // The rule the client reported for the third time:
+  //
+  //   > "Sigue sin respetarse el buffer de dias de limpieza (Revisa los dias antes del
+  //   >  booking y despues de que se regresa)"
+  //
+  // It was held only by an availability exception written from a browser after the provider
+  // accepts, and on Dev that exception simply does not exist - so the calendar showed a
+  // garment as free the day its previous rental ended, and it was booked. The arithmetic is
+  // unit-tested in api-util/cleaningGaps.test.js; these tests are about the gate being
+  // REACHED, and about it stopping the booking before anything is priced or created.
+
+  const AT_LAUNDRY = { onLaundry: true, assignedLaundryId: 'laundry-1', laundryTurnaroundDays: 2 };
+
+  it('refuses a rental that starts the day another one ends', async () => {
+    const { initiate } = setup({
+      ...AT_LAUNDRY,
+      // Someone has the garment from day 3 to day 10.
+      otherRentals: [{ startsInDays: 3, days: 7 }],
+    });
+
+    const res = await run({ days: 7, startsInDays: 10 });
+
+    expect(res.statusCode).toBe(400);
+    expect(handleError.mock.calls[0][1].data.code).toBe('booking-inside-cleaning-gap');
+    expect(buildLineItemsForListing).not.toHaveBeenCalled();
+    expect(initiate).not.toHaveBeenCalled();
+  });
+
+  it('allows the first day after the turnaround', async () => {
+    const { initiate } = setup({
+      ...AT_LAUNDRY,
+      otherRentals: [{ startsInDays: 3, days: 7 }],
+    });
+
+    await run({ days: 7, startsInDays: 12 });
+
+    expect(initiate).toHaveBeenCalled();
+  });
+
+  it('refuses a rental that would come back the day another one starts', async () => {
+    // "los dias antes del booking" - the same rule seen from the other end.
+    const { initiate } = setup({
+      ...AT_LAUNDRY,
+      otherRentals: [{ startsInDays: 14, days: 7 }],
+    });
+
+    const res = await run({ days: 7, startsInDays: 7 });
+
+    expect(res.statusCode).toBe(400);
+    expect(initiate).not.toHaveBeenCalled();
+  });
+
+  it('ignores a rental the studio has already taken back', async () => {
+    // `metadata.readyAt` holds that window from the REAL return date, so projecting
+    // bookingEnd + turnaround on top of it would double-block a garment returned early.
+    const { initiate } = setup({
+      ...AT_LAUNDRY,
+      otherRentals: [
+        { startsInDays: 3, days: 7, lastTransition: 'transition/laundry-mark-available' },
+      ],
+    });
+
+    await run({ days: 7, startsInDays: 10 });
+
+    expect(initiate).toHaveBeenCalled();
+  });
+
+  it('refuses on the speculative path too', async () => {
+    const { initiateSpeculative } = setup({
+      ...AT_LAUNDRY,
+      otherRentals: [{ startsInDays: 3, days: 7 }],
+    });
+
+    const res = await run({ days: 7, startsInDays: 10, isSpeculative: true });
+
+    expect(res.statusCode).toBe(400);
+    expect(initiateSpeculative).not.toHaveBeenCalled();
+  });
+
+  it('lets the booking through when the bookings read fails', async () => {
+    // A rejected query cannot be allowed to refuse every booking on the marketplace. The
+    // failure is logged, the calendar block is still there as the other mechanism, and this
+    // is the opposite of what the gate does when it HAS read the data and found a conflict.
+    const { initiate } = setup({ ...AT_LAUNDRY, otherRentals: [{ startsInDays: 3, days: 7 }] });
+    getIntegrationSdk.mockReturnValue({
+      users: {
+        show: () =>
+          Promise.resolve({
+            data: { data: { attributes: { profile: { privateData: { turnaroundDays: 2 } } } } },
+          }),
+      },
+      transactions: { query: () => Promise.reject(new Error('502')) },
+    });
+
+    await run({ days: 7, startsInDays: 10 });
+
+    expect(initiate).toHaveBeenCalled();
+  });
+
+  it('keeps this refusal distinguishable from the wash the garment is in right now', async () => {
+    // Both refuse a start date for a cleaning reason. One means "this garment is in a wash",
+    // the other "another rental has already claimed the wash around then" - a customer told
+    // the wrong one is told to wait for something that is not happening.
+    setup({ ...AT_LAUNDRY, otherRentals: [{ startsInDays: 3, days: 7 }] });
+    await run({ days: 7, startsInDays: 10 });
+    expect(handleError.mock.calls[0][1].data.code).toBe('booking-inside-cleaning-gap');
+
+    jest.clearAllMocks();
+    handleError.mockImplementation((res, e) => {
+      res.status(e.status || 500).json(e.data || {});
+      return res;
+    });
+
+    setup({ ...AT_LAUNDRY, readyAt: daysFromToday(5).toISOString() });
+    await run({ days: 7, startsInDays: 3 });
+    expect(handleError.mock.calls[0][1].data.code).toBe('booking-before-cleaning-ready');
   });
 });

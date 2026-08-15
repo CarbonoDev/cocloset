@@ -366,17 +366,34 @@ const fetchMonthlyTimeSlots = (dispatch, listing) => {
 // null, and the calendar falls back to the `metadata` snapshot it used before this
 // existed. A stale floor is a small wrong; a listing page that will not render is a big
 // one.
+//
+// THE SAME CALL NOW ALSO BRINGS THE CLEANING GAPS. One request, because both answers come
+// from the same listing on the same page load and both feed the same picker, and because a
+// second endpoint would be a second thing to keep in step with the checkout gate. See
+// server/api-util/cleaningGaps.js for what a gap is and why the calendar cannot derive one.
 const fetchInitialCleaningDaysPayloadCreator = ({ listingId }) => {
   return fetchListingInitialCleaning(listingId.uuid)
     .then(response => {
       const days = response?.data?.initialCleaningDays;
-      return Number.isInteger(days) && days > 0 ? days : null;
+      const gaps = response?.data?.cleaningGaps;
+
+      return {
+        initialCleaningDays: Number.isInteger(days) && days > 0 ? days : null,
+        // Absent stays absent: a failed gap read must not reach the picker as "there are no
+        // gaps", which would look exactly like a clear calendar. Only an array the server
+        // actually sent is trusted.
+        cleaningGaps: Array.isArray(gaps)
+          ? gaps
+              .map(gap => ({ start: new Date(gap.start), end: new Date(gap.end) }))
+              .filter(gap => !Number.isNaN(gap.start.getTime()) && !Number.isNaN(gap.end.getTime()))
+          : null,
+      };
     })
     .catch(e => {
       // Logged, not surfaced. The snapshot fallback is silent on purpose, but a laundry
       // whose profile has become unreadable is worth knowing about.
       log.error(e, 'fetching-live-initial-cleaning-days-failed', { listingId: listingId.uuid });
-      return null;
+      return { initialCleaningDays: null, cleaningGaps: null };
     });
 };
 
@@ -450,6 +467,10 @@ const initialState = {
   // both the initial state and the outcome of every failure - and the calendar then falls
   // back to `listing.metadata.initialCleaningDays`. There is deliberately no error field.
   initialCleaningDays: null,
+  // Cocloset: day ranges that cannot be a rental START, because another booking's wash is
+  // owed then. null means "not known" (initial state, or a failed read) and is deliberately
+  // different from `[]`, which means "asked, and there are none".
+  cleaningGaps: null,
 };
 
 const listingPageSlice = createSlice({
@@ -574,7 +595,8 @@ const listingPageSlice = createSlice({
       // reported as a null payload, so there is nothing for a rejected case to do beyond
       // what the initial state already says.
       .addCase(fetchInitialCleaningDaysThunk.fulfilled, (state, action) => {
-        state.initialCleaningDays = action.payload;
+        state.initialCleaningDays = action.payload?.initialCleaningDays ?? null;
+        state.cleaningGaps = action.payload?.cleaningGaps ?? null;
       });
   },
 });

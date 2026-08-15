@@ -118,23 +118,27 @@ describe('the lookup result reaches the state, and failure never removes the blo
     return dispatch(fetchInitialCleaningDaysThunk({ listingId: new UUID(LISTING_ID) })).unwrap();
   };
 
+  // THE PAYLOAD IS AN OBJECT NOW, not a bare number: the same endpoint call also brings the
+  // cleaning gaps (the days another rental's wash has already claimed), because both answers
+  // come from the same listing on the same page load and both feed the same picker. See
+  // server/api-util/cleaningGaps.js.
   it('stores a usable number of days', async () => {
     fetchListingInitialCleaning.mockResolvedValue({ data: { initialCleaningDays: 4 } });
-    await expect(runThunk()).resolves.toBe(4);
+    await expect(runThunk()).resolves.toMatchObject({ initialCleaningDays: 4 });
   });
 
   // The endpoint answers `{ data: {} }` for "no block applies". That has to arrive as null, not
   // as undefined or NaN, because null is what the calendar reads as "use the snapshot".
   it('stores null when the endpoint reports no block', async () => {
     fetchListingInitialCleaning.mockResolvedValue({ data: {} });
-    await expect(runThunk()).resolves.toBeNull();
+    await expect(runThunk()).resolves.toEqual({ initialCleaningDays: null, cleaningGaps: null });
   });
 
   it.each([['a fraction', 2.5], ['zero', 0], ['negative', -1], ['a string', '3'], ['null', null]])(
     'stores null for the nonsense payload %s rather than passing it on',
     async (_label, initialCleaningDays) => {
       fetchListingInitialCleaning.mockResolvedValue({ data: { initialCleaningDays } });
-      await expect(runThunk()).resolves.toBeNull();
+      await expect(runThunk()).resolves.toMatchObject({ initialCleaningDays: null });
     }
   );
 
@@ -145,7 +149,7 @@ describe('the lookup result reaches the state, and failure never removes the blo
     fetchListingInitialCleaning.mockRejectedValue(
       Object.assign(new Error('too many requests'), { status: 429 })
     );
-    await expect(runThunk()).resolves.toBeNull();
+    await expect(runThunk()).resolves.toEqual({ initialCleaningDays: null, cleaningGaps: null });
   });
 
   // Silent to the customer, not silent to us: a laundry whose profile has become
@@ -170,9 +174,22 @@ describe('the lookup result reaches the state, and failure never removes the blo
   it('puts the resolved value in the slice', async () => {
     const state = reducer(undefined, {
       type: fetchInitialCleaningDaysThunk.fulfilled.type,
-      payload: 5,
+      payload: { initialCleaningDays: 5, cleaningGaps: [] },
     });
     expect(state.initialCleaningDays).toBe(5);
+    expect(state.cleaningGaps).toEqual([]);
+  });
+
+  // "Not known" and "asked, and there are none" have to stay structurally different: the
+  // picker blocks nothing for null, which is the safe answer while a page load is still in
+  // flight, and would be the WRONG answer to read out of an empty list.
+  it('keeps an unknown gap list distinct from an empty one', () => {
+    const unknown = reducer(undefined, {
+      type: fetchInitialCleaningDaysThunk.fulfilled.type,
+      payload: { initialCleaningDays: null, cleaningGaps: null },
+    });
+    expect(unknown.cleaningGaps).toBeNull();
+    expect(reducer(undefined, { type: 'noop' }).cleaningGaps).toBeNull();
   });
 
   it('starts out null, so the calendar uses the snapshot until an answer arrives', () => {
@@ -184,9 +201,10 @@ describe('the lookup result reaches the state, and failure never removes the blo
   it('is cleared by setInitialValues, which loadData calls on every navigation', () => {
     const withValue = reducer(undefined, {
       type: fetchInitialCleaningDaysThunk.fulfilled.type,
-      payload: 5,
+      payload: { initialCleaningDays: 5, cleaningGaps: [] },
     });
     const cleared = reducer(withValue, setInitialValues({ lineItems: null }));
     expect(cleared.initialCleaningDays).toBeNull();
+    expect(cleared.cleaningGaps).toBeNull();
   });
 });

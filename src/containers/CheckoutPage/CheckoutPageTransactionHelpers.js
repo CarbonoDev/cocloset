@@ -229,31 +229,6 @@ export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
     orderPromise.then(order => {
       // Store the returned transaction (order)
       persistTransaction(order, pageData, storeData, setPageData, sessionStorageKey);
-
-      // Cocloset: a garment that is ALREADY at its laundry has nobody to wait for.
-      //
-      //   > "si la prenda esta onLaundry = true, no tiene caso que el provider acepte, se
-      //   >  debe confirmar automáticamente"
-      //
-      // The server decides - it reads the listing's `metadata.onLaundry`, which only it can
-      // trust - and does nothing for a garment that is not there yet. See
-      // server/api/auto-accept-booking.js.
-      //
-      // FIRE AND CONTINUE, deliberately. The customer has paid; their booking exists and is
-      // valid whether or not it is accepted in this same second. Awaiting this would put a
-      // second network call between them and their confirmation page for no benefit, and a
-      // failure would present as a failed payment. The endpoint is idempotent, so a reload or
-      // a retry costs nothing.
-      //
-      // Known gap, the same one create-availability-buffer has documented since it was
-      // written: this is fired from the browser, so it does not run if the tab is closed
-      // first. The booking then simply waits for the provider, which is the behaviour that
-      // existed before this feature - it degrades to the old path rather than breaking. The
-      // real fix for both is a server-side worker on Sharetribe's transaction events.
-      autoAcceptBooking({ transactionId: order?.id }).catch(() => {
-        // Swallowed on purpose: the endpoint logs its own failures server-side, and there is
-        // nothing a customer could do about this one.
-      });
     });
 
     return orderPromise;
@@ -322,6 +297,43 @@ export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
     orderPromise.then(order => {
       // Store the returned transaction (order)
       persistTransaction(order, pageData, storeData, setPageData, sessionStorageKey);
+
+      // Cocloset: a garment that is ALREADY at its laundry has nobody to wait for.
+      //
+      //   > "si la prenda esta onLaundry = true, no tiene caso que el provider acepte, se
+      //   >  debe confirmar automáticamente"
+      //
+      // The server decides - it reads the listing's `metadata.onLaundry`, which only it can
+      // trust - and does nothing for a garment that is not there yet. See
+      // server/api/auto-accept-booking.js.
+      //
+      // IT HAS TO BE HERE, IN STEP 3, AND NOT IN STEP 1. This was fired right after
+      // `fnRequestPayment` created the order, and at that point the transaction's last
+      // transition is `transition/request-payment`: the state is `pending-payment`, the card
+      // has not been charged, and there is nothing to accept. The endpoint refuses anything
+      // that is not `preauthorized` - correctly, since Sharetribe would 409 it - so it
+      // answered `not-awaiting-acceptance` and did nothing, on EVERY booking. The garment
+      // being at its studio never mattered; the call was simply too early.
+      //
+      // `preauthorized` is reached by the transition this step fires, so this is the first
+      // moment the endpoint has anything to do. The unit tests did not catch it because they
+      // exercise the endpoint, which was right, rather than the call site, which was not.
+      //
+      // FIRE AND CONTINUE, deliberately. The customer has paid; their booking exists and is
+      // valid whether or not it is accepted in this same second. Awaiting this would put a
+      // second network call between them and their confirmation page for no benefit, and a
+      // failure would present as a failed payment. The endpoint is idempotent, so a reload or
+      // a retry costs nothing.
+      //
+      // Known gap, the same one create-availability-buffer has documented since it was
+      // written: this is fired from the browser, so it does not run if the tab is closed
+      // first. The booking then simply waits for the provider, which is the behaviour that
+      // existed before this feature - it degrades to the old path rather than breaking. The
+      // real fix for both is a server-side worker on Sharetribe's transaction events.
+      autoAcceptBooking({ transactionId: order?.id }).catch(() => {
+        // Swallowed on purpose: the endpoint logs its own failures server-side, and there is
+        // nothing a customer could do about this one.
+      });
     });
 
     return orderPromise;

@@ -1,6 +1,8 @@
 const { getSdk, handleError } = require('../api-util/sdk');
 const { createRateLimiter } = require('../api-util/rateLimit');
 const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
+const { resolveCleaningGapsForListing } = require('../api-util/listingCleaningGaps');
+const log = require('../log');
 
 // How long must pass before THIS garment can be rented, according to its laundry's
 // CURRENT configuration?
@@ -10,8 +12,22 @@ const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialClean
 //   >  necesiten para el lavado siempre que onLaundry sea false"
 //
 // Request:  GET /api/listing-initial-cleaning?listingId=<uuid>
-// Response (200): { data: { initialCleaningDays: <positive integer> } }
-//            or   { data: {} }   -- no block applies, or no live answer available
+// Response (200): { data: {
+//                    initialCleaningDays?: <positive integer>,   -- omitted when no block applies
+//                    cleaningTurnaroundDays?: <integer>,         -- omitted when the read failed
+//                    cleaningGaps?: [{ start, end }],            -- omitted when the read failed
+//                  } }
+//
+// IT ALSO ANSWERS A SECOND QUESTION NOW, and the two belong together because they feed the
+// same picker on the same page load. `initialCleaningDays` is the lead time before a garment
+// can be rented for the FIRST time. `cleaningGaps` are the day ranges that cannot be a rental
+// START because another rental's wash is owed then - the days after a booking that has not
+// been returned yet. See api-util/cleaningGaps.js for why the calendar cannot work that out
+// on its own, and why this is not the only place the rule is enforced.
+//
+// The gaps expose nothing the calendar does not: a booking's dates are already visible as
+// unavailable days through the public availability API, and these are derived from exactly
+// those dates plus a turnaround that the picker refuses days for anyway.
 //
 // THE RESPONSE IS ONE NUMBER, AND THAT IS THE WHOLE SECURITY DESIGN.
 // This endpoint is PUBLIC - ListingPage is public, and the customer who needs this
@@ -80,17 +96,51 @@ module.exports = (req, res) => {
 
   sdk.listings
     .show({ id: listingId })
-    .then(response => resolveLiveInitialCleaningDays({ listing: response?.data?.data }))
-    .then(initialCleaningDays => {
+    .then(response => {
+      const listing = response?.data?.data;
+
+      return Promise.all([
+        resolveLiveInitialCleaningDays({ listing }),
+        // THE DAYS ALREADY SPOKEN FOR BY ANOTHER RENTAL'S WASH. Resolved here rather than
+        // left to the picker because the picker cannot see them: the calendar shows a
+        // garment as free the day its previous rental ends, and only the transaction behind
+        // that rental knows a turnaround is still owed. See api-util/cleaningGaps.js.
+        //
+        // NEVER FAILS THE RESPONSE. A listing page that 500s because a transactions query
+        // hiccupped is worse than a picker missing a few blocked days - and the server gate
+        // refuses those days at checkout regardless, which is the point of it being the
+        // authoritative copy. The gaps are simply omitted.
+        resolveCleaningGapsForListing({ listing }).catch(e => {
+          log.error(e, 'listing-cleaning-gaps-failed', { listingId });
+          return null;
+        }),
+      ]);
+    })
+    .then(([initialCleaningDays, cleaningGaps]) => {
       // No key at all rather than `initialCleaningDays: null`, so "there is no block"
       // and "the block is n days" are structurally different answers and a client that
       // forgets to check cannot read null as 0 or as NaN.
-      const data = initialCleaningDays === null ? {} : { initialCleaningDays };
+      const initialCleaningMaybe = initialCleaningDays === null ? {} : { initialCleaningDays };
+
+      // Same shape rule for the gaps: absent means "not known", an empty array means "asked,
+      // and there are none". The picker must not read a failed read as a clear calendar.
+      //
+      // The condition is on `gaps`, not on the wrapper: a resolution that could not read the
+      // bookings still comes back as an object, with `gaps: null` inside it.
+      const gapsMaybe = cleaningGaps?.gaps
+        ? {
+            cleaningTurnaroundDays: cleaningGaps.turnaroundDays,
+            cleaningGaps: cleaningGaps.gaps.map(gap => ({
+              start: gap.start.toISOString(),
+              end: gap.end.toISOString(),
+            })),
+          }
+        : {};
 
       res
         .status(200)
         .set('Content-Type', 'application/json')
-        .send({ data })
+        .send({ data: { ...initialCleaningMaybe, ...gapsMaybe } })
         .end();
     })
     .catch(e => handleError(res, e));
