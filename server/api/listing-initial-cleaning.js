@@ -137,10 +137,22 @@ module.exports = (req, res) => {
           }
         : {};
 
+      // How many rentals this garment has actually completed, for the line under the title.
+      //
+      //   > "Quiza podriamos contabilizar las transacciones exitosas para ese listing y
+      //   >  mostrar este dato, de lo contrario lo omitimos"
+      //
+      // Free: it is counted from the transactions query the cleaning gaps already make. Same
+      // shape rule as everything else here - the key is absent when the read failed, so the
+      // page can omit the line rather than claim a garment has never been rented.
+      const rentalsMaybe = Number.isInteger(cleaningGaps?.completedRentals)
+        ? { completedRentals: cleaningGaps.completedRentals }
+        : {};
+
       res
         .status(200)
         .set('Content-Type', 'application/json')
-        .send({ data: { ...initialCleaningMaybe, ...gapsMaybe } })
+        .send({ data: { ...initialCleaningMaybe, ...gapsMaybe, ...rentalsMaybe } })
         .end();
     })
     .catch(e => handleError(res, e));

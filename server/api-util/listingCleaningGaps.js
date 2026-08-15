@@ -6,6 +6,7 @@ const {
   assertCleaningGap,
   collectBookingsAwaitingCleaning,
   computeCleaningGaps,
+  countCompletedRentals,
   resolveGapDays,
 } = require('./cleaningGaps');
 const log = require('../log');
@@ -58,6 +59,11 @@ const resolveBookingConstraints = ({
   listing,
   integrationSdk,
   excludeTransactionId,
+  // The public endpoint wants the transactions query even when there is no wash to hold days
+  // for, because it also reports how many rentals this garment has completed. The GATES do
+  // not: on the checkout path a query that cannot change the answer is a round trip between a
+  // customer and their payment for nothing.
+  countRentals = false,
   log: logger = log,
 }) => {
   const listingId = listing?.id?.uuid;
@@ -89,7 +95,13 @@ const resolveBookingConstraints = ({
           : snapshot
       );
 
-      const nothingToHold = { liveTurnaroundDays, turnaroundDays, bookings: [], gaps: [] };
+      const nothingToHold = {
+        liveTurnaroundDays,
+        turnaroundDays,
+        bookings: [],
+        gaps: [],
+        completedRentals: null,
+      };
 
       // No turnaround, no gap - and no reason to spend a transactions query finding out which
       // bookings it would have applied to.
@@ -102,64 +114,89 @@ const resolveBookingConstraints = ({
       // answer, so it takes the "unknown" shape rather than `[]` - the picker must not read a
       // broken Integration API client as a clear calendar.
       if (!sdk) {
-        return { liveTurnaroundDays, turnaroundDays, bookings: null, gaps: null };
+        return {
+          liveTurnaroundDays,
+          turnaroundDays,
+          bookings: null,
+          gaps: null,
+          completedRentals: null,
+        };
       }
 
-      if (!listingId || turnaroundDays === 0 || !readAssignedLaundryId(listing)) {
+      const holdsDays = turnaroundDays > 0 && !!readAssignedLaundryId(listing);
+      if (!listingId || (!holdsDays && !countRentals)) {
         return nothingToHold;
       }
 
-      return fetchBookingsAwaitingCleaning({ integrationSdk: sdk, listingId, excludeTransactionId })
-        .then(bookings => ({
-          liveTurnaroundDays,
-          turnaroundDays,
-          bookings,
-          gaps: computeCleaningGaps({ bookings, turnaroundDays, timeZone }),
-        }))
+      return queryListingTransactions({ integrationSdk: sdk, listingId })
+        .then(response => {
+          const transactions = response?.data?.data || [];
+          const included = response?.data?.included || [];
+          const bookings = holdsDays
+            ? collectBookingsAwaitingCleaning({ transactions, included, excludeTransactionId })
+            : [];
+
+          return {
+            liveTurnaroundDays,
+            turnaroundDays,
+            bookings,
+            gaps: holdsDays ? computeCleaningGaps({ bookings, turnaroundDays, timeZone }) : [],
+            completedRentals: countRentals ? countCompletedRentals(transactions) : null,
+          };
+        })
         .catch(e => {
           logger.error(e, 'cleaning-gap-bookings-read-failed', { listingId, message: e?.message });
-          return { liveTurnaroundDays, turnaroundDays, bookings: null, gaps: null };
+          return {
+            liveTurnaroundDays,
+            turnaroundDays,
+            bookings: null,
+            gaps: null,
+            completedRentals: null,
+          };
         });
     });
 };
 
 /**
- * Every booking on this listing whose wash has not happened yet.
+ * This listing's transactions, with their bookings.
  *
- * WHY IT QUERIES TRANSACTIONS RATHER THAN BOOKINGS. A booking whose garment is already back
- * is governed by `metadata.readyAt`, written from the REAL return date; projecting
- * `bookingEnd + turnaround` on top of that would double-block a rental returned early. Only
- * the transaction knows whether the return has happened, so the transaction is what is
- * queried and `stateFromLastTransition` is what filters.
+ * WHY TRANSACTIONS RATHER THAN BOOKINGS. A booking whose garment is already back is governed
+ * by `metadata.readyAt`, written from the REAL return date; projecting `bookingEnd +
+ * turnaround` on top of that would double-block a rental returned early. Only the transaction
+ * knows whether the return has happened, so the transaction is what is queried and
+ * `stateFromLastTransition` is what filters. The completed-rental count needs the same page
+ * of data, which is why one query serves both.
+ *
+ * `perPage: 100` is a cap, not a promise. It bounds the cost of a garment with a long history;
+ * the consequence for the gap rule is nil in practice (only bookings awaiting a wash matter,
+ * and those are few), and the consequence for the count is that a garment past 100
+ * transactions under-reports. Stated rather than hidden.
  *
  * @param {Object} params
  * @param {Object} params.integrationSdk
  * @param {string} params.listingId
- * @param {string} [params.excludeTransactionId]
- * @returns {Promise<Array<{start: Date, end: Date, transactionId: string}>>}
+ * @returns {Promise<Object>} the raw query response
  */
-const fetchBookingsAwaitingCleaning = ({ integrationSdk, listingId, excludeTransactionId }) =>
-  integrationSdk.transactions
-    .query({ listingId, include: ['booking'], perPage: 100 })
-    .then(response =>
-      collectBookingsAwaitingCleaning({
-        transactions: response?.data?.data || [],
-        included: response?.data?.included || [],
-        excludeTransactionId,
-      })
-    );
+const queryListingTransactions = ({ integrationSdk, listingId }) =>
+  integrationSdk.transactions.query({ listingId, include: ['booking'], perPage: 100 });
 
 /**
  * The gaps alone, for the public endpoint that feeds the picker.
  *
+ * Also carries the completed-rental count, because the listing page shows it next to the
+ * rating and it comes free out of the same query.
+ *
  * @param {Object} params - see resolveBookingConstraints
- * @returns {Promise<{turnaroundDays: number, gaps: Array|null}>}
+ * @returns {Promise<{turnaroundDays: number, gaps: Array|null, completedRentals: number|null}>}
  */
 const resolveCleaningGapsForListing = params =>
-  resolveBookingConstraints(params).then(({ turnaroundDays, gaps }) => ({
-    turnaroundDays,
-    gaps,
-  }));
+  resolveBookingConstraints({ ...params, countRentals: true }).then(
+    ({ turnaroundDays, gaps, completedRentals }) => ({
+      turnaroundDays,
+      gaps,
+      completedRentals,
+    })
+  );
 
 /**
  * Refuse a booking that leaves no room for a wash either side of it.
@@ -211,7 +248,7 @@ const liveInitialCleaningDaysFrom = (listing, constraints) =>
 
 module.exports = {
   resolveBookingConstraints,
-  fetchBookingsAwaitingCleaning,
+  queryListingTransactions,
   resolveCleaningGapsForListing,
   assertCleaningGapForListing,
   liveInitialCleaningDaysFrom,

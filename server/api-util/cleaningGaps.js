@@ -178,6 +178,44 @@ const collectBookingsAwaitingCleaning = ({
   }, []);
 
 /**
+ * Transaction states that mean this garment was rented, and the rental finished.
+ *
+ *   > "Quiza podriamos contabilizar las transacciones exitosas para ese listing y mostrar
+ *   >  este dato, de lo contrario lo omitimos"
+ *
+ * A COMPLETED rental, not an accepted one: the count sits under the title next to the rating,
+ * where it reads as "this many people have actually worn this and given it back". A booking
+ * that was accepted and then cancelled is not that, and neither is one still out.
+ *
+ * `delivered` is the state a rental reaches when the studio marks the garment available again;
+ * the review states are the same rental with a review attached, and a garment must not lose a
+ * rental from its count because somebody wrote about it.
+ */
+const COMPLETED_RENTAL_STATES = [
+  STATES.DELIVERED,
+  STATES.REVIEWED,
+  STATES.REVIEWED_BY_CUSTOMER,
+  STATES.REVIEWED_BY_PROVIDER,
+];
+
+/**
+ * How many rentals of this garment have run their course.
+ *
+ * Counted from the transactions query the cleaning-gap rule already makes, so it costs
+ * nothing extra - which is the whole reason it lives in this module rather than in an
+ * endpoint of its own.
+ *
+ * @param {Array<Object>} transactions - `response.data.data`
+ * @returns {number}
+ */
+const countCompletedRentals = (transactions = []) =>
+  transactions.filter(transaction =>
+    COMPLETED_RENTAL_STATES.includes(
+      stateFromLastTransition(transaction?.attributes?.lastTransition)
+    )
+  ).length;
+
+/**
  * The day ranges that cannot be a rental START, because a garment is being washed then.
  *
  * This is the picker's half of the rule: `[bookingEnd, bookingEnd + turnaround)` for every
@@ -277,6 +315,8 @@ const assertCleaningGap = ({
 
 module.exports = {
   STATES_AWAITING_CLEANING,
+  COMPLETED_RENTAL_STATES,
+  countCompletedRentals,
   resolveGapDays,
   occupiedWindow,
   collectBookingsAwaitingCleaning,
