@@ -69,3 +69,9 @@
     margin-top: 16px;
   }
 }
+
+/* The informative five-week calendar. Drawn as its own card below the panel, per the design,
+   even though it renders inside the form — see the comment at its call site. */
+.availabilityCalendar {
+  margin-top: 24px;
+}

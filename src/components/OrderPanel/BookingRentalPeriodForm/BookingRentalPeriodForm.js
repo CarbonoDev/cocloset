@@ -35,6 +35,7 @@ import {
   resolveReadyAt,
 } from '../BookingDatesForm/BookingDatesForm';
 
+import AvailabilityCalendar from '../AvailabilityCalendar/AvailabilityCalendar';
 import RentalPeriodChips from './RentalPeriodChips';
 import css from './BookingRentalPeriodForm.module.css';
 
@@ -574,6 +575,24 @@ export const BookingRentalPeriodForm = props => {
               </PrimaryButton>
             </div>
             <FinePrint payoutDetailsWarning={payoutDetailsWarning} isOwnListing={isOwnListing} />
+
+            {/* The informative five-week view.
+                  > "el calendario que aparece ahi solo es informativo, no tiene uso mas que
+                  >  para ver disponibilidad de las próximas 5 semanas"
+
+                RENDERED INSIDE THE FORM, though the design draws it as a separate card below
+                the panel — and it is styled as one. It lives here because it has to highlight
+                the customer's CURRENT pick, which is final-form state: lifting it out would
+                mean either publishing that state upwards or letting the two calendars answer
+                "what have I chosen" from different sources. */}
+            <AvailabilityCalendar
+              className={css.availabilityCalendar}
+              allTimeSlots={allTimeSlots}
+              cleaningGaps={cleaningGaps}
+              selectedStartDate={startDate}
+              selectedPeriodDays={periodDays}
+              timeZone={timeZone}
+            />
           </Form>
         );
       }}
