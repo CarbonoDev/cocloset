@@ -14,6 +14,7 @@ import {
 } from '../../../util/dates';
 import { BOOKING_PROCESS_NAME } from '../../../transactions/transaction';
 import { resolveCleaningWindowDays } from '../../../util/rentalPeriods';
+import { windowOverlapsCleaningGap } from '../../../util/cleaningGaps';
 
 import { Form, PrimaryButton, FieldSingleDatePicker, H6 } from '../../../components';
 
@@ -236,6 +237,8 @@ export const inclusiveEndForPeriod = (startDate, periodDays, timeZone) =>
  *   laundry's turnaround
  * @param {number} [props.liveInitialCleaningDays] - Cocloset: the laundry's CURRENT
  *   turnaround, resolved at ListingPage load. Wins over the snapshot.
+ * @param {Array<{start: Date, end: Date}>} [props.cleaningGaps] - Cocloset: day ranges owed
+ *   to another rental's wash. See util/cleaningGaps.js.
  * @returns {JSX.Element}
  */
 export const BookingRentalPeriodForm = props => {
@@ -260,6 +263,11 @@ export const BookingRentalPeriodForm = props => {
     // Cocloset: when the wash this garment is in right now finishes. See
     // earliestBookableStart in BookingDatesForm.
     readyAt,
+    // Cocloset: day ranges owed to ANOTHER rental's wash - the days after a booking whose
+    // return has not happened yet. Nothing on the calendar marks them, because the
+    // availability exception that should is written from a browser and can silently not
+    // happen; see util/cleaningGaps.js.
+    cleaningGaps,
     onSubmit,
     ...rest
   } = props;
@@ -378,7 +386,15 @@ export const BookingRentalPeriodForm = props => {
             return true;
           }
           const dayInTz = getStartOf(timeOfDayFromLocalToTimeZone(day, timeZone), 'day', timeZone);
-          return !isWindowAvailable(dayInTz, windowDays);
+          // TWO CHECKS, BECAUSE THE CALENDAR ONLY KNOWS ONE OF THEM. Time slots say which days
+          // are free; they do not say that the day a rental ends is owed to that rental's wash.
+          // The server sends those ranges separately - see util/cleaningGaps.js for why the
+          // browser cannot derive them from availability without double-blocking a garment
+          // that came back early.
+          return (
+            !isWindowAvailable(dayInTz, windowDays) ||
+            windowOverlapsCleaningGap(dayInTz, windowDays, cleaningGaps, timeZone)
+          );
         };
 
         const isOutsideRange = day => {

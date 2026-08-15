@@ -281,6 +281,12 @@ const hasValidPriceVariants = priceVariants => {
  *   CURRENT initial-cleaning turnaround, resolved server-side at page load by
  *   ListingPage.duck.js. Takes precedence over the `metadata.initialCleaningDays`
  *   snapshot; null (not yet arrived, or any failure) falls back to it.
+ * @param {Array<{start: Date, end: Date}>} [props.cleaningGaps] - Cocloset: day ranges that
+ *   cannot be a rental start because another booking's wash is owed then, resolved by the
+ *   same endpoint call. null means "not known" and is deliberately not the same as `[]`.
+ *   Passed only to BookingRentalPeriodForm, which is the form a Cocloset garment is rented
+ *   through. BookingDatesForm - the stock free-range picker - does not receive it: the rule
+ *   is still enforced for it by the server gate, which is the authoritative copy either way.
  *
  * @returns {JSX.Element} Component that displays the order panel with appropriate form
  */
@@ -326,6 +332,9 @@ const OrderPanel = props => {
     // /api/listing-initial-cleaning, because the number lives in the laundry user's
     // privateData and the browser cannot read it.
     liveInitialCleaningDays,
+    // Cocloset: day ranges another rental's wash has already claimed. Resolved by the same
+    // endpoint call, and passed straight through to the picker.
+    cleaningGaps,
   } = props;
 
   const publicData = listing?.attributes?.publicData || {};
@@ -556,6 +565,7 @@ const OrderPanel = props => {
             initialCleaningDays={initialCleaningDays}
             liveInitialCleaningDays={liveInitialCleaningDays}
             readyAt={readyAt}
+            cleaningGaps={cleaningGaps}
             dayCountAvailableForBooking={dayCountAvailableForBooking}
             monthlyTimeSlots={monthlyTimeSlots}
             onFetchTimeSlots={onFetchTimeSlots}

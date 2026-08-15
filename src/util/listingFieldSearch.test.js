@@ -38,6 +38,20 @@ describe('listingFieldSearchParams', () => {
     });
   });
 
+  // THE SHAPE COCLOSET ACTUALLY HAS. Console's short free-text field arrives in the hosted
+  // asset as `shortText`, not `text`, and Cocloset's `brand` is exactly that - verified
+  // against the Dev listing-fields asset. The first version of this module knew only `text`,
+  // so every real brand fell past every branch, got null, and rendered as plain text: the
+  // link the client asked for never appeared on any listing.
+  it.each([[true], [false]])(
+    'falls back to a keyword search for shortText (indexForSearch: %s)',
+    indexed => {
+      expect(listingFieldSearchParams(field('shortText', indexed), 'Galvan')).toEqual({
+        keywords: 'Galvan',
+      });
+    }
+  );
+
   it('falls back to keywords for an enum with no search schema pushed', () => {
     // Being an enum is not the same as being filterable - the schema has to exist
     // (`flex-cli search`), and an absent one fails OPEN. A keyword search that finds roughly

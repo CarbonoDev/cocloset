@@ -7,8 +7,13 @@ jest.mock('../api-util/liveInitialCleaning', () => ({
   resolveLiveInitialCleaningDays: jest.fn(),
 }));
 
+jest.mock('../api-util/listingCleaningGaps', () => ({
+  resolveCleaningGapsForListing: jest.fn(),
+}));
+
 const { getSdk, handleError } = require('../api-util/sdk');
 const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
+const { resolveCleaningGapsForListing } = require('../api-util/listingCleaningGaps');
 
 const listingInitialCleaning = require('./listing-initial-cleaning');
 const { limiter } = listingInitialCleaning;
@@ -63,6 +68,10 @@ describe('listing-initial-cleaning', () => {
     // The shared jest config sets `resetMocks: true`.
     limiter.reset();
     resolveLiveInitialCleaningDays.mockResolvedValue(null);
+    // "Not known" by default, which is what the endpoint omits from the response - so every
+    // pre-existing assertion below still describes a response with nothing but the initial
+    // cleaning answer in it. The gap keys get their own describe.
+    resolveCleaningGapsForListing.mockResolvedValue({ turnaroundDays: 0, gaps: null });
     handleError.mockImplementation((res, e) => {
       res.status(e.status || 500);
       res.json({ error: e.statusText || 'error' });
@@ -124,8 +133,9 @@ describe('listing-initial-cleaning', () => {
   describe('the response shape', () => {
     // THE SECURITY CONTRACT, asserted rather than described. Per-category cleaning FEES
     // live in the same laundry privateData blob the turnaround is read from, so the
-    // response is checked to be exactly one key and nothing else - a future change that
-    // starts spreading the resolver's input fails here.
+    // response is checked key by key - a future change that starts spreading the resolver's
+    // input fails here. The gap keys added below are derived from booking DATES, which the
+    // public availability API already exposes; nothing from privateData rides along.
     it('returns nothing but initialCleaningDays', async () => {
       setupSdk();
       resolveLiveInitialCleaningDays.mockResolvedValue(2);
@@ -183,6 +193,62 @@ describe('listing-initial-cleaning', () => {
       resolveLiveInitialCleaningDays.mockResolvedValue(null);
       const res = await run({ listingId: LISTING_ID });
       expect(res.body).toEqual({ data: {} });
+    });
+  });
+
+  describe('the cleaning gaps', () => {
+    // The days that cannot be a rental START because another rental's wash is owed then.
+    // The picker cannot work these out from availability - see api-util/cleaningGaps.js -
+    // so the same page load that fetches the lead time fetches these.
+    const GAP = {
+      start: new Date('2026-08-24T00:00:00.000Z'),
+      end: new Date('2026-08-26T00:00:00.000Z'),
+    };
+
+    it('sends them as ISO strings, with the turnaround they came from', async () => {
+      setupSdk();
+      resolveCleaningGapsForListing.mockResolvedValue({ turnaroundDays: 2, gaps: [GAP] });
+
+      const res = await run({ listingId: LISTING_ID });
+
+      expect(res.body.data.cleaningTurnaroundDays).toBe(2);
+      expect(res.body.data.cleaningGaps).toEqual([
+        { start: '2026-08-24T00:00:00.000Z', end: '2026-08-26T00:00:00.000Z' },
+      ]);
+    });
+
+    it('sends an empty array when there are genuinely none', async () => {
+      // Structurally different from "not known" below, and it has to be: the picker treats
+      // an absent list as "block nothing" and an empty one as "there is nothing to block".
+      setupSdk();
+      resolveCleaningGapsForListing.mockResolvedValue({ turnaroundDays: 2, gaps: [] });
+
+      const res = await run({ listingId: LISTING_ID });
+
+      expect(res.body.data.cleaningGaps).toEqual([]);
+    });
+
+    it('omits them when the read failed, rather than claiming there are none', async () => {
+      setupSdk();
+      resolveCleaningGapsForListing.mockResolvedValue({ turnaroundDays: 2, gaps: null });
+
+      const res = await run({ listingId: LISTING_ID });
+
+      expect('cleaningGaps' in res.body.data).toBe(false);
+      expect('cleaningTurnaroundDays' in res.body.data).toBe(false);
+    });
+
+    it('still answers when the gap resolution rejects outright', async () => {
+      // A listing page that 500s because a transactions query hiccupped is worse than a
+      // picker missing a few blocked days - and the checkout gate refuses those days anyway.
+      setupSdk();
+      resolveLiveInitialCleaningDays.mockResolvedValue(3);
+      resolveCleaningGapsForListing.mockRejectedValue(new Error('502'));
+
+      const res = await run({ listingId: LISTING_ID });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual({ data: { initialCleaningDays: 3 } });
     });
   });
 

@@ -136,7 +136,14 @@ const setup = ({ laundryTurnaroundDays, ...listingParams } = {}) => {
           },
         })
   );
-  getIntegrationSdk.mockReturnValue({ users: { show: laundryShow } });
+  // The listing's OTHER bookings, for the cleaning-gap gate. Empty by default: every test in
+  // this file is about a different rule, and a fixture that silently added a rental would
+  // make them fail for the wrong reason.
+  const transactionsQuery = jest.fn(() => Promise.resolve({ data: { data: [], included: [] } }));
+  getIntegrationSdk.mockReturnValue({
+    users: { show: laundryShow },
+    transactions: { query: transactionsQuery },
+  });
 
   const show = jest.fn(() =>
     Promise.resolve({
@@ -159,7 +166,7 @@ const setup = ({ laundryTurnaroundDays, ...listingParams } = {}) => {
 
   const transition = jest.fn(() => Promise.resolve({ data: { data: { id: TX_ID } } }));
   getTrustedSdk.mockResolvedValue({ transactions: { transition } });
-  return { transition, laundryShow };
+  return { transition, laundryShow, transactionsQuery };
 };
 
 const run = async params => {
@@ -264,10 +271,14 @@ describe('transition-privileged: the booking gates are reached on this door too'
       expect(transition).toHaveBeenCalled();
     });
 
-    // Most transitions through this endpoint act on a booking that already exists, on a
-    // garment long since delivered. None of those may pay for an Integration API round trip.
-    it('makes no Integration API call once the garment is at its laundry', async () => {
-      const { laundryShow } = setup({
+    // THIS ASSERTION CHANGED, DELIBERATELY. It used to be "no Integration API call once the
+    // garment is at its laundry", on the reasoning that the lead time is spent by then. The
+    // cleaning-gap gate needs the same studio's turnaround for EVERY rental, so the call is
+    // now made on this path too. What is still worth holding is that it happens ONCE - two
+    // fetches of one number would be two chances for the two gates to disagree - and that
+    // the lead time itself stays retired.
+    it('asks the laundry once, and still lets a garment at its studio book tomorrow', async () => {
+      const { laundryShow, transition } = setup({
         initialCleaningDays: 3,
         onLaundry: true,
         assignedLaundryId: 'laundry-1',
@@ -276,7 +287,8 @@ describe('transition-privileged: the booking gates are reached on this door too'
 
       await run({ days: 1, startsInDays: 1 });
 
-      expect(laundryShow).not.toHaveBeenCalled();
+      expect(laundryShow).toHaveBeenCalledTimes(1);
+      expect(transition).toHaveBeenCalled();
     });
 
     it('falls back to the snapshot when the lookup fails, and still refuses', async () => {

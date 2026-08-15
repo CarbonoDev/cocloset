@@ -14,8 +14,11 @@ const {
   assertInitialCleaningLeadTime,
   assertCleaningReadiness,
 } = require('../api-util/bookingRules');
+const {
+  assertCleaningGapForListing,
+  liveInitialCleaningDaysFrom,
+} = require('../api-util/listingCleaningGaps');
 const { assertRentalPeriodBooking } = require('../api-util/rentalPeriods');
-const { resolveLiveInitialCleaningDays } = require('../api-util/liveInitialCleaning');
 const { ensureHandoverQr } = require('../api-util/handoverQr');
 const log = require('../log');
 
@@ -164,12 +167,8 @@ module.exports = (req, res) => {
       // src/components/OrderPanel/BookingDatesForm/initialCleaningAgreement.test.js was
       // written to prevent. So both sides resolve from the same input.
       //
-      // AND WHY THAT DOES NOT PUT AN INTEGRATION API CALL BACK ON THE COMMON PATH.
-      // resolveLiveInitialCleaningDays returns immediately, with no API call at all, when
-      // `metadata.onLaundry === true` - which is every rental after the first. The extra
-      // round trip happens only for a garment that has never reached a studio. A failed
-      // resolution returns null, which falls back to the SNAPSHOT rather than to "no
-      // block": a read error must not open the gate.
+      // A failed resolution returns null, which falls back to the SNAPSHOT rather than to
+      // "no block": a read error must not open the gate.
       // The garment is in a wash RIGHT NOW, from a return the studio has already confirmed
       // and sized. Free (the value is on the listing entity above), and deliberately
       // checked alongside the first-cleaning gate rather than left to the availability
@@ -177,11 +176,35 @@ module.exports = (req, res) => {
       // write is not enough places to enforce this.
       assertCleaningReadiness({ listing, bookingStart: bodyParams?.params?.bookingStart });
 
-      return resolveLiveInitialCleaningDays({ listing }).then(liveInitialCleaningDays => {
+      // THE CLEANING BETWEEN TWO RENTALS, which `readyAt` above cannot express: it only knows
+      // about a wash that has already started. A garment out on a rental that ends on the
+      // 24th still owes its studio a turnaround afterwards, and nothing on the calendar says
+      // so until the accept-time buffer write lands - which, on Dev, it does not.
+      //
+      //   > "Sigue sin respetarse el buffer de dias de limpieza (Revisa los dias antes del
+      //   >  booking y despues de que se regresa)"
+      //
+      // See api-util/cleaningGaps.js for the rule and for the evidence that the calendar
+      // write alone was never holding it. This is the same argument as `readyAt`: the
+      // authoritative copy of a rule has to live where it cannot silently do nothing.
+      //
+      // WHAT IT COSTS, STATED PLAINLY. Two Integration API reads on the checkout path - the
+      // studio's turnaround and the listing's other bookings - where a previous change had
+      // deliberately got that number down to one-on-the-first-rental-only. It buys the rule
+      // an enforcement point that cannot silently do nothing, and the alternative has now
+      // been reported three times. The turnaround read is SHARED with the initial-cleaning
+      // gate below rather than repeated: one number, one fetch, no way for the two gates to
+      // disagree. A read failure logs and lets the booking through rather than refusing it -
+      // see resolveBookingConstraints.
+      return assertCleaningGapForListing({
+        listing,
+        bookingStart: bodyParams?.params?.bookingStart,
+        bookingEnd: bodyParams?.params?.bookingEnd,
+      }).then(constraints => {
         assertInitialCleaningLeadTime({
           listing,
           bookingStart: bodyParams?.params?.bookingStart,
-          liveInitialCleaningDays,
+          liveInitialCleaningDays: liveInitialCleaningDaysFrom(listing, constraints),
         });
 
         return buildLineItemsForListing({

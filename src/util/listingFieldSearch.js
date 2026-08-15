@@ -1,4 +1,9 @@
-import { SCHEMA_TYPE_ENUM, SCHEMA_TYPE_MULTI_ENUM, SCHEMA_TYPE_TEXT } from './types';
+import {
+  SCHEMA_TYPE_ENUM,
+  SCHEMA_TYPE_MULTI_ENUM,
+  SCHEMA_TYPE_SHORT_TEXT,
+  SCHEMA_TYPE_TEXT,
+} from './types';
 
 /**
  * TURNING A LISTING FIELD'S VALUE INTO A SEARCH.
@@ -17,6 +22,16 @@ import { SCHEMA_TYPE_ENUM, SCHEMA_TYPE_MULTI_ENUM, SCHEMA_TYPE_TEXT } from './ty
  *     marketplace, which reads as "the link is broken" rather than "there is no filter".
  *     So a text field falls back to `?keywords=`, the full-text search that DOES cover
  *     title and description-style content.
+ *
+ * FREE TEXT IS TWO SCHEMA TYPES, NOT ONE. Console offers a short (70 char) and a long free
+ * text field, and they arrive in the hosted asset as `shortText` and `text`. The first
+ * version of this module handled only `text`, which is why the brand link never appeared:
+ * Cocloset's `brand` is configured as `shortText`, fell past every branch below, and
+ * returned null - so `CustomListingFields` was handed no search params and rendered the
+ * value as plain text, exactly as it did before the feature. Both are free text and both
+ * take the keyword fallback; they are listed explicitly rather than defaulted to, because
+ * a future schema type that is NOT text (a date, say) must not silently become a keyword
+ * search for its own raw value.
  *
  * WHICH ONE IS DECIDED FROM THE FIELD CONFIG, not hardcoded, so the day `brand` becomes a
  * multi-select in Console the link starts filtering properly with no code change. That is the
@@ -56,7 +71,12 @@ export const listingFieldSearchParams = (fieldConfig, value) => {
     // value would be read as "has_all" by some filters and match nothing.
     return { [`pub_${key}`]: `has_any:${searchValue}` };
   }
-  if (schemaType === SCHEMA_TYPE_TEXT || schemaType === SCHEMA_TYPE_ENUM || !schemaType) {
+  if (
+    schemaType === SCHEMA_TYPE_TEXT ||
+    schemaType === SCHEMA_TYPE_SHORT_TEXT ||
+    schemaType === SCHEMA_TYPE_ENUM ||
+    !schemaType
+  ) {
     return { keywords: searchValue };
   }
 
