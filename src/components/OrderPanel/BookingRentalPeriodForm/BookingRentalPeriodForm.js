@@ -565,6 +565,61 @@ export const BookingRentalPeriodForm = props => {
                   marketplaceName={marketplaceName}
                   processName={BOOKING_PROCESS_NAME}
                 />
+
+                {/* WHAT THE DATES ACTUALLY MEAN, spelled out under the money. The design puts
+                    four facts here, and the two on the right are the ones a customer cannot
+                    work out from the dates above: the garment does not come back on the
+                    market when the rental ends, it comes back when its wash finishes.
+
+                    Same `cleaningWindowDays` the picker sizes its window with and the server
+                    gate enforces - stating a different number here would be a promise the
+                    calendar does not keep. */}
+                {inclusiveEnd ? (
+                  <dl className={css.bookingSummary}>
+                    <div className={css.summaryCell}>
+                      <dt className={css.summaryLabel}>
+                        <FormattedMessage id="BookingRentalPeriodForm.summaryPickup" />
+                      </dt>
+                      <dd className={css.summaryValue}>
+                        {intl.formatDate(startDate, dateFormatOptionsIn(timeZone))}
+                      </dd>
+                    </div>
+                    <div className={css.summaryCell}>
+                      <dt className={css.summaryLabel}>
+                        <FormattedMessage id="BookingRentalPeriodForm.summaryReturn" />
+                      </dt>
+                      <dd className={css.summaryValue}>
+                        {intl.formatDate(inclusiveEnd, dateFormatOptionsIn(timeZone))}
+                      </dd>
+                    </div>
+                    {cleaningWindowDays > 0 ? (
+                      <>
+                        <div className={css.summaryCell}>
+                          <dt className={css.summaryLabel}>
+                            <FormattedMessage id="BookingRentalPeriodForm.summaryCleaningBuffer" />
+                          </dt>
+                          <dd className={css.summaryValue}>
+                            <FormattedMessage
+                              id="BookingRentalPeriodForm.summaryDays"
+                              values={{ days: cleaningWindowDays }}
+                            />
+                          </dd>
+                        </div>
+                        <div className={css.summaryCell}>
+                          <dt className={css.summaryLabel}>
+                            <FormattedMessage id="BookingRentalPeriodForm.summaryAvailableAgain" />
+                          </dt>
+                          <dd className={css.summaryValue}>
+                            {intl.formatDate(
+                              getStartOf(bookingEnd, 'day', timeZone, cleaningWindowDays, 'days'),
+                              dateFormatOptionsIn(timeZone)
+                            )}
+                          </dd>
+                        </div>
+                      </>
+                    ) : null}
+                  </dl>
+                ) : null}
               </div>
             ) : null}
             <FetchLineItemsError error={fetchLineItemsError} />
