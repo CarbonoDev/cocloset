@@ -21,6 +21,7 @@
 /* The section heading. Left-aligned and set in ink, matching the landing page's own sections
    rather than the template's centred default. */
 .title {
+  font-family: var(--fontFamilyDisplay);
   font-size: 28px;
   line-height: 1.15;
   letter-spacing: -0.01em;

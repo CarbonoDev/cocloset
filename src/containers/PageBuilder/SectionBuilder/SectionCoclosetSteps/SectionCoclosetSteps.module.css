@@ -58,6 +58,7 @@
 }
 
 .numeral {
+  font-family: var(--fontFamilyDisplay);
   font-size: 28px;
   line-height: 1;
   color: var(--coclosetBrandTint);
