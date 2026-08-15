@@ -41,6 +41,8 @@ import css from './ListingPage.module.css';
  * @param {Object} [props.publicData] - The listing's publicData
  * @param {propTypes.uuid} props.listingId - The listing id
  * @param {Object} props.mapsConfig - config.maps
+ * @param {number} [props.cleaningTurnaroundDays] - Cocloset: the assigned studio's live
+ *   turnaround, resolved by ListingPage.duck.js. Omitted from the card when not known.
  * @returns {JSX.Element} section map maybe component
  */
 class SectionMapMaybe extends Component {
@@ -50,7 +52,15 @@ class SectionMapMaybe extends Component {
   }
 
   render() {
-    const { className, rootClassName, geolocation, publicData, listingId, mapsConfig } = this.props;
+    const {
+      className,
+      rootClassName,
+      geolocation,
+      publicData,
+      listingId,
+      mapsConfig,
+      cleaningTurnaroundDays,
+    } = this.props;
 
     // The studio name + street address, or null when no laundry has been assigned.
     const laundryLocation = getAssignedLaundryLocation(publicData);
@@ -87,6 +97,18 @@ class SectionMapMaybe extends Component {
                 place the garment is handed over, which is exactly what the
                 element means. */}
             <address className={css.pickupLocationAddress}>{laundryLocation.address}</address>
+            {/* How long this studio takes between rentals. Resolved live by the same page-load
+                call that produces the calendar's blocked days, so the number here and the days
+                the calendar refuses cannot disagree. Omitted entirely when it is not known -
+                a turnaround printed as a guess is a promise nobody made. */}
+            {cleaningTurnaroundDays > 0 ? (
+              <p className={css.pickupLocationMeta}>
+                <FormattedMessage
+                  id="ListingPage.pickupLocationTurnaround"
+                  values={{ days: cleaningTurnaroundDays }}
+                />
+              </p>
+            ) : null}
             <p className={css.pickupLocationNote}>
               <FormattedMessage id="ListingPage.pickupLocationNote" />
             </p>

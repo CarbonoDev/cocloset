@@ -367,6 +367,11 @@ describe('Duck', () => {
         // known" and is deliberately NOT the same as `[]`, which would tell the picker
         // there is nothing to block.
         cleaningGaps: null,
+        // Cocloset: the assigned studio's turnaround and this garment's completed-rental
+        // count. Both null until the page-load call answers, and on any failure - the page
+        // leaves the line out rather than stating a number it did not read.
+        cleaningTurnaroundDays: null,
+        completedRentals: null,
       });
     });
 

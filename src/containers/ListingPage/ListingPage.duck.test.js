@@ -131,7 +131,12 @@ describe('the lookup result reaches the state, and failure never removes the blo
   // as undefined or NaN, because null is what the calendar reads as "use the snapshot".
   it('stores null when the endpoint reports no block', async () => {
     fetchListingInitialCleaning.mockResolvedValue({ data: {} });
-    await expect(runThunk()).resolves.toEqual({ initialCleaningDays: null, cleaningGaps: null });
+    await expect(runThunk()).resolves.toEqual({
+      initialCleaningDays: null,
+      cleaningGaps: null,
+      cleaningTurnaroundDays: null,
+      completedRentals: null,
+    });
   });
 
   it.each([['a fraction', 2.5], ['zero', 0], ['negative', -1], ['a string', '3'], ['null', null]])(
@@ -149,7 +154,12 @@ describe('the lookup result reaches the state, and failure never removes the blo
     fetchListingInitialCleaning.mockRejectedValue(
       Object.assign(new Error('too many requests'), { status: 429 })
     );
-    await expect(runThunk()).resolves.toEqual({ initialCleaningDays: null, cleaningGaps: null });
+    await expect(runThunk()).resolves.toEqual({
+      initialCleaningDays: null,
+      cleaningGaps: null,
+      cleaningTurnaroundDays: null,
+      completedRentals: null,
+    });
   });
 
   // Silent to the customer, not silent to us: a laundry whose profile has become

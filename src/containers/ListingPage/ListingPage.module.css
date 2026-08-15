@@ -872,3 +872,78 @@
   width: 100%;
   height: 100%;
 }
+
+/* ── How cleaning works ──────────────────────────────────────────────────────
+   The paragraph that explains why the calendar holds days a customer can see are
+   otherwise empty. Panel-styled rather than plain prose so it reads as an aside
+   about the service, not as more of the garment's description. */
+.sectionCleaningWorks {
+  padding: 0 24px;
+  margin-bottom: 36px;
+
+  @media (--viewportMedium) {
+    padding: 0;
+  }
+}
+
+.cleaningWorksBody {
+  composes: p from global;
+  background-color: var(--coclosetSubtle);
+  border-radius: 10px;
+  color: var(--coclosetInk);
+  margin: 0;
+  padding: 16px 18px;
+}
+
+/* ── Rental timeline ─────────────────────────────────────────────────────── */
+.sectionRentalTimeline {
+  padding: 0 24px;
+  margin-bottom: 36px;
+
+  @media (--viewportMedium) {
+    padding: 0;
+  }
+}
+
+.timelineSteps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Chips rather than a vertical list: eight steps stacked reads as a long process, and the
+   point is the opposite - each one is small and somebody else does most of them. */
+.timelineStep {
+  composes: marketplaceTinyFontStyles from global;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 999px;
+  color: var(--coclosetInk);
+  margin: 0;
+  padding: 7px 14px 7px 8px;
+}
+
+.timelineStepNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--coclosetBrandSubtle);
+  color: var(--coclosetBrandDark);
+  font-weight: var(--fontWeightSemiBold);
+}
+
+/* The studio's turnaround, on the pickup card. */
+.pickupLocationMeta {
+  composes: h5 from global;
+  color: var(--coclosetInkMuted);
+  margin: 6px 0 0 0;
+}
