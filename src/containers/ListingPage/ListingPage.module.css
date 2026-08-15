@@ -979,12 +979,12 @@
 }
 
 .listingTitle {
-  /* The display serif, through a VARIABLE WITH A FALLBACK rather than a shared class.
-     The serif itself lives on the branch behind PR #35, which is not merged; naming its
-     helper class here would make this branch fail to build against develop. When #35 lands
-     and defines --coclosetDisplayFontFamily this title picks it up with no change, and until
-     then it renders in a system serif rather than in the body sans - which is the point. */
-  font-family: var(--coclosetDisplayFontFamily, Georgia, 'Times New Roman', serif);
+  /* Cocloset's display face, the same variable every other heading built from the mockups
+     uses (--fontFamilyDisplay, defined in styles/marketplaceDefaults.css). Read through the
+     variable rather than restated here so a change of face is one edit, and the fallbacks in
+     that declaration are real serifs - a slow webfont degrades to a serif, not to the body
+     sans. */
+  font-family: var(--fontFamilyDisplay);
   font-weight: var(--fontWeightSemiBold);
   color: var(--coclosetInk);
   font-size: 30px;
