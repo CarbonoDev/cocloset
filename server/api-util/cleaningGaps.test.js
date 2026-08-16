@@ -1,5 +1,6 @@
 const {
   STATES_AWAITING_CLEANING,
+  countCompletedRentals,
   resolveGapDays,
   occupiedWindow,
   collectBookingsAwaitingCleaning,
@@ -251,5 +252,51 @@ describe('computeCleaningGaps', () => {
 
   it('is empty when there is no turnaround to hold', () => {
     expect(computeCleaningGaps({ bookings: [FIRST_RENTAL], turnaroundDays: 0 })).toEqual([]);
+  });
+});
+
+describe('countCompletedRentals', () => {
+  // > "Quiza podriamos contabilizar las transacciones exitosas para ese listing y mostrar
+  // >  este dato, de lo contrario lo omitimos"
+  //
+  // Counted from the transactions query the gap rule already makes, so it costs nothing.
+  const tx = lastTransition => ({ id: { uuid: 'x' }, attributes: { lastTransition } });
+
+  it('counts a rental that ran its course', () => {
+    expect(countCompletedRentals([tx('transition/laundry-mark-available')])).toBe(1);
+  });
+
+  it('still counts it once somebody has reviewed it', () => {
+    // A garment must not lose a rental from its count because a review was written about it.
+    const reviewed = [
+      'transition/review-1-by-customer',
+      'transition/review-1-by-provider',
+      'transition/review-2-by-customer',
+      'transition/review-2-by-provider',
+      'transition/expire-review-period',
+    ];
+    reviewed.forEach(t => {
+      expect(countCompletedRentals([tx(t)])).toBe(1);
+    });
+  });
+
+  it('does not count a rental that is still running, or one that never happened', () => {
+    const notCompleted = [
+      'transition/request-payment',
+      'transition/confirm-payment',
+      'transition/accept',
+      'transition/laundry-confirm-pickup',
+      'transition/laundry-confirm-return',
+      'transition/decline',
+      'transition/expire-payment',
+    ];
+    notCompleted.forEach(t => {
+      expect(countCompletedRentals([tx(t)])).toBe(0);
+    });
+  });
+
+  it('is zero, not a crash, for an empty or absent list', () => {
+    expect(countCompletedRentals([])).toBe(0);
+    expect(countCompletedRentals()).toBe(0);
   });
 });

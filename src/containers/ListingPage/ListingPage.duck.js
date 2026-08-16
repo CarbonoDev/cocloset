@@ -376,9 +376,18 @@ const fetchInitialCleaningDaysPayloadCreator = ({ listingId }) => {
     .then(response => {
       const days = response?.data?.initialCleaningDays;
       const gaps = response?.data?.cleaningGaps;
+      const turnaround = response?.data?.cleaningTurnaroundDays;
+      const rentals = response?.data?.completedRentals;
 
       return {
         initialCleaningDays: Number.isInteger(days) && days > 0 ? days : null,
+        // How long this garment's studio takes between rentals. Shown on the page as prose
+        // ("that is why the calendar holds N days") rather than used for any arithmetic - the
+        // gaps above are already computed server-side from this exact number.
+        cleaningTurnaroundDays: Number.isInteger(turnaround) && turnaround > 0 ? turnaround : null,
+        // How many rentals this garment has completed. Absent (rather than 0) when the read
+        // failed, so the page omits the line instead of claiming a history it did not read.
+        completedRentals: Number.isInteger(rentals) ? rentals : null,
         // Absent stays absent: a failed gap read must not reach the picker as "there are no
         // gaps", which would look exactly like a clear calendar. Only an array the server
         // actually sent is trusted.
@@ -393,7 +402,12 @@ const fetchInitialCleaningDaysPayloadCreator = ({ listingId }) => {
       // Logged, not surfaced. The snapshot fallback is silent on purpose, but a laundry
       // whose profile has become unreadable is worth knowing about.
       log.error(e, 'fetching-live-initial-cleaning-days-failed', { listingId: listingId.uuid });
-      return { initialCleaningDays: null, cleaningGaps: null };
+      return {
+        initialCleaningDays: null,
+        cleaningGaps: null,
+        cleaningTurnaroundDays: null,
+        completedRentals: null,
+      };
     });
 };
 
@@ -471,6 +485,11 @@ const initialState = {
   // owed then. null means "not known" (initial state, or a failed read) and is deliberately
   // different from `[]`, which means "asked, and there are none".
   cleaningGaps: null,
+  // Cocloset: the assigned studio's turnaround, and how many rentals this garment has
+  // completed. Both resolved by the same page-load call; both null until it answers, and on
+  // any failure, so the page can leave the line out rather than state a wrong number.
+  cleaningTurnaroundDays: null,
+  completedRentals: null,
 };
 
 const listingPageSlice = createSlice({
@@ -597,6 +616,8 @@ const listingPageSlice = createSlice({
       .addCase(fetchInitialCleaningDaysThunk.fulfilled, (state, action) => {
         state.initialCleaningDays = action.payload?.initialCleaningDays ?? null;
         state.cleaningGaps = action.payload?.cleaningGaps ?? null;
+        state.cleaningTurnaroundDays = action.payload?.cleaningTurnaroundDays ?? null;
+        state.completedRentals = action.payload?.completedRentals ?? null;
       });
   },
 });

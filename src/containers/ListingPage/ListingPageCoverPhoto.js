@@ -52,6 +52,9 @@ import SectionHero from './SectionHero';
 import SectionReviews from './SectionReviews';
 import SectionAuthorMaybe from './SectionAuthorMaybe';
 import SectionMapMaybe from './SectionMapMaybe';
+import SectionListingHeader from './SectionListingHeader';
+import SectionCleaningWorks from './SectionCleaningWorks';
+import SectionRentalTimeline from './SectionRentalTimeline';
 import CustomListingFields from './CustomListingFields';
 import Notifications from './Notifications/Notifications';
 import ListingPageAccessWrapper from './ListingPageAccessWrapper';
@@ -94,6 +97,11 @@ export const ListingPageComponent = props => {
     config,
     routeConfiguration,
     showOwnListingsOnly,
+    // Cocloset: the assigned studio's live turnaround and this garment's completed-rental
+    // count. Named here rather than left in `restOfProps` because the PAGE renders them -
+    // everything in that rest object is forwarded to OrderPanel.
+    cleaningTurnaroundDays,
+    completedRentals,
     ...restOfProps
   } = props;
 
@@ -280,23 +288,20 @@ export const ListingPageComponent = props => {
         )}
         <div className={css.contentWrapperForHeroLayout}>
           <div className={css.mainColumnForHeroLayout}>
-            <div className={showListingImage ? css.mobileHeading : css.noListingImageHeadingHero}>
-              {showListingImage ? (
-                // add css logic here that applies larger margin on mobile view to push down title
-                <H2 as="h1" className={css.orderPanelTitle}>
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H2>
-              ) : (
-                <H3
-                  as="h1"
-                  className={classNames(css.orderPanelTitle, {
-                    [css.titleMarginForOwnListingNoImage]: isOwnListing,
-                  })}
-                >
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H3>
-              )}
-            </div>
+            {/* The garment's own heading: brand, title, provenance. See the twin in
+                  ListingPageCarousel.js for why it replaces the template's mobile-only
+                  repeat of the order panel's title. */}
+            <SectionListingHeader
+              className={classNames({
+                [css.titleMarginForOwnListingNoImage]: isOwnListing && !showListingImage,
+              })}
+              publicData={publicData}
+              listingFieldConfigs={listingConfig.listingFields}
+              title={richTitle}
+              completedRentals={completedRentals}
+              reviews={reviews}
+              authorDisplayName={authorDisplayName}
+            />
             {showDescription && <SectionText text={description} showAsIngress />}
 
             <CustomListingFields
@@ -312,7 +317,16 @@ export const ListingPageComponent = props => {
               publicData={publicData}
               listingId={currentListing.id}
               mapsConfig={config.maps}
+              cleaningTurnaroundDays={cleaningTurnaroundDays}
             />
+            {/* Why the calendar holds days after a rental, and what happens between paying and
+                wearing. Both sit here, after the pickup location, because both are about the
+                studio the section above just named. */}
+            <SectionCleaningWorks
+              cleaningTurnaroundDays={cleaningTurnaroundDays}
+              laundryName={publicData?.assignedLaundryName}
+            />
+            <SectionRentalTimeline />
             <SectionReviews reviews={reviews} fetchReviewsError={fetchReviewsError} />
             <SectionAuthorMaybe
               title={title}
@@ -426,6 +440,10 @@ const ListingPage = props => {
     // Cocloset: day ranges another rental's wash has already claimed, so the picker does
     // not offer them as a start date. See server/api-util/cleaningGaps.js.
     cleaningGaps,
+    // Cocloset: the assigned studio's live turnaround, and how many rentals this garment has
+    // completed. Same page-load call as the gaps above.
+    cleaningTurnaroundDays,
+    completedRentals,
   } = useSelector(state => state.ListingPage);
   const currentUser = useSelector(state => state.user?.currentUser);
   const scrollingDisabled = useSelector(state => isScrollingDisabled(state));
@@ -495,6 +513,8 @@ const ListingPage = props => {
       fetchLineItemsError={fetchLineItemsError}
       liveInitialCleaningDays={liveInitialCleaningDays}
       cleaningGaps={cleaningGaps}
+      cleaningTurnaroundDays={cleaningTurnaroundDays}
+      completedRentals={completedRentals}
       sendInquiryInProgress={sendInquiryInProgress}
       sendInquiryError={sendInquiryError}
       onManageDisableScrolling={onManageDisableScrolling}

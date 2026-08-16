@@ -69,3 +69,38 @@
     margin-top: 16px;
   }
 }
+
+/* The informative five-week calendar. Drawn as its own card below the panel, per the design,
+   even though it renders inside the form — see the comment at its call site. */
+.availabilityCalendar {
+  margin-top: 24px;
+}
+
+/* The four facts under the price breakdown: pickup, return, the studio's turnaround, and the
+   day the garment is on the market again. Two columns so the pairs read across rather than as
+   a list of four unrelated numbers. */
+.bookingSummary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin: 16px 0 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--coclosetBorder);
+}
+
+.summaryCell {
+  margin: 0;
+}
+
+.summaryLabel {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+}
+
+.summaryValue {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+  margin: 2px 0 0 0;
+}

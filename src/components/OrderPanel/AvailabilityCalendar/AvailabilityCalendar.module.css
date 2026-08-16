@@ -1,0 +1,108 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  background-color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.heading {
+  composes: marketplaceTinyFontStyles from global;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--coclosetInkMuted);
+  margin: 0 0 14px 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.day {
+  composes: marketplaceTinyFontStyles from global;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* A square that keeps its shape at any column width. `aspect-ratio` rather than a fixed
+     height because this grid sits in a column that is 1/3 of a desktop and full width on a
+     phone, and a fixed height turns into letterboxed rectangles at one of the two. */
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  margin: 0;
+  padding: 0;
+}
+
+/* The four states. Each is a background AND a foreground: a swatch that only changes the fill
+   stops meaning anything the moment it sits on a coloured surface, which is the defect the
+   disabled-day calendar shipped with once already. */
+.available {
+  background-color: var(--coclosetSubtle);
+  color: var(--coclosetInk);
+}
+
+.selected {
+  background-color: var(--coclosetBrand);
+  color: #ffffff;
+}
+
+.booked {
+  background-color: var(--coclosetInk);
+  color: #ffffff;
+}
+
+.cleaning {
+  background-color: var(--coclosetToneBlueBg);
+  color: var(--coclosetToneBlueFg);
+}
+
+/* Days earlier in the week than today. Drawn so the grid keeps its weekday columns, dimmed so
+   nobody reads a date that has passed as a state of the garment. */
+.past {
+  opacity: 0.35;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  list-style: none;
+  margin: 14px 0 0 0;
+  padding: 0;
+}
+
+.legendItem {
+  composes: marketplaceTinyFontStyles from global;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+}
+
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  /* The available swatch is a pale fill on a near-white card, so it needs an outline of its
+     own or the legend's first entry reads as a missing image. */
+  border: 1px solid var(--coclosetBorder);
+}
+
+.srOnly {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+  white-space: nowrap;
+}

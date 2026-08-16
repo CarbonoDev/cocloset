@@ -15,6 +15,8 @@ import {
 
 import CustomExtendedDataSection from '../../components/CustomExtendedDataSection/CustomExtendedDataSection.js';
 
+import css from './ListingPage.module.css';
+
 /**
  * Renders custom listing fields.
  * - SectionDetails is used if schemaType is 'enum', 'long', or 'boolean'
@@ -68,6 +70,13 @@ const CustomListingFields = props => {
     isFieldForCategory: isFieldForSelectedCategories,
     fieldConfigs: displayableFieldConfigs,
     heading: 'ListingPage.detailsTitle',
+    // The design's two-column grid of stacked label/value pairs. Passed as class overrides
+    // because SectionDetails is SHARED with the ProfilePage, which wants the rows it already
+    // has - restyling through props rather than forking the component.
+    listClassName: css.detailsGrid,
+    rowClassName: css.detailsGridRow,
+    labelClassName: css.detailsGridLabel,
+    valueClassName: css.detailsGridValue,
   };
 
   const pickExtendedDataFields = (filteredConfigs, config) => {

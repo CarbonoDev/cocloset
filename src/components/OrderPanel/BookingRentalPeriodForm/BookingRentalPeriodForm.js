@@ -35,6 +35,7 @@ import {
   resolveReadyAt,
 } from '../BookingDatesForm/BookingDatesForm';
 
+import AvailabilityCalendar from '../AvailabilityCalendar/AvailabilityCalendar';
 import RentalPeriodChips from './RentalPeriodChips';
 import css from './BookingRentalPeriodForm.module.css';
 
@@ -564,6 +565,61 @@ export const BookingRentalPeriodForm = props => {
                   marketplaceName={marketplaceName}
                   processName={BOOKING_PROCESS_NAME}
                 />
+
+                {/* WHAT THE DATES ACTUALLY MEAN, spelled out under the money. The design puts
+                    four facts here, and the two on the right are the ones a customer cannot
+                    work out from the dates above: the garment does not come back on the
+                    market when the rental ends, it comes back when its wash finishes.
+
+                    Same `cleaningWindowDays` the picker sizes its window with and the server
+                    gate enforces - stating a different number here would be a promise the
+                    calendar does not keep. */}
+                {inclusiveEnd ? (
+                  <dl className={css.bookingSummary}>
+                    <div className={css.summaryCell}>
+                      <dt className={css.summaryLabel}>
+                        <FormattedMessage id="BookingRentalPeriodForm.summaryPickup" />
+                      </dt>
+                      <dd className={css.summaryValue}>
+                        {intl.formatDate(startDate, dateFormatOptionsIn(timeZone))}
+                      </dd>
+                    </div>
+                    <div className={css.summaryCell}>
+                      <dt className={css.summaryLabel}>
+                        <FormattedMessage id="BookingRentalPeriodForm.summaryReturn" />
+                      </dt>
+                      <dd className={css.summaryValue}>
+                        {intl.formatDate(inclusiveEnd, dateFormatOptionsIn(timeZone))}
+                      </dd>
+                    </div>
+                    {cleaningWindowDays > 0 ? (
+                      <>
+                        <div className={css.summaryCell}>
+                          <dt className={css.summaryLabel}>
+                            <FormattedMessage id="BookingRentalPeriodForm.summaryCleaningBuffer" />
+                          </dt>
+                          <dd className={css.summaryValue}>
+                            <FormattedMessage
+                              id="BookingRentalPeriodForm.summaryDays"
+                              values={{ days: cleaningWindowDays }}
+                            />
+                          </dd>
+                        </div>
+                        <div className={css.summaryCell}>
+                          <dt className={css.summaryLabel}>
+                            <FormattedMessage id="BookingRentalPeriodForm.summaryAvailableAgain" />
+                          </dt>
+                          <dd className={css.summaryValue}>
+                            {intl.formatDate(
+                              getStartOf(bookingEnd, 'day', timeZone, cleaningWindowDays, 'days'),
+                              dateFormatOptionsIn(timeZone)
+                            )}
+                          </dd>
+                        </div>
+                      </>
+                    ) : null}
+                  </dl>
+                ) : null}
               </div>
             ) : null}
             <FetchLineItemsError error={fetchLineItemsError} />
@@ -574,6 +630,24 @@ export const BookingRentalPeriodForm = props => {
               </PrimaryButton>
             </div>
             <FinePrint payoutDetailsWarning={payoutDetailsWarning} isOwnListing={isOwnListing} />
+
+            {/* The informative five-week view.
+                  > "el calendario que aparece ahi solo es informativo, no tiene uso mas que
+                  >  para ver disponibilidad de las próximas 5 semanas"
+
+                RENDERED INSIDE THE FORM, though the design draws it as a separate card below
+                the panel — and it is styled as one. It lives here because it has to highlight
+                the customer's CURRENT pick, which is final-form state: lifting it out would
+                mean either publishing that state upwards or letting the two calendars answer
+                "what have I chosen" from different sources. */}
+            <AvailabilityCalendar
+              className={css.availabilityCalendar}
+              allTimeSlots={allTimeSlots}
+              cleaningGaps={cleaningGaps}
+              selectedStartDate={startDate}
+              selectedPeriodDays={periodDays}
+              timeZone={timeZone}
+            />
           </Form>
         );
       }}
