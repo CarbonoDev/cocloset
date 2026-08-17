@@ -77,11 +77,24 @@ const SearchResultsPanel = props => {
       <ul className={isMapVariant ? css.listingCardsMapVariant : css.listingCards}>
         {listings.map(l => (
           <li key={l.id.uuid} className={css.resultItem}>
+            {/* THE EDITORIAL CARD, per the client's search-page design: brand eyebrow, title,
+                price set against it, then size and collection point on one line.
+
+                This component was written for the landing page's carousel, and its own header
+                says the search grid deliberately kept the default layout - "a browsing grid
+                wants the price first and the seller named, because the reader is comparing".
+                The client's design says otherwise for this marketplace, and the design decides
+                what a browsing grid should look like. One variant, two surfaces, no new card.
+
+                NB the fields it shows (brand, size, assignedLaundryName) have to be asked for
+                in SearchPage.duck.js's `fields.listing` allowlist, or every card renders the
+                image and nothing else. */}
             <ListingCard
               className={css.listingCard}
               listing={l}
               renderSizes={cardRenderSizes(isMapVariant)}
               setActiveListing={setActiveListing}
+              variant="editorial"
             />
           </li>
         ))}

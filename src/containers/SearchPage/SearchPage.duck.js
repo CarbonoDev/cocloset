@@ -15,6 +15,9 @@ import { hasPermissionToViewData, isUserAuthorized } from '../../util/userHelper
 import { parse } from '../../util/urlHelpers';
 import { getReferralParams } from '../../util/webStorageHelpers';
 
+import { fetchLaundryOptions } from '../../util/api';
+import * as log from '../../util/log';
+
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 
 // Pagination page size might need to be dynamic on responsive page layouts
@@ -347,6 +350,34 @@ export const searchListings = createAsyncThunk(
   searchListingsPayloadCreator
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The studios a customer can filter by.
+//
+//   > "Manten el filtro / Arma un endpoint publico para mostrar laundries"
+//
+// The filter itself needs no help - `meta_assignedLaundryId` has a live search schema
+// (verified against Dev: filtering by each of the three studios returns exactly its own
+// garments). What it needs is the list of studios to offer, and a studio's name lives on the
+// laundry USER, which the browser cannot query. Hence a server endpoint.
+//
+// PUBLIC, and deliberately its own endpoint rather than the authenticated directory with the
+// session removed - see server/api/laundry-options.js for what that distinction protects.
+//
+// FAILURE IS NOT AN ERROR STATE. No rejected case and no error field: a marketplace whose
+// search page will not render because a dropdown could not be populated is a far worse
+// outcome than a search page with one filter missing.
+// ─────────────────────────────────────────────────────────────────────────────
+export const fetchLaundryOptionsThunk = createAsyncThunk('SearchPage/fetchLaundryOptions', () =>
+  fetchLaundryOptions()
+    .then(response => (Array.isArray(response?.data) ? response.data : []))
+    .catch(e => {
+      // Logged, not surfaced. A studio directory that has become unreadable is worth
+      // knowing about even though the customer is never told.
+      log.error(e, 'fetching-laundry-options-failed', {});
+      return [];
+    })
+);
+
 // ================ Slice ================ //
 
 const searchPageSlice = createSlice({
@@ -358,6 +389,10 @@ const searchPageSlice = createSlice({
     searchListingsError: null,
     currentPageResultIds: [],
     activeListingId: null,
+    // Cocloset: the studios a customer can filter the results by, as { id, name }. Empty
+    // until the public endpoint answers, and on any failure - the filter then renders
+    // nothing rather than an empty dropdown, which would read as "there are no laundries".
+    laundryOptions: [],
   },
   reducers: {
     setActiveListing: (state, action) => {
@@ -381,6 +416,12 @@ const searchPageSlice = createSlice({
         console.error(action.payload);
         state.searchInProgress = false;
         state.searchListingsError = action.payload;
+      })
+      // Only `fulfilled`, and the payload creator never rejects: a failed lookup resolves to
+      // an empty list, which is what the initial state already says. The pickup filter is an
+      // improvement on a working search, not a new dependency of it.
+      .addCase(fetchLaundryOptionsThunk.fulfilled, (state, action) => {
+        state.laundryOptions = action.payload;
       });
   },
 });
@@ -449,6 +490,13 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
         'publicData.shippingEnabled',
         'publicData.priceVariationsEnabled',
         'publicData.priceVariants',
+        // Cocloset: what the search card actually shows. `fields.listing` is an ALLOWLIST -
+        // a field not named here arrives undefined, so the brand eyebrow, the size and the
+        // collection point would each render as nothing at all, on every card, with no error
+        // anywhere. Adding the card's fields and adding them to this list are one change.
+        'publicData.brand',
+        'publicData.size',
+        'publicData.assignedLaundryName',
       ],
       'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
       'fields.image': [
@@ -464,5 +512,18 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
     config,
   });
 
-  return dispatch(searchListingsCall);
+  const searchPromise = dispatch(searchListingsCall);
+
+  // The pickup filter's options, AFTER the search is under way and never awaited. The results
+  // do not depend on them, so a slow studio lookup must not delay the listings - and firing it
+  // second keeps the search the first thing this page does, which is what it is for.
+  //
+  // Browser-only for the same mundane reason ListingPage's live-cleaning fetch is: src/util/
+  // api.js builds its base URL from `window.location.origin`. It costs nothing here, since
+  // the filter bar renders after mount either way.
+  if (typeof window !== 'undefined') {
+    dispatch(fetchLaundryOptionsThunk());
+  }
+
+  return searchPromise;
 };

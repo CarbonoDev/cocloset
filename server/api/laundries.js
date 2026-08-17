@@ -1,6 +1,6 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { getSdk, handleError } = require('../api-util/sdk');
-const { buildLaundryDirectory } = require('../api-util/laundryDirectory');
+const { buildLaundryDirectory, fetchAllUsers } = require('../api-util/laundryDirectory');
 
 // List of laundries (users flagged with metadata.isLaundry) used by the listing
 // wizard's "Laundry Assignment" step. Only obtainable via the Integration API
@@ -61,26 +61,8 @@ const { buildLaundryDirectory } = require('../api-util/laundryDirectory');
 // and counted in `meta.incompleteProfileCount` — assigning one would write no
 // `geolocation` and leave the listing permanently unpublishable.
 
-// users.query returns one page at a time. A marketplace with more users than
-// one page would silently truncate the laundry list, so page through. MAX_PAGES
-// bounds the Integration API quota this endpoint can burn on one request; if it
-// is ever hit, `meta.truncated` says so rather than pretending the list is
-// complete. (Revisit once a user search schema exists — then the query itself
-// can do the filtering and this loop becomes unnecessary.)
-const PER_PAGE = 100;
-const MAX_PAGES = 20;
-
-const fetchUsersPage = (integrationSdk, page, collected) =>
-  integrationSdk.users.query({ page, perPage: PER_PAGE }, { expand: true }).then(response => {
-    const { data = [], meta = {} } = response.data || {};
-    const users = collected.concat(data);
-    const totalPages = Number.isFinite(meta.totalPages) ? meta.totalPages : page;
-
-    if (page < totalPages && page < MAX_PAGES) {
-      return fetchUsersPage(integrationSdk, page + 1, users);
-    }
-    return { users, truncated: page < totalPages };
-  });
+// The paging loop moved to api-util/laundryDirectory.js `fetchAllUsers` when the public
+// name/id endpoint (api/laundry-options.js) needed the same walk. One copy.
 
 // Console supports three category levels, so a legitimate chain is never longer than
 // that. Cap rather than reject: an over-long or malformed `categories` param is a
@@ -102,7 +84,7 @@ module.exports = (req, res) => {
   // sessions, which handleError turns into the SDK's own 401/403 response.
   sdk.currentUser
     .show()
-    .then(() => fetchUsersPage(getIntegrationSdk(), 1, []))
+    .then(() => fetchAllUsers(getIntegrationSdk()))
     .then(({ users, truncated }) => {
       const { laundries, meta } = buildLaundryDirectory(users, listingCategoryValues);
 

@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import { mapboxStyleUrl } from '../../../config/configMaps';
 import ReactDOM from 'react-dom';
 import isEqual from 'lodash/isEqual';
 import classNames from 'classnames';
@@ -356,7 +357,9 @@ class SearchMapWithMapbox extends Component {
     if (hasDimensions) {
       this.map = new window.mapboxgl.Map({
         container: this.state.mapContainer,
-        style: 'mapbox://styles/mapbox/streets-v10',
+        // See config/configMaps.js: Cocloset's own style when the env var is set, Mapbox's
+        // own otherwise - which is the case today, so this changes nothing until it is.
+        style: mapboxStyleUrl || 'mapbox://styles/mapbox/streets-v10',
         scrollZoom: false,
       });
       window.mapboxMap = this.map;

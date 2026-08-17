@@ -40,6 +40,45 @@ const LoginLink = () => {
   );
 };
 
+/**
+ * THE LAUNDRY LINK, and who sees which one.
+ *
+ *   > "Si el usuario esta loggeado y es laundry, debe llevarlo a su panel, si no hay usuario
+ *   >  loggeado, debe llevarlo a landing de laundry"
+ *   > "Si esta loggeado y no es laundry no muestres el enlace"
+ *
+ * Three states, three answers, and the third is to render nothing: a customer or a garment
+ * owner has no use for either destination - the panel is not theirs and the partner pitch is
+ * not addressed to them - so the link is absent rather than pointing somewhere polite.
+ *
+ * `isLaundryUser` reads `metadata.isLaundry`, which is Integration-API-only, so this cannot
+ * be self-assigned to get at the panel. It is a NAVIGATION hint either way: LaundryOpsPage
+ * gates itself for non-laundry users, and this only decides what to draw.
+ *
+ * WHILE HYDRATING (`mounted === false`) the anonymous answer is drawn, matching how the signup
+ * and login links behave - the server does not know who is reading, and a link that changes
+ * after hydration is better than one that flickers between three shapes.
+ */
+const LaundryLinkMaybe = ({ isAuthenticated, currentUser }) => {
+  if (isAuthenticated) {
+    return isLaundryUser(currentUser) ? (
+      <NamedLink id="laundry-link" className={css.topbarLink} name="LaundryOpsDashboardPage">
+        <span className={css.topbarLinkLabel}>
+          <FormattedMessage id="TopbarDesktop.laundry" />
+        </span>
+      </NamedLink>
+    ) : null;
+  }
+
+  return (
+    <NamedLink id="laundry-link" className={css.topbarLink} name="PartnerLandingPage">
+      <span className={css.topbarLinkLabel}>
+        <FormattedMessage id="TopbarDesktop.laundry" />
+      </span>
+    </NamedLink>
+  );
+};
+
 const InboxLink = ({ notificationCount, inboxTab }) => {
   const notificationDot = notificationCount > 0 ? <div className={css.notificationDot} /> : null;
   return (
@@ -63,7 +102,9 @@ const ProfileMenu = ({ currentPage, currentUser, onLogout, showManageListingsLin
       page === 'AccountSettingsPage' && ACCOUNT_SETTINGS_PAGES.includes(currentPage);
     const isLaundryOpsPage =
       page === 'LaundryProfilePage' && LAUNDRY_OPS_PAGES.includes(currentPage);
-    return currentPage === page || isAccountSettingsPage || isLaundryOpsPage ? css.currentPage : null;
+    return currentPage === page || isAccountSettingsPage || isLaundryOpsPage
+      ? css.currentPage
+      : null;
   };
 
   // Studio ops is reachable only for users the Integration API has flagged as a laundry
@@ -201,6 +242,12 @@ const TopbarDesktop = props => {
     />
   ) : null;
 
+  // Anonymous readers get the partner pitch; a studio gets its panel; everyone else gets no
+  // link at all. See LaundryLinkMaybe.
+  const laundryLinkMaybe = (
+    <LaundryLinkMaybe isAuthenticated={authenticatedOnClientSide} currentUser={currentUser} />
+  );
+
   const signupLinkMaybe = isAuthenticatedOrJustHydrated ? null : <SignupLink />;
   const loginLinkMaybe = isAuthenticatedOrJustHydrated ? null : <LoginLink />;
 
@@ -242,6 +289,7 @@ const TopbarDesktop = props => {
         showCreateListingsLink={showCreateListingsLink}
       />
 
+      {laundryLinkMaybe}
       {inboxLinkMaybe}
       {profileMenuMaybe}
       {signupLinkMaybe}
