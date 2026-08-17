@@ -92,14 +92,66 @@ const validateCleaningDays = cleaningDays => {
  * @param {number} params.turnaroundDays - resolved per-category turnaround, in days
  * @returns {{days: number, source: 'laundry'|'configured-turnaround'}}
  */
-const resolveCleaningDays = ({ requestedDays, turnaroundDays }) => {
-  if (typeof requestedDays === 'number') {
-    return { days: requestedDays, source: 'laundry' };
+const resolveCleaningDays = ({ requestedDays, turnaroundDays, maxDays }) => {
+  const resolved =
+    typeof requestedDays === 'number'
+      ? { days: requestedDays, source: 'laundry' }
+      : {
+          days: computeBufferDays(turnaroundDays).totalBufferDays,
+          source: 'configured-turnaround',
+        };
+
+  // THE NEXT BOOKING WINS.
+  //
+  //   > "si alguien hace booking el 29 y la prenda es devuelta el día 26, solo se tienen dos
+  //   >  días para hacer el lavado (...) hay que limitarlo para que no sean mas de esos días"
+  //
+  // A garment already reserved for a date cannot be held past it, so the days available
+  // before that reservation are a ceiling on whatever the studio asks for - and on whatever
+  // its configured turnaround would have been. The client chose this over letting the studio
+  // overrun and flagging the next booking as in conflict.
+  //
+  // It is a CLAMP, not a rejection: this runs after a transition that has already succeeded,
+  // and refusing here would leave a returned garment with no readiness recorded at all. The
+  // clamped value is reported back so the caller can say what happened.
+  if (Number.isFinite(maxDays) && resolved.days > maxDays) {
+    return {
+      days: Math.max(0, Math.trunc(maxDays)),
+      source: resolved.source,
+      requestedDays: resolved.days,
+      cappedByNextBooking: true,
+    };
   }
-  return {
-    days: computeBufferDays(turnaroundDays).totalBufferDays,
-    source: 'configured-turnaround',
-  };
+
+  return resolved;
+};
+
+/**
+ * How many cleaning days there is room for before this garment's next reservation.
+ *
+ * The wash starts the day AFTER the handover (see computeReadiness), so a garment back on the
+ * 26th whose next rental starts on the 29th has the 27th and the 28th: `29 - 26 - 1 = 2`.
+ *
+ * NEVER NEGATIVE. A late return can leave no room at all - back on the 29th for a rental that
+ * starts on the 29th - and 0 is the honest answer there: ready today, because it has to be.
+ * Returning a negative would flow into `Math.max(0, ...)` anyway; clamping here keeps the
+ * number meaningful to a caller that wants to SHOW it.
+ *
+ * @param {Object} params
+ * @param {Date} params.returnedAt
+ * @param {Date} [params.nextBookingStart] - the start of the next booking on this listing
+ * @param {string} [params.timeZone]
+ * @returns {number|null} null when nothing is booked next, so there is no ceiling
+ */
+const maxCleaningDaysBeforeNextBooking = ({ returnedAt, nextBookingStart, timeZone }) => {
+  if (!(nextBookingStart instanceof Date) || Number.isNaN(nextBookingStart.getTime())) {
+    return null;
+  }
+  const returnDay = startOfDayInTimeZone(returnedAt, timeZone);
+  const nextDay = startOfDayInTimeZone(nextBookingStart, timeZone);
+
+  const wholeDaysBetween = Math.round((nextDay.getTime() - returnDay.getTime()) / MS_IN_DAY);
+  return Math.max(0, wholeDaysBetween - 1);
 };
 
 /**
@@ -255,10 +307,15 @@ const writeCustodyMetadata = ({ integrationSdk, listingId, onLaundry, readyAt })
     .then(() => metadata);
 };
 
+// Whole days, for the one subtraction above. Both operands are midnights in the same zone by
+// construction, so this cannot drift across a DST boundary the way adding hours would.
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+
 module.exports = {
   MAX_CLEANING_DAYS,
   validateCleaningDays,
   resolveCleaningDays,
+  maxCleaningDaysBeforeNextBooking,
   computeReadiness,
   findActiveTransactions,
   assertNoActiveTransaction,

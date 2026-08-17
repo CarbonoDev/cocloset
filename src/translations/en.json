@@ -565,6 +565,7 @@
   "FilterPlain.clear": "Clear",
   "HandoverPage.cleaningDays.help": "Your usual turnaround for this garment is {days, plural, one {# day} other {# days}}. Change it if this one needs longer — the garment stays unavailable until these days have passed.",
   "HandoverPage.cleaningDays.label": "Days needed to clean",
+  "HandoverPage.cleaningDays.nextBooking": "This garment is booked again on {date}, so you have {days, plural, one {# day} other {# days}} to clean it.",
   "HandoverPage.counterparty.customer": "With the renter",
   "HandoverPage.counterparty.provider": "With the garment owner",
   "HandoverPage.damage.label": "Report damage on this garment",

@@ -36,14 +36,22 @@ const { UUID } = sdkTypes;
 
 const LISTING_ID = 'listing-1';
 
-const listingEntity = ({ metadata = {}, alias = 'default-booking/release-1' } = {}) => ({
+const ASSIGNED_LAUNDRY_ID = '9a1b2c3d-0000-0000-0000-0000000000aa';
+
+// Assigned to a studio by default: that is what decides whether this page has anything to
+// fetch. Custody (`onLaundry`) used to decide it, which is the bug the tests below now pin.
+const listingEntity = ({
+  metadata = {},
+  alias = 'default-booking/release-1',
+  assignedLaundryId = ASSIGNED_LAUNDRY_ID,
+} = {}) => ({
   id: new UUID(LISTING_ID),
   type: 'listing',
   attributes: {
     state: 'published',
     availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
     publicData: { unitType: 'day', transactionProcessAlias: alias },
-    metadata,
+    metadata: { ...(assignedLaundryId ? { assignedLaundryId } : {}), ...metadata },
   },
 });
 
@@ -88,23 +96,31 @@ describe('the live initial-cleaning lookup is asked for at page load', () => {
     expect(fetchListingInitialCleaning).toHaveBeenCalledWith(LISTING_ID);
   });
 
-  // The same condition that makes this rule first-time-only everywhere else. Without it, every
-  // view of every garment in the marketplace after its first rental would cost a request here
-  // and an Integration API read behind it, to be told there is no block.
-  it('does not ask once the garment is at its laundry', async () => {
+  // THE REGRESSION THIS PINS. The call used to be skipped once `onLaundry === true`, which
+  // was right when it answered only the INITIAL cleaning lead time - a rule that is spent by
+  // then. It now also carries the days blocked by the wash owed after each booking, which are
+  // not first-time-only, so skipping it meant a garment's calendar stopped hearing about
+  // cleaning days the moment it had been to a laundry once. That is every garment after its
+  // first rental, and it was reproduced against Dev on four of seven listings.
+  it('STILL asks once the garment is at its laundry', async () => {
     await runLoadData(listingEntity({ metadata: { onLaundry: true } }));
-    expect(fetchListingInitialCleaning).not.toHaveBeenCalled();
+    expect(fetchListingInitialCleaning).toHaveBeenCalledTimes(1);
   });
 
-  // `=== true` and not truthiness, matching the server gate and the calendar: bad data is not
-  // custody, and must not switch the lookup off.
-  it.each([['false', false], ['the string "true"', 'true'], ['1', 1]])(
-    'still asks when onLaundry is %s',
+  it.each([['false', false], ['the string "true"', 'true'], ['1', 1], ['true', true]])(
+    'asks whatever onLaundry says (%s), because custody no longer decides',
     async (_label, onLaundry) => {
       await runLoadData(listingEntity({ metadata: { onLaundry } }));
       expect(fetchListingInitialCleaning).toHaveBeenCalledTimes(1);
     }
   );
+
+  // What DOES decide: a studio to ask about. With none assigned there is no turnaround, no
+  // lead time and no gaps - the answer is known without a request.
+  it('does not ask when no laundry is assigned', async () => {
+    await runLoadData(listingEntity({ assignedLaundryId: null }));
+    expect(fetchListingInitialCleaning).not.toHaveBeenCalled();
+  });
 
   it('does not ask for a listing with no booking calendar to move', async () => {
     await runLoadData(listingEntity({ alias: 'default-inquiry/release-1' }));

@@ -8,6 +8,9 @@ const {
 const { stateFromLastTransition } = require('../api-util/coclosetBookingProcess');
 const { handoverStepFor } = require('../api-util/handoverSteps');
 const { createRateLimiter } = require('../api-util/rateLimit');
+const { maxCleaningDaysBeforeNextBooking } = require('../api-util/listingCustody');
+const { resolveNextBookingStart } = require('../api-util/listingCleaningGaps');
+const log = require('../log');
 
 /**
  * GET /api/handover-status?transactionId=<uuid>
@@ -208,36 +211,74 @@ module.exports = (req, res) => {
           }
         : {};
 
-      res
-        .status(200)
-        .set('Content-Type', 'application/json')
-        .send({
-          data: {
-            transactionId,
-            processState,
-            viewerRole,
-            // A step being due is not the same as this caller being able to advance it. Only
-            // the assigned laundry ever gets `true`; the client renders a button off this
-            // field alone, so the rule lives here rather than in the page.
-            canConfirm: viewerRole === ROLE_LAUNDRY && !!step,
-            step: step
-              ? {
-                  state: step.state,
-                  status: step.status,
-                  counterparty: step.counterparty,
-                  direction: step.direction,
-                  isLate: !!step.isLate,
-                }
-              : null,
-            ...defaultCleaningDaysMaybe,
-            takesDamageReport: takesCleaningDays,
-            listingTitle: listing?.attributes?.title || null,
-            bookingStart: booking?.attributes?.displayStart || booking?.attributes?.start || null,
-            bookingEnd: booking?.attributes?.displayEnd || booking?.attributes?.end || null,
-            ticketCode: transaction?.attributes?.metadata?.ticketCode || null,
-          },
-        })
-        .end();
+      // HOW MANY DAYS THE STUDIO MAY ACTUALLY ASK FOR.
+      //
+      //   > "quiza podríamos indicar que ya esta reservado el mismo listing para la próxima
+      //   >  fecha"
+      //
+      // The server clamps regardless (api-util/listingCustody.js `resolveCleaningDays`), so
+      // this is not what enforces the rule - it is what stops a studio typing 4 and silently
+      // getting 2. The date is sent with the number because "you have 2 days" is an
+      // instruction and "it is booked again on the 29th" is the reason for it.
+      //
+      // Resolved ONLY at the return step: it costs a transactions query, while every other
+      // step here answers from data already fetched. A failed lookup sends neither field, and
+      // the page then behaves exactly as it did before this existed - the clamp still applies
+      // where it counts.
+      const nextBookingPromise = takesCleaningDays
+        ? resolveNextBookingStart({
+            integrationSdk: getIntegrationSdk(),
+            listingId: listing?.id?.uuid,
+            after: new Date(),
+            excludeTransactionId: transactionId,
+          }).catch(e => {
+            log.error(e, 'handover-next-booking-lookup-failed', { txId: transactionId });
+            return null;
+          })
+        : Promise.resolve(null);
+
+      return nextBookingPromise.then(nextBookingStart => {
+        const maxCleaningDays = maxCleaningDaysBeforeNextBooking({
+          returnedAt: new Date(),
+          nextBookingStart,
+          timeZone: listing?.attributes?.availabilityPlan?.timezone,
+        });
+        const cleaningCeilingMaybe = Number.isFinite(maxCleaningDays)
+          ? { maxCleaningDays, nextBookingStart: nextBookingStart.toISOString() }
+          : {};
+
+        res
+          .status(200)
+          .set('Content-Type', 'application/json')
+          .send({
+            data: {
+              transactionId,
+              processState,
+              viewerRole,
+              // A step being due is not the same as this caller being able to advance it. Only
+              // the assigned laundry ever gets `true`; the client renders a button off this
+              // field alone, so the rule lives here rather than in the page.
+              canConfirm: viewerRole === ROLE_LAUNDRY && !!step,
+              step: step
+                ? {
+                    state: step.state,
+                    status: step.status,
+                    counterparty: step.counterparty,
+                    direction: step.direction,
+                    isLate: !!step.isLate,
+                  }
+                : null,
+              ...defaultCleaningDaysMaybe,
+              ...cleaningCeilingMaybe,
+              takesDamageReport: takesCleaningDays,
+              listingTitle: listing?.attributes?.title || null,
+              bookingStart: booking?.attributes?.displayStart || booking?.attributes?.start || null,
+              bookingEnd: booking?.attributes?.displayEnd || booking?.attributes?.end || null,
+              ticketCode: transaction?.attributes?.metadata?.ticketCode || null,
+            },
+          })
+          .end();
+      });
     })
     .catch(e => handleError(res, e));
 };

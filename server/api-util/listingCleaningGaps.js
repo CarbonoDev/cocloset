@@ -246,8 +246,51 @@ const liveInitialCleaningDaysFrom = (listing, constraints) =>
     ? null
     : constraints?.liveTurnaroundDays ?? null;
 
+/**
+ * When this garment is next spoken for.
+ *
+ *   > "quiza podríamos indicar que ya esta reservado el mismo listing para la próxima fecha"
+ *
+ * The earliest booking that starts AFTER the given moment, out of the ones still awaiting
+ * their wash. Used at the return counter to cap how long a studio may hold the garment: it
+ * cannot be held past a date somebody has already reserved.
+ *
+ * NULL MEANS "NOTHING BOOKED NEXT", NOT "COULD NOT TELL" - and the two must not be confused,
+ * so a failed read REJECTS rather than resolving null. A caller that treated an outage as "no
+ * ceiling" would let a studio hold a garment straight through a rental somebody has paid for.
+ *
+ * @param {Object} params
+ * @param {Object} params.integrationSdk
+ * @param {string} params.listingId
+ * @param {Date} params.after - typically the return moment
+ * @param {string} [params.excludeTransactionId] - the rental being returned right now
+ * @returns {Promise<Date|null>}
+ */
+const resolveNextBookingStart = ({ integrationSdk, listingId, after, excludeTransactionId }) =>
+  // Promise.resolve() first, so a SYNCHRONOUS failure - an SDK without a `transactions`
+  // property, `getIntegrationSdk()` throwing on missing env vars - reaches the caller's
+  // `.catch` rather than escaping as an exception into a caller that only handles rejections.
+  // Every other Integration API helper on these paths does the same, for the same reason.
+  Promise.resolve()
+    .then(() => queryListingTransactions({ integrationSdk, listingId }))
+    .then(response => {
+      const bookings = collectBookingsAwaitingCleaning({
+        transactions: response?.data?.data || [],
+        included: response?.data?.included || [],
+        excludeTransactionId,
+      });
+
+      const starts = bookings
+        .map(booking => booking.start)
+        .filter(start => start instanceof Date && start.getTime() > after.getTime())
+        .sort((a, b) => a.getTime() - b.getTime());
+
+      return starts.length > 0 ? starts[0] : null;
+    });
+
 module.exports = {
   resolveBookingConstraints,
+  resolveNextBookingStart,
   queryListingTransactions,
   resolveCleaningGapsForListing,
   assertCleaningGapForListing,
