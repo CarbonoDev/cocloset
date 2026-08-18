@@ -190,3 +190,11 @@
   margin: 8px 0 0 0;
   padding: 8px 10px;
 }
+
+/* The studio's own code for the garment, shown to whoever is reading. Quiet: it is a label
+   somebody reads out at a counter, not a status. */
+.laundryCodeLine {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 12px 0 0 0;
+}

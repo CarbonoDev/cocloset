@@ -356,6 +356,11 @@ describe('handover-status: what it discloses', () => {
           'ticketCode',
           'transactionId',
           'viewerRole',
+          // The studio's own code for the garment, and whether THIS step is the one that asks
+          // for it. Both are about where a garment sits on a shelf; neither says anything
+          // about the money, which is what this assertion is really guarding.
+          'laundryCode',
+          'takesLaundryCode',
         ].sort()
       );
     });
