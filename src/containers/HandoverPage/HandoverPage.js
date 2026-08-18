@@ -117,6 +117,13 @@ export const HandoverPageComponent = props => {
   // place decides, and it is the same place that decides whether there is a button.
   const [cleaningDays, setCleaningDays] = useState('');
   const defaultCleaningDays = handover?.defaultCleaningDays;
+  // How many days there is actually room for before this garment's next rental, and the date
+  // that causes it. Absent when nothing is booked next, or when the lookup failed - in either
+  // case there is no ceiling to show and the field behaves as it always did. The server
+  // clamps regardless; this is what stops a studio typing 4 and silently getting 2.
+  const maxCleaningDays = handover?.maxCleaningDays;
+  const nextBookingStart = handover?.nextBookingStart;
+  const hasCleaningCeiling = Number.isInteger(maxCleaningDays);
 
   // The damage report, at the same moment.
   //
@@ -135,8 +142,15 @@ export const HandoverPageComponent = props => {
     // Seeded from the server's answer, and re-seeded when it changes (the page refetches
     // after every confirm). An empty string until it arrives, so the field is never a
     // controlled input flipping to uncontrolled.
-    setCleaningDays(Number.isInteger(defaultCleaningDays) ? String(defaultCleaningDays) : '');
-  }, [defaultCleaningDays]);
+    // Pre-filled with what the studio can actually have: its own turnaround, or the ceiling
+    // when the calendar leaves less room than that. Pre-filling the larger number and letting
+    // the server quietly cut it down is exactly the silence the client asked to remove.
+    const suggested =
+      Number.isInteger(defaultCleaningDays) && Number.isInteger(maxCleaningDays)
+        ? Math.min(defaultCleaningDays, maxCleaningDays)
+        : defaultCleaningDays;
+    setCleaningDays(Number.isInteger(suggested) ? String(suggested) : '');
+  }, [defaultCleaningDays, maxCleaningDays]);
 
   const title = intl.formatMessage({ id: 'HandoverPage.title' });
 
@@ -321,6 +335,7 @@ export const HandoverPageComponent = props => {
                   step="1"
                   inputMode="numeric"
                   value={cleaningDays}
+                  {...(hasCleaningCeiling ? { max: String(maxCleaningDays) } : {})}
                   onChange={e => setCleaningDays(e.target.value)}
                 />
                 <p className={css.cleaningDaysHelp}>
@@ -329,6 +344,23 @@ export const HandoverPageComponent = props => {
                     values={{ days: defaultCleaningDays }}
                   />
                 </p>
+                {/* The reason, not just the number. "You have 2 days" is an instruction;
+                    "it is booked again on the 29th" is why - and it is the thing the studio
+                    can act on, by calling somebody. */}
+                {hasCleaningCeiling ? (
+                  <p className={css.cleaningDaysLimit}>
+                    <FormattedMessage
+                      id="HandoverPage.cleaningDays.nextBooking"
+                      values={{
+                        days: maxCleaningDays,
+                        date: intl.formatDate(new Date(nextBookingStart), {
+                          day: 'numeric',
+                          month: 'short',
+                        }),
+                      }}
+                    />
+                  </p>
+                ) : null}
               </div>
             ) : null}
             {confirmError ? (
@@ -349,8 +381,15 @@ export const HandoverPageComponent = props => {
                   // number. A blank box is NOT a zero: the server reads "absent" as "apply
                   // the configured turnaround", while 0 means "ready today" and would block
                   // nothing at all.
+                  // Clamped here as well as on the server. Not belt-and-braces for its own
+                  // sake: a browser's `max` is advisory on a typed value, and posting 4 to be
+                  // silently stored as 2 is the behaviour this change exists to remove.
                   ...(Number.isInteger(defaultCleaningDays) && /^\d+$/.test(cleaningDays.trim())
-                    ? { cleaningDays: Number.parseInt(cleaningDays, 10) }
+                    ? {
+                        cleaningDays: hasCleaningCeiling
+                          ? Math.min(Number.parseInt(cleaningDays, 10), maxCleaningDays)
+                          : Number.parseInt(cleaningDays, 10),
+                      }
                     : {}),
                   // The note only travels when damage was actually reported: a note left
                   // behind after un-ticking the box would attach a description of damage to a

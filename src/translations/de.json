@@ -508,6 +508,7 @@
   "FilterForm.screenreader.label": "Filterformular. {mode, select, live {Wenn du die Filterwerte änderst, wird die Suchseite sofort aktualisiert.} other {}}",
   "FilterForm.submit": "Anwenden",
   "FilterPlain.clear": "Leeren",
+  "HandoverPage.cleaningDays.nextBooking": "This garment is booked again on {date}, so you have {days, plural, one {# day} other {# days}} to clean it.",
   "IconSpinner.screenreader.loading": "Wird geladen…",
   "ImageCarousel.imageAltText": "Eintragsfoto {index}/{count}",
   "ImageFromFile.couldNotReadFile": "Datei konnte nicht gelesen werden",

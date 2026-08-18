@@ -675,18 +675,32 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
       // could do on the day it was assigned. Booking listings only - there is no calendar
       // to move otherwise.
       //
-      // GATED ON `onLaundry !== true` HERE AS WELL AS SERVER-SIDE. The server returns no
-      // block for a garment that is already at its laundry, so this call would be
-      // harmless - but it would still be a request, and an Integration API read behind it,
-      // on every view of every garment in the marketplace after its first rental. This is
-      // the same condition that makes the rule first-time-only everywhere else.
+      // NO LONGER GATED ON `onLaundry !== true`, AND THAT GATE WAS A BUG.
       //
-      // Awaited as little as the time slots are: not part of the returned promise, because
-      // a slow or failing laundry lookup must not hold up (or fail) the listing page. The
-      // calendar renders with the snapshot and moves to the live floor when the answer
-      // arrives - and OrderPanel only mounts the booking form after hydration anyway.
-      const isAtLaundry = listing?.attributes?.metadata?.onLaundry === true;
-      if (typeof window !== 'undefined' && listing?.id && !isAtLaundry) {
+      // It was right when this call answered one question: the INITIAL cleaning lead time,
+      // which applies only before a garment has ever reached its studio. Skipping the request
+      // for a garment already there saved a round trip and changed nothing.
+      //
+      // The same call now also carries the days blocked by the wash owed after each booking,
+      // the studio's turnaround, and the completed-rental count - none of which are
+      // first-time-only. So the gate quietly meant: THE MOMENT A GARMENT HAS BEEN TO A
+      // LAUNDRY ONCE, ITS CALENDAR STOPS HEARING ABOUT CLEANING DAYS. Which is every garment
+      // after its first rental.
+      //
+      // Reported by the client, and reproduced against Dev: four of seven listings had real
+      // cleaning gaps the page never asked for. The checkout gate still refused those dates -
+      // so no double booking happened - but the picker offered a day the payment would then
+      // decline, which is the exact failure the agreement tests exist to prevent.
+      //
+      // WHAT IT COSTS, PLAINLY: one Integration API read per listing view for any garment
+      // with a studio assigned, rather than only on its first rental. That is the price of a
+      // calendar that tells the truth. Skipped entirely when no laundry is assigned - there
+      // are then no gaps, no turnaround and no lead time to fetch.
+      //
+      // Awaited as little as the time slots are: not part of the returned promise, because a
+      // slow or failing lookup must not hold up (or fail) the listing page.
+      const hasAssignedLaundry = !!listing?.attributes?.metadata?.assignedLaundryId;
+      if (typeof window !== 'undefined' && listing?.id && hasAssignedLaundry) {
         dispatch(fetchInitialCleaningDaysThunk({ listingId: listing.id }));
       }
     }

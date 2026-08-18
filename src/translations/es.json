@@ -508,6 +508,7 @@
   "FilterForm.screenreader.label": "Formulario de filtro. {mode, select, live {Cambiar los valores de los filtros actualizará la página inmediatamente.} other {}}",
   "FilterForm.submit": "OK",
   "FilterPlain.clear": "Borrar",
+  "HandoverPage.cleaningDays.nextBooking": "Esta prenda ya está reservada para el {date}, así que tienes {days, plural, one {# día} other {# días}} para lavarla.",
   "IconSpinner.screenreader.loading": "Cargando...",
   "ImageCarousel.imageAltText": "foto del anuncio {index}/{count}",
   "ImageFromFile.couldNotReadFile": "No se pudo leer el archivo",

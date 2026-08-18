@@ -21,6 +21,7 @@ const {
   MAX_CLEANING_DAYS,
   validateCleaningDays,
   resolveCleaningDays,
+  maxCleaningDaysBeforeNextBooking,
   computeReadiness,
   writeCustodyMetadata,
 } = require('../api-util/listingCustody');
@@ -219,6 +220,7 @@ const handleRealReturn = ({
   turnaroundDays,
   turnaroundSource,
   requestedCleaningDays,
+  transactionId,
   txIdForLog,
 }) => {
   if (!listing) {
@@ -226,14 +228,99 @@ const handleRealReturn = ({
   }
 
   const returnedAt = new Date();
-  const { days: cleaningDays, source: cleaningDaysSource } = resolveCleaningDays({
-    requestedDays: requestedCleaningDays,
-    turnaroundDays,
-  });
   // The listing's own zone, not the server's and not UTC. The days the operator typed are
   // days on the studio's wall calendar; counting them in UTC put the whole window a day out
   // for any studio west of Greenwich confirming a return in the evening.
   const timeZone = listing.attributes?.availabilityPlan?.timezone;
+
+  // HOW LONG THE STUDIO MAY ACTUALLY HOLD IT.
+  //
+  //   > "si alguien hace booking el 29 y la prenda es devuelta el día 26, solo se tienen dos
+  //   >  días para hacer el lavado (...) hay que limitarlo para que no sean mas de esos días"
+  //
+  // A garment already reserved for a date cannot be held past it, so the room left before
+  // that reservation is a ceiling on whatever the studio asks for.
+  //
+  // A FAILED READ IS NOT "NO CEILING". Treating an outage as "hold it as long as you like"
+  // would run a wash straight through a rental somebody has already paid for, so the failure
+  // is logged and the clamp simply does not apply - the least-bad of two wrong answers, and
+  // the same direction the other best-effort reads on this path err in.
+  return Promise.resolve()
+    .then(() =>
+      resolveNextBookingStart({
+        integrationSdk,
+        listingId: listing.id?.uuid,
+        after: returnedAt,
+        excludeTransactionId: transactionId,
+      })
+    )
+    .catch(e => {
+      log.error(e, 'next-booking-lookup-failed', { txId: txIdForLog, message: e?.message });
+      return null;
+    })
+    .then(nextBookingStart => {
+      const maxCleaningDays = maxCleaningDaysBeforeNextBooking({
+        returnedAt,
+        nextBookingStart,
+        timeZone,
+      });
+
+      const {
+        days: cleaningDays,
+        source: cleaningDaysSource,
+        requestedDays: uncappedCleaningDays,
+        cappedByNextBooking,
+      } = resolveCleaningDays({
+        requestedDays: requestedCleaningDays,
+        turnaroundDays,
+        maxDays: maxCleaningDays,
+      });
+
+      if (cappedByNextBooking) {
+        // Worth a line in the log: a garment has gone back on the market without the wash its
+        // studio asked for, because the calendar left no room. Nobody did anything wrong -
+        // this is the rule the client chose - but it is the sort of thing somebody will one
+        // day need to explain.
+        log.error(new Error('Cleaning days capped by the next booking'), 'cleaning-days-capped', {
+          txId: txIdForLog,
+          requested: uncappedCleaningDays,
+          allowed: cleaningDays,
+          nextBookingStart: nextBookingStart ? nextBookingStart.toISOString() : null,
+        });
+      }
+
+      return writeReadiness({
+        integrationSdk,
+        listing,
+        returnedAt,
+        timeZone,
+        cleaningDays,
+        cleaningDaysSource,
+        turnaroundSource,
+        maxCleaningDays,
+        cappedByNextBooking,
+        uncappedCleaningDays,
+        txIdForLog,
+      });
+    });
+};
+
+// The custody and calendar writes. Split out of handleRealReturn only so the ceiling lookup
+// above reads as one step instead of nesting this whole body another level deep; the behaviour
+// is unchanged.
+const writeReadiness = ({
+  integrationSdk,
+  listing,
+  returnedAt,
+  timeZone,
+  cleaningDays,
+  cleaningDaysSource,
+  turnaroundSource,
+  maxCleaningDays,
+  cappedByNextBooking,
+  uncappedCleaningDays,
+  txIdForLog,
+}) => {
   const { readyAt, blockWindow } = computeReadiness({ returnedAt, cleaningDays, timeZone });
 
   // Custody first, availability second. Custody is the fact the client asked to
@@ -279,6 +366,13 @@ const handleRealReturn = ({
       readyAt: readyAt.toISOString(),
       cleaningDays,
       cleaningDaysSource,
+      // What the studio asked for before the next booking cut it short, and the ceiling that
+      // did the cutting. Absent when nothing was capped, so a caller cannot mistake a normal
+      // return for one that was shortened.
+      ...(cappedByNextBooking
+        ? { requestedCleaningDays: uncappedCleaningDays, cappedByNextBooking: true }
+        : {}),
+      ...(Number.isFinite(maxCleaningDays) ? { maxCleaningDays } : {}),
       // Only meaningful when the days were NOT supplied by the laundry: it says
       // which rung of the fallback chain the default came from ('category' - the
       // days this studio set for this garment's top-level category, 'studio' -
@@ -478,6 +572,7 @@ module.exports = (req, res) => {
             turnaroundDays: laundry.turnaroundDays,
             turnaroundSource: laundry.turnaroundSource,
             requestedCleaningDays: cleaningDaysCheck.value,
+            transactionId: txIdForLog,
             txIdForLog,
           })
         : Promise.resolve(null);

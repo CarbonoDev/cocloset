@@ -179,3 +179,14 @@
   color: var(--coclosetInk);
   resize: vertical;
 }
+
+/* Why the cleaning box is capped: the garment is already reserved for a date. Set apart from
+   the ordinary help text below the field, because this is a constraint rather than a hint. */
+.cleaningDaysLimit {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetToneAmberFg);
+  background-color: var(--coclosetToneAmberBg);
+  border-radius: 8px;
+  margin: 8px 0 0 0;
+  padding: 8px 10px;
+}
