@@ -10,6 +10,7 @@ const { handoverStepFor } = require('../api-util/handoverSteps');
 const { createRateLimiter } = require('../api-util/rateLimit');
 const { maxCleaningDaysBeforeNextBooking } = require('../api-util/listingCustody');
 const { resolveNextBookingStart } = require('../api-util/listingCleaningGaps');
+const { TRANSACTION_CODE_KEY, takesLaundryCode } = require('../api-util/laundryCode');
 const log = require('../log');
 
 /**
@@ -275,6 +276,21 @@ module.exports = (req, res) => {
               bookingStart: booking?.attributes?.displayStart || booking?.attributes?.start || null,
               bookingEnd: booking?.attributes?.displayEnd || booking?.attributes?.end || null,
               ticketCode: transaction?.attributes?.metadata?.ticketCode || null,
+              // THE STUDIO'S OWN CODE FOR THIS GARMENT.
+              //
+              //   > "ese código se le debe mostrar a todas las partes de la transacción"
+              //
+              // Read off the TRANSACTION, not the listing, and sent to all three roles. The
+              // transaction's copy is the one that is true for this rental: a garment that
+              // has since moved to another studio carries a different code on the listing,
+              // and showing that here would name a shelf in a building nobody is going to.
+              laundryCode: transaction?.attributes?.metadata?.[TRANSACTION_CODE_KEY] || null,
+              // Whether THIS step is the one that asks for it. The reception from the owner,
+              // and only that: it is when the garment is physically on the counter and about
+              // to go onto a shelf. Its own flag rather than something the page infers from
+              // the status string, matching `takesDamageReport` - a client that re-derives a
+              // server rule is a client that breaks silently when the rule moves.
+              takesLaundryCode: viewerRole === ROLE_LAUNDRY && takesLaundryCode(step?.status),
             },
           })
           .end();

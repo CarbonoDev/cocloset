@@ -116,11 +116,18 @@ export const HandoverPageComponent = props => {
   // `defaultCleaningDays` only for the laundry, and only at the step that consumes it. One
   // place decides, and it is the same place that decides whether there is a button.
   const [cleaningDays, setCleaningDays] = useState('');
+  // Pre-filled with whatever this garment already carries, so a studio re-confirming a step
+  // is not asked to remember its own code.
+  const [codeInput, setCodeInput] = useState('');
   const defaultCleaningDays = handover?.defaultCleaningDays;
   // How many days there is actually room for before this garment's next rental, and the date
   // that causes it. Absent when nothing is booked next, or when the lookup failed - in either
   // case there is no ceiling to show and the field behaves as it always did. The server
   // clamps regardless; this is what stops a studio typing 4 and silently getting 2.
+  // The studio's own code for this garment, and whether this step is the one that asks for
+  // it. Both decided by the server: see server/api-util/laundryCode.js.
+  const laundryCode = handover?.laundryCode;
+  const takesLaundryCode = handover?.takesLaundryCode === true;
   const maxCleaningDays = handover?.maxCleaningDays;
   const nextBookingStart = handover?.nextBookingStart;
   const hasCleaningCeiling = Number.isInteger(maxCleaningDays);
@@ -151,6 +158,10 @@ export const HandoverPageComponent = props => {
         : defaultCleaningDays;
     setCleaningDays(Number.isInteger(suggested) ? String(suggested) : '');
   }, [defaultCleaningDays, maxCleaningDays]);
+
+  useEffect(() => {
+    setCodeInput(typeof laundryCode === 'string' ? laundryCode : '');
+  }, [laundryCode]);
 
   const title = intl.formatMessage({ id: 'HandoverPage.title' });
 
@@ -322,6 +333,29 @@ export const HandoverPageComponent = props => {
               </div>
             ) : null}
 
+            {/* THE STUDIO'S OWN CODE, asked for at the one step where the garment is
+                physically on the counter coming IN from its owner.
+                  > "cuando laundry recibe la prenda desde el provider, debe aparecer un input
+                  >  para que laundry pueda ingresar un código interno para esa prenda" */}
+            {takesLaundryCode ? (
+              <div className={css.cleaningDaysField}>
+                <label className={css.cleaningDaysLabel} htmlFor="handoverLaundryCode">
+                  <FormattedMessage id="HandoverPage.laundryCode.label" />
+                </label>
+                <input
+                  id="handoverLaundryCode"
+                  className={css.cleaningDaysInput}
+                  type="text"
+                  maxLength={40}
+                  value={codeInput}
+                  onChange={e => setCodeInput(e.target.value)}
+                />
+                <p className={css.cleaningDaysHelp}>
+                  <FormattedMessage id="HandoverPage.laundryCode.help" />
+                </p>
+              </div>
+            ) : null}
+
             {Number.isInteger(defaultCleaningDays) ? (
               <div className={css.cleaningDaysField}>
                 <label className={css.cleaningDaysLabel} htmlFor="handoverCleaningDays">
@@ -363,6 +397,16 @@ export const HandoverPageComponent = props => {
                 ) : null}
               </div>
             ) : null}
+            {/* Shown to all three roles, at every step, once the garment has one.
+                  > "ese código se le debe mostrar a todas las partes de la transacción" */}
+            {laundryCode ? (
+              <p className={css.laundryCodeLine}>
+                <FormattedMessage
+                  id="HandoverPage.laundryCode.value"
+                  values={{ code: laundryCode }}
+                />
+              </p>
+            ) : null}
             {confirmError ? (
               <p className={css.error}>
                 <FormattedMessage id="HandoverPage.error.confirmFailed" />
@@ -390,6 +434,13 @@ export const HandoverPageComponent = props => {
                           ? Math.min(Number.parseInt(cleaningDays, 10), maxCleaningDays)
                           : Number.parseInt(cleaningDays, 10),
                       }
+                    : {}),
+                  // Only at the step that takes it, and only when something was typed. A
+                  // blank box is "not decided yet" rather than "clear the code": the server
+                  // reads an absent value as "leave it alone", so a studio confirming a step
+                  // without touching the field cannot wipe a code it set earlier.
+                  ...(takesLaundryCode && codeInput.trim() !== ''
+                    ? { laundryCode: codeInput.trim() }
                     : {}),
                   // The note only travels when damage was actually reported: a note left
                   // behind after un-ticking the box would attach a description of damage to a

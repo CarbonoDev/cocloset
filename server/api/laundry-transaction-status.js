@@ -14,6 +14,13 @@ const { buildTicketCode } = require('../api-util/ticketCodeHelpers');
 const { resolveTurnaroundDays } = require('../api-util/availabilityHelpers');
 const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
 const {
+  LISTING_CODE_KEY,
+  MAX_CODE_LENGTH,
+  TRANSACTION_CODE_KEY,
+  buildListingCodeRecord,
+  validateLaundryCode,
+} = require('../api-util/laundryCode');
+const {
   getListingCategoryValues,
   resolveTurnaroundDaysEntry,
 } = require('../api-util/categoryPricing');
@@ -66,7 +73,13 @@ const log = require('../log');
 //   damageNote,              // optional string  - only read at status 'returned'
 //   cleaningDays,            // optional integer - only read at status 'returned';
 //                            //   defaults to the laundry's configured turnaround
-//                            //   for this garment's category
+//                            //   for this garment's category, and is capped by the
+//                            //   garment's next booking (see listingCustody.js)
+//   laundryCode,             // optional string  - only read at status 'ready-for-pickup',
+//                            //   the studio's own code for the garment. Written to the
+//                            //   transaction (so both parties see it) AND to the listing,
+//                            //   stamped with the studio that issued it. See
+//                            //   api-util/laundryCode.js.
 // }
 //
 // `status` rather than a transition name is deliberate. It is what makes the
@@ -119,6 +132,7 @@ const buildTransitionMetadata = ({
   studioName,
   txIdForLog,
   existingTicketCode,
+  laundryCode,
 }) => {
   const metadata = {};
 
@@ -148,6 +162,25 @@ const buildTransitionMetadata = ({
     const currentRack = listing?.attributes?.privateData?.currentRack;
     if (currentRack) {
       metadata.currentRack = currentRack;
+    }
+
+    // THE STUDIO'S OWN CODE FOR THIS GARMENT, typed at the counter as it takes delivery.
+    //
+    //   > "cuando laundry recibe la prenda desde el provider, debe aparecer un input para que
+    //   >  laundry pueda ingresar un código interno para esa prenda, ese código se le debe
+    //   >  mostrar a todas las partes de la transacción"
+    //
+    // On the TRANSACTION it is a plain string, and that is what makes it visible to both
+    // parties: transaction metadata rides along on every `transactions.show` for a party,
+    // while the listing record it is also written to is not something a customer can read
+    // usefully. It also makes a finished rental honest - it keeps the code that was true while
+    // it ran, even after the garment has moved to another studio and been given a new one.
+    //
+    // Absent when the studio did not type one. See validateLaundryCode for why that is allowed
+    // rather than refused: a garment physically on the counter must not be stuck in the app
+    // because nobody has decided where it goes yet.
+    if (laundryCode) {
+      metadata[TRANSACTION_CODE_KEY] = laundryCode;
     }
   }
 
@@ -385,7 +418,7 @@ const writeReadiness = ({
 };
 
 module.exports = (req, res) => {
-  const { transactionId, status, damaged, damageNote, cleaningDays } = req.body || {};
+  const { transactionId, status, damaged, damageNote, cleaningDays, laundryCode } = req.body || {};
   const txIdForLog = transactionId?.uuid || transactionId || 'unknown';
 
   if (!transactionId) {
@@ -419,6 +452,20 @@ module.exports = (req, res) => {
         error:
           'Invalid "cleaningDays" in request body. Must be an integer between 0 and ' +
           `${MAX_CLEANING_DAYS}.`,
+      })
+      .end();
+    return;
+  }
+
+  // Same treatment as `cleaningDays`, and for the same reason: the transition is irreversible
+  // once fired, so a malformed value has to be a 400 up front rather than something quietly
+  // dropped afterwards with no way to correct it.
+  const laundryCodeCheck = validateLaundryCode(laundryCode);
+  if (!laundryCodeCheck.valid) {
+    res
+      .status(400)
+      .json({
+        error: `Invalid "laundryCode" in request body. Must be a string of at most ${MAX_CODE_LENGTH} characters.`,
       })
       .end();
     return;
@@ -492,6 +539,7 @@ module.exports = (req, res) => {
           studioName: laundry.studioName,
           txIdForLog,
           existingTicketCode: data.attributes?.metadata?.ticketCode,
+          laundryCode: laundryCodeCheck.value,
         });
 
         return integrationSdk.transactions
@@ -516,6 +564,46 @@ module.exports = (req, res) => {
       const garmentTitle = listing?.attributes?.title;
       const ticketCode = storedMetadata?.ticketCode;
       const customerName = customer?.attributes?.profile?.displayName;
+
+      // THE GARMENT'S OWN COPY OF THE CODE.
+      //
+      //   > "ese código (...) debe guardarse tambien en el metadata del listing"
+      //
+      // Written AFTER the transition, and fire-and-continue like everything else here: the
+      // transition has already succeeded, and failing the request over a listing write would
+      // make the ops UI retry a step Sharetribe now answers 409 for. The transaction already
+      // carries the code, so the parties see it either way; what a failure here costs is the
+      // GARMENT's copy, which is what the next rental at this studio would have inherited.
+      //
+      // STAMPED WITH THE STUDIO THAT ISSUED IT. The code names a place on one studio's
+      // shelving and means nothing at another, so the record carries `laundryId` and readers
+      // ignore it once the garment is assigned elsewhere - see api-util/laundryCode.js
+      // `currentLaundryCodeFor`. That is also the answer to "several codes or replace the
+      // same one": replace, but keep the issuer, because a bare string cannot be told apart
+      // from a dead one.
+      if (laundryCodeCheck.value && listing?.id) {
+        Promise.resolve()
+          .then(() =>
+            integrationSdk.listings.update(
+              {
+                id: listing.id,
+                metadata: {
+                  [LISTING_CODE_KEY]: buildListingCodeRecord({
+                    code: laundryCodeCheck.value,
+                    laundryId: readAssignedLaundryId(listing),
+                  }),
+                },
+              },
+              { expand: true }
+            )
+          )
+          .catch(e => {
+            log.error(e, 'laundry-code-listing-write-failed', {
+              txId: txIdForLog,
+              message: e?.message,
+            });
+          });
+      }
 
       // ---- Fire-and-continue side effects ---------------------------------
       // The try/catch is not belt-and-braces. api-util/laundryMailer.js is
@@ -590,6 +678,12 @@ module.exports = (req, res) => {
               transition,
               state: newState,
               ...(ticketCode ? { ticketCode } : {}),
+              // Echoed back for the same reason `ticketCode` is: the caller typed it, and a
+              // confirmation that says what was stored is worth more than one that says
+              // "done". Read off what the API actually kept, not off what we sent.
+              ...(storedMetadata?.[TRANSACTION_CODE_KEY]
+                ? { laundryCode: storedMetadata[TRANSACTION_CODE_KEY] }
+                : {}),
               ...(storedMetadata?.damageReported
                 ? { damageReported: storedMetadata.damageReported }
                 : {}),
