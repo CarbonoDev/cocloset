@@ -163,19 +163,25 @@ describe('InboxPage', () => {
         expect(salesTabTitle).toBeInTheDocument();
         expect(salesTabTitle.getAttribute('href')).toContain('/inbox/sales');
 
-        // Has 2 items
-        const items = screen.queryAllByRole('link', { name: /listing1/i });
+        // Has 2 items. BUTTONS, not links, and that is the redesign: selecting a rental
+        // opens the detail beside this list rather than navigating away from it
+        // ("al seleccionar uno, abre el detalle de la transacción sin ocultar el listado").
+        // The route to the page that can ACT on a rental now lives in that panel - see the
+        // note at the top of InboxTransactionPanel.js for why it had to be given back.
+        const items = screen.queryAllByRole('button', { name: /listing1/i });
         expect(items).toHaveLength(2);
 
         const item1 = items[0];
-        expect(item1.getAttribute('href')).toContain('/order/order1');
         const status1 = within(item1).getByText('InboxPage.default-purchase.purchased.status');
         expect(status1).toBeInTheDocument();
 
         const item2 = items[1];
-        expect(item2.getAttribute('href')).toContain('/order/order2');
         const status2 = within(item2).getByText('InboxPage.default-purchase.purchased.status');
         expect(status2).toBeInTheDocument();
+
+        // Nothing is open yet, so the reader is told what to do rather than shown a blank
+        // column.
+        expect(screen.getByText('InboxPage.selectATransaction')).toBeInTheDocument();
       });
     });
 
@@ -261,16 +267,15 @@ describe('InboxPage', () => {
         expect(salesTabTitle.getAttribute('href')).toContain('/inbox/sales');
 
         // Has 2 items
-        const items = screen.queryAllByRole('link', { name: /listing1/i });
+        // Buttons, not links - see the note on the orders case above.
+        const items = screen.queryAllByRole('button', { name: /listing1/i });
         expect(items).toHaveLength(2);
 
         const item1 = items[0];
-        expect(item1.getAttribute('href')).toContain('/sale/sale1');
         const status1 = within(item1).getByText('InboxPage.default-purchase.purchased.status');
         expect(status1).toBeInTheDocument();
 
         const item2 = items[1];
-        expect(item2.getAttribute('href')).toContain('/sale/sale2');
         const status2 = within(item2).getByText('InboxPage.default-purchase.purchased.status');
         expect(status2).toBeInTheDocument();
       });

@@ -2,6 +2,7 @@ import React from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../util/reactIntl';
+import { RENTAL_TIMELINE_STEPS } from '../../util/rentalTimeline';
 
 import css from './ListingPage.module.css';
 
@@ -23,21 +24,16 @@ import css from './ListingPage.module.css';
  * and there is no booking yet. Every step is drawn the same way, deliberately - a highlighted
  * "current" step would be a lie about a rental that does not exist.
  *
+ * THE LIST ITSELF LIVES IN util/rentalTimeline.js, because the inbox marks the SAME eight
+ * steps against a real rental. Two copies would drift the first time a step was renamed, and
+ * the two surfaces sit one click apart - a reader told about "Returned to laundry" here and
+ * something else there has been told about two things.
+ *
  * @component
  * @param {Object} props
  * @param {string} [props.className]
  * @returns {JSX.Element}
  */
-const STEPS = [
-  'bookingConfirmed',
-  'laundryPreparing',
-  'readyForPickup',
-  'pickedUp',
-  'rentalActive',
-  'returnedToLaundry',
-  'cleaning',
-  'readyForNextRental',
-];
 
 const SectionRentalTimeline = props => {
   const { className } = props;
@@ -48,12 +44,12 @@ const SectionRentalTimeline = props => {
         <FormattedMessage id="ListingPage.rentalTimelineTitle" />
       </h2>
       <ol className={css.timelineSteps}>
-        {STEPS.map((step, index) => (
-          <li key={step} className={css.timelineStep}>
+        {RENTAL_TIMELINE_STEPS.map((step, index) => (
+          <li key={step.key} className={css.timelineStep}>
             <span className={css.timelineStepNumber} aria-hidden="true">
               {index + 1}
             </span>
-            <FormattedMessage id={`ListingPage.rentalTimeline.${step}`} />
+            <FormattedMessage id={`ListingPage.rentalTimeline.${step.key}`} />
           </li>
         ))}
       </ol>

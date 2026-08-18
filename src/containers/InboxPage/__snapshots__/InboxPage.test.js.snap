@@ -19,9 +19,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-ACCEPT-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -64,7 +64,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -87,9 +87,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-CANCEL-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -132,7 +132,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -155,9 +155,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-COMPLETE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -200,7 +200,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -223,9 +223,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-CONFIRM_PAYMENT-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -272,7 +272,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -295,9 +295,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-DECLINE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -340,7 +340,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -363,9 +363,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-EXPIRE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -408,7 +408,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -431,9 +431,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-EXPIRE_CUSTOMER_REVIEW_PERIOD-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -476,7 +476,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -499,9 +499,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-EXPIRE_PAYMENT-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -544,7 +544,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -567,9 +567,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-EXPIRE_PROVIDER_REVIEW_PERIOD-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -612,7 +612,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -635,9 +635,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-EXPIRE_REVIEW_PERIOD-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -680,7 +680,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -703,9 +703,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-INQUIRE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -738,7 +738,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -761,9 +761,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-OPERATOR_ACCEPT-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -806,7 +806,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -829,9 +829,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-OPERATOR_COMPLETE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -874,7 +874,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -897,9 +897,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-OPERATOR_DECLINE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -942,7 +942,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -965,9 +965,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-REQUEST_PAYMENT-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1010,7 +1010,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1033,9 +1033,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-REQUEST_PAYMENT_AFTER_INQUIRY-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1078,7 +1078,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1101,9 +1101,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-REVIEW_1_BY_CUSTOMER-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1146,7 +1146,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1169,9 +1169,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-REVIEW_1_BY_PROVIDER-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1214,7 +1214,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1237,9 +1237,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-REVIEW_2_BY_CUSTOMER-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1282,7 +1282,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1305,9 +1305,9 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-booking-REVIEW_2_BY_PROVIDER-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1350,7 +1350,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1373,9 +1373,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-ACCEPT-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1418,7 +1418,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1441,9 +1441,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-CANCEL-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1486,7 +1486,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1509,9 +1509,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-COMPLETE-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1554,7 +1554,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1577,9 +1577,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-CONFIRM_PAYMENT-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1622,7 +1622,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1645,9 +1645,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-DECLINE-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1690,7 +1690,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1713,9 +1713,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-EXPIRE-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1758,7 +1758,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1781,9 +1781,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-EXPIRE_CUSTOMER_REVIEW_PERIOD-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1826,7 +1826,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1849,9 +1849,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-EXPIRE_PAYMENT-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1894,7 +1894,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1917,9 +1917,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-EXPIRE_PROVIDER_REVIEW_PERIOD-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -1962,7 +1962,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -1985,9 +1985,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-EXPIRE_REVIEW_PERIOD-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2030,7 +2030,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2053,9 +2053,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-INQUIRE-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2088,7 +2088,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2111,9 +2111,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-OPERATOR_ACCEPT-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2156,7 +2156,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2179,9 +2179,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-OPERATOR_COMPLETE-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2224,7 +2224,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2247,9 +2247,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-OPERATOR_DECLINE-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2292,7 +2292,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2315,9 +2315,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-REQUEST_PAYMENT-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2360,7 +2360,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2383,9 +2383,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-REQUEST_PAYMENT_AFTER_INQUIRY-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2428,7 +2428,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2451,9 +2451,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-REVIEW_1_BY_CUSTOMER-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2496,7 +2496,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2519,9 +2519,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-REVIEW_1_BY_PROVIDER-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2564,7 +2564,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2587,9 +2587,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-REVIEW_2_BY_CUSTOMER-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2632,7 +2632,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2655,9 +2655,9 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-booking-REVIEW_2_BY_PROVIDER-order"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2700,7 +2700,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2723,9 +2723,9 @@ exports[`InboxPage InboxItem: default-inquiry process with "inquiry" item check 
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-inquiry-INQUIRE_WITHOUT_PAYMENT-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2758,7 +2758,7 @@ exports[`InboxPage InboxItem: default-inquiry process with "inquiry" item check 
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2781,9 +2781,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-ACCEPT_DELIVERABLE-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2816,7 +2816,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2839,9 +2839,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-ACCEPT_UPDATE-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2874,7 +2874,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2897,9 +2897,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-AUTO_ACCEPT_DELIVERABLE-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2932,7 +2932,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -2955,9 +2955,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-AUTO_CANCEL-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -2990,7 +2990,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3013,9 +3013,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-AUTO_CANCEL_FROM_CHANGES_REQUESTED-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3048,7 +3048,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3071,9 +3071,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-CONFIRM_PAYMENT-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3106,7 +3106,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3129,9 +3129,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-CUSTOMER_MAKE_COUNTER_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3164,7 +3164,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3187,9 +3187,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-CUSTOMER_REJECT_FROM_UPDATE_PENDING-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3222,7 +3222,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3245,9 +3245,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-CUSTOMER_REJECT_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3280,7 +3280,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3303,9 +3303,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-CUSTOMER_WITHDRAW_COUNTER_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3338,7 +3338,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3361,9 +3361,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-DELIVER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3396,7 +3396,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3419,9 +3419,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-DELIVER_CHANGES-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3454,7 +3454,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3477,9 +3477,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-EXPIRE_CUSTOMER_REVIEW_PERIOD-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3512,7 +3512,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3535,9 +3535,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-EXPIRE_PAYMENT-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3570,7 +3570,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3593,9 +3593,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-EXPIRE_PROVIDER_REVIEW_PERIOD-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3628,7 +3628,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3651,9 +3651,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-EXPIRE_REVIEW_PERIOD-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3686,7 +3686,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3709,9 +3709,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-INQUIRE-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3744,7 +3744,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3767,9 +3767,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-MAKE_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3802,7 +3802,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3825,9 +3825,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-MAKE_OFFER_AFTER_INQUIRY-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3860,7 +3860,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3883,9 +3883,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-MAKE_OFFER_FROM_REQUEST-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3918,7 +3918,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3941,9 +3941,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_ACCEPT_DELIVERABLE-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -3976,7 +3976,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -3999,9 +3999,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_ACCEPT_UPDATE-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4034,7 +4034,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4057,9 +4057,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_CANCEL-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4092,7 +4092,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4115,9 +4115,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_CANCEL_FROM_CHANGES_REQUESTED-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4150,7 +4150,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4173,9 +4173,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_CANCEL_FROM_DELIVERED-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4208,7 +4208,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4231,9 +4231,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_MARK_CHANGES_DELIVERED-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4266,7 +4266,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4289,9 +4289,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_MARK_DELIVERED-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4324,7 +4324,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4347,9 +4347,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_REJECT_FROM_CUSTOMER_COUNTER_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4382,7 +4382,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4405,9 +4405,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_REJECT_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4440,7 +4440,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4463,9 +4463,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_REJECT_REQUEST-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4498,7 +4498,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4521,9 +4521,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-OPERATOR_REQUEST_CHANGES-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4556,7 +4556,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4579,9 +4579,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-PROVIDER_ACCEPT_COUNTER_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4614,7 +4614,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4637,9 +4637,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-PROVIDER_MAKE_COUNTER_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4672,7 +4672,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4695,9 +4695,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-PROVIDER_REJECT_COUNTER_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4730,7 +4730,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4753,9 +4753,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-PROVIDER_WITHDRAW_FROM_UPDATE_PENDING-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4788,7 +4788,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4811,9 +4811,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-PROVIDER_WITHDRAW_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4846,7 +4846,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4869,9 +4869,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-REJECT_REQUEST-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4904,7 +4904,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4927,9 +4927,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-REQUEST_CHANGES-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -4962,7 +4962,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -4985,9 +4985,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-REQUEST_PAYMENT_TO_ACCEPT_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5020,7 +5020,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5043,9 +5043,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-REQUEST_QUOTE-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5078,7 +5078,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5101,9 +5101,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-REVIEW_1_BY_CUSTOMER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5136,7 +5136,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5159,9 +5159,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-REVIEW_1_BY_PROVIDER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5194,7 +5194,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5217,9 +5217,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-REVIEW_2_BY_CUSTOMER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5252,7 +5252,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5275,9 +5275,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-REVIEW_2_BY_PROVIDER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5310,7 +5310,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5333,9 +5333,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-UPDATE_FROM_UPDATE_PENDING-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5368,7 +5368,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5391,9 +5391,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-UPDATE_OFFER-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5426,7 +5426,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5449,9 +5449,9 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/order/id-negotiation-WITHDRAW_REQUEST-request"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5484,7 +5484,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5507,9 +5507,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" InboxItem wit
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/oneItem-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5546,7 +5546,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" InboxItem wit
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5569,9 +5569,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-AUTO_CANCEL-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5608,7 +5608,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5631,9 +5631,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-AUTO_CANCEL_FROM_DISPUTED-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5670,7 +5670,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5693,9 +5693,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-AUTO_COMPLETE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5732,7 +5732,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5755,9 +5755,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-AUTO_MARK_RECEIVED-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5794,7 +5794,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5817,9 +5817,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-CANCEL-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5856,7 +5856,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5879,9 +5879,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-CANCEL_FROM_DISPUTED-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5918,7 +5918,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -5941,9 +5941,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-CONFIRM_PAYMENT-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -5984,7 +5984,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6007,9 +6007,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-DISPUTE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6046,7 +6046,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6069,9 +6069,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-EXPIRE_CUSTOMER_REVIEW_PERIOD-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6108,7 +6108,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6131,9 +6131,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-EXPIRE_PAYMENT-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6170,7 +6170,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6193,9 +6193,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-EXPIRE_PROVIDER_REVIEW_PERIOD-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6232,7 +6232,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6255,9 +6255,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-EXPIRE_REVIEW_PERIOD-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6294,7 +6294,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6317,9 +6317,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-INQUIRE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6352,7 +6352,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6375,9 +6375,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-MARK_DELIVERED-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6414,7 +6414,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6437,9 +6437,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-MARK_RECEIVED-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6476,7 +6476,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6499,9 +6499,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-MARK_RECEIVED_FROM_DISPUTED-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6538,7 +6538,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6561,9 +6561,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-MARK_RECEIVED_FROM_PURCHASED-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6600,7 +6600,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6623,9 +6623,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-OPERATOR_DISPUTE-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6662,7 +6662,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6685,9 +6685,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-OPERATOR_MARK_DELIVERED-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6724,7 +6724,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6747,9 +6747,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-REQUEST_PAYMENT-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6786,7 +6786,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6809,9 +6809,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-REQUEST_PAYMENT_AFTER_INQUIRY-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6848,7 +6848,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6871,9 +6871,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-REVIEW_1_BY_CUSTOMER-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6910,7 +6910,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6933,9 +6933,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-REVIEW_1_BY_PROVIDER-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -6972,7 +6972,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -6995,9 +6995,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-REVIEW_2_BY_CUSTOMER-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -7034,7 +7034,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
 
@@ -7057,9 +7057,9 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </a>
   </div>
-  <a
-    class="itemLink"
-    href="/sale/id-purchase-REVIEW_2_BY_PROVIDER-sale"
+  <button
+    class="itemLink itemButton"
+    type="button"
   >
     <div
       class="rowNotificationDot"
@@ -7096,6 +7096,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
         </span>
       </div>
     </div>
-  </a>
+  </button>
 </div>
 `;
