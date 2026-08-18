@@ -70,6 +70,10 @@ const loadDataPayloadCreator = ({ params, search }, { dispatch, rejectWithValue,
     processNames,
     include: [
       'listing',
+      // Cocloset: the garment's photo, for the list and for the detail header. The inbox is a
+      // wardrobe now, not a message list - a row without the garment on it is unreadable at a
+      // glance, which is the whole reason the design puts a thumbnail on every one.
+      'listing.images',
       'provider',
       'provider.profileImage',
       'customer',
@@ -84,6 +88,10 @@ const loadDataPayloadCreator = ({ params, search }, { dispatch, rejectWithValue,
       'payinTotal',
       'payoutTotal',
       'lineItems',
+      // Cocloset: the ticket the counter goes by, and the studio's own code for the garment.
+      // `fields.transaction` is an ALLOWLIST - without this the detail panel would render
+      // those two rows blank on every rental, with nothing anywhere saying why.
+      'metadata',
     ],
     'fields.listing': [
       'title',
@@ -91,9 +99,21 @@ const loadDataPayloadCreator = ({ params, search }, { dispatch, rejectWithValue,
       'publicData.listingType',
       'publicData.transactionProcessAlias',
       'publicData.unitType',
+      // Cocloset: what the detail panel actually shows - the brand above the title, and where
+      // the garment is collected. Same allowlist trap as above.
+      'publicData.brand',
+      'publicData.assignedLaundryName',
+      'publicData.pickupAddress',
     ],
     'fields.user': ['profile.displayName', 'profile.abbreviatedName', 'deleted', 'banned'],
-    'fields.image': ['variants.square-small', 'variants.square-small2x'],
+    'fields.image': [
+      'variants.square-small',
+      'variants.square-small2x',
+      // The garment thumbnails. The two square variants above are avatar-sized and are what
+      // the stock inbox used for the counterparty's photo; a garment needs a real one.
+      'variants.listing-card',
+      'variants.listing-card-2x',
+    ],
     page,
     perPage: INBOX_PAGE_SIZE,
     ...getValidInboxSort(sort),

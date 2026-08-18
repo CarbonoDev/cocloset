@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation, useHistory } from 'react-router-dom';
 import { compose } from 'redux';
 import { connect } from 'react-redux';
@@ -8,7 +8,7 @@ import { useConfiguration } from '../../context/configurationContext';
 import { useRouteConfiguration } from '../../context/routeConfigurationContext';
 
 import { FormattedMessage, intlShape, useIntl } from '../../util/reactIntl';
-import { parse } from '../../util/urlHelpers';
+import { parse, stringify } from '../../util/urlHelpers';
 import { getCurrentUserTypeRoles } from '../../util/userHelpers';
 import {
   propTypes,
@@ -22,6 +22,8 @@ import {
   LINE_ITEM_FIXED,
 } from '../../util/types';
 import { subtractTime } from '../../util/dates';
+
+import InboxTransactionPanel from './InboxTransactionPanel';
 import { createResourceLocatorString } from '../../util/routes';
 import {
   TX_TRANSITION_ACTOR_CUSTOMER,
@@ -42,6 +44,7 @@ import {
   NotificationBadge,
   Page,
   PaginationLinks,
+  ResponsiveImage,
   TabNav,
   IconSpinner,
   TimeRange,
@@ -161,6 +164,9 @@ export const InboxItem = props => {
     isPurchase,
     availabilityType,
     stockType = STOCK_MULTIPLE_ITEMS,
+    // Cocloset: selecting opens the detail beside the list rather than navigating to it.
+    isSelected,
+    onSelect,
   } = props;
   const { customer, provider, listing } = tx;
   const {
@@ -195,14 +201,32 @@ export const InboxItem = props => {
   });
 
   return (
-    <div className={css.item}>
+    <div className={classNames(css.item, { [css.itemSelected]: isSelected })}>
+      {/* THE GARMENT, NOT THE COUNTERPARTY.
+            The stock row leads with the other person's avatar, which is right for a
+            marketplace where the conversation is the thing. Here the reader is scanning their
+            own wardrobe: the design leads with the piece, and a column of identical avatars
+            would be unreadable at a glance. */}
       <div className={css.itemAvatar}>
-        <Avatar user={otherUser} />
+        {listing?.images?.[0] ? (
+          <ResponsiveImage
+            rootClassName={css.itemThumb}
+            alt={listing?.attributes?.title || ''}
+            image={listing.images[0]}
+            variants={['listing-card', 'listing-card-2x']}
+          />
+        ) : (
+          <Avatar user={otherUser} />
+        )}
       </div>
-      <NamedLink
-        className={linkClasses}
-        name={isCustomer ? 'OrderDetailsPage' : 'SaleDetailsPage'}
-        params={{ id: tx.id.uuid }}
+      {/* A BUTTON, NOT A LINK, because selecting no longer navigates away - it opens the
+          detail beside this list. The URL still changes (see `onSelect`), so the rental is
+          linkable and the back button works; what it is not is a page transition. */}
+      <button
+        type="button"
+        className={classNames(linkClasses, css.itemButton)}
+        onClick={onSelect}
+        aria-current={isSelected ? 'true' : undefined}
       >
         <div className={css.rowNotificationDot}>{rowNotificationDot}</div>
         <div className={css.itemUsername}>{otherUserDisplayName}</div>
@@ -227,7 +251,7 @@ export const InboxItem = props => {
             />
           </div>
         </div>
-      </NamedLink>
+      </button>
     </div>
   );
 };
@@ -285,6 +309,28 @@ export const InboxPageComponent = props => {
   const title = isOrders ? ordersTitle : salesTitle;
   const search = parse(location.search);
 
+  // WHICH RENTAL IS OPEN, IN THE URL.
+  //
+  //   > "al seleccionar uno, abre el detalle de la transacción sin ocultar el listado"
+  //
+  // A QUERY PARAM RATHER THAN A PATH SEGMENT. `/inbox/:tab` is a route this app and its
+  // links already know; adding `/:id?` means a second route entry, a second loadData
+  // signature and every existing link becoming a special case, in exchange for a prettier
+  // URL. What the param buys is what actually matters: the back button works, a rental can
+  // be linked to, and a reload does not drop the reader back on the empty state.
+  const selectedTxId = typeof search.tx === 'string' ? search.tx : null;
+  const selectedTransaction = selectedTxId
+    ? transactions.find(tx => tx.id?.uuid === selectedTxId)
+    : null;
+
+  // Collapsed on a phone once something is open, per the client: the list and a full detail
+  // stacked would be a very long page. On desktop both are always visible - that is the point
+  // of the layout - so this state is only ever consulted by the mobile styles.
+  //
+  // Initial value derived rather than defaulted: arriving on a link to one rental should show
+  // that rental, and arriving on the inbox should show the list.
+  const [isListOpenOnMobile, setListOpenOnMobile] = useState(!selectedTxId);
+
   const pickType = lt => conf => conf.listingType === lt;
   const findListingTypeConfig = publicData => {
     const listingTypeConfigs = config.listing?.listingTypes;
@@ -292,6 +338,22 @@ export const InboxPageComponent = props => {
     const foundConfig = listingTypeConfigs?.find(pickType(listingType));
     return foundConfig;
   };
+  // Derived the same way the row's is, from the same function, so the panel and the row that
+  // opened it cannot describe one rental with two different phrases.
+  let selectedStateData = null;
+  try {
+    selectedStateData = selectedTransaction
+      ? getStateData({
+          transaction: selectedTransaction,
+          transactionRole: isOrders ? TX_TRANSITION_ACTOR_CUSTOMER : TX_TRANSITION_ACTOR_PROVIDER,
+          intl,
+        })
+      : null;
+  } catch (error) {
+    // Same swallow as the list's: a transaction in a state this app does not model renders
+    // without a status rather than taking the page down.
+  }
+
   const toTxItem = tx => {
     const transactionRole = isOrders ? TX_TRANSITION_ACTOR_CUSTOMER : TX_TRANSITION_ACTOR_PROVIDER;
     let stateData = null;
@@ -322,6 +384,13 @@ export const InboxPageComponent = props => {
           availabilityType={availabilityType}
           isBooking={isBooking}
           isPurchase={isPurchase}
+          isSelected={tx.id?.uuid === selectedTxId}
+          onSelect={() => {
+            // Replace rather than push: clicking through five rentals should leave one entry
+            // in the history, not five, so Back returns to wherever the reader came FROM.
+            history.replace(`${location.pathname}?${stringify({ ...search, tx: tx.id?.uuid })}`);
+            setListOpenOnMobile(false);
+          }}
         />
       </li>
     ) : null;
@@ -397,40 +466,85 @@ export const InboxPageComponent = props => {
               tabRootClassName={css.tab}
               tabs={tabs}
               ariaLabel={intl.formatMessage({ id: 'InboxPage.screenreader.sidenav' })}
-            />{' '}
+            />
+
+            {/* THE LIST MOVED IN HERE, which is the whole structural change.
+                  > "hay un listado de transacciones como panel lateral (...) al seleccionar
+                  >  uno, abre el detalle de la transacción sin ocultar el listado"
+
+                It used to be the page's content, with the detail on a route of its own. Now
+                it is the column, and the content is whichever rental is open - so selecting
+                one no longer takes the others off the screen. */}
+            <InboxSearchForm
+              onSubmit={() => {}}
+              onSelect={handleSortSelect(tab, routeConfiguration, history)}
+              intl={intl}
+              tab={tab}
+              routeConfiguration={routeConfiguration}
+              history={history}
+            />
+
+            {/* On a phone the list collapses once a rental is open, per the client: stacked,
+                a full list and a full detail make a very long page. The button exists only at
+                that width - on desktop the list is simply always there, which is the point of
+                the layout - so it is hidden by CSS rather than by a JS breakpoint, and no
+                reader ever gets a control that does nothing. */}
+            <button
+              type="button"
+              className={css.listToggle}
+              aria-expanded={isListOpenOnMobile}
+              aria-controls="inbox-transaction-list"
+              onClick={() => setListOpenOnMobile(open => !open)}
+            >
+              <FormattedMessage
+                id={isListOpenOnMobile ? 'InboxPage.hideList' : 'InboxPage.showList'}
+              />
+            </button>
+
+            {fetchOrdersOrSalesError ? (
+              <p className={css.error}>
+                <FormattedMessage id="InboxPage.fetchFailed" />
+              </p>
+            ) : null}
+            <ul
+              id="inbox-transaction-list"
+              className={classNames(css.itemList, {
+                [css.itemListCollapsedOnMobile]: !isListOpenOnMobile,
+              })}
+            >
+              {!fetchInProgress ? (
+                transactions.map(toTxItem)
+              ) : (
+                <li className={css.listItemsLoading}>
+                  <IconSpinner />
+                </li>
+              )}
+              {hasNoResults ? (
+                <li key="noResults" className={css.noResults}>
+                  <FormattedMessage
+                    id={isOrders ? 'InboxPage.noOrdersFound' : 'InboxPage.noSalesFound'}
+                  />
+                </li>
+              ) : null}
+            </ul>
           </>
         }
         footer={<FooterContainer />}
       >
-        <InboxSearchForm
-          onSubmit={() => {}}
-          onSelect={handleSortSelect(tab, routeConfiguration, history)}
-          intl={intl}
-          tab={tab}
-          routeConfiguration={routeConfiguration}
-          history={history}
-        />
-        {fetchOrdersOrSalesError ? (
-          <p className={css.error}>
-            <FormattedMessage id="InboxPage.fetchFailed" />
+        {selectedTransaction ? (
+          <InboxTransactionPanel
+            transaction={selectedTransaction}
+            stateData={selectedStateData}
+            transactionRole={isOrders ? TX_TRANSITION_ACTOR_CUSTOMER : TX_TRANSITION_ACTOR_PROVIDER}
+            onManageDisableScrolling={props.onManageDisableScrolling}
+          />
+        ) : (
+          // The empty state the design draws, rather than a blank column. A reader who has
+          // not picked anything yet is not looking at a broken page, and should be told so.
+          <p className={css.panelEmpty}>
+            <FormattedMessage id="InboxPage.selectATransaction" />
           </p>
-        ) : null}
-        <ul className={css.itemList}>
-          {!fetchInProgress ? (
-            transactions.map(toTxItem)
-          ) : (
-            <li className={css.listItemsLoading}>
-              <IconSpinner />
-            </li>
-          )}
-          {hasNoResults ? (
-            <li key="noResults" className={css.noResults}>
-              <FormattedMessage
-                id={isOrders ? 'InboxPage.noOrdersFound' : 'InboxPage.noSalesFound'}
-              />
-            </li>
-          ) : null}
-        </ul>
+        )}
         {hasTransactions && pagination && pagination.totalPages > 1 ? (
           <PaginationLinks
             className={css.pagination}

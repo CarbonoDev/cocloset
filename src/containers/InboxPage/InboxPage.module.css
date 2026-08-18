@@ -380,3 +380,304 @@
     color: var(--colorGrey300);
   }
 }
+
+/* ── The list, now the column ─────────────────────────────────────────────────
+   The stock inbox put the list in the content area with the detail on a route of
+   its own. It is the side column now, and the content is whichever rental is
+   open — so selecting one no longer takes the others off the screen. */
+.itemButton {
+  /* A button carrying a link's layout. `composes` is not usable here (the class it
+     replaces is applied conditionally), so the reset is explicit. */
+  appearance: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.itemSelected {
+  background-color: var(--coclosetSubtle);
+  border-radius: 10px;
+}
+
+.itemThumb {
+  border-radius: 8px;
+  height: 48px;
+  object-fit: cover;
+  width: 48px;
+}
+
+/* Collapsing is a PHONE behaviour only: on desktop the list and the detail are both meant to
+   be visible, which is the whole point of the layout. Hidden at that width rather than
+   conditionally rendered, so a wide screen never gets a control that does nothing. */
+.listToggle {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 999px;
+  color: var(--coclosetInk);
+  cursor: pointer;
+  font: inherit;
+  margin: 0 24px 12px 24px;
+  padding: 6px 14px;
+
+  @media (--viewportLarge) {
+    display: none;
+  }
+}
+
+.itemListCollapsedOnMobile {
+  display: none;
+
+  @media (--viewportLarge) {
+    display: block;
+  }
+}
+
+/* ── The open rental ─────────────────────────────────────────────────────── */
+.panelEmpty {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.panel {
+  padding: 0 24px 48px 24px;
+
+  @media (--viewportMedium) {
+    padding: 0 0 48px 0;
+  }
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--coclosetBorder);
+}
+
+.panelThumb {
+  flex: 0 0 auto;
+  width: 72px;
+}
+
+.panelThumbImage {
+  border-radius: 10px;
+  width: 72px;
+}
+
+.panelHeading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.panelBrand {
+  composes: marketplaceTinyFontStyles from global;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--coclosetBrand);
+  margin: 0 0 4px 0;
+}
+
+.panelTitle {
+  font-family: var(--fontFamilyDisplay);
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
+  font-size: 24px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.panelIdentifiers {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 6px 0 0 0;
+}
+
+.panelStatus {
+  composes: marketplaceTinyFontStyles from global;
+  display: inline-block;
+  background-color: var(--coclosetSubtle);
+  border-radius: 999px;
+  color: var(--coclosetInk);
+  margin-top: 10px;
+  padding: 4px 12px;
+}
+
+.panelStatusAction {
+  background-color: var(--coclosetToneAmberBg);
+  color: var(--coclosetToneAmberFg);
+}
+
+.panelStatusFinal {
+  background-color: var(--coclosetToneGreenBg);
+  color: var(--coclosetToneGreenFg);
+}
+
+/* The small QR. A thumbnail is not something a scanner can read, so its only job is to open
+   the modal — which is why it is a button and looks like one you can press. */
+.panelQrButton {
+  appearance: none;
+  background-color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px;
+
+  &:hover {
+    border-color: var(--coclosetBorderStrong);
+  }
+}
+
+.panelQrLabel {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+}
+
+.panelCards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 24px;
+
+  @media (--viewportMedium) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.panelCard {
+  background-color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 12px;
+  margin-top: 16px;
+  padding: 18px;
+}
+
+.panelCards .panelCard {
+  margin-top: 0;
+}
+
+.panelCardTitle {
+  composes: marketplaceTinyFontStyles from global;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--coclosetInkMuted);
+  margin: 0 0 10px 0;
+}
+
+.panelCardStrong {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0;
+}
+
+.panelCardAddress {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  font-style: normal;
+  margin: 2px 0 0 0;
+}
+
+.panelCardValue {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  margin: 8px 0 0 0;
+}
+
+.panelCardBody {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 10px 0 0 0;
+}
+
+/* The eight steps, marked against this rental. */
+.panelTimeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.panelStep {
+  composes: marketplaceDefaultFontStyles from global;
+  align-items: center;
+  color: var(--coclosetInkMuted);
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.panelStepMarker {
+  background-color: var(--coclosetBorder);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 12px;
+  width: 12px;
+}
+
+.panelStepDone {
+  color: var(--coclosetInk);
+}
+
+.panelStepDone .panelStepMarker {
+  background-color: var(--coclosetBrand);
+}
+
+.panelStepCurrent {
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+}
+
+/* A ring rather than a fill, so "here" reads differently from "done" without relying on the
+   two browns being told apart. */
+.panelStepCurrent .panelStepMarker {
+  background-color: var(--coclosetSurface);
+  box-shadow: 0 0 0 3px var(--coclosetBrand) inset;
+}
+
+.qrModalContent {
+  padding: 24px 0;
+  text-align: center;
+}
+
+.qrModalTitle {
+  composes: h3 from global;
+  margin: 0 0 8px 0;
+}
+
+.qrModalBody {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0 0 20px 0;
+}
+
+.srOnly {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+/* The route to the page that can act on this rental. See the note in InboxTransactionPanel:
+   the list row used to be this link, and turning it into a selector took the route away. */
+.panelFullLink {
+  composes: marketplaceDefaultFontStyles from global;
+  display: inline-block;
+  color: var(--coclosetBrandDark);
+  margin-top: 20px;
+}
