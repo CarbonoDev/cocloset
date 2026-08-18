@@ -466,6 +466,8 @@ export const InboxPageComponent = props => {
             <TabNav
               rootClassName={css.tabs}
               tabRootClassName={css.tab}
+              tabLinkClassName={css.tabLink}
+              tabSelectedLinkClassName={css.tabLinkSelected}
               tabs={tabs}
               ariaLabel={intl.formatMessage({ id: 'InboxPage.screenreader.sidenav' })}
             />

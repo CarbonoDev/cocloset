@@ -67,8 +67,18 @@
   }
 }
 
+/* "Inbox" IS A LABEL FOR A COLUMN, NOT THE PAGE'S HEADLINE.
+   The stock size (a 40px h2, sized for a page whose whole content was the list) shouted from a
+   240px sidebar and out-weighed the garment title in the panel beside it - the one heading a
+   reader is actually here for. Small, muted and set in the display serif: still clearly the
+   column's name, no longer competing with the rental it sits next to. */
 .title {
   align-self: center;
+  font-family: var(--fontFamilyDisplay);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
   padding: 0px 0 8px 0;
 
   /* Layout */
@@ -82,6 +92,8 @@
   }
 
   @media (--viewportLarge) {
+    font-size: 22px;
+    line-height: 28px;
     padding: 5px 0 3px 0;
     align-self: unset;
   }
@@ -100,8 +112,12 @@
   }
 
   @media (--viewportLarge) {
-    padding-top: 24px;
+    padding-top: 20px;
     flex-direction: column;
+    /* The tabs are a two-item switch, not a nav bar. Their own gap replaces the 16px margin
+       each link carried for a horizontal row. */
+    gap: 2px;
+    padding-right: 24px;
   }
 }
 
@@ -114,6 +130,42 @@
 
   @media (--viewportLarge) {
     margin-left: 0;
+  }
+}
+
+/* THE TWO TABS, AS A SWITCH RATHER THAN AS A NAV BAR.
+   The stock desktop link is 20px semibold, 200px wide, and marks the selected one with a 32px
+   black bar drawn as a background image on its right edge - which in a sidebar this narrow
+   read as a stray black stripe floating beside the words, and was the loudest thing on the
+   column. Same job, quieter: the selected tab is filled, the other is muted text. */
+.tabLink {
+  composes: textSmall from global;
+  border-radius: 8px;
+  color: var(--coclosetInkMuted);
+  display: block;
+  padding: 8px 12px;
+  transition: var(--transitionStyleButton);
+  white-space: nowrap;
+
+  &:hover {
+    background-color: var(--coclosetSurfaceRaised);
+    color: var(--coclosetInk);
+    text-decoration: none;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 15px;
+    line-height: 20px;
+  }
+}
+
+.tabLinkSelected {
+  background-color: var(--coclosetSubtle);
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+
+  &:hover {
+    background-color: var(--coclosetSubtle);
   }
 }
 
@@ -397,9 +449,14 @@
   width: 100%;
 }
 
+/* The open rental. Raised rather than filled with `--coclosetSubtle`: that is the same tone the
+   neutral status pill uses, so filling the row with it made the pill vanish on exactly the
+   rental a reader is looking at. Tinting the row and outlining it says "this one" without
+   taking a colour the row's own contents already spend. */
 .itemSelected {
-  background-color: var(--coclosetSubtle);
+  background-color: var(--coclosetSurfaceRaised);
   border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--coclosetBorder);
 }
 
 .itemThumb {
