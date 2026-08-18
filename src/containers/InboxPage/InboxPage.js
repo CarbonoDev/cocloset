@@ -36,7 +36,7 @@ import {
 } from '../../transactions/transaction';
 
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
-import { isScrollingDisabled } from '../../ducks/ui.duck';
+import { isScrollingDisabled, manageDisableScrolling } from '../../ducks/ui.duck';
 import {
   H2,
   Avatar,
@@ -229,7 +229,6 @@ export const InboxItem = props => {
         aria-current={isSelected ? 'true' : undefined}
       >
         <div className={css.rowNotificationDot}>{rowNotificationDot}</div>
-        <div className={css.itemUsername}>{otherUserDisplayName}</div>
         <div className={css.itemTitle}>{listing?.attributes?.title}</div>
         <div className={css.itemDetails}>
           {isBooking ? (
@@ -238,18 +237,21 @@ export const InboxItem = props => {
             <FormattedMessage id="InboxPage.quantity" values={{ quantity }} />
           ) : null}
         </div>
+        {/* The counterparty moved BELOW the garment and into the quiet line. The design leads
+            with the piece; who it is with is context, not the headline. */}
+        {otherUserDisplayName ? (
+          <div className={css.itemUsername}>{otherUserDisplayName}</div>
+        ) : null}
         {availabilityType == AVAILABILITY_MULTIPLE_SEATS && unitLineItem?.seats ? (
           <div className={css.itemSeats}>
             <FormattedMessage id="InboxPage.seats" values={{ seats: unitLineItem.seats }} />
           </div>
         ) : null}
-        <div className={css.itemState}>
-          <div className={stateClasses}>
-            <FormattedMessage
-              id={`InboxPage.${processName}.${processState}.status`}
-              values={{ transactionRole }}
-            />
-          </div>
+        <div className={stateClasses}>
+          <FormattedMessage
+            id={`InboxPage.${processName}.${processState}.status`}
+            values={{ transactionRole }}
+          />
         </div>
       </button>
     </div>
@@ -464,6 +466,8 @@ export const InboxPageComponent = props => {
             <TabNav
               rootClassName={css.tabs}
               tabRootClassName={css.tab}
+              tabLinkClassName={css.tabLink}
+              tabSelectedLinkClassName={css.tabLinkSelected}
               tabs={tabs}
               ariaLabel={intl.formatMessage({ id: 'InboxPage.screenreader.sidenav' })}
             />
@@ -578,6 +582,20 @@ const mapStateToProps = state => {
   };
 };
 
-const InboxPage = compose(connect(mapStateToProps))(InboxPageComponent);
+// THE PAGE HAD NO DISPATCH PROPS, because the stock inbox never opened a modal. The QR modal
+// does, and `Modal` calls `onManageDisableScrolling` to lock the page behind it - so passing
+// `undefined` threw, and the browser tab locked up the moment a rental was selected. Found by
+// the client, on the first screen I shipped without opening it myself.
+const mapDispatchToProps = dispatch => ({
+  onManageDisableScrolling: (componentId, disableScrolling) =>
+    dispatch(manageDisableScrolling(componentId, disableScrolling)),
+});
+
+const InboxPage = compose(
+  connect(
+    mapStateToProps,
+    mapDispatchToProps
+  )
+)(InboxPageComponent);
 
 export default InboxPage;

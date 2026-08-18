@@ -67,8 +67,18 @@
   }
 }
 
+/* "Inbox" IS A LABEL FOR A COLUMN, NOT THE PAGE'S HEADLINE.
+   The stock size (a 40px h2, sized for a page whose whole content was the list) shouted from a
+   240px sidebar and out-weighed the garment title in the panel beside it - the one heading a
+   reader is actually here for. Small, muted and set in the display serif: still clearly the
+   column's name, no longer competing with the rental it sits next to. */
 .title {
   align-self: center;
+  font-family: var(--fontFamilyDisplay);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
   padding: 0px 0 8px 0;
 
   /* Layout */
@@ -82,6 +92,8 @@
   }
 
   @media (--viewportLarge) {
+    font-size: 22px;
+    line-height: 28px;
     padding: 5px 0 3px 0;
     align-self: unset;
   }
@@ -100,8 +112,12 @@
   }
 
   @media (--viewportLarge) {
-    padding-top: 24px;
+    padding-top: 20px;
     flex-direction: column;
+    /* The tabs are a two-item switch, not a nav bar. Their own gap replaces the 16px margin
+       each link carried for a horizontal row. */
+    gap: 2px;
+    padding-right: 24px;
   }
 }
 
@@ -114,6 +130,42 @@
 
   @media (--viewportLarge) {
     margin-left: 0;
+  }
+}
+
+/* THE TWO TABS, AS A SWITCH RATHER THAN AS A NAV BAR.
+   The stock desktop link is 20px semibold, 200px wide, and marks the selected one with a 32px
+   black bar drawn as a background image on its right edge - which in a sidebar this narrow
+   read as a stray black stripe floating beside the words, and was the loudest thing on the
+   column. Same job, quieter: the selected tab is filled, the other is muted text. */
+.tabLink {
+  composes: textSmall from global;
+  border-radius: 8px;
+  color: var(--coclosetInkMuted);
+  display: block;
+  padding: 8px 12px;
+  transition: var(--transitionStyleButton);
+  white-space: nowrap;
+
+  &:hover {
+    background-color: var(--coclosetSurfaceRaised);
+    color: var(--coclosetInk);
+    text-decoration: none;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 15px;
+    line-height: 20px;
+  }
+}
+
+.tabLinkSelected {
+  background-color: var(--coclosetSubtle);
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+
+  &:hover {
+    background-color: var(--coclosetSubtle);
   }
 }
 
@@ -397,9 +449,14 @@
   width: 100%;
 }
 
+/* The open rental. Raised rather than filled with `--coclosetSubtle`: that is the same tone the
+   neutral status pill uses, so filling the row with it made the pill vanish on exactly the
+   rental a reader is looking at. Tinting the row and outlining it says "this one" without
+   taking a colour the row's own contents already spend. */
 .itemSelected {
-  background-color: var(--coclosetSubtle);
+  background-color: var(--coclosetSurfaceRaised);
   border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--coclosetBorder);
 }
 
 .itemThumb {
@@ -455,6 +512,10 @@
 .panelHeader {
   display: flex;
   align-items: flex-start;
+  /* Wraps on a phone. Thumbnail + title + QR is about 110px too wide for a 390px screen, and
+     without this the garment's name breaks mid-phrase ("Nice / shirt") to make room for a code
+     nobody is reading at that size. Wrapping drops the QR onto its own line instead. */
+  flex-wrap: wrap;
   gap: 16px;
   padding-bottom: 24px;
   border-bottom: 1px solid var(--coclosetBorder);
@@ -462,16 +523,22 @@
 
 .panelThumb {
   flex: 0 0 auto;
-  width: 72px;
+  width: 64px;
+
+  @media (--viewportMedium) {
+    width: 72px;
+  }
 }
 
 .panelThumbImage {
   border-radius: 10px;
-  width: 72px;
+  width: 100%;
 }
 
 .panelHeading {
-  flex: 1 1 auto;
+  /* The 160px basis is what decides the wrap above: below it the title would start breaking, so
+     the QR is pushed to the next line rather than the words. */
+  flex: 1 1 160px;
   min-width: 0;
 }
 
@@ -528,13 +595,20 @@
   cursor: pointer;
   display: flex;
   flex: 0 0 auto;
-  flex-direction: column;
+  /* Sideways on a phone, where it sits on its own line and a column would waste the width;
+     stacked from tablet up, where it sits in the corner of the header. */
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
   padding: 10px;
 
   &:hover {
     border-color: var(--coclosetBorderStrong);
+  }
+
+  @media (--viewportMedium) {
+    flex-direction: column;
+    gap: 4px;
   }
 }
 
@@ -648,6 +722,12 @@
 .qrModalContent {
   padding: 24px 0;
   text-align: center;
+  /* `text-align` centres the title and the caption but not the <svg> the QR renders as, which
+     is a block and so hugs the left edge. Flex centres the code itself - the one thing in this
+     modal a person at a counter is actually looking at. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .qrModalTitle {
@@ -680,4 +760,78 @@
   display: inline-block;
   color: var(--coclosetBrandDark);
   margin-top: 20px;
+}
+
+/* ── The row, rebuilt for a narrow column ────────────────────────────────────
+   The stock row lays five cells across a wide content area. In the side column
+   those cells collided: the counterparty's name ran into the status pill and the
+   pill was clipped by the column edge. The design's row is a thumbnail beside
+   three stacked lines, which is what this width can hold.
+
+   These override the stock `.item*` rules, so they come after them in the file. */
+.item {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  padding: 10px 24px;
+}
+
+.itemButton {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+}
+
+.itemAvatar {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.itemTitle {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+  /* Two lines, then ellipsis: a long garment name must not push the date and the status out
+     of the row, which is what makes a column of these scannable. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+.itemDetails,
+.itemUsername {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  font-weight: var(--fontWeightRegular);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* The status, as the design's pill rather than as a bare word in its own column. */
+.stateName {
+  composes: marketplaceTinyFontStyles from global;
+  align-self: flex-start;
+  background-color: var(--coclosetSubtle);
+  border-radius: 999px;
+  color: var(--coclosetInk);
+  margin-top: 6px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.stateActionNeeded {
+  background-color: var(--coclosetToneAmberBg);
+  color: var(--coclosetToneAmberFg);
+}
+
+.stateConcluded {
+  background-color: var(--coclosetToneGreenBg);
+  color: var(--coclosetToneGreenFg);
 }

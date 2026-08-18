@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
+import { subtractTime } from '../../util/dates';
 import { getProcess, resolveLatestProcessName } from '../../transactions/transaction';
 import {
   RENTAL_TIMELINE_STEPS,
@@ -79,15 +80,21 @@ const InboxTransactionPanel = props => {
   const laundryName = publicData.assignedLaundryName;
   const pickupAddress = publicData.pickupAddress;
 
+  // THE LISTING'S TIMEZONE, NOT THE READER'S. A day booking is stored as midnight-to-midnight
+  // in the marketplace's zone; formatting it in the browser's zone moves it to the previous day
+  // for anyone west of it. The row beside this panel already reads the dates this way, so
+  // getting it wrong here showed the SAME rental as "Aug 14 – 20" in the list and "Aug 13" in
+  // the detail - which is how it shipped, and why this goes through the same helpers the row
+  // uses rather than through raw Date arithmetic.
+  const timeZone = listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC';
   const bookingStart = booking?.attributes?.displayStart || booking?.attributes?.start;
   const bookingEnd = booking?.attributes?.displayEnd || booking?.attributes?.end;
   // The last day the customer HAS the garment, not the exclusive end the API stores. Same
   // convention as the listing page and the price breakdown, so the three agree.
-  const inclusiveEnd = bookingEnd
-    ? new Date(new Date(bookingEnd).getTime() - 24 * 60 * 60 * 1000)
-    : null;
+  const inclusiveEnd = bookingEnd ? subtractTime(bookingEnd, 1, 'days', timeZone) : null;
 
-  const formatDate = date => (date ? intl.formatDate(new Date(date), DATE_FORMAT) : null);
+  const formatDate = date =>
+    date ? intl.formatDate(new Date(date), { ...DATE_FORMAT, timeZone }) : null;
 
   // The identifiers a counter goes by. Assembled from what exists rather than from a fixed
   // template, so a rental that has not reached the studio yet reads as one line rather than
