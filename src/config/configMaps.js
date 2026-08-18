@@ -9,6 +9,30 @@ import defaultLocationSearches from './configDefaultLocationSearches';
 export const mapboxAccessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN;
 export const googleMapsAPIKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
+// COCLOSET'S OWN MAP STYLE, opt-in through the environment.
+//
+//   > "Manten el mapa asi, prepáralo para recibir un id de env y si viene vacío el mapa sigue
+//   >  igual, si tiene un id válido, utiliza el diseño de ahi"
+//
+// A Mapbox style is owned by an account and named `mapbox://styles/<owner>/<styleId>`, so the
+// style cannot live in this repo - only a reference to one can. Unset (the case today) means
+// every map keeps rendering Mapbox's own `streets-v10`, exactly as it does now; set, and both
+// the interactive maps and the static ones switch to it.
+//
+// EXPECTS THE FULL "<owner>/<styleId>" PAIR rather than an id alone: the id is not unique
+// across accounts, and the two URL forms below both need the owner. Whitespace-only is treated
+// as unset, because an env var set to nothing in a deploy config is how "unset" usually looks
+// in practice.
+const rawMapboxStyle = process.env.REACT_APP_MAPBOX_STYLE;
+export const mapboxStyle =
+  typeof rawMapboxStyle === 'string' && rawMapboxStyle.trim() !== '' ? rawMapboxStyle.trim() : null;
+
+// The two shapes Mapbox wants the same style in: a `mapbox://` URL for the interactive GL map,
+// and an HTTPS path segment for the Static Images API. Derived from one value so a deploy
+// cannot end up with an interactive map in the brand style and a static one in Mapbox's.
+export const mapboxStyleUrl = mapboxStyle ? `mapbox://styles/${mapboxStyle}` : null;
+export const mapboxStaticStylePath = mapboxStyle || 'mapbox/streets-v10';
+
 // Choose map provider: 'mapbox', 'googleMaps'
 // Note: The mapProvider comes from map asset nowadays by default.
 //       To use this built-in configuration, you need to remove the overwrite from configHelper.js (mergeMapConfig func)

@@ -226,6 +226,7 @@ export class SearchPageComponent extends Component {
       config,
       params: currentPathParams = {},
       currentUser,
+      laundryOptions,
     } = this.props;
 
     const {
@@ -261,6 +262,7 @@ export class SearchPageComponent extends Component {
       searchInProgress,
       currentPathParams,
       currentUser,
+      laundryOptions,
     });
 
     const isWindowDefined = typeof window !== 'undefined';
@@ -509,6 +511,9 @@ const SearchPage = props => {
     searchListingsError,
     searchParams,
     activeListingId,
+    // Cocloset: the studios the pickup filter offers. Empty until the public endpoint
+    // answers, and on any failure - the filter is then simply not rendered.
+    laundryOptions,
   } = useSelector(state => state.SearchPage);
   const listings = useSelector(state =>
     selectListingsById(state, state.SearchPage.currentPageResultIds)
@@ -536,6 +541,7 @@ const SearchPage = props => {
       searchListingsError={searchListingsError}
       searchParams={searchParams}
       activeListingId={activeListingId}
+      laundryOptions={laundryOptions}
       onManageDisableScrolling={onManageDisableScrolling}
       onActivateListing={onActivateListing}
     />

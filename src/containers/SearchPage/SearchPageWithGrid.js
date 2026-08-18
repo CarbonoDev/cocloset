@@ -143,6 +143,7 @@ export class SearchPageComponent extends Component {
       config,
       params: currentPathParams = {},
       currentUser,
+      laundryOptions,
     } = this.props;
 
     const {
@@ -173,6 +174,7 @@ export class SearchPageComponent extends Component {
       searchInProgress,
       currentPathParams,
       currentUser,
+      laundryOptions,
     });
 
     const sortBy = mode => {
@@ -343,9 +345,15 @@ const SearchPage = props => {
   const selectListingsById = useMemo(makeGetListingsByIdSelector, []);
 
   const currentUser = useSelector(state => state.user?.currentUser);
-  const { pagination, searchInProgress, searchListingsError, searchParams } = useSelector(
-    state => state.SearchPage
-  );
+  const {
+    pagination,
+    searchInProgress,
+    searchListingsError,
+    searchParams,
+    // Cocloset: the studios the pickup filter offers. Empty until the public endpoint
+    // answers, and on any failure - the filter is then simply not rendered.
+    laundryOptions,
+  } = useSelector(state => state.SearchPage);
   const listings = useSelector(state =>
     selectListingsById(state, state.SearchPage.currentPageResultIds)
   );
@@ -368,6 +376,7 @@ const SearchPage = props => {
       searchInProgress={searchInProgress}
       searchListingsError={searchListingsError}
       searchParams={searchParams}
+      laundryOptions={laundryOptions}
       onManageDisableScrolling={onManageDisableScrolling}
     />
   );

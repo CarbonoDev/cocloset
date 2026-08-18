@@ -163,6 +163,18 @@ export const submitLaundryPartnerApplication = body => {
   return post('/api/laundry-partner-application', body);
 };
 
+// The laundries as a PUBLIC name/id list, for the search page's pickup filter.
+//
+// A DIFFERENT ENDPOINT from `fetchLaundries` below, not the same one without a session.
+// That one carries each studio's address, coordinates, hours and turnaround for the listing
+// wizard; this one is two strings for a dropdown, and the search page is public. See the
+// header of server/api/laundry-options.js.
+//
+// Returns `{ data: [ { id, name } ] }`, sorted by name.
+export const fetchLaundryOptions = () => {
+  return request('/api/laundry-options', { method: methods.GET });
+};
+
 // Fetch the list of laundries (users flagged with metadata.isLaundry), used by
 // the listing wizard's "Laundry Assignment" step. Requires an authenticated
 // caller.

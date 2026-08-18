@@ -1,4 +1,5 @@
 import React from 'react';
+import { mapboxStaticStylePath } from '../../config/configMaps';
 import polyline from '@mapbox/polyline';
 
 import { lazyLoadWithDimensions } from '../../util/uiHelpers';
@@ -63,7 +64,9 @@ const StaticMapboxMap = props => {
 
   const overlay = mapOverlay(center, mapsConfig);
   const src =
-    'https://api.mapbox.com/styles/v1/mapbox/streets-v10/static' +
+    // The Static Images API takes the style as a path segment, so the same value the
+    // interactive map passes as a mapbox:// URL is spliced in here. See config/configMaps.js.
+    `https://api.mapbox.com/styles/v1/${mapboxStaticStylePath}/static` +
     (overlay ? `/${overlay}` : '') +
     `/${center.lng},${center.lat},${zoom}` +
     `/${width}x${height}` +

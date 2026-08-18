@@ -296,6 +296,12 @@ const getSearchParams = config => {
       'publicData.shippingEnabled',
       'publicData.priceVariationsEnabled',
       'publicData.priceVariants',
+      // Cocloset: the search card's own fields. `fields.listing` is an allowlist, so a field
+      // missing here arrives undefined and the brand, size and collection point each render as
+      // nothing at all, on every card, with no error anywhere.
+      'publicData.brand',
+      'publicData.size',
+      'publicData.assignedLaundryName',
     ],
     'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
     'fields.image': [
@@ -667,7 +673,17 @@ describe('Duck', () => {
     // loadData() function is called. If you make customizations to the loadData() logic,
     // update this test accordingly!
     return loadData(null, null, config)(dispatch, getState, sdk).then(data => {
-      const actions = dispatchedActions(dispatch);
+      const allActions = dispatchedActions(dispatch);
+
+      // FOUR now, not three: the page also fetches the studios its pickup filter offers.
+      // Asserted by PRESENCE rather than by position - it is fired without being awaited, so
+      // where it interleaves with the search's own resolution is a scheduling detail rather
+      // than a contract. The search's three actions are then checked in order, with this one
+      // filtered out, so this test keeps saying what it was written to say.
+      expect(allActions).toHaveLength(4);
+      expect(allActions.map(a => a.type)).toContain('SearchPage/fetchLaundryOptions/pending');
+
+      const actions = allActions.filter(a => !a.type.startsWith('SearchPage/fetchLaundryOptions'));
       expect(actions).toHaveLength(3);
 
       // First action should be searchListings.pending

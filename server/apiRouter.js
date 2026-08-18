@@ -18,6 +18,7 @@ const transitionPrivileged = require('./api/transition-privileged');
 const deleteAccount = require('./api/delete-account');
 const laundryPartnerApplication = require('./api/laundry-partner-application');
 const laundries = require('./api/laundries');
+const laundryOptions = require('./api/laundry-options');
 const createAvailabilityBuffer = require('./api/create-availability-buffer');
 const laundryTransactionStatus = require('./api/laundry-transaction-status');
 const listingReadinessStatus = require('./api/listing-readiness-status');
@@ -71,6 +72,11 @@ router.post('/initiate-privileged', initiatePrivileged);
 router.post('/transition-privileged', transitionPrivileged);
 router.post('/delete-account', deleteAccount);
 router.get('/laundries', laundries);
+// PUBLIC, and deliberately a different endpoint from the one above rather than the same one
+// with its session requirement removed: this returns a studio's name and id and nothing else,
+// for the search page's pickup filter. See the header of server/api/laundry-options.js for
+// what that distinction is protecting.
+router.get('/laundry-options', laundryOptions);
 router.post('/create-availability-buffer', createAvailabilityBuffer);
 router.post('/laundry-transaction-status', laundryTransactionStatus);
 router.post('/listing-readiness-status', listingReadinessStatus);

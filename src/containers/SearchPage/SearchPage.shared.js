@@ -572,6 +572,60 @@ const getSelectedSecondaryFiltersCount = (
  * @param {Object} [params.currentUser]
  * @returns {Object} Derived values used by map and grid variants in render
  */
+/**
+ * THE PICKUP FILTER, expressed as a listing field so the template's own machinery carries it.
+ *
+ *   > "Manten el filtro / Arma un endpoint publico para mostrar laundries"
+ *
+ * It cannot come from Console: it filters on `metadata.assignedLaundryId`, which is written by
+ * our server rather than by an owner, and its options are studio names that live on the laundry
+ * USER - neither of which a listing-field config can express.
+ *
+ * SYNTHESISED AS A FIELD RATHER THAN AS A NEW FILTER KIND, deliberately. Handed to
+ * `pickListingFieldFilters` it is validated, named (`meta_` from its scope), grouped
+ * primary/secondary, rendered by the existing enum case and dropped from the URL when its value
+ * is not a real option - all by code that already exists. A bespoke `schemaType: 'laundry'`
+ * would have needed a branch in each of those places, and the fourth one anybody forgot would
+ * have been the bug.
+ *
+ * ONLY WHEN THERE ARE OPTIONS. An empty list is what "not answered yet" and "the lookup failed"
+ * both look like, and a dropdown offering nothing reads as "this marketplace has no laundries",
+ * which is worse than no dropdown.
+ *
+ * @param {Array<Object>} listingFields - from config.listing
+ * @param {Array<{id: string, name: string}>} laundryOptions
+ * @param {Object} intl - the label is TEXT here, not a key: Console supplies a human label for
+ *   every other filter and the components render it verbatim.
+ * @returns {Array<Object>}
+ */
+export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [], intl) => {
+  if (!Array.isArray(laundryOptions) || laundryOptions.length === 0) {
+    return listingFields;
+  }
+
+  return [
+    ...listingFields,
+    {
+      key: 'assignedLaundryId',
+      scope: 'meta',
+      schemaType: 'enum',
+      enumOptions: laundryOptions.map(option => ({ option: option.id, label: option.name })),
+      filterConfig: {
+        // The search schema for this key is live - verified against Dev, where filtering by
+        // each studio returns exactly its own garments. Without it Sharetribe would ignore the
+        // parameter and quietly return the whole marketplace.
+        indexForSearch: true,
+        showFilter: true,
+        group: 'primary',
+        // One studio at a time. A garment has exactly one collection point, so a multi-select
+        // would offer combinations that are just "or", and the design draws a single dropdown.
+        filterType: 'SelectSingleFilter',
+        label: intl ? intl.formatMessage({ id: 'SearchPage.laundryPickupFilterLabel' }) : 'Pickup',
+      },
+    },
+  ];
+};
+
 export const getDerivedRenderData = ({
   intl,
   location,
@@ -583,6 +637,9 @@ export const getDerivedRenderData = ({
   searchInProgress,
   currentPathParams = {},
   currentUser,
+  // Cocloset: the studios a customer can filter by, from the public endpoint. Empty until it
+  // answers, and on any failure - see the note on `laundryFilterConfig` below.
+  laundryOptions = [],
 }) => {
   const { listingType: listingTypePathParam } = currentPathParams;
 
@@ -598,7 +655,7 @@ export const getDerivedRenderData = ({
   const categoryConfiguration = config.categoryConfiguration;
   const listingCategories = categoryConfiguration.categories;
   const listingFieldsConfig = pickListingFieldFilters({
-    listingFields,
+    listingFields: withLaundryPickupFilter(listingFields, laundryOptions, intl),
     locationSearch: location.search,
     categoryConfiguration,
     activeListingTypes,

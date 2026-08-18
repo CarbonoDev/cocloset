@@ -166,9 +166,68 @@ const buildLaundryDirectory = (users, listingCategoryValues = []) => {
   };
 };
 
+// users.query returns one page at a time, so a marketplace with more users than one page
+// would silently truncate the laundry list. MAX_PAGES bounds the Integration API quota one
+// request can burn; when it is hit, `truncated` says so rather than pretending the list is
+// complete. (Revisit once a user search schema exists - the query itself could filter then,
+// and this loop would go away.)
+//
+// LIVES HERE, NOT IN AN ENDPOINT, because two endpoints now need it: the authenticated
+// directory the listing wizard uses, and the public name/id list the search filter uses. One
+// copy of "how do we page through users" rather than two that drift.
+const PER_PAGE = 100;
+const MAX_PAGES = 20;
+
+const fetchUsersPage = (integrationSdk, page, collected) =>
+  integrationSdk.users.query({ page, perPage: PER_PAGE }, { expand: true }).then(response => {
+    const { data = [], meta = {} } = response.data || {};
+    const users = collected.concat(data);
+    const totalPages = Number.isFinite(meta.totalPages) ? meta.totalPages : page;
+
+    if (page < totalPages && page < MAX_PAGES) {
+      return fetchUsersPage(integrationSdk, page + 1, users);
+    }
+    return { users, truncated: page < totalPages };
+  });
+
+/**
+ * Every user in the marketplace, paged.
+ *
+ * @param {Object} integrationSdk
+ * @returns {Promise<{users: Array<Object>, truncated: boolean}>}
+ */
+const fetchAllUsers = integrationSdk => fetchUsersPage(integrationSdk, 1, []);
+
+/**
+ * The laundries as a PUBLIC name/id list, for the search page's pickup filter.
+ *
+ * DELIBERATELY NOT `buildLaundryDirectory` WITH FEWER KEYS. That function's job is to answer
+ * "which studios can this garment be assigned to", so it drops a studio with no usable
+ * address - correctly, since assigning one would leave the listing unpublishable. A filter is
+ * a different question: a studio holding garments belongs in the dropdown whether or not its
+ * profile is finished, or the customer gets results they cannot reach through the filter.
+ *
+ * Sorted by name so the dropdown has a stable order rather than whatever order the user query
+ * returned. Studios with no name are dropped: an option a reader cannot identify is noise.
+ *
+ * @param {Array<Object>} users
+ * @returns {Array<{id: string, name: string}>}
+ */
+const buildLaundryOptions = (users = []) =>
+  (Array.isArray(users) ? users : [])
+    .filter(isLaundryUserEntity)
+    .map(user => ({
+      id: user?.id?.uuid || null,
+      name: user?.attributes?.profile?.publicData?.laundryProfile?.studioName || null,
+    }))
+    .filter(option => !!option.id && !!option.name)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
 module.exports = {
   isLaundryUserEntity,
   toLaundryDirectoryEntry,
   hasUsableLaundryProfile,
   buildLaundryDirectory,
+  buildLaundryOptions,
+  fetchAllUsers,
 };
