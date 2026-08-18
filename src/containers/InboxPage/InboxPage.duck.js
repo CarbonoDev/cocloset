@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { storableError } from '../../util/errors';
 import { parse, getValidInboxSort } from '../../util/urlHelpers';
 import { getSupportedProcessesInfo } from '../../transactions/transaction';
+import { createImageVariantConfig } from '../../util/sdkLoader';
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 
 const INBOX_PAGE_SIZE = 10;
@@ -114,6 +115,13 @@ const loadDataPayloadCreator = ({ params, search }, { dispatch, rejectWithValue,
       'variants.listing-card',
       'variants.listing-card-2x',
     ],
+    // AND THE VARIANT HAS TO BE ASKED FOR, not just named above. `fields.image` says which
+    // variants to RETURN; `imageVariant.<name>` is what makes the API generate one. Naming a
+    // variant that was never requested returns an image with no such variant, and
+    // ResponsiveImage then renders a broken <img> - which is exactly what shipped, on every
+    // row, because this page was never opened with data in it.
+    ...createImageVariantConfig('listing-card', 400, 1),
+    ...createImageVariantConfig('listing-card-2x', 800, 1),
     page,
     perPage: INBOX_PAGE_SIZE,
     ...getValidInboxSort(sort),

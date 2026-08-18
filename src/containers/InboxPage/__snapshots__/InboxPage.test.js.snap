@@ -27,15 +27,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -54,15 +45,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.accepted.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.accepted.status
+      </span>
     </div>
   </button>
 </div>
@@ -95,15 +91,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -122,15 +109,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.canceled.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -163,15 +155,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -190,15 +173,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.delivered.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -235,15 +223,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       />
     </div>
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -262,15 +241,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.preauthorized.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.preauthorized.status
+      </span>
     </div>
   </button>
 </div>
@@ -303,15 +287,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -330,15 +305,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.declined.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.declined.status
+      </span>
     </div>
   </button>
 </div>
@@ -371,15 +351,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -398,15 +369,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.expired.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.expired.status
+      </span>
     </div>
   </button>
 </div>
@@ -439,15 +415,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -466,15 +433,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -507,15 +479,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -534,15 +497,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.payment-expired.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.payment-expired.status
+      </span>
     </div>
   </button>
 </div>
@@ -575,15 +543,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -602,15 +561,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -643,15 +607,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -670,15 +625,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -711,6 +671,14 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-day title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -720,23 +688,11 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-day title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-booking.inquiry.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-booking.inquiry.status
+      </span>
     </div>
   </button>
 </div>
@@ -769,15 +725,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -796,15 +743,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.accepted.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.accepted.status
+      </span>
     </div>
   </button>
 </div>
@@ -837,15 +789,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -864,15 +807,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.delivered.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -905,15 +853,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -932,15 +871,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.declined.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.declined.status
+      </span>
     </div>
   </button>
 </div>
@@ -973,15 +917,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -1000,15 +935,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.pending-payment.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.pending-payment.status
+      </span>
     </div>
   </button>
 </div>
@@ -1041,15 +981,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -1068,15 +999,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.pending-payment.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.pending-payment.status
+      </span>
     </div>
   </button>
 </div>
@@ -1109,15 +1045,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -1136,15 +1063,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed-by-customer.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed-by-customer.status
+      </span>
     </div>
   </button>
 </div>
@@ -1177,15 +1109,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -1204,15 +1127,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed-by-provider.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed-by-provider.status
+      </span>
     </div>
   </button>
 </div>
@@ -1245,15 +1173,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -1272,15 +1191,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -1313,15 +1237,6 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-day title
@@ -1340,15 +1255,20 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -1381,15 +1301,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -1408,15 +1319,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.accepted.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.accepted.status
+      </span>
     </div>
   </button>
 </div>
@@ -1449,15 +1365,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -1476,15 +1383,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.canceled.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -1517,15 +1429,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -1544,15 +1447,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.delivered.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -1585,15 +1493,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -1612,15 +1511,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.preauthorized.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.preauthorized.status
+      </span>
     </div>
   </button>
 </div>
@@ -1653,15 +1557,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -1680,15 +1575,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.declined.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.declined.status
+      </span>
     </div>
   </button>
 </div>
@@ -1721,15 +1621,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -1748,15 +1639,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.expired.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.expired.status
+      </span>
     </div>
   </button>
 </div>
@@ -1789,15 +1685,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -1816,15 +1703,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -1857,15 +1749,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -1884,15 +1767,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.payment-expired.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.payment-expired.status
+      </span>
     </div>
   </button>
 </div>
@@ -1925,15 +1813,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -1952,15 +1831,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -1993,15 +1877,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2020,15 +1895,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -2061,6 +1941,14 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-hour title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -2070,23 +1958,11 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-hour title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-booking.inquiry.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-booking.inquiry.status
+      </span>
     </div>
   </button>
 </div>
@@ -2119,15 +1995,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2146,15 +2013,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.accepted.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.accepted.status
+      </span>
     </div>
   </button>
 </div>
@@ -2187,15 +2059,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2214,15 +2077,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.delivered.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -2255,15 +2123,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2282,15 +2141,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.declined.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.declined.status
+      </span>
     </div>
   </button>
 </div>
@@ -2323,15 +2187,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2350,15 +2205,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.pending-payment.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.pending-payment.status
+      </span>
     </div>
   </button>
 </div>
@@ -2391,15 +2251,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2418,15 +2269,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.pending-payment.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.pending-payment.status
+      </span>
     </div>
   </button>
 </div>
@@ -2459,15 +2315,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2486,15 +2333,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed-by-customer.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed-by-customer.status
+      </span>
     </div>
   </button>
 </div>
@@ -2527,15 +2379,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2554,15 +2397,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed-by-provider.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed-by-provider.status
+      </span>
     </div>
   </button>
 </div>
@@ -2595,15 +2443,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2622,15 +2461,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -2663,15 +2507,6 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        provider display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing-hour title
@@ -2690,15 +2525,20 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       </div>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-booking.reviewed.status
-        </span>
-      </div>
+        provider display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-booking.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -2731,6 +2571,14 @@ exports[`InboxPage InboxItem: default-inquiry process with "inquiry" item check 
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing1 title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -2740,23 +2588,11 @@ exports[`InboxPage InboxItem: default-inquiry process with "inquiry" item check 
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing1 title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-inquiry.free-inquiry.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-inquiry.free-inquiry.status
+      </span>
     </div>
   </button>
 </div>
@@ -2789,6 +2625,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -2798,23 +2642,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.completed.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.completed.status
+      </span>
     </div>
   </button>
 </div>
@@ -2847,6 +2679,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -2856,23 +2696,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -2905,6 +2733,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -2914,23 +2750,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.completed.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.completed.status
+      </span>
     </div>
   </button>
 </div>
@@ -2963,6 +2787,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -2972,23 +2804,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.canceled.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -3021,6 +2841,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3030,23 +2858,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.canceled.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -3079,6 +2895,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3088,23 +2912,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-accepted.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-accepted.status
+      </span>
     </div>
   </button>
 </div>
@@ -3137,6 +2949,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3146,23 +2966,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.customer-offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.customer-offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -3195,6 +3003,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3204,23 +3020,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-rejected.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-rejected.status
+      </span>
     </div>
   </button>
 </div>
@@ -3253,6 +3057,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3262,23 +3074,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-rejected.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-rejected.status
+      </span>
     </div>
   </button>
 </div>
@@ -3311,6 +3111,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3320,23 +3128,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -3369,6 +3165,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3378,23 +3182,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.delivered.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -3427,6 +3219,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3436,23 +3236,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.delivered.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -3485,6 +3273,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3494,23 +3290,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.reviewed.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -3543,6 +3327,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3552,23 +3344,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.payment-expired.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.payment-expired.status
+      </span>
     </div>
   </button>
 </div>
@@ -3601,6 +3381,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3610,23 +3398,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.reviewed.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -3659,6 +3435,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3668,23 +3452,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.reviewed.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -3717,6 +3489,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3726,23 +3506,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.inquiry.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.inquiry.status
+      </span>
     </div>
   </button>
 </div>
@@ -3775,6 +3543,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3784,23 +3560,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -3833,6 +3597,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3842,23 +3614,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -3891,6 +3651,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3900,23 +3668,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -3949,6 +3705,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -3958,23 +3722,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.completed.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.completed.status
+      </span>
     </div>
   </button>
 </div>
@@ -4007,6 +3759,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4016,23 +3776,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -4065,6 +3813,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4074,23 +3830,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.canceled.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -4123,6 +3867,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4132,23 +3884,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.canceled.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -4181,6 +3921,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4190,23 +3938,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.canceled.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -4239,6 +3975,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4248,23 +3992,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.delivered.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -4297,6 +4029,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4306,23 +4046,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.delivered.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -4355,6 +4083,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4364,23 +4100,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-rejected.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-rejected.status
+      </span>
     </div>
   </button>
 </div>
@@ -4413,6 +4137,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4422,23 +4154,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-rejected.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-rejected.status
+      </span>
     </div>
   </button>
 </div>
@@ -4471,6 +4191,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4480,23 +4208,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.request-rejected.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.request-rejected.status
+      </span>
     </div>
   </button>
 </div>
@@ -4529,6 +4245,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4538,23 +4262,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.changes-requested.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.changes-requested.status
+      </span>
     </div>
   </button>
 </div>
@@ -4587,6 +4299,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4596,23 +4316,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -4645,6 +4353,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4654,23 +4370,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -4703,6 +4407,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4712,23 +4424,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -4761,6 +4461,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4770,23 +4478,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-rejected.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-rejected.status
+      </span>
     </div>
   </button>
 </div>
@@ -4819,6 +4515,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4828,23 +4532,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.offer-rejected.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.offer-rejected.status
+      </span>
     </div>
   </button>
 </div>
@@ -4877,6 +4569,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4886,23 +4586,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.request-rejected.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.request-rejected.status
+      </span>
     </div>
   </button>
 </div>
@@ -4935,6 +4623,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -4944,23 +4640,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.changes-requested.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.changes-requested.status
+      </span>
     </div>
   </button>
 </div>
@@ -4993,6 +4677,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5002,23 +4694,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.pending-payment.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.pending-payment.status
+      </span>
     </div>
   </button>
 </div>
@@ -5051,6 +4731,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5060,23 +4748,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.quote-requested.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.quote-requested.status
+      </span>
     </div>
   </button>
 </div>
@@ -5109,6 +4785,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5118,23 +4802,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.reviewed-by-customer.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.reviewed-by-customer.status
+      </span>
     </div>
   </button>
 </div>
@@ -5167,6 +4839,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5176,23 +4856,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.reviewed-by-provider.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.reviewed-by-provider.status
+      </span>
     </div>
   </button>
 </div>
@@ -5225,6 +4893,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5234,23 +4910,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.reviewed.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -5283,6 +4947,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5292,23 +4964,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.reviewed.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -5341,6 +5001,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5350,23 +5018,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.update-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.update-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -5399,6 +5055,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5408,23 +5072,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.update-pending.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.update-pending.status
+      </span>
     </div>
   </button>
 </div>
@@ -5457,6 +5109,14 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing-request title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5466,23 +5126,11 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateConcluded stateNoActionNeeded"
     >
-      listing-request title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
-      >
-        <span>
-          InboxPage.default-negotiation.request-rejected.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-negotiation.request-rejected.status
+      </span>
     </div>
   </button>
 </div>
@@ -5519,6 +5167,14 @@ exports[`InboxPage InboxItem: default-purchase process with "item" InboxItem wit
       />
     </div>
     <div
+      class="itemTitle"
+    >
+      listing1 title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -5528,23 +5184,11 @@ exports[`InboxPage InboxItem: default-purchase process with "item" InboxItem wit
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing1 title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-purchase.purchased.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-purchase.purchased.status
+      </span>
     </div>
   </button>
 </div>
@@ -5577,15 +5221,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -5598,15 +5233,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.canceled.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -5639,15 +5279,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -5660,15 +5291,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.canceled.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -5701,15 +5337,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -5722,15 +5349,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.completed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.completed.status
+      </span>
     </div>
   </button>
 </div>
@@ -5763,15 +5395,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -5784,15 +5407,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.received.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.received.status
+      </span>
     </div>
   </button>
 </div>
@@ -5825,15 +5453,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -5846,15 +5465,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.canceled.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -5887,15 +5511,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -5908,15 +5523,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.canceled.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.canceled.status
+      </span>
     </div>
   </button>
 </div>
@@ -5953,15 +5573,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       />
     </div>
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -5974,15 +5585,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.purchased.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.purchased.status
+      </span>
     </div>
   </button>
 </div>
@@ -6015,15 +5631,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6036,15 +5643,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.disputed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.disputed.status
+      </span>
     </div>
   </button>
 </div>
@@ -6077,15 +5689,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6098,15 +5701,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -6139,15 +5747,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6160,15 +5759,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.payment-expired.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.payment-expired.status
+      </span>
     </div>
   </button>
 </div>
@@ -6201,15 +5805,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6222,15 +5817,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -6263,15 +5863,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6284,15 +5875,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -6325,6 +5921,14 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
+      class="itemTitle"
+    >
+      listing1 title
+    </div>
+    <div
+      class="itemDetails"
+    />
+    <div
       class="itemUsername"
     >
       <span
@@ -6334,23 +5938,11 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemTitle"
+      class="stateName stateActionNeeded"
     >
-      listing1 title
-    </div>
-    <div
-      class="itemDetails"
-    />
-    <div
-      class="itemState"
-    >
-      <div
-        class="stateName stateActionNeeded"
-      >
-        <span>
-          InboxPage.default-purchase.inquiry.status
-        </span>
-      </div>
+      <span>
+        InboxPage.default-purchase.inquiry.status
+      </span>
     </div>
   </button>
 </div>
@@ -6383,15 +5975,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6404,15 +5987,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.delivered.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -6445,15 +6033,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6466,15 +6045,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.received.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.received.status
+      </span>
     </div>
   </button>
 </div>
@@ -6507,15 +6091,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6528,15 +6103,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.received.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.received.status
+      </span>
     </div>
   </button>
 </div>
@@ -6569,15 +6149,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6590,15 +6161,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.received.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.received.status
+      </span>
     </div>
   </button>
 </div>
@@ -6631,15 +6207,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6652,15 +6219,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.disputed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.disputed.status
+      </span>
     </div>
   </button>
 </div>
@@ -6693,15 +6265,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6714,15 +6277,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.delivered.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.delivered.status
+      </span>
     </div>
   </button>
 </div>
@@ -6755,15 +6323,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6776,15 +6335,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.pending-payment.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.pending-payment.status
+      </span>
     </div>
   </button>
 </div>
@@ -6817,15 +6381,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6838,15 +6393,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.pending-payment.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.pending-payment.status
+      </span>
     </div>
   </button>
 </div>
@@ -6879,15 +6439,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6900,15 +6451,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.reviewed-by-customer.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.reviewed-by-customer.status
+      </span>
     </div>
   </button>
 </div>
@@ -6941,15 +6497,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -6962,15 +6509,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.reviewed-by-provider.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.reviewed-by-provider.status
+      </span>
     </div>
   </button>
 </div>
@@ -7003,15 +6555,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -7024,15 +6567,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.reviewed.status
+      </span>
     </div>
   </button>
 </div>
@@ -7065,15 +6613,6 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       class="rowNotificationDot"
     />
     <div
-      class="itemUsername"
-    >
-      <span
-        class=""
-      >
-        customer display name
-      </span>
-    </div>
-    <div
       class="itemTitle"
     >
       listing1 title
@@ -7086,15 +6625,20 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       </span>
     </div>
     <div
-      class="itemState"
+      class="itemUsername"
     >
-      <div
-        class="stateName stateConcluded stateNoActionNeeded"
+      <span
+        class=""
       >
-        <span>
-          InboxPage.default-purchase.reviewed.status
-        </span>
-      </div>
+        customer display name
+      </span>
+    </div>
+    <div
+      class="stateName stateConcluded stateNoActionNeeded"
+    >
+      <span>
+        InboxPage.default-purchase.reviewed.status
+      </span>
     </div>
   </button>
 </div>
