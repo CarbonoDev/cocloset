@@ -4,7 +4,10 @@ import classNames from 'classnames';
 import { IconArrowHead, Menu, MenuContent, MenuItem, MenuLabel } from '../../../components';
 import css from './InboxSortBy.module.css';
 
-const SORT_DROPDOWN_OFFSET = -14;
+// The -14 this carried compensated for the 18px of side padding the trigger used to have as a
+// filter chip. The trigger is bare text now (see .sortLabel), so the same offset pushed the
+// panel 14px past the column's right edge and over the divider. Flush with the label instead.
+const SORT_DROPDOWN_OFFSET = 0;
 
 const optionLabel = (options, key) => {
   const option = options.find(o => o.key === key);

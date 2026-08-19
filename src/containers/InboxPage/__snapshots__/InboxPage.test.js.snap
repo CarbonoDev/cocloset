@@ -7,9 +7,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -17,7 +16,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -71,9 +70,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -81,7 +79,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -135,9 +133,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -145,7 +142,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -199,9 +196,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -209,7 +205,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -267,9 +263,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -277,7 +272,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -331,9 +326,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -341,7 +335,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -395,9 +389,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -405,7 +398,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -459,9 +452,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -469,7 +461,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -523,9 +515,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -533,7 +524,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -587,9 +578,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -597,7 +587,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -651,9 +641,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -661,7 +650,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -705,9 +694,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -715,7 +703,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -769,9 +757,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -779,7 +766,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -833,9 +820,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -843,7 +829,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -897,9 +883,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -907,7 +892,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -961,9 +946,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -971,7 +955,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1025,9 +1009,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -1035,7 +1018,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1089,9 +1072,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -1099,7 +1081,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1153,9 +1135,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -1163,7 +1144,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1217,9 +1198,8 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -1227,7 +1207,7 @@ exports[`InboxPage InboxItem: default-booking process with "day" check booking: 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1281,9 +1261,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1291,7 +1270,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1345,9 +1324,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1355,7 +1333,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1409,9 +1387,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1419,7 +1396,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1473,9 +1450,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1483,7 +1459,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1537,9 +1513,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1547,7 +1522,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1601,9 +1576,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1611,7 +1585,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1665,9 +1639,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1675,7 +1648,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1729,9 +1702,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1739,7 +1711,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1793,9 +1765,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1803,7 +1774,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1857,9 +1828,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1867,7 +1837,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1921,9 +1891,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1931,7 +1900,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -1975,9 +1944,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -1985,7 +1953,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2039,9 +2007,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2049,7 +2016,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2103,9 +2070,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2113,7 +2079,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2167,9 +2133,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2177,7 +2142,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2231,9 +2196,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2241,7 +2205,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2295,9 +2259,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2305,7 +2268,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2359,9 +2322,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2369,7 +2331,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2423,9 +2385,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2433,7 +2394,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2487,9 +2448,8 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2497,7 +2457,7 @@ exports[`InboxPage InboxItem: default-booking process with "hour" check booking:
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2551,9 +2511,8 @@ exports[`InboxPage InboxItem: default-inquiry process with "inquiry" item check 
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -2561,7 +2520,7 @@ exports[`InboxPage InboxItem: default-inquiry process with "inquiry" item check 
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2605,9 +2564,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2615,7 +2573,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2659,9 +2617,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2669,7 +2626,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2713,9 +2670,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2723,7 +2679,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2767,9 +2723,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2777,7 +2732,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2821,9 +2776,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2831,7 +2785,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2875,9 +2829,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2885,7 +2838,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2929,9 +2882,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2939,7 +2891,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -2983,9 +2935,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -2993,7 +2944,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3037,9 +2988,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3047,7 +2997,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3091,9 +3041,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3101,7 +3050,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3145,9 +3094,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3155,7 +3103,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3199,9 +3147,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3209,7 +3156,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3253,9 +3200,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3263,7 +3209,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3307,9 +3253,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3317,7 +3262,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3361,9 +3306,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3371,7 +3315,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3415,9 +3359,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3425,7 +3368,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3469,9 +3412,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3479,7 +3421,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3523,9 +3465,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3533,7 +3474,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3577,9 +3518,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3587,7 +3527,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3631,9 +3571,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3641,7 +3580,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3685,9 +3624,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3695,7 +3633,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3739,9 +3677,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3749,7 +3686,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3793,9 +3730,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3803,7 +3739,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3847,9 +3783,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3857,7 +3792,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3901,9 +3836,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3911,7 +3845,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -3955,9 +3889,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -3965,7 +3898,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4009,9 +3942,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4019,7 +3951,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4063,9 +3995,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4073,7 +4004,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4117,9 +4048,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4127,7 +4057,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4171,9 +4101,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4181,7 +4110,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4225,9 +4154,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4235,7 +4163,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4279,9 +4207,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4289,7 +4216,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4333,9 +4260,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4343,7 +4269,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4387,9 +4313,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4397,7 +4322,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4441,9 +4366,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4451,7 +4375,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4495,9 +4419,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4505,7 +4428,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4549,9 +4472,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4559,7 +4481,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4603,9 +4525,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4613,7 +4534,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4657,9 +4578,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4667,7 +4587,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4711,9 +4631,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4721,7 +4640,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4765,9 +4684,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4775,7 +4693,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4819,9 +4737,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4829,7 +4746,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4873,9 +4790,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4883,7 +4799,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4927,9 +4843,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4937,7 +4852,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -4981,9 +4896,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -4991,7 +4905,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5035,9 +4949,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -5045,7 +4958,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5089,9 +5002,8 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/provider"
       title="provider display name"
     >
       <span
@@ -5099,7 +5011,7 @@ exports[`InboxPage InboxItem: default-negotiation process with "request" check n
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5143,9 +5055,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" InboxItem wit
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5153,7 +5064,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" InboxItem wit
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5201,9 +5112,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5211,7 +5121,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5259,9 +5169,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5269,7 +5178,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5317,9 +5226,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5327,7 +5235,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5375,9 +5283,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5385,7 +5292,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5433,9 +5340,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5443,7 +5349,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5491,9 +5397,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5501,7 +5406,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5549,9 +5454,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5559,7 +5463,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5611,9 +5515,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5621,7 +5524,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5669,9 +5572,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5679,7 +5581,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5727,9 +5629,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5737,7 +5638,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5785,9 +5686,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5795,7 +5695,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5843,9 +5743,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5853,7 +5752,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5901,9 +5800,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5911,7 +5809,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -5955,9 +5853,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -5965,7 +5862,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6013,9 +5910,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6023,7 +5919,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6071,9 +5967,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6081,7 +5976,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6129,9 +6024,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6139,7 +6033,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6187,9 +6081,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6197,7 +6090,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6245,9 +6138,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6255,7 +6147,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6303,9 +6195,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6313,7 +6204,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6361,9 +6252,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6371,7 +6261,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6419,9 +6309,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6429,7 +6318,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6477,9 +6366,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6487,7 +6375,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6535,9 +6423,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6545,7 +6432,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"
@@ -6593,9 +6480,8 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
   <div
     class="itemAvatar"
   >
-    <a
+    <div
       class="root"
-      href="/u/customer"
       title="customer display name"
     >
       <span
@@ -6603,7 +6489,7 @@ exports[`InboxPage InboxItem: default-purchase process with "item" check purchas
       >
         TT
       </span>
-    </a>
+    </div>
   </div>
   <button
     class="itemLink itemButton"

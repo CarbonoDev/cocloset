@@ -11,11 +11,14 @@
   transform: rotate(-180deg);
 }
 
+/* 300px was sized for the stock inbox, where this sat above a full-width content area. The
+   list is a ~215px sidebar now and the trigger is right-aligned in it, so a 300px panel opened
+   across the divider and over the rental beside it. Sized to the column instead. */
 .menuContent {
   margin-top: 7px;
-  padding-top: 24px;
-  padding-bottom: 24px;
-  min-width: 300px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  min-width: 200px;
   border-radius: var(--borderRadiusMedium);
 }
 
@@ -46,9 +49,9 @@
 
   /* Layout */
   position: relative;
-  min-width: 300px;
+  min-width: 200px;
   margin: 0;
-  padding: 4px 30px;
+  padding: 6px 20px;
 
   /* Override button styles */
   outline: none;
@@ -75,63 +78,71 @@
   }
 }
 
+/* THE TRIGGER IS TEXT, NOT A BUTTON.
+     > "remueve tambien el select de newest o mas bien, que parezca que es una sola linea de
+     >  texto y al dar click se desplegue el select, es como si quitaramos el background"
+
+   The stock label is a filter chip: white fill, grey border, 35px tall, 18px of side padding.
+   Beside the "Sort by:" text in a 215px sidebar it read as a form control sitting in a
+   sidebar that has no other form controls. Stripped to a run of text with its caret, it
+   reads as the continuation of the sentence it follows - the whole point of the label being
+   the word "Sort by:" - and still opens the same menu on click.
+
+   Nothing about the interaction changes: this is the same <button> MenuLabel always rendered,
+   so it is still focusable, still announces its expanded state, and still opens on Enter. */
 .sortLabel {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
   width: auto;
-  height: 35px;
-  min-height: 35px;
+  height: auto;
+  min-height: 0;
 
-  padding: 0 18px;
+  padding: 8px 0;
+  margin: 0;
 
-  transition: all var(--transitionStyleButton);
+  transition: color var(--transitionStyleButton);
   cursor: pointer;
 
-  /* Font */
-  font-weight: var(--fontWeightSemiBold);
-  font-size: 13px;
-  line-height: 18px;
-  letter-spacing: 0.2px;
+  /* Font - matches .sortyBy ("Sort by:") beside it, so the two read as one line. */
+  font-weight: var(--fontWeightMedium);
+  font-size: 14px;
+  line-height: 24px;
+  letter-spacing: 0;
 
-  /* Button text styles */
-  /* Default button text is centered without decorations */
-  text-align: center;
+  text-align: left;
   text-decoration: none;
 
-  /* Button borders */
-  border: 1px solid var(--colorGrey100);
-  border-radius: var(--borderRadiusMedium);
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+  color: var(--coclosetInk);
 
-  background-color: var(--colorWhite);
-
-  &:focus,
   &:hover {
     outline: none;
-    box-shadow: var(--boxShadowFilterButton);
+    box-shadow: none;
     text-decoration: none;
-    border-color: var(--colorGrey300);
+    background-color: transparent;
+    color: var(--coclosetBrandDark);
+  }
+
+  /* Removing the border took the only visible focus affordance with it. `:focus-visible`
+     rather than `:focus` so a mouse click doesn't leave a ring behind on a control that no
+     longer looks like a control. */
+  &:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coclosetBrand);
+    outline-offset: 3px;
+    border-radius: var(--coclosetRadiusSmall);
   }
 
   &:disabled {
     box-shadow: none;
     cursor: not-allowed;
-  }
-
-  @media (--viewportMedium) {
-    gap: 36px;
-    height: auto;
-    min-height: 0;
-    padding: var(--marketplaceButtonSmallDesktopPadding);
-    margin: 0;
-
-    font-weight: var(--fontWeightMedium);
-    font-size: 13px;
-    line-height: 20px;
-
-    &:hover,
-    &:focus {
-      border-color: transparent;
-    }
+    color: var(--coclosetInkMuted);
   }
 }

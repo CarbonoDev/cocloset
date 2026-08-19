@@ -53,9 +53,17 @@
     padding: 24px 24px 0 24px;
   }
 
+  /* THE COLUMN NEEDS A RIGHT GUTTER, NOT JUST A LEFT ONE.
+       > "un margin para que no choque con la linea a la derecha"
+
+     The stock side nav is zero-padded on the right because the tabs it holds are short text
+     that never reaches the edge. This column holds full-width rows, and the selected one's
+     card ran flush into the `.main` border-left beside it. 24px here backs the whole column
+     off that divider; `.tabs` used to carry its own 24px for the same reason and no longer
+     needs to, or the two would compound. */
   @media (--viewportLarge) {
     flex-wrap: unset;
-    padding: 40px 0 82px 36px;
+    padding: 40px 24px 82px 36px;
     flex-direction: column;
     justify-content: flex-start;
     border: none;
@@ -63,7 +71,7 @@
     background-color: transparent;
   }
   @media (--viewportLargeWithPaddings) {
-    padding: 40px 0 82px calc((100% - 1056px) / 2);
+    padding: 40px 24px 82px calc((100% - 1056px) / 2);
   }
 }
 
@@ -115,9 +123,9 @@
     padding-top: 20px;
     flex-direction: column;
     /* The tabs are a two-item switch, not a nav bar. Their own gap replaces the 16px margin
-       each link carried for a horizontal row. */
+       each link carried for a horizontal row. The right gutter they used to carry alone now
+       belongs to the whole column - see `.navigation`. */
     gap: 2px;
-    padding-right: 24px;
   }
 }
 
@@ -769,11 +777,49 @@
    three stacked lines, which is what this width can hold.
 
    These override the stock `.item*` rules, so they come after them in the file. */
+/* The row's 24px side padding moved out here, half to the list and half to the row. Same 24px
+   of content inset as before, but now 12px of it is OUTSIDE the row's box - which is what gives
+   the hover tint and the selected card their breathing room instead of letting them run to the
+   column's edges. The separators (`.listItem`) sit inside the same padding, so they line up
+   with the card rather than overhanging it. */
+.itemList {
+  padding: 0 12px;
+}
+
+/* THE WHOLE ROW IS THE TARGET, NOT THE WORDS IN IT.
+     > "hay que hacer clickable todo el div en lugar de dar click solo en el texto"
+
+   The button holds the three text lines, so the thumbnail, the gap beside it and the row's own
+   padding were all dead space - a reader aiming at the garment's photo, which is what this row
+   leads with, hit nothing. `.itemButton::before` stretches that same button over the whole row
+   (see `position: relative` here), so the entire surface activates it.
+
+   An overlay rather than wrapping everything in the <button>: the fallback avatar renders a
+   NamedLink to the other party's profile, and a link inside a button is invalid markup that
+   browsers un-nest in ways that break both. The Avatar is passed `disableProfileLink` for the
+   same reason - see InboxPage.js - so nothing interactive is left stranded underneath. */
 .item {
   align-items: flex-start;
+  cursor: pointer;
   display: flex;
   gap: 12px;
-  padding: 10px 24px;
+  padding: 10px 12px;
+  position: relative;
+  border-radius: 10px;
+  transition: background-color var(--transitionStyleButton);
+}
+
+/* The row now answers the pointer. Tinted rather than raised: `--coclosetSurfaceRaised` is the
+   selected row's own fill, and hovering an unselected row must not make it look chosen. */
+.item:hover {
+  background-color: var(--coclosetSubtle);
+}
+
+/* Doubled class for specificity: `.item:hover` above outranks a single `.itemSelected`, so
+   without this the open rental changed appearance whenever the pointer crossed it. */
+.item.itemSelected,
+.item.itemSelected:hover {
+  background-color: var(--coclosetSurfaceRaised);
 }
 
 .itemButton {
@@ -782,6 +828,26 @@
   gap: 2px;
   min-width: 0;
   padding: 0;
+}
+
+.itemButton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Matches .item / .itemSelected, so the focus ring below traces the row's corners. */
+  border-radius: 10px;
+}
+
+/* The hit area moved to a pseudo-element, so the focus ring has to follow it - a ring drawn
+   around the button itself would outline the text column and miss the thumbnail the reader
+   just tabbed onto. `:focus-visible` keeps it off mouse clicks. */
+.itemButton:focus-visible {
+  outline: none;
+}
+
+.itemButton:focus-visible::before {
+  outline: 2px solid var(--coclosetBrand);
+  outline-offset: 2px;
 }
 
 .itemAvatar {

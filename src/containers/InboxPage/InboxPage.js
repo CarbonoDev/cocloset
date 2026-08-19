@@ -216,7 +216,11 @@ export const InboxItem = props => {
             variants={['listing-card', 'listing-card-2x']}
           />
         ) : (
-          <Avatar user={otherUser} />
+          // `disableProfileLink` because the row's click target now covers this cell too (see
+          // `.itemButton::before`): the link underneath would be unreachable by pointer while
+          // still landing in the tab order, which is a control that looks broken to exactly
+          // the readers least able to work around it.
+          <Avatar user={otherUser} disableProfileLink />
         )}
       </div>
       {/* A BUTTON, NOT A LINK, because selecting no longer navigates away - it opens the

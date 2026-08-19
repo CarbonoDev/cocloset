@@ -40,8 +40,30 @@
   background-color: var(--coclosetSurfaceRaised);
   border-top-color: var(--coclosetBorder);
 
+  /* THE RAIL IS SIZED, NOT LEFT TO ITS CONTENTS.
+       > "esta demasiado ancho, por favor haslo mas delgado para que cubra solo el
+       >  texto y un poquito mas (...) debemos tener un poco de margin como el que
+       >  se ve a la izquierda pero a la derecha"
+
+     LayoutSideNavigation sets `width: unset` on the aside from --viewportLarge, so
+     the column is as wide as its widest child. Every nav label is one short word,
+     but `.opsNavHint` is a two-sentence paragraph with nothing capping it - so the
+     rail resolved to that sentence's max-content and took ~570px, most of it empty
+     beside seven links, and the orders table lost the width to it.
+
+     A declared width fixes the cause. 216px of content holds the longest label
+     ("Dashboard") several times over and lets the hint wrap to four or five lines,
+     which is what it should have been doing all along. `flex: 0 0 auto` because the
+     aside is a flex item beside a `flex-grow: 1` main: without it this width is a
+     starting point that the row is free to shrink.
+
+     The 36px right padding is the mirror of the left one the mockups already show,
+     and is what keeps the links off the `.opsMain` border beside them. */
   @media (--viewportLarge) {
     background-color: var(--coclosetSurfaceRaised);
+    flex: 0 0 auto;
+    width: 288px;
+    padding: 48px 36px 82px 36px;
   }
 
   /* The ops rail is a narrow, flush-left column in the mockups (03-09.jpg), not
@@ -49,7 +71,7 @@
      hands ~150px back to the main column, which is what lets all seven table
      columns - including the "Open" action - fit without scrolling on a laptop. */
   @media (--viewportLargeWithPaddings) {
-    padding: 48px 0 82px 36px;
+    padding: 48px 36px 82px 36px;
   }
 }
 
@@ -192,7 +214,10 @@
 
   @media (--viewportLarge) {
     display: block;
-    margin: 32px 36px 0 0;
+    /* The 36px right margin this carried was standing in for the gutter the rail
+       itself now has (see `.opsSideNav`). Kept, it would inset the hint twice and
+       squeeze its text into a column narrower than the links above it. */
+    margin: 32px 0 0 0;
     padding: 14px 16px;
     border: 1px solid var(--coclosetBorder);
     border-radius: var(--coclosetRadius);
