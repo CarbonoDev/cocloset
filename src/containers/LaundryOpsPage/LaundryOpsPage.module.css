@@ -492,8 +492,12 @@
   white-space: nowrap;
 }
 
+/* The whole summary row toggles its detail (see LaundryOrderRow), so it says so. The tint was
+   already here as a plain hover; `cursor` is what turns it from decoration into a promise.
+   Only this class - the detail row below it is deliberately not a target. */
 .row {
   border-bottom: 1px solid var(--coclosetBorder);
+  cursor: pointer;
   transition: var(--transitionStyle);
 
   &:hover {

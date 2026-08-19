@@ -117,6 +117,53 @@ describe('LaundryOpsPage', () => {
       ).not.toBeInTheDocument();
     });
 
+    // ---------------------------------------------------------------------------
+    //   > "podrías hacer que todo el row sea clickeable? solo el row, ya que al abrir, se
+    //   >  abre el content de cada fila y no deberiamos poder dar click a toda esa area"
+    //
+    // Two halves of one rule, and the second is the one worth a test: the detail row is a
+    // SIBLING of the summary row, not a child, so a handler placed on a wrapper around both -
+    // the obvious way to write this - would collapse the panel the moment an operator clicked
+    // into the cleaning-days box. Asserted through the panel's own contents rather than
+    // through the handler, since the bug is a panel that closes, not a listener that fires.
+    // ---------------------------------------------------------------------------
+    it('toggles the detail from anywhere on the summary row, not just the label', async () => {
+      const user = userEvent.setup();
+      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+
+      // A cell with no control in it - the garment's title.
+      const cell = screen.getByText('Draped jersey gown, crimson').closest('td');
+
+      await user.click(cell);
+      expect(screen.getByText('LaundryOpsPage.detail.transactionId')).toBeInTheDocument();
+
+      await user.click(cell);
+      expect(screen.queryByText('LaundryOpsPage.detail.transactionId')).not.toBeInTheDocument();
+    });
+
+    it('does not close the detail when the operator clicks inside it', async () => {
+      const user = userEvent.setup();
+      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1'));
+
+      expect(screen.getByText('LaundryOpsPage.detail.transactionId')).toBeInTheDocument();
+    });
+
+    // The label keeps working on its own terms. Without `stopPropagation` its click would
+    // bubble to the row and toggle a second time, so the panel would never open.
+    it('opens exactly once when the label itself is clicked', async () => {
+      const user = userEvent.setup();
+      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      expect(screen.getByText('LaundryOpsPage.detail.transactionId')).toBeInTheDocument();
+
+      await user.click(screen.getByText('LaundryOpsPage.table.close'));
+      expect(screen.queryByText('LaundryOpsPage.detail.transactionId')).not.toBeInTheDocument();
+    });
+
     it('still shows the transaction id, which is what a broken scanner falls back to', async () => {
       const user = userEvent.setup();
       render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
