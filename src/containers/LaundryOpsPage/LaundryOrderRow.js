@@ -95,6 +95,10 @@ const LaundryOrderRow = props => {
   // Rows share a table, so the input's id has to be per-row or every label in the
   // table would point at the first one.
   const cleaningDaysInputId = `LaundryOrderRow.cleaningDays.${row.id}`;
+  // Same reason: `aria-controls` on the toggle has to name THIS row's detail.
+  const detailRowId = `LaundryOrderRow.detail.${row.id}`;
+
+  const toggleOpen = () => setIsOpen(open => !open);
 
   // Only send cleaningDays when it is a usable non-negative integer. A blank box
   // is not a zero: the server treats "absent" as "apply the configured
@@ -115,7 +119,21 @@ const LaundryOrderRow = props => {
 
   return (
     <>
-      <tr className={css.row}>
+      {/* THE WHOLE SUMMARY ROW TOGGLES, AND ONLY THE SUMMARY ROW.
+            > "podrías hacer que todo el row sea clickeable? solo el row, ya que al abrir, se
+            >  abre el content de cada fila y no deberiamos poder dar click a toda esa area"
+
+          The handler sits on this <tr> alone. The detail <tr> below is a sibling, not a child,
+          so the panel an operator is typing cleaning days into never collapses under its own
+          click - which is the distinction the client drew, and which a single wrapper around
+          both rows would have lost.
+
+          No `tabIndex` or `role="button"` here on purpose: the Open/Close button stays, and it
+          is what carries keyboard access and the expanded state. Making the row focusable too
+          would put two tab stops on one control and announce the row's entire contents as the
+          button's name. So the row is a pointer affordance over a real control, not a
+          replacement for one - and `.row`'s existing hover already says it is live. */}
+      <tr className={css.row} onClick={toggleOpen}>
         <td className={css.cellNoWrap}>
           <span className={css.primaryText}>{row.ticketCode || '—'}</span>
           <span className={css.secondaryText}>{row.currentRack || '—'}</span>
@@ -167,7 +185,19 @@ const LaundryOrderRow = props => {
           ) : null}
         </td>
         <td className={css.cellNoWrap}>
-          <InlineTextButton type="button" onClick={() => setIsOpen(!isOpen)}>
+          {/* `stopPropagation` because this click would otherwise bubble to the <tr> above and
+              toggle a second time, leaving the label looking dead. Explicit here rather than
+              dropping the button's own handler and letting it bubble: the button must keep
+              working on its own terms if the row's handler is ever moved or removed. */}
+          <InlineTextButton
+            type="button"
+            aria-expanded={isOpen}
+            aria-controls={detailRowId}
+            onClick={e => {
+              e.stopPropagation();
+              toggleOpen();
+            }}
+          >
             <FormattedMessage
               id={isOpen ? 'LaundryOpsPage.table.close' : 'LaundryOpsPage.table.open'}
             />
@@ -175,7 +205,7 @@ const LaundryOrderRow = props => {
         </td>
       </tr>
       {isOpen ? (
-        <tr>
+        <tr id={detailRowId}>
           <td className={css.detailCell} colSpan={6}>
             <div className={css.detailPanel}>
               {/* The endpoint denormalizes the listing's first image down to a
