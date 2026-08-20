@@ -40,7 +40,7 @@ import css from './HandoverPage.module.css';
  * that `server/api-util/laundryAuth.js` performs again on the write itself.
  */
 
-const DATE_FORMAT = { year: 'numeric', month: 'short', day: 'numeric' };
+const DATE_FORMAT = { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' };
 
 /**
  * The customer's last day, from the API's exclusive booking end.
