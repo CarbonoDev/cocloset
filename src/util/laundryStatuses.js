@@ -99,6 +99,25 @@ export const DAMAGE_REPORT_STATUS = 'returned';
 // per-category settings - the client neither knows nor guesses it.
 export const CLEANING_DAYS_STATUS = 'returned';
 
+// The step at which the studio names the garment on its own shelving.
+//
+//   > "cuando laundry recibe la prenda desde el provider, debe aparecer un input
+//   >  para que laundry pueda ingresar un código interno para esa prenda"
+//
+// The reception step, which is the one moment the garment is on the counter coming
+// IN from its owner. MUST match `takesLaundryCode` in server/api-util/laundryCode.js -
+// the server decides whether the code is read at all, and a client that offers the box
+// at a step the server ignores would take an operator's input and drop it silently.
+// That is exactly what the ops table did: the handover page asked, this one did not,
+// so the same reception done from a desk lost the code with nothing on screen to say so.
+export const LAUNDRY_CODE_STATUS = 'ready-for-pickup';
+
+// Mirrors MAX_CODE_LENGTH in server/api-util/laundryCode.js, which is the authority and will
+// reject anything longer. Held here so both screens that ask for a code cap it the same way -
+// the handover page carried a bare `40`, and a second literal in the ops table would have been
+// the third copy of one number.
+export const MAX_LAUNDRY_CODE_LENGTH = 40;
+
 // The action that fires the owner's payout. Called out separately because the
 // UI has to warn about it: it is the point of no return for a refund.
 export const PAYOUT_ACTION_STATUS = 'pending-cleaning';
@@ -141,7 +160,7 @@ export const opsStatus = row => {
  *
  * @param {Object} row - a row from the /api/laundry-orders response
  * @returns {Array<{status: string, labelKey: string, needsDamageReport: boolean,
- *   needsCleaningDays: boolean, firesPayout: boolean}>}
+ *   needsCleaningDays: boolean, needsLaundryCode: boolean, firesPayout: boolean}>}
  */
 export const laundryActionsFor = row => {
   // Inventory-only rows (§8's listings with no transaction) have no process
@@ -190,6 +209,7 @@ export const laundryActionsFor = row => {
       labelKey: `LaundryOpsPage.action.${nextStatus}`,
       needsDamageReport: nextStatus === DAMAGE_REPORT_STATUS,
       needsCleaningDays: nextStatus === CLEANING_DAYS_STATUS,
+      needsLaundryCode: nextStatus === LAUNDRY_CODE_STATUS,
       firesPayout: nextStatus === PAYOUT_ACTION_STATUS,
     },
   ];

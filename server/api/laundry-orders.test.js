@@ -223,6 +223,84 @@ describe('laundry-orders', () => {
     expect(row.bookingEnd).toBe('2026-08-11T00:00:00.000Z');
   });
 
+  // The ops table asks for the studio's internal code at the reception step and pre-fills the
+  // box from this field, the way the handover page already does. Without it a studio
+  // re-confirming a step is asked to remember its own shelving.
+  describe('the studio internal code', () => {
+    const codedListing = (record, assignedTo = LAUNDRY_ID) =>
+      listing('listing-mine', {
+        attributes: {
+          title: 'Listing listing-mine',
+          state: 'published',
+          publicData: { brand: 'Galvan', size: 'FR 38' },
+          privateData: { currentRack: 'Rack A-04' },
+          metadata: {
+            assignedLaundryId: assignedTo,
+            readinessStatus: 'stored',
+            laundryCode: record,
+          },
+        },
+      });
+
+    const rowFor = async (listingEntity, txMetadata) => {
+      setupSdk({
+        listingPages: [page([listingEntity], listingIncluded)],
+        transactionsByListing: {
+          'listing-mine': {
+            data: {
+              data: [transaction('tx-1', txMetadata, 'transition/accept')],
+              included: txIncluded,
+            },
+          },
+        },
+      });
+
+      const res = mockRes();
+      await laundryOrders({}, res);
+      await new Promise(setImmediate);
+      return res.body.data.orders[0];
+    };
+
+    it('falls back to the code this studio gave the garment before', async () => {
+      const row = await rowFor(
+        codedListing({ code: 'RACK 12', laundryId: LAUNDRY_ID, updatedAt: '2026-08-01T00:00:00Z' }),
+        { ticketCode: 'PIG-2032' }
+      );
+
+      expect(row.laundryCode).toBe('RACK 12');
+    });
+
+    it('prefers the code this rental was actually given', async () => {
+      const row = await rowFor(
+        codedListing({ code: 'RACK 12', laundryId: LAUNDRY_ID, updatedAt: '2026-08-01T00:00:00Z' }),
+        { ticketCode: 'PIG-2032', laundryCode: 'A-04 / BIN 7' }
+      );
+
+      expect(row.laundryCode).toBe('A-04 / BIN 7');
+    });
+
+    // A code names a place on ONE studio's shelving. If the garment has moved, the old code is
+    // not history - it is a wrong answer that sends somebody to the wrong shelf.
+    it('refuses a code issued by a studio that no longer holds the garment', async () => {
+      const row = await rowFor(
+        codedListing({
+          code: 'RACK 12',
+          laundryId: 'some-other-studio',
+          updatedAt: '2026-08-01T00:00:00Z',
+        }),
+        { ticketCode: 'PIG-2032' }
+      );
+
+      expect(row.laundryCode).toBeNull();
+    });
+
+    it('is null for a garment nobody has named yet', async () => {
+      const row = await rowFor(listing('listing-mine'), { ticketCode: 'PIG-2032' });
+
+      expect(row.laundryCode).toBeNull();
+    });
+  });
+
   it('pre-fills the cleaning-days box with the studio own turnaround', async () => {
     //   > "estos días deben tener un default de los días que indique la laundry"
     //

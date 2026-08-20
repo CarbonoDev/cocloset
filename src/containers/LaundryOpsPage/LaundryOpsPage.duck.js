@@ -28,6 +28,12 @@ export const fetchOrdersThunk = createAsyncThunk(
 // for the garment's category, and sizes listing.metadata.readyAt and the
 // availability block from that.
 //
+// `laundryCode` is the studio's own name for the garment, read only at the reception
+// step. THE WHITELIST BELOW IS LOAD-BEARING AND WAS WHY THE OPS TABLE COULD NOT SEND
+// ONE: every field is spread in explicitly, so a key the caller passes and this list
+// does not name is dropped here, silently, before the request is built. Anything added
+// to the row's payload has to be added here too.
+//
 // The server re-validates the move against the legal sequence and answers 409
 // on an illegal jump; the UI only ever offers the single next status, so a 409
 // here means the row was stale. Refetching the whole payload on success keeps
@@ -35,13 +41,17 @@ export const fetchOrdersThunk = createAsyncThunk(
 // terminal in the studio.
 export const advanceStatusThunk = createAsyncThunk(
   'LaundryOpsPage/advanceStatus',
-  ({ transactionId, status, damaged, damageNote, cleaningDays }, { dispatch, rejectWithValue }) =>
+  (
+    { transactionId, status, damaged, damageNote, cleaningDays, laundryCode },
+    { dispatch, rejectWithValue }
+  ) =>
     updateLaundryTransactionStatus({
       transactionId,
       status,
       ...(typeof damaged === 'boolean' ? { damaged } : {}),
       ...(damageNote ? { damageNote } : {}),
       ...(typeof cleaningDays === 'number' ? { cleaningDays } : {}),
+      ...(laundryCode ? { laundryCode } : {}),
     })
       .then(response => {
         dispatch(fetchOrdersThunk());

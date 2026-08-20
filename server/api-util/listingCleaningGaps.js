@@ -1,7 +1,12 @@
 const { getIntegrationSdk } = require('./integrationSdk');
 const { resolveLiveTurnaroundDays } = require('./liveInitialCleaning');
 const { readAssignedLaundryId } = require('./laundryAssignment');
-const { INITIAL_CLEANING_DAYS_KEY } = require('./bookingRules');
+const {
+  INITIAL_CLEANING_DAYS_KEY,
+  earliestStartAfterCleaning,
+  resolveReadyAt,
+  startOfDayInTimeZone,
+} = require('./bookingRules');
 const {
   assertCleaningGap,
   collectBookingsAwaitingCleaning,
@@ -181,6 +186,62 @@ const queryListingTransactions = ({ integrationSdk, listingId }) =>
   integrationSdk.transactions.query({ listingId, include: ['booking'], perPage: 100 });
 
 /**
+ * THE WASH THAT IS HAPPENING RIGHT NOW.
+ *
+ *   > "cuando laundry recibe la prenda de vuelta, y puedo ingresar la cantidad de días para
+ *   >  lavado, estos no se reflejan en la página de listingPage, debe mostrar los días de
+ *   >  lavado en color celeste pero de momento no lo hace"
+ *
+ * ── WHY IT WAS MISSING, WHICH IS THE INTERESTING PART ───────────────────────
+ * `computeCleaningGaps` deliberately covers only bookings whose return has NOT happened yet -
+ * everything from `pending-payment` through `overdue` - because after that `metadata.readyAt`
+ * holds the real window, measured from the real return date, and projecting
+ * `bookingEnd + turnaround` on top of it would double-block a garment returned early.
+ *
+ * That handover is correct and it is exactly where the days disappeared. The moment the studio
+ * confirms the return - the moment it types the number - the transaction leaves the state list
+ * above, its projected gap vanishes, and nothing put `readyAt` in the gaps' place. So the
+ * calendar lost the wash at precisely the moment somebody entered it, on both routes, because
+ * both routes write the same `readyAt`.
+ *
+ * The gate never had the bug: `assertCleaningReadiness` reads `readyAt` directly and has been
+ * refusing those dates all along. The picker and the calendar simply could not see what the
+ * gate was enforcing - the "the calendar offered me a date and then my card was refused" shape
+ * this module's header warns about, running in the other direction.
+ *
+ * ── THE WINDOW STARTS TODAY, NOT AT THE RETURN ──────────────────────────────
+ * `readyAt` is the only end of the window the listing stores; the return date is not kept, so
+ * the true start cannot be recovered from the listing alone. Today is the right substitute
+ * rather than a compromise: days before today cannot be booked by anyone, and `readyAt` is the
+ * whole of what the gate compares against - so what the picker refuses and what checkout
+ * refuses are the same set of days, by construction. Both boundaries come out of
+ * `earliestStartAfterCleaning`/`startOfDayInTimeZone`, the same helpers the gate uses, in the
+ * listing's own zone.
+ *
+ * @param {Object} [listing] - a listing API entity
+ * @returns {{start: Date, end: Date}|null} null when nothing is being washed
+ */
+const currentCleaningGap = listing => {
+  const readyAt = resolveReadyAt(listing?.attributes?.metadata);
+  if (!readyAt) {
+    return null;
+  }
+
+  const timeZone = listing?.attributes?.availabilityPlan?.timezone;
+  const earliestStart = earliestStartAfterCleaning({ readyAt, timeZone });
+  if (!earliestStart) {
+    return null;
+  }
+
+  const today = startOfDayInTimeZone(new Date(), timeZone);
+
+  // A finished wash is not a gap. `readyAt` is left on the listing forever - it is a fact about
+  // the last return, not a flag - so the overwhelming majority of listings reach here with one
+  // in the past and must come out unblocked.
+  return earliestStart.getTime() > today.getTime() ? { start: today, end: earliestStart } : null;
+};
+
+/**
  * The gaps alone, for the public endpoint that feeds the picker.
  *
  * Also carries the completed-rental count, because the listing page shows it next to the
@@ -191,11 +252,20 @@ const queryListingTransactions = ({ integrationSdk, listingId }) =>
  */
 const resolveCleaningGapsForListing = params =>
   resolveBookingConstraints({ ...params, countRentals: true }).then(
-    ({ turnaroundDays, gaps, completedRentals }) => ({
-      turnaroundDays,
-      gaps,
-      completedRentals,
-    })
+    ({ turnaroundDays, gaps, completedRentals }) => {
+      const current = currentCleaningGap(params.listing);
+
+      return {
+        turnaroundDays,
+        // NULL STAYS NULL. It means the bookings read failed, and the endpoint's contract is
+        // that absent gaps are "not known" while `[]` is "asked, and there are none". Returning
+        // just this one gap would answer the second when the truth is the first, and the picker
+        // would read a broken query as a calendar with a single block on it. The wash is
+        // enforced by `assertCleaningReadiness` either way.
+        gaps: gaps ? (current ? [...gaps, current] : gaps) : null,
+        completedRentals,
+      };
+    }
   );
 
 /**
@@ -292,6 +362,7 @@ module.exports = {
   resolveBookingConstraints,
   resolveNextBookingStart,
   queryListingTransactions,
+  currentCleaningGap,
   resolveCleaningGapsForListing,
   assertCleaningGapForListing,
   liveInitialCleaningDaysFrom,

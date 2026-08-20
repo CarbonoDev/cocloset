@@ -9,6 +9,7 @@ import {
   HANDOVER_COUNTERPARTY_PROVIDER,
   handoverStepMessageId,
 } from '../../util/handoverSteps';
+import { MAX_LAUNDRY_CODE_LENGTH } from '../../util/laundryStatuses';
 
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 
@@ -346,7 +347,7 @@ export const HandoverPageComponent = props => {
                   id="handoverLaundryCode"
                   className={css.cleaningDaysInput}
                   type="text"
-                  maxLength={40}
+                  maxLength={MAX_LAUNDRY_CODE_LENGTH}
                   value={codeInput}
                   onChange={e => setCodeInput(e.target.value)}
                 />
