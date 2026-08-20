@@ -1,5 +1,6 @@
 import React from 'react';
 import loadable from '@loadable/component';
+import classNames from 'classnames';
 import { bool, func, object } from 'prop-types';
 import { compose } from 'redux';
 import { connect } from 'react-redux';
@@ -138,49 +139,62 @@ export const PartnerLandingPageComponent = props => {
         <div className={css.root}>
           {content}
 
-          <section className={css.applySection} id="apply">
-            <H2 className={css.sectionTitle}>
-              <FormattedMessage id="PartnerLandingPage.applyTitle" />
-            </H2>
-            <p className={css.sectionIntro}>
-              <FormattedMessage id="PartnerLandingPage.applyIntro" />
-            </p>
+          {/* Canvas band, white card. The card is what separates the form from whatever
+              precedes it, which matters most on the HOSTED path: every skinned section is
+              canvas, so without it the form would run straight out of the last one. */}
+          <section className={css.band} id="apply">
+            <div className={css.bandInner}>
+              <H2 className={css.sectionTitle}>
+                <FormattedMessage id="PartnerLandingPage.applyTitle" />
+              </H2>
+              <p className={css.sectionIntro}>
+                <FormattedMessage id="PartnerLandingPage.applyIntro" />
+              </p>
 
-            {applicationSubmitted ? (
-              <ApplicationSubmitted />
-            ) : (
-              <PartnerApplicationForm
-                onSubmit={onSubmitApplication}
-                onChange={onFormChange}
-                inProgress={submitInProgress}
-                submitApplicationError={submitError}
-              />
-            )}
+              <div className={css.applyCard}>
+                {applicationSubmitted ? (
+                  <ApplicationSubmitted />
+                ) : (
+                  <PartnerApplicationForm
+                    onSubmit={onSubmitApplication}
+                    onChange={onFormChange}
+                    inProgress={submitInProgress}
+                    submitApplicationError={submitError}
+                  />
+                )}
+              </div>
+            </div>
           </section>
 
-          <section className={css.contactSection}>
-            <H2 className={css.sectionTitle}>
-              <FormattedMessage id="PartnerLandingPage.contactTitle" />
-            </H2>
-            {/* Deliberately not a second form: a general-enquiry form would be the
-                application form minus two fields, and would double both the spam
-                surface and the number of places a message can get lost. */}
-            <p className={css.sectionIntro}>
-              <FormattedMessage
-                id="PartnerLandingPage.contactText"
-                values={{
-                  contactLink: (
-                    // target="_self": a mailto: in a new tab leaves an empty tab behind.
-                    <ExternalLink href={`mailto:${contactEmail}`} target="_self">
-                      {contactEmail}
-                    </ExternalLink>
-                  ),
-                }}
-              />
-            </p>
-            <p className={css.placeholderNote}>
-              <FormattedMessage id="PartnerLandingPage.contactPlaceholderNote" />
-            </p>
+          <section className={classNames(css.band, css.bandAlt)}>
+            <div className={css.bandInner}>
+              <H2 className={css.sectionTitle}>
+                <FormattedMessage id="PartnerLandingPage.contactTitle" />
+              </H2>
+              {/* Deliberately not a second form: a general-enquiry form would be the
+                  application form minus two fields, and would double both the spam
+                  surface and the number of places a message can get lost. */}
+              <p className={css.sectionIntro}>
+                <FormattedMessage
+                  id="PartnerLandingPage.contactText"
+                  values={{
+                    contactLink: (
+                      // target="_self": a mailto: in a new tab leaves an empty tab behind.
+                      <ExternalLink
+                        className={css.contactLink}
+                        href={`mailto:${contactEmail}`}
+                        target="_self"
+                      >
+                        {contactEmail}
+                      </ExternalLink>
+                    ),
+                  }}
+                />
+              </p>
+              <p className={css.placeholderNote}>
+                <FormattedMessage id="PartnerLandingPage.contactPlaceholderNote" />
+              </p>
+            </div>
           </section>
         </div>
       </LayoutSingleColumn>

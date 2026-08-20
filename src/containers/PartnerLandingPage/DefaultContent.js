@@ -1,4 +1,5 @@
 import React from 'react';
+import classNames from 'classnames';
 
 import { FormattedMessage } from '../../util/reactIntl';
 import { H1, H2, H3 } from '../../components';
@@ -50,24 +51,45 @@ const FAQ_KEYS = [
   'afterApplying',
 ];
 
+/**
+ * One full-bleed stripe of the page, with the reading column inside it.
+ *
+ * The bands alternate canvas / white the way /p/about does. Eight screens of continuous prose
+ * on one flat surface give a reader nothing to navigate by, and the alternation is what the
+ * rest of the site already uses to break a long page into parts. `alt` is passed by the caller
+ * rather than derived from an index, because the apply and contact sections in
+ * PartnerLandingPage.js are part of the same sequence and cannot see this component's counter.
+ *
+ * @param {Object} props
+ * @param {boolean} [props.alt] - render on the white surface instead of the canvas
+ * @param {ReactNode} props.children
+ */
+const Band = props => (
+  <section className={classNames(css.band, { [css.bandAlt]: props.alt })}>
+    <div className={css.bandInner}>{props.children}</div>
+  </section>
+);
+
 const Hero = () => (
   <section className={css.hero}>
-    <H1 className={css.heroTitle}>
-      <FormattedMessage id="PartnerLandingPage.heroTitle" />
-    </H1>
-    <p className={css.heroSubtitle}>
-      <FormattedMessage id="PartnerLandingPage.heroSubtitle" />
-    </p>
-    <a className={css.heroCta} href="#apply">
-      <FormattedMessage id="PartnerLandingPage.heroCta" />
-    </a>
+    <div className={css.heroInner}>
+      <H1 className={css.heroTitle}>
+        <FormattedMessage id="PartnerLandingPage.heroTitle" />
+      </H1>
+      <p className={css.heroSubtitle}>
+        <FormattedMessage id="PartnerLandingPage.heroSubtitle" />
+      </p>
+      <a className={css.heroCta} href="#apply">
+        <FormattedMessage id="PartnerLandingPage.heroCta" />
+      </a>
+    </div>
   </section>
 );
 
 const BulletSection = props => {
-  const { titleId, introId, keys, keyPrefix } = props;
+  const { titleId, introId, keys, keyPrefix, alt } = props;
   return (
-    <section className={css.section}>
+    <Band alt={alt}>
       <H2 className={css.sectionTitle}>
         <FormattedMessage id={titleId} />
       </H2>
@@ -83,12 +105,12 @@ const BulletSection = props => {
           </li>
         ))}
       </ul>
-    </section>
+    </Band>
   );
 };
 
 const HowItWorks = () => (
-  <section className={css.section}>
+  <Band>
     <H2 className={css.sectionTitle}>
       <FormattedMessage id="PartnerLandingPage.howItWorksTitle" />
     </H2>
@@ -102,11 +124,11 @@ const HowItWorks = () => (
         </li>
       ))}
     </ol>
-  </section>
+  </Band>
 );
 
 const Faq = () => (
-  <section className={css.section}>
+  <Band alt>
     <H2 className={css.sectionTitle}>
       <FormattedMessage id="PartnerLandingPage.faqTitle" />
     </H2>
@@ -120,7 +142,7 @@ const Faq = () => (
         </p>
       </div>
     ))}
-  </section>
+  </Band>
 );
 
 /**
@@ -137,6 +159,7 @@ const DefaultContent = () => (
   <>
     <Hero />
     <BulletSection
+      alt
       titleId="PartnerLandingPage.responsibilitiesTitle"
       introId="PartnerLandingPage.responsibilitiesIntro"
       keys={RESPONSIBILITY_KEYS}
@@ -144,6 +167,7 @@ const DefaultContent = () => (
     />
     <HowItWorks />
     <BulletSection
+      alt
       titleId="PartnerLandingPage.commercialTitle"
       introId="PartnerLandingPage.commercialIntro"
       keys={COMMERCIAL_KEYS}
@@ -155,6 +179,8 @@ const DefaultContent = () => (
       keys={REQUIREMENT_KEYS}
       keyPrefix="PartnerLandingPage.requirement"
     />
+    {/* Ends on the white band so the apply section below - canvas, with a white card - reads
+        as the next stripe rather than as more of the FAQ. */}
     <Faq />
   </>
 );

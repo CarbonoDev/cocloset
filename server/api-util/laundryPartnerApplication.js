@@ -168,6 +168,17 @@ const escapeHtml = value =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
+// Inline styles, not a <style> block: Gmail strips <head> entirely and Outlook ignores most
+// of what survives, so anything an operator is meant to actually see has to travel on the
+// element. Kept to borders and padding for the same reason — this is a work email, and the
+// table is here to be scanned, not designed.
+const TABLE_STYLE =
+  'border-collapse:collapse;width:100%;max-width:640px;font-family:Arial,Helvetica,sans-serif;font-size:14px;';
+const LABEL_CELL_STYLE =
+  'border:1px solid #ddd;padding:8px 12px;text-align:left;vertical-align:top;background:#f7f4ef;font-weight:bold;white-space:nowrap;';
+const VALUE_CELL_STYLE =
+  'border:1px solid #ddd;padding:8px 12px;text-align:left;vertical-align:top;';
+
 // The application is written by an anonymous member of the public, so every value here is
 // untrusted input landing in an operator's inbox — escape it for the HTML part.
 const buildApplicationEmail = application => {
@@ -191,13 +202,22 @@ const buildApplicationEmail = application => {
     'Reply directly to the applicant at the email address above.',
   ].join('\n');
 
+  // A table rather than the bullet list this used to be: an operator reading these compares
+  // one application against the next, and a two-column grid lines the labels up so the eye can
+  // run down them. Every field the applicant filled in is a row — `rows` is built from
+  // EMAIL_FIELD_LABELS, which covers the whole of FIELD_SPECS plus turnaround, so adding a
+  // field to the form and forgetting it here is the one way a value could go missing.
   const html = [
     '<p>A new laundry partner application was submitted.</p>',
-    '<ul>',
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">`,
+    '<tbody>',
     ...rows.map(
-      ([label, value]) => `<li><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</li>`
+      ([label, value]) =>
+        `<tr><th scope="row" style="${LABEL_CELL_STYLE}">${escapeHtml(label)}</th>` +
+        `<td style="${VALUE_CELL_STYLE}">${escapeHtml(value)}</td></tr>`
     ),
-    '</ul>',
+    '</tbody>',
+    '</table>',
     '<p>Reply directly to the applicant at the email address above.</p>',
   ].join('');
 
