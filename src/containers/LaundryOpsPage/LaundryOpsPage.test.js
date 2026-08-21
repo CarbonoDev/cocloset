@@ -164,6 +164,102 @@ describe('LaundryOpsPage', () => {
       expect(screen.queryByText('LaundryOpsPage.detail.transactionId')).not.toBeInTheDocument();
     });
 
+    // ---------------------------------------------------------------------------
+    //   > "handover/... está en etapa de recibir una prenda y puedo ingresar el numero de
+    //   >  internal code, pero no es visible este input en laundry/orders"
+    //
+    // The endpoint has always ACCEPTED `laundryCode`; the phone page has always asked for it.
+    // This table did not, so a reception done at a desk put the garment on a shelf with no
+    // name and said nothing about it. The step is the one the server reads the code at
+    // (`takesLaundryCode`), and offering it anywhere else would take an operator's input and
+    // drop it - which is why the second test here is not redundant.
+    // ---------------------------------------------------------------------------
+    it('asks for the internal code at the reception step, and sends what was typed', async () => {
+      const onAdvanceStatus = jest.fn();
+      const user = userEvent.setup();
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ state: 'accepted' })]}
+          onAdvanceStatus={onAdvanceStatus}
+        />
+      );
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+
+      const input = document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1');
+      expect(input).toBeInTheDocument();
+
+      await user.type(input, 'A-04 / BIN 7');
+      await user.click(screen.getByText('LaundryOpsPage.action.ready-for-pickup'));
+
+      expect(onAdvanceStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 'tx-1',
+          status: 'ready-for-pickup',
+          laundryCode: 'A-04 / BIN 7',
+        })
+      );
+    });
+
+    it('pre-fills the code this studio already gave the garment', async () => {
+      const user = userEvent.setup();
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ state: 'accepted', laundryCode: 'RACK 12' })]}
+        />
+      );
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+
+      expect(document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1')).toHaveValue('RACK 12');
+    });
+
+    // Every step after reception only READS the code. A box at the return step would collect
+    // one the server discards.
+    it('does not ask for the internal code at the return step', async () => {
+      const user = userEvent.setup();
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ state: 'picked-up' })]}
+        />
+      );
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+
+      expect(document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1')).toBeNull();
+      // The days box belongs to this step, so its absence would mean the wrong thing was tested.
+      expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).toBeInTheDocument();
+    });
+
+    // A blank box is "not decided yet", never a delete: sending an empty string would ask the
+    // server to consider a code it must then treat as absent, and a studio that has not named a
+    // garment yet must still be able to advance it.
+    it('sends no code at all when the box is left empty', async () => {
+      const onAdvanceStatus = jest.fn();
+      const user = userEvent.setup();
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ state: 'accepted' })]}
+          onAdvanceStatus={onAdvanceStatus}
+        />
+      );
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByText('LaundryOpsPage.action.ready-for-pickup'));
+
+      expect(onAdvanceStatus).toHaveBeenCalledWith(
+        expect.not.objectContaining({ laundryCode: expect.anything() })
+      );
+    });
+
     it('still shows the transaction id, which is what a broken scanner falls back to', async () => {
       const user = userEvent.setup();
       render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);

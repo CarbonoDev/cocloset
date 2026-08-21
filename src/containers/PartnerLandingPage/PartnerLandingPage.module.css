@@ -1,157 +1,242 @@
 @import '../../styles/customMediaQueries.css';
 
+/* THE PARTNER PAGE, IN THE SAME VOICE AS THE LANDING PAGE AND /p/about.
+ *
+ *   > "puedes ajustar la página /become-a-partner para que tenga los estilos de la landing
+ *   >  y de about? revisa tambien el button ya que se ve raro"
+ *
+ * This page shipped in the stock template's clothes: white throughout, sans-serif headings,
+ * a 720px column, and `buttonPrimary` for its call to action - which renders in
+ * `--marketplaceColor`, the one colour the Cocloset palette never uses. Beside the front page
+ * it read as a different product.
+ *
+ * Nothing structural changes. What changes is that the page now spends the same tokens the
+ * rest of the site does: `--coclosetCanvas`/`--coclosetSurface` for the bands,
+ * `--fontFamilyDisplay` and `--coclosetInk` for headings, `--coclosetInkMuted` for prose, and
+ * the ink pill for every action. Those are the same values `coclosetSkin.module.css` passes
+ * into the hosted sections, so the two halves of this page - built-in copy and, once Console
+ * has the `laundry-partners` page, hosted copy - come out matching rather than merely similar.
+ *
+ * ── WHY THE BANDS ARE FULL-BLEED ───────────────────────────────────────────────────────
+ * `.root` used to be the 720px column itself. That was fine for the built-in copy and wrong
+ * for the hosted path: a skinned section already carries `max-width: var(--contentMaxWidthPages)`
+ * and its own full-width background, so nesting it inside a narrower padded column clipped the
+ * band to 720px and doubled the padding. `.root` is now full-bleed and each band owns its
+ * width, which is exactly how /p/about is laid out - and is why a Console-authored section
+ * dropped in here will look identical to the same section on that page.
+ */
+
 .layoutWrapperMain {
   min-height: calc(100vh - var(--topbarHeight));
+  background-color: var(--coclosetCanvas);
 
   @media (--viewportMedium) {
     min-height: calc(100vh - var(--topbarHeightDesktop));
   }
 }
 
-/* Mobile-first single column. The content column is capped and centred from
-   --viewportMedium up so long-form copy stays readable on wide screens. */
 .root {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 24px 24px 72px 24px;
-
-  @media (--viewportMedium) {
-    padding: 40px 24px 96px 24px;
-  }
-
-  @media (--viewportLarge) {
-    padding: 56px 24px 120px 24px;
-  }
 }
 
 .loading {
   display: flex;
   justify-content: center;
-  padding: 48px 0;
+  padding: 96px 0;
+}
+
+/* ================ Bands ================ */
+
+/* One horizontal stripe of the page. The background runs edge to edge; the reading column
+   inside it is capped at the same width every other page uses. Long pages need the rhythm:
+   this one is six sections of prose, and on a single flat surface they run together. */
+.band {
+  background-color: var(--coclosetCanvas);
+}
+
+.bandAlt {
+  background-color: var(--coclosetSurface);
+}
+
+.bandInner {
+  max-width: var(--contentMaxWidthPages);
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 48px 24px;
+
+  @media (--viewportMedium) {
+    padding: 64px 36px 72px 36px;
+  }
 }
 
 /* ================ Hero ================ */
 
 .hero {
-  padding-bottom: 12px;
+  background-color: var(--coclosetCanvas);
+}
+
+.heroInner {
+  max-width: var(--contentMaxWidthPages);
+  width: 100%;
+  margin: 0 auto;
+  padding: 48px 24px 40px 24px;
 
   @media (--viewportMedium) {
-    padding-bottom: 16px;
+    padding: 80px 36px 64px 36px;
   }
 }
 
+/* Sized between the landing hero (60px, one headline and nothing else to read) and a section
+   title. This page is a document, not a poster - the headline introduces 2000 words rather
+   than carrying the screen on its own. */
 .heroTitle {
-  margin-top: 0;
-  margin-bottom: 12px;
+  font-family: var(--fontFamilyDisplay);
+  font-size: 36px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--coclosetInk);
+  max-width: 15ch;
+  margin: 0 0 16px 0;
+  padding: 0;
 
   @media (--viewportMedium) {
-    margin-bottom: 16px;
+    font-size: 52px;
+    margin-bottom: 20px;
   }
 }
 
 .heroSubtitle {
-  composes: textLarge from global;
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  max-width: 640px;
+  margin: 0 0 24px 0;
+  padding: 0;
 
-  margin-top: 0;
-  margin-bottom: 18px;
+  @media (--viewportMedium) {
+    margin-bottom: 28px;
+  }
+}
+
+/* ================ Actions ================ */
+
+/* The same pill the landing page's primary action uses, and the same one `coclosetSkin` gives
+   a CTA authored in Console - so the built-in hero and a hosted hero produce one button, not
+   two that merely resemble each other. */
+.heroCta {
+  composes: marketplaceDefaultFontStyles from global;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  width: auto;
+  padding: 0 24px;
+  border-radius: var(--coclosetRadiusPill);
+  font-weight: var(--fontWeightSemiBold);
+  background-color: var(--coclosetInk);
+  color: var(--coclosetSurface);
+  border: 1px solid var(--coclosetInk);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all var(--transitionStyleButton);
+}
+
+.heroCta:hover,
+.heroCta:focus {
+  background-color: var(--coclosetBrandDark);
+  border-color: var(--coclosetBrandDark);
+  color: var(--coclosetSurface);
+  text-decoration: none;
+}
+
+/* ================ Sections ================ */
+
+.sectionTitle {
+  font-family: var(--fontFamilyDisplay);
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--coclosetInk);
+  margin: 0 0 10px 0;
+  padding: 0;
+
+  @media (--viewportMedium) {
+    font-size: 34px;
+    margin-bottom: 12px;
+  }
+}
+
+.sectionIntro {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  max-width: 640px;
+  margin: 0 0 20px 0;
+  padding: 0;
 
   @media (--viewportMedium) {
     margin-bottom: 24px;
   }
 }
 
-.heroCta {
-  composes: buttonPrimary from global;
-
-  display: inline-flex;
-  width: auto;
-  min-height: 48px;
-  padding: 0 24px;
-  text-decoration: none;
-
-  @media (--viewportMedium) {
-    min-height: 56px;
-  }
-}
-
-/* ================ Sections ================ */
-
-.section,
-.applySection,
-.contactSection {
-  padding-top: 24px;
-
-  @media (--viewportMedium) {
-    padding-top: 32px;
-  }
-}
-
-.sectionTitle {
-  margin-top: 0;
-  margin-bottom: 6px;
-
-  @media (--viewportMedium) {
-    margin-bottom: 8px;
-  }
-}
-
-.sectionIntro {
-  margin-top: 0;
-  margin-bottom: 12px;
-
-  @media (--viewportMedium) {
-    margin-bottom: 16px;
-  }
-}
-
 .list {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  max-width: 640px;
   margin: 0;
-  padding-left: 24px;
+  padding-left: 20px;
   list-style: disc;
 }
 
 .listItem {
-  margin-bottom: 6px;
+  margin: 0 0 8px 0;
+  padding-left: 4px;
 
-  @media (--viewportMedium) {
-    margin-bottom: 8px;
+  &:last-child {
+    margin-bottom: 0;
   }
 }
 
 /* ================ How it works ================ */
 
 .steps {
+  max-width: 640px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .step {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
   display: flex;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin: 0 0 14px 0;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   @media (--viewportMedium) {
     margin-bottom: 16px;
   }
 }
 
+/* Ink rather than `--marketplaceColor`: that variable is the template's accent and resolves
+   to a colour this palette does not contain, which is what made these read as a stray green. */
 .stepNumber {
-  composes: textSmall from global;
-
+  composes: marketplaceTinyFontStyles from global;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  margin-right: 12px;
+  width: 26px;
+  height: 26px;
+  margin: 1px 14px 0 0;
   border-radius: 50%;
-  background-color: var(--marketplaceColor);
-  color: var(--colorWhite);
+  background-color: var(--coclosetInk);
+  color: var(--coclosetSurface);
+  font-weight: var(--fontWeightSemiBold);
 }
 
 .stepText {
@@ -160,30 +245,68 @@
 
 /* ================ FAQ ================ */
 
+/* A rule between questions rather than whitespace alone: eight of these in a row need
+   something to separate one answer from the next question. */
 .faqItem {
-  padding-top: 12px;
+  max-width: 720px;
+  padding-top: 18px;
+  margin-top: 18px;
+  border-top: 1px solid var(--coclosetBorder);
+
+  &:first-of-type {
+    padding-top: 0;
+    margin-top: 0;
+    border-top: none;
+  }
 
   @media (--viewportMedium) {
-    padding-top: 16px;
+    padding-top: 24px;
+    margin-top: 24px;
   }
 }
 
+/* Sans, not the display serif: on /p/about the band headings are serif and the headings
+   inside a band are sans, and a question is the second kind. */
 .faqQuestion {
-  margin-top: 0;
-  margin-bottom: 0;
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0 0 6px 0;
+  padding: 0;
 }
 
 .faqAnswer {
-  margin-top: 0;
-  margin-bottom: 0;
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+  padding: 0;
 }
 
 /* ================ Application + contact ================ */
 
+/* The form is the one thing on this page a reader is meant to DO, so it sits on a card rather
+   than on the band - the same device the landing hero uses for its "how it works" panel. It
+   is also what keeps the apply section separated on the HOSTED path: every skinned section is
+   canvas, so a canvas apply band would run straight into the last one. The card divides them
+   whichever way the copy arrives. */
+.applyCard {
+  max-width: 640px;
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadius);
+  background-color: var(--coclosetSurface);
+
+  @media (--viewportMedium) {
+    padding: 32px;
+  }
+}
+
 .submitted {
-  padding: 18px;
-  border-radius: var(--borderRadiusMedium);
-  background-color: var(--colorSuccessSubtle);
+  padding: 20px;
+  border-radius: var(--coclosetRadius);
+  border: 1px solid var(--coclosetToneGreenFg);
+  background-color: var(--coclosetToneGreenBg);
 
   @media (--viewportMedium) {
     padding: 24px;
@@ -191,17 +314,22 @@
 }
 
 .submittedTitle {
-  margin-top: 0;
-  margin-bottom: 6px;
-
-  @media (--viewportMedium) {
-    margin-bottom: 8px;
-  }
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetToneGreenFg);
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0 0 6px 0;
+  padding: 0;
 }
 
 .submittedMessage {
-  margin-top: 0;
-  margin-bottom: 0;
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetToneGreenFg);
+  margin: 0;
+  padding: 0;
+}
+
+.contactLink {
+  color: var(--coclosetBrandDark);
 }
 
 /* Marks copy that is a stand-in for information the business has not defined yet.
@@ -210,7 +338,11 @@
 .placeholderNote {
   composes: textSmall from global;
 
-  color: var(--colorGrey700);
-  margin-top: 0;
-  margin-bottom: 0;
+  color: var(--coclosetInkMuted);
+  max-width: 640px;
+  margin: 12px 0 0 0;
+
+  @media (--viewportMedium) {
+    margin-top: 16px;
+  }
 }

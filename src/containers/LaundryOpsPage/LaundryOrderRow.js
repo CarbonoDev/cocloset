@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
-import { laundryActionsFor, statusLabelKey } from '../../util/laundryStatuses';
+import {
+  MAX_LAUNDRY_CODE_LENGTH,
+  laundryActionsFor,
+  statusLabelKey,
+} from '../../util/laundryStatuses';
 import { isLate } from './LaundryOpsPage.helpers';
 import { InlineTextButton, PrimaryButton } from '../../components';
 
@@ -68,6 +72,24 @@ const LaundryOrderRow = props => {
     Number.isInteger(row?.defaultCleaningDays) ? String(row.defaultCleaningDays) : ''
   );
 
+  // THE STUDIO'S OWN CODE FOR THIS GARMENT, asked for at the reception step.
+  //
+  //   > "handover/... está en etapa de recibir una prenda y puedo ingresar el numero de
+  //   >  internal code, pero no es visible este input en laundry/orders"
+  //
+  // The phone page has always asked for it; this table never did. Both post to the same
+  // endpoint, and that endpoint has always ACCEPTED `laundryCode` - so a reception done from
+  // a desk simply never sent one, and the garment went onto a shelf with no name, silently.
+  //
+  // Pre-filled from the row, so a studio re-confirming a step is not asked to remember its own
+  // shelving: the transaction's code if this rental has one, otherwise the listing's current
+  // code, which is what a garment this studio has held before already carries. Resolved
+  // server-side - see server/api/laundry-orders.js - because deciding whether a stored code is
+  // still live means comparing its issuer against the current assignment.
+  const [laundryCode, setLaundryCode] = useState(
+    typeof row?.laundryCode === 'string' ? row.laundryCode : ''
+  );
+
   const labelKey = statusLabelKey(row);
   const start = formatBookingDate(row.bookingStart, intl);
   const end = formatBookingDate(lastBookedDayIso(row.bookingEnd), intl);
@@ -95,6 +117,7 @@ const LaundryOrderRow = props => {
   // Rows share a table, so the input's id has to be per-row or every label in the
   // table would point at the first one.
   const cleaningDaysInputId = `LaundryOrderRow.cleaningDays.${row.id}`;
+  const laundryCodeInputId = `LaundryOrderRow.laundryCode.${row.id}`;
   // Same reason: `aria-controls` on the toggle has to name THIS row's detail.
   const detailRowId = `LaundryOrderRow.detail.${row.id}`;
 
@@ -108,12 +131,18 @@ const LaundryOrderRow = props => {
   const hasCleaningDays =
     cleaningDays !== '' && Number.isInteger(parsedCleaningDays) && parsedCleaningDays >= 0;
 
+  // A blank box is "not decided yet", never a delete: the server treats an empty string as
+  // "not given" and leaves whatever is stored alone, which is what lets a studio advance a
+  // garment it has not named yet without wiping the name it had.
+  const trimmedLaundryCode = laundryCode.trim();
+
   const handleAdvance = () => {
     onAdvanceStatus({
       transactionId: row.transactionId,
       status: action.status,
       ...(action.needsDamageReport ? { damaged, damageNote: damaged ? damageNote : '' } : {}),
       ...(action.needsCleaningDays && hasCleaningDays ? { cleaningDays: parsedCleaningDays } : {}),
+      ...(action.needsLaundryCode && trimmedLaundryCode ? { laundryCode: trimmedLaundryCode } : {}),
     });
   };
 
@@ -246,6 +275,27 @@ const LaundryOrderRow = props => {
 
                 {action ? (
                   <div className={css.advance}>
+                    {/* Same box, same step and the same copy as HandoverPage: a studio that
+                        does half its receptions at the counter and half at the desk must not
+                        be asked two different questions about the same garment. */}
+                    {action.needsLaundryCode ? (
+                      <div className={css.cleaningDaysField}>
+                        <label className={css.cleaningDaysLabel} htmlFor={laundryCodeInputId}>
+                          <FormattedMessage id="HandoverPage.laundryCode.label" />
+                        </label>
+                        <input
+                          id={laundryCodeInputId}
+                          className={css.cleaningDaysInput}
+                          type="text"
+                          maxLength={MAX_LAUNDRY_CODE_LENGTH}
+                          value={laundryCode}
+                          onChange={e => setLaundryCode(e.target.value)}
+                        />
+                        <span className={css.cleaningDaysHint}>
+                          <FormattedMessage id="HandoverPage.laundryCode.help" />
+                        </span>
+                      </div>
+                    ) : null}
                     {action.needsCleaningDays ? (
                       <div className={css.cleaningDaysField}>
                         <label className={css.cleaningDaysLabel} htmlFor={cleaningDaysInputId}>

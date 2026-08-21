@@ -3,6 +3,7 @@ const { handleError } = require('../api-util/sdk');
 const { requireLaundryCaller } = require('../api-util/laundryAuth');
 const { resolveInitialCleaningDays } = require('../api-util/laundryAssignment');
 const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
+const { TRANSACTION_CODE_KEY, currentLaundryCodeFor } = require('../api-util/laundryCode');
 const {
   TRANSITIONS,
   OPS_LAST_TRANSITIONS,
@@ -215,6 +216,17 @@ const listingFields = (listing, included, laundryPrivateData) => {
 
   return {
     listingId: listing.id.uuid,
+    // THE STUDIO'S OWN CODE FOR THIS GARMENT, so the ops table can pre-fill its box the way
+    // the handover page already does - a studio re-confirming a step should not be asked to
+    // remember its own shelving. It matters most at the RECEPTION step, where the transaction
+    // has no code yet but this studio may well have named the garment during an earlier rental.
+    //
+    // `currentLaundryCodeFor` rather than the raw metadata: it refuses a code issued by a
+    // studio that no longer holds the garment, which a bare string could not be told apart
+    // from. It compares the record's issuer against the listing's own `assignedLaundryId`, so
+    // it needs no caller id. Costs nothing - the listing is already in hand.
+    // See api-util/laundryCode.js.
+    laundryCode: currentLaundryCodeFor(listing) || null,
     title: attrs.title || null,
     listingState: attrs.state || null,
     brand: publicData.brand || null,
@@ -267,6 +279,12 @@ const transactionRow = (transaction, txIncluded, listingBase) => {
     // The ticket code is written by transition/laundry-mark-ready, so it is
     // null until the laundry has prepared the garment.
     ticketCode: metadata.ticketCode || null,
+    // The transaction's own copy of the studio's code wins over the listing's (see
+    // `listingFields`): it is the one THIS rental was given and the one both parties see, and
+    // it stays historically honest after the garment moves on. `||` rather than `??` because
+    // the write path stores no empty strings - an absent code and a blank one are the same
+    // "not decided yet", which is what the listing fallback is then free to answer.
+    laundryCode: metadata[TRANSACTION_CODE_KEY] || listingBase.laundryCode || null,
     customerName: displayNameOf(customer),
     // Prefer the transaction's own provider (always the listing author, but
     // present even when the listing page's `included` didn't resolve).

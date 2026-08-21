@@ -333,6 +333,78 @@ describe('deliverApplication — email sink', () => {
     expect(params.get('text')).toContain('Garments accepted: Eveningwear, Silk');
   });
 
+  // The operator reads these side by side, one application against the next, so the HTML part
+  // is a two-column table rather than the bullet list it started as. Asserted field by field
+  // against every key of a FULL application: the failure this guards is not "the table is
+  // missing" but "a field was added to the form and never reached the email", which a check on
+  // the markup alone would sail straight past.
+  it('renders every submitted field as a row of an HTML table', async () => {
+    mailgunEnv();
+    process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL = 'partners@example.com';
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: '<msg@mg.test>' }),
+    });
+
+    const full = {
+      studioName: 'Studio Pigalle',
+      contactName: 'Ana Rivera',
+      email: 'ana@example.com',
+      phone: '+52 55 1234 5678',
+      address: 'Calle Rivera 12, CDMX',
+      businessHours: 'Mon-Fri 9:00-19:00',
+      acceptedCategories: ['Eveningwear', 'Silk'],
+      turnaroundDays: 2,
+      notes: 'We already handle bridal.',
+    };
+
+    await deliverApplication(full);
+
+    const html = new URLSearchParams(global.fetch.mock.calls[0][1].body.toString()).get('html');
+
+    expect(html).toContain('<table');
+    expect(html).not.toContain('<ul>');
+
+    const expectedRows = [
+      ['Studio name', 'Studio Pigalle'],
+      ['Contact name', 'Ana Rivera'],
+      ['Email', 'ana@example.com'],
+      ['Phone', '+52 55 1234 5678'],
+      ['Address', 'Calle Rivera 12, CDMX'],
+      ['Business hours', 'Mon-Fri 9:00-19:00'],
+      // Arrays render as a readable list rather than "[object Object]" or raw JSON.
+      ['Garments accepted', 'Eveningwear, Silk'],
+      ['Turnaround (days)', '2'],
+      ['Notes', 'We already handle bridal.'],
+    ];
+
+    expectedRows.forEach(([label, value]) => {
+      expect(html).toContain(`>${label}</th>`);
+      expect(html).toContain(`>${value}</td>`);
+    });
+
+    // Every key of the application is accounted for above — no field reaches the operator's
+    // inbox only in the plain-text part.
+    expect(expectedRows).toHaveLength(Object.keys(full).length);
+  });
+
+  // An application that skipped the optional field must not leave an empty row behind.
+  it('omits rows for fields the applicant left blank', async () => {
+    mailgunEnv();
+    process.env.SERVER_LAUNDRY_PARTNER_APPLICATION_EMAIL = 'partners@example.com';
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: '<msg@mg.test>' }),
+    });
+
+    await deliverApplication(application);
+
+    const html = new URLSearchParams(global.fetch.mock.calls[0][1].body.toString()).get('html');
+    expect(html).not.toContain('>Notes</th>');
+  });
+
   it('escapes applicant-supplied values in the HTML part', async () => {
     // The form is public and unauthenticated, so every value is untrusted input landing
     // in an operator's inbox.

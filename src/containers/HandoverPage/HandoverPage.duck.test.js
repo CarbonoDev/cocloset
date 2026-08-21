@@ -129,6 +129,43 @@ describe('confirmHandoverThunk', () => {
     expect(fetchHandoverStatus).toHaveBeenCalledWith(TX_ID);
   });
 
+  // THE FIELD THAT WENT NOWHERE. Every key is spread in by name here - which is what stops a
+  // caller posting arbitrary keys at a privileged endpoint - and `laundryCode` was simply not
+  // among them. The component built it and the endpoint accepted it, so a studio typing its
+  // shelf code on the counter phone saw the step succeed while the code was dropped in
+  // between, silently. Nothing else could have caught it: the component test asserts what it
+  // handed to `onConfirm`, the endpoint test asserts what it does with a body it was given.
+  it('forwards the studio internal code, and omits it when there is none', async () => {
+    updateLaundryTransactionStatus.mockResolvedValue({ data: {} });
+    fetchHandoverStatus.mockResolvedValue(RESPONSE_BODY);
+    const store = makeStore();
+
+    await store.dispatch(
+      confirmHandoverThunk({
+        transactionId: TX_ID,
+        status: 'ready-for-pickup',
+        laundryCode: 'A-04 / BIN 7',
+      })
+    );
+
+    expect(updateLaundryTransactionStatus).toHaveBeenCalledWith({
+      transactionId: TX_ID,
+      status: 'ready-for-pickup',
+      laundryCode: 'A-04 / BIN 7',
+    });
+
+    // A blank box is "not decided yet", never a delete - the server reads an absent value as
+    // "leave whatever is stored alone".
+    await store.dispatch(
+      confirmHandoverThunk({ transactionId: TX_ID, status: 'ready-for-pickup' })
+    );
+
+    expect(updateLaundryTransactionStatus).toHaveBeenLastCalledWith({
+      transactionId: TX_ID,
+      status: 'ready-for-pickup',
+    });
+  });
+
   it('surfaces a rejected confirm without wiping the handover on screen', async () => {
     // The operator has physically handed the garment over by now; the screen has to keep
     // showing what they were doing.

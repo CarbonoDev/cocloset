@@ -299,8 +299,11 @@ const PartnerApplicationForm = props => (
 
           {submitErrorMessage}
 
+          {/* `rootClassName`, not `className`: see the note on `.submitButton`. It replaces the
+              template's `buttonPrimary` root rather than competing with it at equal specificity. */}
           <Button
-            className={css.submitButton}
+            rootClassName={css.submitButton}
+            spinnerClassName={css.submitSpinner}
             type="submit"
             inProgress={submitInProgress}
             disabled={submitDisabled}

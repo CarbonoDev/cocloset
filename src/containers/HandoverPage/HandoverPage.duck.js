@@ -41,17 +41,32 @@ export const fetchHandoverThunk = createAsyncThunk(
 // page ever showing a step the transaction has already left.
 export const confirmHandoverThunk = createAsyncThunk(
   'HandoverPage/confirmHandover',
-  ({ transactionId, status, cleaningDays, damaged, damageNote }, { dispatch, rejectWithValue }) =>
+  (
+    { transactionId, status, cleaningDays, damaged, damageNote, laundryCode },
+    { dispatch, rejectWithValue }
+  ) =>
     // `cleaningDays` is forwarded only when the caller supplied a number. Omitting it is
     // MEANINGFUL: the server then applies the turnaround this studio configured for the
     // garment's category. Sending 0 would mean "ready today" and block nothing at all, so a
     // blank box must not become a zero on the way here.
+    //
+    // `laundryCode` WAS MISSING FROM THIS LIST, and that is a bug this page had all along
+    // rather than one introduced with it. The component built the field, the endpoint accepted
+    // it, and this destructure silently dropped it in between - so a studio typing its shelf
+    // code on the counter phone watched the step succeed and the code never existed. Nothing
+    // could catch it: the component test asserts what it handed to `onConfirm`, the endpoint
+    // test asserts what it does with a body it was given, and this is the seam between them.
+    //
+    // EVERY FIELD IS SPREAD IN BY NAME on purpose - it is what stops a caller posting
+    // arbitrary keys at a privileged endpoint - so anything added to the form has to be added
+    // here too, or it goes nowhere and says nothing.
     updateLaundryTransactionStatus({
       transactionId,
       status,
       ...(typeof cleaningDays === 'number' ? { cleaningDays } : {}),
       ...(typeof damaged === 'boolean' ? { damaged } : {}),
       ...(damageNote ? { damageNote } : {}),
+      ...(laundryCode ? { laundryCode } : {}),
     })
       .then(response => {
         dispatch(fetchHandoverThunk({ transactionId }));
