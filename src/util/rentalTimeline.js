@@ -32,6 +32,33 @@ export const RENTAL_TIMELINE_STEPS = [
   { key: 'readyForNextRental', state: coclosetStates.DELIVERED },
 ];
 
+/**
+ * The message id for a step's label.
+ *
+ *   > "en el status 'Returned to laundry', podemos poner 'Returned to laundry - reported' solo
+ *   >  si la prenda fue reportada como dañada, si no tiene daños debe permanecer igual y el
+ *   >  resto de los pasos debe funcionar igual"
+ *
+ * Damage is recorded at the return, by the studio holding the garment, so the return step is
+ * the only one that can carry the annotation - and this function is where that knowledge
+ * lives, beside the step list itself, rather than in whichever component happens to render it.
+ *
+ * The annotation is a fact about a step that has HAPPENED, so it stays once the rental moves
+ * on to cleaning: a garment does not become undamaged because it went in the wash. It is also
+ * a whole separate string rather than a suffix pasted onto the plain one - " - reported" is
+ * not a phrase every language builds the same way, and the listing page (which has no
+ * transaction, so no damage to report) keeps using the plain key untouched.
+ *
+ * @param {string} stepKey - one of RENTAL_TIMELINE_STEPS' keys
+ * @param {Object} [options]
+ * @param {boolean} [options.damageReported] - the transaction's `metadata.damageReported.flag`
+ * @returns {string} a translation key
+ */
+export const timelineStepMessageId = (stepKey, options = {}) =>
+  stepKey === 'returnedToLaundry' && options.damageReported === true
+    ? 'ListingPage.rentalTimeline.returnedToLaundryReported'
+    : `ListingPage.rentalTimeline.${stepKey}`;
+
 export const STEP_DONE = 'done';
 export const STEP_CURRENT = 'current';
 export const STEP_PENDING = 'pending';

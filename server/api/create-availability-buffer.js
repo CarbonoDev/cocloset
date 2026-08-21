@@ -1,5 +1,6 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { getSdk, handleError } = require('../api-util/sdk');
+const { uuidString } = require('../api-util/uuid');
 const log = require('../log');
 const { buildBufferForAcceptedTransaction } = require('../api-util/availabilityBuffer');
 const { ACCEPT_TRANSITIONS } = require('../api-util/coclosetBookingProcess');
@@ -143,10 +144,20 @@ const isPartyToTransaction = (transaction, currentUserId) => {
 };
 
 module.exports = (req, res) => {
-  const { transactionId } = req.body || {};
-  // transactionId may be a UUID object or a plain string; normalise for logs
-  // (the old code interpolated `.uuid` unconditionally and logged `undefined`).
-  const txIdForLog = transactionId?.uuid || transactionId || 'unknown';
+  // THE SAME FAULT AS auto-accept-booking, on the endpoint that has been reported broken
+  // three times. TransactionPage.duck sends `new UUID(params.id)` - a FLEX-SDK UUID - which
+  // the Integration SDK's query serializer cannot accept, because it tests `instanceof` its
+  // OWN UUID class and cross-package `instanceof` is always false. Every browser-fired buffer
+  // creation threw "Don't know how to serialize query parameter 'id'" before reaching the
+  // API, and this endpoint's failures are logged and swallowed by design.
+  //
+  // That is very likely why the buffer exception "does not exist on Dev" while driving this
+  // handler IN-PROCESS produced the right window every time: an in-process call passes a
+  // string. Recorded as the probable cause rather than a proven one - the earlier
+  // investigation concluded the browser trigger was not landing, and it was landing and dying
+  // here. See api-util/uuid.js.
+  const transactionId = uuidString(req.body?.transactionId);
+  const txIdForLog = transactionId || 'unknown';
 
   if (!transactionId) {
     res

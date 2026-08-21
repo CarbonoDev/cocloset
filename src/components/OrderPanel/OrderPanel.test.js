@@ -751,7 +751,7 @@ describe('OrderPanel', () => {
     },
   ];
 
-  const garmentRentalListing = (id, publicData = {}) =>
+  const garmentRentalListing = (id, publicData = {}, metadata = {}) =>
     createListing(id, {
       title: 'the listing',
       price: new Money(10000, 'USD'),
@@ -767,7 +767,7 @@ describe('OrderPanel', () => {
         ],
         ...publicData,
       },
-      metadata: {},
+      metadata,
     });
 
   it('Booking: a garment is offered by fixed period, not by date range', async () => {
@@ -863,5 +863,54 @@ describe('OrderPanel', () => {
       expect(getByText('OrderPanel.listingPriceMissing')).toBeInTheDocument();
     });
     expect(queryByText('BookingRentalPeriodForm.periodLabel')).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  //   > "cuando se puede hacer autoaccept, el label del button no debe ser 'Request...' si no
+  //   >  solo 'Book now' o algo similar"
+  //
+  // `submitButtonMessageId` has its own tests and they pin the rule. These pin the THREADING,
+  // for the same reason the `onLaundry` tests further up this file do: the flag lives in
+  // `listing.metadata`, and a reader that looks in `publicData` - where the rest of the panel's
+  // props come from - gets `undefined` and silently never fires. That exact failure has shipped
+  // in this codebase before.
+  // ---------------------------------------------------------------------------
+  it('Booking: offers to book NOW when the garment is already at its studio', async () => {
+    const listing = garmentRentalListing('listing-at-studio', {}, { onLaundry: true });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText, queryByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingRentalPeriodForm.bookNow')).toBeInTheDocument();
+    });
+    // "Request" would promise a wait that auto-accept is about to make not happen.
+    expect(queryByText('BookingDatesForm.requestToBook')).not.toBeInTheDocument();
+  });
+
+  it('Booking: still asks the owner when the garment is not at its studio yet', async () => {
+    const listing = garmentRentalListing('listing-not-at-studio', {}, { onLaundry: false });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText, queryByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.requestToBook')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingRentalPeriodForm.bookNow')).not.toBeInTheDocument();
   });
 });

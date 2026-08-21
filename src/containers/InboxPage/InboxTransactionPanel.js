@@ -9,6 +9,7 @@ import {
   STEP_CURRENT,
   STEP_DONE,
   timelineStatusFor,
+  timelineStepMessageId,
 } from '../../util/rentalTimeline';
 
 import { HandoverQrCode, Modal, NamedLink, ResponsiveImage } from '../../components';
@@ -79,6 +80,11 @@ const InboxTransactionPanel = props => {
 
   const laundryName = publicData.assignedLaundryName;
   const pickupAddress = publicData.pickupAddress;
+
+  // Written by the studio at the return step (server/api/laundry-transaction-status.js).
+  // `=== true` rather than truthiness, matching every other reader of this flag: the shape is
+  // `{ flag, note }`, and the object's mere presence is not a report of damage.
+  const damageReported = metadata.damageReported?.flag === true;
 
   // THE LISTING'S TIMEZONE, NOT THE READER'S. A day booking is stored as midnight-to-midnight
   // in the marketplace's zone; formatting it in the browser's zone moves it to the previous day
@@ -207,7 +213,10 @@ const InboxTransactionPanel = props => {
               })}
             >
               <span className={css.panelStepMarker} aria-hidden="true" />
-              <FormattedMessage id={`ListingPage.rentalTimeline.${step.key}`} />
+              {/* The return step reads "…- reported" when the studio flagged damage. Which
+                  step can say that, and what it says, is decided in util/rentalTimeline.js -
+                  see the note there. */}
+              <FormattedMessage id={timelineStepMessageId(step.key, { damageReported })} />
               {/* The state is carried as text too, not by the marker's colour alone: this is
                   the one thing the panel exists to communicate. */}
               <span className={css.srOnly}>

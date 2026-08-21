@@ -199,6 +199,27 @@ const handleMonthClick = (
  * the 8th. `server/api-util/rentalPeriods.js` derives the same value and rejects anything
  * else, so this is the expression the server checks against.
  */
+/**
+ * What the submit button should say.
+ *
+ *   > "cuando se puede hacer autoaccept, el label del button no debe ser 'Request...' si no
+ *   >  solo 'Book now' o algo similar"
+ *
+ * A garment already at its studio is accepted the moment the payment confirms - its owner has
+ * nothing to approve, because they are not the one handing it over (see
+ * server/api/auto-accept-booking.js). "Request to book" promises a wait that will not happen.
+ *
+ * The condition is `onLaundry === true`: the SAME field and the same strictness the endpoint
+ * gates on. Deliberately not a cleverer rule - the label has to be right exactly when the
+ * auto-accept fires, and asking the same question is the only way to guarantee that. `=== true`
+ * because only a real boolean is custody, matching every other reader of this flag.
+ *
+ * @param {boolean} [onLaundry] - the listing's `metadata.onLaundry`
+ * @returns {string} a translation key
+ */
+export const submitButtonMessageId = onLaundry =>
+  onLaundry === true ? 'BookingRentalPeriodForm.bookNow' : 'BookingDatesForm.requestToBook';
+
 export const bookingEndForPeriod = (startDate, periodDays, timeZone) =>
   startDate && periodDays ? getStartOf(startDate, 'day', timeZone, periodDays, 'days') : null;
 
@@ -624,9 +645,11 @@ export const BookingRentalPeriodForm = props => {
             ) : null}
             <FetchLineItemsError error={fetchLineItemsError} />
 
+            {/* "Request" is the wrong word when there is nobody to ask - see
+                `submitButtonMessageId` for which garments those are and why. */}
             <div className={css.submitButton}>
               <PrimaryButton type="submit" inProgress={fetchLineItemsInProgress}>
-                <FormattedMessage id="BookingDatesForm.requestToBook" />
+                <FormattedMessage id={submitButtonMessageId(onLaundry)} />
               </PrimaryButton>
             </div>
             <FinePrint payoutDetailsWarning={payoutDetailsWarning} isOwnListing={isOwnListing} />

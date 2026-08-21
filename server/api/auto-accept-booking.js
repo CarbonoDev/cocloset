@@ -1,5 +1,6 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { getSdk, handleError } = require('../api-util/sdk');
+const { uuidString } = require('../api-util/uuid');
 const { buildBufferForAcceptedTransaction } = require('../api-util/availabilityBuffer');
 const {
   ACCEPT_TRANSITIONS,
@@ -95,8 +96,14 @@ const nothingToDo = (res, reason) => {
 };
 
 module.exports = (req, res) => {
-  const { transactionId } = req.body || {};
-  const txIdForLog = transactionId?.uuid || transactionId || 'unknown';
+  // NORMALISED BEFORE IT TOUCHES THE INTEGRATION SDK. The browser sends the order's own
+  // `UUID`, which arrives here as a FLEX-SDK UUID after the transit decode - and the
+  // Integration SDK's query serializer only accepts its own UUID class, so the id fell past
+  // every branch and threw "Don't know how to serialize query parameter 'id': [object
+  // Object]". Every auto-accept has been failing on that, logged and swallowed, since the
+  // call site moved to step 3. See api-util/uuid.js.
+  const transactionId = uuidString(req.body?.transactionId);
+  const txIdForLog = transactionId || 'unknown';
 
   if (!transactionId) {
     res
