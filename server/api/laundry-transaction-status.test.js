@@ -35,7 +35,11 @@ const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
 const laundryTransactionStatus = require('./laundry-transaction-status');
 
 const LAUNDRY_ID = 'laundry-1';
+// The API returns ids as `{ uuid }`, so this is the right shape for an ENTITY - and it is
+// also, deliberately, the shape a client can end up posting. The endpoint normalises it
+// before any SDK call (see api-util/uuid.js); TX_ID_STRING is what those calls must receive.
 const TX_ID = { uuid: 'tx-1' };
+const TX_ID_STRING = 'tx-1';
 
 const mockRes = () => ({
   statusCode: null,
@@ -267,7 +271,7 @@ describe('laundry-transaction-status', () => {
 
       expect(res.statusCode).toBe(200);
       expect(transition).toHaveBeenCalledWith(
-        expect.objectContaining({ id: TX_ID, transition: expected }),
+        expect.objectContaining({ id: TX_ID_STRING, transition: expected }),
         { expand: true }
       );
       expect(res.body.data.transition).toBe(expected);

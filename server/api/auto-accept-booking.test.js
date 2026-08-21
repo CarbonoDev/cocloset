@@ -256,6 +256,51 @@ describe('auto-accept-booking: when it must NOT fire', () => {
       expect(res.statusCode).toBe(400);
     });
   });
+
+  it('rejects an id that carries no usable uuid', () => {
+    setup();
+    return run({ transactionId: {} }).then(res => {
+      expect(res.statusCode).toBe(400);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE BUG THIS ENDPOINT ACTUALLY HAD, and it was not in any of the conditions above.
+//
+//   > "Don't know how to serialize query parameter 'id': [object Object]"
+//
+// The browser sends the order's own `UUID`. The transit decode turns it back into a
+// FLEX-SDK UUID, and the Integration SDK's query serializer accepts a value only if it is
+// `instanceof` ITS OWN UUID class - cross-package `instanceof` is always false. So every
+// auto-accept threw before reaching the API, and the call site swallows failures by design:
+// the feature was silently dead while every test in this file passed.
+//
+// Asserted as "the id handed to the SDK is a STRING", not as "no error was thrown". A test
+// that only checked the response would pass again the day somebody reintroduces an object,
+// because the mock SDK here serializes nothing.
+// ---------------------------------------------------------------------------
+describe('auto-accept-booking: the id handed to the Integration SDK', () => {
+  const idShapes = [
+    ['a plain string', TX_ID],
+    ['an SDK UUID instance', { uuid: TX_ID, _sdkType: 'UUID' }],
+    ['a plain { uuid } object', { uuid: TX_ID }],
+  ];
+
+  idShapes.forEach(([label, transactionId]) => {
+    it(`is a plain string when the body carries ${label}`, () => {
+      const { txShow, transition } = setup();
+
+      return run({ transactionId }).then(res => {
+        expect(res.statusCode).toBe(200);
+        expect(txShow).toHaveBeenCalledWith(expect.objectContaining({ id: TX_ID }));
+        expect(transition).toHaveBeenCalledWith(
+          expect.objectContaining({ id: TX_ID }),
+          expect.anything()
+        );
+      });
+    });
+  });
 });
 
 describe('auto-accept-booking: failure handling', () => {

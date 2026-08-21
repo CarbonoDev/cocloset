@@ -1,4 +1,5 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
+const { uuidString } = require('../api-util/uuid');
 const { handleError } = require('../api-util/sdk');
 const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
 const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
@@ -418,8 +419,14 @@ const writeReadiness = ({
 };
 
 module.exports = (req, res) => {
-  const { transactionId, status, damaged, damageNote, cleaningDays, laundryCode } = req.body || {};
-  const txIdForLog = transactionId?.uuid || transactionId || 'unknown';
+  const { status, damaged, damageNote, cleaningDays, laundryCode } = req.body || {};
+  // Both of this endpoint's callers happen to send a plain string today, so it has never hit
+  // the cross-SDK UUID trap that broke auto-accept-booking and create-availability-buffer -
+  // but it is the same boundary handing a client-supplied id to the Integration SDK, and
+  // "happens to send a string" is not a property a caller can be relied on to keep. See
+  // api-util/uuid.js.
+  const transactionId = uuidString(req.body?.transactionId);
+  const txIdForLog = transactionId || 'unknown';
 
   if (!transactionId) {
     res

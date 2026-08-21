@@ -4,6 +4,7 @@ import {
   STEP_DONE,
   STEP_PENDING,
   timelineStatusFor,
+  timelineStepMessageId,
 } from './rentalTimeline';
 
 // One list, two readers: the listing page describes how renting works, the inbox marks where a
@@ -74,6 +75,47 @@ describe('timelineStatusFor', () => {
   it('does not crash on an unknown or absent state', () => {
     [undefined, null, 'something-else'].forEach(state => {
       expect(timelineStatusFor(state)).toHaveLength(RENTAL_TIMELINE_STEPS.length);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "en el status 'Returned to laundry', podemos poner 'Returned to laundry - reported' solo
+//   >  si la prenda fue reportada como dañada, si no tiene daños debe permanecer igual y el
+//   >  resto de los pasos debe funcionar igual"
+// ---------------------------------------------------------------------------
+describe('timelineStepMessageId', () => {
+  it('annotates the return step when damage was reported', () => {
+    expect(timelineStepMessageId('returnedToLaundry', { damageReported: true })).toBe(
+      'ListingPage.rentalTimeline.returnedToLaundryReported'
+    );
+  });
+
+  it('leaves the return step alone when nothing was reported', () => {
+    [{ damageReported: false }, {}, undefined].forEach(options => {
+      expect(timelineStepMessageId('returnedToLaundry', options)).toBe(
+        'ListingPage.rentalTimeline.returnedToLaundry'
+      );
+    });
+  });
+
+  // "el resto de los pasos debe funcionar igual" - damage is recorded AT the return, so no
+  // other step can carry the annotation, whatever the flag says.
+  it('never annotates any other step, even on a damaged rental', () => {
+    RENTAL_TIMELINE_STEPS.filter(step => step.key !== 'returnedToLaundry').forEach(step => {
+      expect(timelineStepMessageId(step.key, { damageReported: true })).toBe(
+        `ListingPage.rentalTimeline.${step.key}`
+      );
+    });
+  });
+
+  // Only a real boolean. The caller reads `metadata.damageReported?.flag`, and the object it
+  // sits on exists on rentals with no damage at all.
+  it('treats a non-boolean flag as no report', () => {
+    [{ damageReported: 'true' }, { damageReported: 1 }, { damageReported: {} }].forEach(o => {
+      expect(timelineStepMessageId('returnedToLaundry', o)).toBe(
+        'ListingPage.rentalTimeline.returnedToLaundry'
+      );
     });
   });
 });

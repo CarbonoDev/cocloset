@@ -4,6 +4,7 @@ import {
   inclusiveEndForPeriod,
   isWindowAvailableFn,
   latestBookableStartDate,
+  submitButtonMessageId,
 } from './BookingRentalPeriodForm';
 
 const TZ = 'Etc/UTC';
@@ -140,5 +141,30 @@ describe('dateFormatOptionsIn', () => {
     // the best available answer.
     expect('timeZone' in dateFormatOptionsIn(undefined)).toBe(false);
     expect(() => render(midnightUtc, dateFormatOptionsIn(undefined))).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "cuando se puede hacer autoaccept, el label del button no debe ser 'Request...' si no
+//   >  solo 'Book now' o algo similar"
+//
+// The label has to be right exactly when server/api/auto-accept-booking.js fires, so it asks
+// that endpoint's own question - `onLaundry === true` - rather than a cleverer one. These pin
+// the strictness: anything short of a real boolean is not custody, and a garment still in its
+// owner's wardrobe genuinely does need its owner to accept.
+// ---------------------------------------------------------------------------
+describe('submitButtonMessageId', () => {
+  it('says "book now" for a garment already at its studio', () => {
+    expect(submitButtonMessageId(true)).toBe('BookingRentalPeriodForm.bookNow');
+  });
+
+  it('keeps "request to book" when the owner still has to hand the garment over', () => {
+    expect(submitButtonMessageId(false)).toBe('BookingDatesForm.requestToBook');
+  });
+
+  it('keeps "request to book" for anything that is not a real boolean true', () => {
+    [undefined, null, 'true', 1, {}].forEach(value => {
+      expect(submitButtonMessageId(value)).toBe('BookingDatesForm.requestToBook');
+    });
   });
 });
