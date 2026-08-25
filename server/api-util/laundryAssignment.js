@@ -300,7 +300,22 @@ const resolveAssignedLaundry = ({ integrationSdk, assignedLaundryId }) =>
  * @returns {{assignedLaundryName: string|null, pickupAddress: string, geolocation: {lat: number, lng: number}}}
  */
 const laundryDerivedListingFields = laundry => ({
-  assignedLaundryName: laundry.displayName || laundry.studioName || null,
+  // THE STUDIO'S NAME, NOT THE ACCOUNT HOLDER'S.
+  //
+  //   > "se muestra el displayName de cada laundry, pero debe ser el nombre de la laundry, no
+  //   >  del user"
+  //
+  // Reported against the assignment picker, but the picker only shows what this writes: this
+  // name is stamped onto `publicData.assignedLaundryName` and is what the listing card, the
+  // listing page and the inbox panel all read. Fixing the picker alone would have left the
+  // account holder's name on every other surface.
+  //
+  // `displayName` remains the fallback rather than being dropped - a studio that has not
+  // filled in its profile name yet must still be nameable, and blank is worse than the
+  // account's name. Kept identical to the comparison in api-util/laundryAddress.js, which
+  // decides whether a listing needs re-stamping: if the two derived the name differently,
+  // every listing would either re-stamp forever or never.
+  assignedLaundryName: laundry.studioName || laundry.displayName || null,
   pickupAddress: laundry.address,
   geolocation: { lat: laundry.origin.lat, lng: laundry.origin.lng },
 });

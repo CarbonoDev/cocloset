@@ -25,7 +25,20 @@ const LaundryCard = props => {
   // /api/laundries returns a flat, explicitly allowlisted record (see
   // server/api-util/laundryDirectory.js) rather than the raw publicData blob.
   const { studioName, address, businessHours, acceptedCategories = [] } = laundry || {};
-  const name = laundry.displayName || studioName;
+  // THE STUDIO'S NAME, NOT THE ACCOUNT HOLDER'S.
+  //
+  //   > "se muestra el displayName de cada laundry, pero debe ser el nombre de la laundry, no
+  //   >  del user"
+  //
+  // The precedence was the wrong way round. `displayName` is whatever the person who signed
+  // the studio up called themselves - often their own name - and an owner choosing where their
+  // garment goes is choosing a PLACE. `studioName` is the name that place trades under and the
+  // one on its shopfront.
+  //
+  // `displayName` stays as the fallback rather than being dropped: a studio that has not filled
+  // in its profile name yet must still be identifiable in this list, and an unnamed card is
+  // worse than one naming the account.
+  const name = studioName || laundry.displayName;
   const inputId = `${formId}.assignedLaundryId.${laundry.id}`;
 
   // Stored accepted categories are Console category IDs (`midi_dress`), which are not

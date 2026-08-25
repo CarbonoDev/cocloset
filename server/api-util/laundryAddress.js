@@ -368,7 +368,10 @@ const propagateAddressToAssignedListings = ({ integrationSdk, laundryId, laundry
           publicData.pickupAddress === laundry.address &&
           geolocation.lat === laundry.origin.lat &&
           geolocation.lng === laundry.origin.lng &&
-          publicData.assignedLaundryName === (laundry.displayName || laundry.studioName || null);
+          // Same precedence as `laundryDerivedListingFields` in api-util/laundryAssignment.js,
+          // which is what writes this field. The two must agree or a listing either re-stamps
+          // on every pass or never converges.
+          publicData.assignedLaundryName === (laundry.studioName || laundry.displayName || null);
 
         if (alreadyCorrect) {
           skipped.push({ id: listing.id.uuid, description: describeListing(listing) });
