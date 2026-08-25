@@ -96,7 +96,7 @@ const TopbarMobileMenu = props => {
     );
   });
 
-  const createListingsLinkMaybe = showCreateListingsLink ? (
+  const createListingsLinkMaybe = showCreateListingsLink && !isLaundryUser(currentUser) ? (
     <NamedLink className={css.createNewListingLink} name="NewListingPage">
       <FormattedMessage id="TopbarMobileMenu.newListingLink" />
     </NamedLink>
@@ -156,7 +156,7 @@ const TopbarMobileMenu = props => {
     return currentPage === page || isAccountSettingsPage || isInboxPage || isLaundryOpsPage ? css.currentPage : null;
   };
 
-  const manageListingsLinkMaybe = showCreateListingsLink ? (
+  const manageListingsLinkMaybe = showCreateListingsLink && !isLaundryUser(currentUser) ? (
     <li className={classNames(css.navigationLink, currentPageClass('ManageListingsPage'))}>
       <NamedLink name="ManageListingsPage">
         <FormattedMessage id="TopbarMobileMenu.yourListingsLink" />

@@ -89,7 +89,7 @@ const LaundryCard = props => {
           />
         </span>
       ) : null}
-      {categoryChips.length > 0 ? (
+      {/* {categoryChips.length > 0 ? (
         <span className={css.cardCategories}>
           {categoryChips.map(category => (
             <span key={category.value} className={css.cardCategory} title={category.path}>
@@ -97,7 +97,7 @@ const LaundryCard = props => {
             </span>
           ))}
         </span>
-      ) : null}
+      ) : null} */}
     </label>
   );
 };

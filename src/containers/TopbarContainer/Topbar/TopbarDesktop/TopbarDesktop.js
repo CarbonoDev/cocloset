@@ -107,7 +107,7 @@ const ProfileMenu = ({ currentPage, currentUser, onLogout, showManageListingsLin
       : null;
   };
 
-  // Studio ops is reachable only for users the Integration API has flagged as a laundry
+  // Store ops is reachable only for users the Integration API has flagged as a laundry
   // (metadata.isLaundry - see isLaundryUser). Without this entry the ops shell had no
   // link anywhere in the app and could only be reached by typing the URL. The target is
   // LaundryProfilePage because it renders the ops rail, so this one link opens the whole
@@ -237,7 +237,7 @@ const TopbarDesktop = props => {
       currentPage={currentPage}
       currentUser={currentUser}
       onLogout={onLogout}
-      showManageListingsLink={showCreateListingsLink}
+      showManageListingsLink={showCreateListingsLink && !isLaundryUser(currentUser)}
       intl={intl}
     />
   ) : null;
@@ -286,7 +286,7 @@ const TopbarDesktop = props => {
         customLinks={customLinks}
         intl={intl}
         hasClientSideContentReady={authenticatedOnClientSide || !isAuthenticatedOrJustHydrated}
-        showCreateListingsLink={showCreateListingsLink}
+        showCreateListingsLink={showCreateListingsLink && !isLaundryUser(currentUser)}
       />
 
       {laundryLinkMaybe}

@@ -45,7 +45,7 @@ const UserNav = props => {
       ]
     : [];
 
-  const manageListingsTabMaybe = showManageListingsLink
+  const manageListingsTabMaybe = showManageListingsLink && !showLaundryProfileLink
     ? [
         {
           text: <FormattedMessage id="UserNav.yourListings" />,

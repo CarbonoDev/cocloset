@@ -29,6 +29,7 @@ import {
 
 import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer';
 import FooterContainer from '../../containers/FooterContainer/FooterContainer';
+import NotFoundPage from '../NotFoundPage/NotFoundPage';
 
 import ManageListingCard from './ManageListingCard/ManageListingCard';
 
@@ -133,7 +134,14 @@ export const ManageListingsPageComponent = props => {
     queryParams,
     scrollingDisabled,
     onManageDisableScrolling,
+    staticContext,
   } = props;
+
+  const currentUserLoaded = !!currentUser?.id;
+
+  if (currentUserLoaded && isLaundryUser(currentUser)) {
+    return <NotFoundPage staticContext={staticContext} />;
+  }
 
   useEffect(() => {
     if (isErrorNoPermissionToPostListings(openingListingError?.error)) {

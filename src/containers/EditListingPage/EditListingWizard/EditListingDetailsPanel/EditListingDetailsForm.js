@@ -528,9 +528,9 @@ const EditListingDetailsForm = props => (
             />
           )}
 
-          {showOwnerAddress && showListingFields && isCompatibleCurrency && (
+          {/* {showOwnerAddress && showListingFields && isCompatibleCurrency && (
             <FieldOwnerAddress formId={formId} intl={intl} />
-          )}
+          )} */}
 
           {!isCompatibleCurrency && listingType && (
             <p className={css.error}>
