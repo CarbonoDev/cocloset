@@ -465,7 +465,12 @@ describe('cocloset-booking wizard: publishing from the laundry tab', () => {
     // a real change that the server refuses with 409 must not publish, and must say which
     // condition refused it.
     fetchLaundries.mockResolvedValue({
-      data: [laundry, { ...laundry, id: 'laundry-2', displayName: 'Studio Two' }],
+      // A second STUDIO, so it needs a second studio name: the card is named by
+      // `studioName` now, not by the account behind it.
+      data: [
+        laundry,
+        { ...laundry, id: 'laundry-2', displayName: 'Studio Two', studioName: 'Studio Two' },
+      ],
     });
     assignListingLaundry.mockRejectedValue({ status: 409, data: { reason: 'active-transaction' } });
 

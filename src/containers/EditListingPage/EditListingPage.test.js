@@ -407,7 +407,11 @@ describe('EditListingPage', () => {
       queryAllByRole('option', { name: 'EditListingDetailsForm.categoryPlaceholder' })[0].selected
     ).toBe(false);
     expect(getByRole('option', { name: 'Sneakers' }).selected).toBe(true);
-    expect(queryAllByText('EditListingDetailsForm.categoryLabel')).toHaveLength(2);
+    // One required label and one optional one. The subcategory carries its own key now that
+    // it is optional (see EditListingDetailsForm), so counting the required key alone is what
+    // asserts the level below it did NOT come out required.
+    expect(queryAllByText('EditListingDetailsForm.categoryLabel')).toHaveLength(1);
+    expect(queryAllByText('EditListingDetailsForm.categoryLabelOptional')).toHaveLength(1);
 
     // Simulate user selecting subcategory: second combobox is the subcategory
     const selectSubcategory = screen.getAllByRole('combobox')[1];
@@ -537,7 +541,11 @@ describe('EditListingPage', () => {
       queryAllByRole('option', { name: 'EditListingDetailsForm.categoryPlaceholder' })[0].selected
     ).toBe(false);
     expect(getByRole('option', { name: 'Sneakers' }).selected).toBe(true);
-    expect(queryAllByText('EditListingDetailsForm.categoryLabel')).toHaveLength(2);
+    // One required label and one optional one. The subcategory carries its own key now that
+    // it is optional (see EditListingDetailsForm), so counting the required key alone is what
+    // asserts the level below it did NOT come out required.
+    expect(queryAllByText('EditListingDetailsForm.categoryLabel')).toHaveLength(1);
+    expect(queryAllByText('EditListingDetailsForm.categoryLabelOptional')).toHaveLength(1);
 
     // Simulate user interaction and select sub level category: second combobox is subcategory
     const selectSubcategory = screen.getAllByRole('combobox')[1];

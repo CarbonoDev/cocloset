@@ -12,6 +12,9 @@ import {
   isSearchableListingField,
   listingFieldSearchParams,
 } from '../../util/listingFieldSearch.js';
+import { formatMoneyListingFieldValue, isMoneyListingField } from '../../util/listingFieldMoney.js';
+
+import { useConfiguration } from '../../context/configurationContext.js';
 
 import CustomExtendedDataSection from '../../components/CustomExtendedDataSection/CustomExtendedDataSection.js';
 
@@ -28,6 +31,10 @@ import css from './ListingPage.module.css';
  */
 const CustomListingFields = props => {
   const { publicData, metadata, listingFieldConfigs, categoryConfiguration, intl } = props;
+  // The marketplace's own currency, for the money-valued fields below. Read from context rather
+  // than threaded through props because ProfilePage renders these same components and has no
+  // prices to format - see util/listingFieldMoney.js.
+  const currency = useConfiguration()?.currency;
 
   const { key: categoryPrefix, categories: listingCategoriesConfig } = categoryConfiguration;
   const categoriesObj = pickCategoryFields(publicData, categoryPrefix, 1, listingCategoriesConfig);
@@ -101,9 +108,22 @@ const CustomListingFields = props => {
         'ListingPage'
       );
 
-      return detailValue
-        ? filteredConfigs.concat(withSearchParams(detailValue, key))
-        : filteredConfigs;
+      if (!detailValue) {
+        return filteredConfigs;
+      }
+
+      // A retail value is a `long` like any other as far as Console is concerned, so the shared
+      // helper hands back a bare number. Formatting it here rather than inside that helper
+      // keeps a listing-page decision off ProfilePage, which renders custom fields through the
+      // same components. See util/listingFieldMoney.js.
+      const withMoney = isMoneyListingField(key)
+        ? {
+            ...detailValue,
+            value: formatMoneyListingFieldValue(detailValue.value, { intl, currency }),
+          }
+        : detailValue;
+
+      return filteredConfigs.concat(withSearchParams(withMoney, key));
     }
     return filteredConfigs;
   };
