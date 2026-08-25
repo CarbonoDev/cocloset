@@ -151,6 +151,18 @@ const CategoryField = props => {
 
   const categoryConfig = findCategoryConfig(currentCategoryOptions, values[`${prefix}${level}`]);
 
+  // ONLY THE TOP CATEGORY IS REQUIRED.
+  //
+  //   > "Puedes cambiar la subcategoría para que sea opcional? Si el usuario selecciona una
+  //   >  categoria esta bien, pero si esa categoria tiene subcategorías, puedo continuar si la
+  //   >  selecciono o no"
+  //
+  // A garment has to be something; how finely it is described below that is the owner's
+  // choice. Deeper levels only exist because the level above them offered them, so making
+  // them optional is a rule about depth rather than about any particular category - it holds
+  // for a three-level tree an operator adds next year without another change here.
+  const isRequired = level === 1;
+
   return (
     <>
       {currentCategoryOptions ? (
@@ -161,17 +173,32 @@ const CategoryField = props => {
           className={css.listingTypeSelect}
           onChange={event => handleCategoryChange(event, level, currentCategoryOptions)}
           label={intl.formatMessage(
-            { id: 'EditListingDetailsForm.categoryLabel' },
+            {
+              id: isRequired
+                ? 'EditListingDetailsForm.categoryLabel'
+                : 'EditListingDetailsForm.categoryLabelOptional',
+            },
             { categoryLevel: currentCategoryKey }
           )}
-          validate={required(
-            intl.formatMessage(
-              { id: 'EditListingDetailsForm.categoryRequired' },
-              { categoryLevel: currentCategoryKey }
-            )
-          )}
+          validate={
+            isRequired
+              ? required(
+                  intl.formatMessage(
+                    { id: 'EditListingDetailsForm.categoryRequired' },
+                    { categoryLevel: currentCategoryKey }
+                  )
+                )
+              : undefined
+          }
         >
-          <option disabled value="">
+          {/* THE PLACEHOLDER IS A REAL CHOICE ON AN OPTIONAL LEVEL.
+                > "ese select no permite regresar al placeholder si selecciono una opción"
+
+              It was `disabled` on every level, which is correct for a required field - there
+              is nothing to go back TO - and a dead end on an optional one: having picked a
+              subcategory the owner could never un-pick it, only pick a different wrong one.
+              So the option is disabled exactly when the field is required. */}
+          <option disabled={isRequired} value="">
             {intl.formatMessage(
               { id: 'EditListingDetailsForm.categoryPlaceholder' },
               { categoryLevel: currentCategoryKey }
@@ -207,9 +234,11 @@ const FieldSelectCategory = props => {
 
   const { prefix, listingCategories, formApi, intl, setAllCategoriesChosen, values } = props;
 
-  // Counts the number of selected categories in the form values based on the given prefix.
+  // Counts the category levels that actually hold a choice. `Object.keys` alone counted a key
+  // whose value had been cleared to null, which now happens on purpose: an owner may empty an
+  // optional subcategory, and a level that has been emptied is not a level that was selected.
   const countSelectedCategories = () => {
-    return Object.keys(values).filter(key => key.startsWith(prefix)).length;
+    return Object.keys(values).filter(key => key.startsWith(prefix) && !!values[key]).length;
   };
 
   // Checks if initial values exist for categories and sets the state accordingly.
@@ -227,8 +256,23 @@ const FieldSelectCategory = props => {
         formApi.change(`${prefix}${i}`, null);
       }
     }
-    const categoryConfig = findCategoryConfig(currentCategoryOptions, category).subcategories;
-    setAllCategoriesChosen(!categoryConfig || categoryConfig.length === 0);
+
+    // WHAT "ALL CHOSEN" MEANS NOW THAT SUBCATEGORIES ARE OPTIONAL.
+    //
+    // This flag is what reveals the title, the description and every listing field, so it has
+    // to flip the moment the owner has said enough - which, with only level 1 required, is as
+    // soon as level 1 holds a value. It used to wait for a leaf category, so a garment whose
+    // top category happened to have subcategories showed an empty form until the owner picked
+    // one; that is precisely the wait the client asked to remove.
+    //
+    // Level-aware rather than reading `values`, which is stale inside this handler: only
+    // level 1 can take the form back to nothing, and clearing an optional subcategory must
+    // not hide a form the owner has already filled in.
+    //
+    // This also drops an unguarded `findCategoryConfig(...).subcategories` that used to
+    // decide the flag. Clearing a select calls this with an empty id, for which that lookup
+    // returns undefined - so the old line threw the moment a placeholder became reachable.
+    setAllCategoriesChosen(level > 1 ? true : !!category);
   };
 
   return (

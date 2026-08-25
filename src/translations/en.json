@@ -278,6 +278,7 @@
   "EditListingDeliveryPanel.createListingTitle": "Delivery options",
   "EditListingDeliveryPanel.title": "Edit the delivery options of {listingTitle}",
   "EditListingDetailsForm.categoryLabel": "{categoryLevel, select, categoryLevel1 {Category} other {Subcategory}}",
+  "EditListingDetailsForm.categoryLabelOptional": "{categoryLevel, select, categoryLevel1 {Category} other {Subcategory}} (optional)",
   "EditListingDetailsForm.categoryPlaceholder": "{categoryLevel, select, categoryLevel1 {Select category} other {Select subcategory}}",
   "EditListingDetailsForm.categoryRequired": "{categoryLevel, select, categoryLevel1 {You need to select a category.} other {You need to select a subcategory.}}",
   "EditListingDetailsForm.createListingDraftError": "Failed to create a draft listing. Please try again.",

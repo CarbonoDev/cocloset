@@ -269,6 +269,7 @@
   "EditListingDeliveryPanel.createListingTitle": "Options de livraison",
   "EditListingDeliveryPanel.title": "Modifier les options de livraison de {listingTitle}",
   "EditListingDetailsForm.categoryLabel": "{categoryLevel, select, categoryLevel1 {Catégorie} other {Sous-catégorie}}",
+  "EditListingDetailsForm.categoryLabelOptional": "{categoryLevel, select, categoryLevel1 {Category} other {Subcategory}} (optional)",
   "EditListingDetailsForm.categoryPlaceholder": "{categoryLevel, select, categoryLevel1 {Sélectionnez une catégorie} other {Sélectionnez une sous-catégorie}}",
   "EditListingDetailsForm.categoryRequired": "{categoryLevel, select, categoryLevel1 {Vous devez sélectionner une catégorie.} other {Vous devez sélectionner une sous-catégorie.}}",
   "EditListingDetailsForm.createListingDraftError": "La création du brouillon de l'annonce a échoué. Veuillez réessayer.",

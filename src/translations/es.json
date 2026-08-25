@@ -269,6 +269,7 @@
   "EditListingDeliveryPanel.createListingTitle": "Opciones de entrega",
   "EditListingDeliveryPanel.title": "Editar las opciones de entrega de {listingTitle}",
   "EditListingDetailsForm.categoryLabel": "{categoryLevel, select, categoryLevel1 {Categoría} other {Subcategoría}}",
+  "EditListingDetailsForm.categoryLabelOptional": "{categoryLevel, select, categoryLevel1 {Categoría} other {Subcategoría}} (opcional)",
   "EditListingDetailsForm.categoryPlaceholder": "{categoryLevel, select, categoryLevel1 {Selecciona una categoría} other {Selecciona una Subcategoría}}",
   "EditListingDetailsForm.categoryRequired": "{categoryLevel, select, categoryLevel1 {Debes seleccionar una categoría.} other {Debes seleccionar una Subcategoría.}}",
   "EditListingDetailsForm.createListingDraftError": "Error al crear el borrador del anuncio. Por favor, inténtalo de nuevo.",

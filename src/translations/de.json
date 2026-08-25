@@ -269,6 +269,7 @@
   "EditListingDeliveryPanel.createListingTitle": "Lieferoptionen",
   "EditListingDeliveryPanel.title": "Bearbeite die Lieferoptionen von {listingTitle}",
   "EditListingDetailsForm.categoryLabel": "{categoryLevel, select, categoryLevel1 {Kategorie} other {Unterkategorie}}",
+  "EditListingDetailsForm.categoryLabelOptional": "{categoryLevel, select, categoryLevel1 {Category} other {Subcategory}} (optional)",
   "EditListingDetailsForm.categoryPlaceholder": "{categoryLevel, select, categoryLevel1 {Kategorie wählen} other {Unterkategorie wählen}}",
   "EditListingDetailsForm.categoryRequired": "{categoryLevel, select, categoryLevel1 {Du musst eine Kategorie wählen.} other {Du musst eine Unterkategorie wählen.}}",
   "EditListingDetailsForm.createListingDraftError": "Das Erstellen des Eintrag-Entwurfs ist fehlgeschlagen. Bitte versuche es erneut.",
