@@ -287,9 +287,26 @@ const FieldSelectCategory = props => {
   );
 };
 
+/**
+ * LISTING FIELDS THAT COME BEFORE THE TITLE.
+ *
+ *   > "brand debe estar en el editListingPage como el primer field despues de categoria y
+ *   >  subcategoria"
+ *
+ * Everything else keeps the order Console gives it. Console orders ALL the listing fields
+ * together, after the title and the description, and has no way to say "this one belongs up
+ * with the category" - so the exception has to live here, where the title and the category are
+ * laid out.
+ *
+ * A key list, so adding a second early field is a one-word change and the rule stays readable.
+ * A key that is not configured, not for this listing type, or not for the chosen category is
+ * simply not rendered - the split below filters, it does not force anything to appear.
+ */
+const LISTING_FIELD_KEYS_BEFORE_TITLE = ['brand'];
+
 // Add collect data for listing fields (both publicData and privateData) based on configuration
 const AddListingFields = props => {
-  const { listingType, listingFieldsConfig, selectedCategories, formId, intl } = props;
+  const { listingType, listingFieldsConfig, selectedCategories, formId, intl, pickField } = props;
   const targetCategoryIds = Object.values(selectedCategories);
 
   const fields = listingFieldsConfig.reduce((pickedFields, fieldConfig) => {
@@ -300,8 +317,15 @@ const AddListingFields = props => {
     const isProviderScope = ['public', 'private'].includes(scope);
     const isTargetListingType = isFieldForListingType(listingType, fieldConfig);
     const isTargetCategory = isFieldForCategory(targetCategoryIds, fieldConfig);
+    // Which SIDE of the title this field belongs on. Defaults to rendering everything, so the
+    // component behaves exactly as before for any caller that does not split.
+    const isWantedHere = pickField ? pickField(key) : true;
 
-    return isKnownSchemaType && isProviderScope && isTargetListingType && isTargetCategory
+    return isKnownSchemaType &&
+      isProviderScope &&
+      isTargetListingType &&
+      isTargetCategory &&
+      isWantedHere
       ? [
           ...pickedFields,
           <CustomExtendedDataField
@@ -528,6 +552,20 @@ const EditListingDetailsForm = props => (
             />
           )}
 
+          {/* Brand sits with the category, not down with the rest of the listing fields - see
+              LISTING_FIELD_KEYS_BEFORE_TITLE. Same visibility condition as the block at the
+              bottom, so an early field never appears before the category has been chosen. */}
+          {showListingFields && isCompatibleCurrency && (
+            <AddListingFields
+              listingType={listingType}
+              listingFieldsConfig={listingFieldsConfig}
+              selectedCategories={pickSelectedCategories(values)}
+              formId={formId}
+              intl={intl}
+              pickField={key => LISTING_FIELD_KEYS_BEFORE_TITLE.includes(key)}
+            />
+          )}
+
           {showTitle && isCompatibleCurrency && (
             <FieldTextInput
               id={`${formId}title`}
@@ -569,6 +607,7 @@ const EditListingDetailsForm = props => (
               selectedCategories={pickSelectedCategories(values)}
               formId={formId}
               intl={intl}
+              pickField={key => !LISTING_FIELD_KEYS_BEFORE_TITLE.includes(key)}
             />
           )}
 
