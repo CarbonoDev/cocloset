@@ -3,6 +3,9 @@ import {
   STEP_CURRENT,
   STEP_DONE,
   STEP_PENDING,
+  TIMELINE_AUDIENCE_CUSTOMER,
+  TIMELINE_AUDIENCE_PROVIDER,
+  rentalTimelineSteps,
   timelineStatusFor,
   timelineStepMessageId,
 } from './rentalTimeline';
@@ -11,14 +14,20 @@ import {
 // real rental has got to. These pin the marking - the description needs no test beyond the
 // keys existing.
 
+// Default audience is the customer, which is what the listing page renders and what most of
+// these assert. The owner's list is exercised in its own describe below.
 const statuses = state => timelineStatusFor(state).map(s => s.status);
 const keyAt = status => timelineStatusFor(status).find(s => s.status === STEP_CURRENT)?.key;
 
+const customerKeys = rentalTimelineSteps(TIMELINE_AUDIENCE_CUSTOMER).map(s => s.key);
+const providerKeys = rentalTimelineSteps(TIMELINE_AUDIENCE_PROVIDER).map(s => s.key);
+
 describe('timelineStatusFor', () => {
-  it('always returns all eight steps, in order', () => {
-    expect(timelineStatusFor('picked-up').map(s => s.key)).toEqual(
-      RENTAL_TIMELINE_STEPS.map(s => s.key)
-    );
+  it("always returns the reader's whole list, in order", () => {
+    expect(timelineStatusFor('picked-up').map(s => s.key)).toEqual(customerKeys);
+    expect(
+      timelineStatusFor('picked-up', { audience: TIMELINE_AUDIENCE_PROVIDER }).map(s => s.key)
+    ).toEqual(providerKeys);
   });
 
   it('marks the step a rental is on, and everything before it as done', () => {
@@ -26,7 +35,6 @@ describe('timelineStatusFor', () => {
       STEP_DONE,
       STEP_DONE,
       STEP_CURRENT,
-      STEP_PENDING,
       STEP_PENDING,
       STEP_PENDING,
       STEP_PENDING,
@@ -48,12 +56,22 @@ describe('timelineStatusFor', () => {
     expect(statuses('overdue')).toEqual(statuses('picked-up'));
   });
 
-  it('counts a reviewed rental as finished', () => {
-    // A garment does not become un-returned because somebody wrote about it.
+  it('counts a reviewed rental as a returned one, for every step but the review', () => {
+    // A garment does not become un-returned because somebody wrote about it - so the garment
+    // steps read the same. The review step is the one that moves, and it is asserted below.
+    const withoutReview = state => statuses(state).slice(0, -1);
+
     ['reviewed', 'reviewed-by-customer', 'reviewed-by-provider'].forEach(state => {
-      expect(statuses(state)).toEqual(statuses('delivered'));
+      expect(withoutReview(state)).toEqual(withoutReview('delivered'));
     });
-    expect(keyAt('delivered')).toBe('readyForNextRental');
+  });
+
+  it('ends the owner on "ready for next rental" once the garment is back on the shelf', () => {
+    const providerStatuses = timelineStatusFor('delivered', {
+      audience: TIMELINE_AUDIENCE_PROVIDER,
+    });
+
+    expect(providerStatuses.find(s => s.key === 'readyForNextRental').status).toBe(STEP_CURRENT);
   });
 
   it('marks NOTHING before the rental has been accepted', () => {
@@ -74,7 +92,85 @@ describe('timelineStatusFor', () => {
 
   it('does not crash on an unknown or absent state', () => {
     [undefined, null, 'something-else'].forEach(state => {
-      expect(timelineStatusFor(state)).toHaveLength(RENTAL_TIMELINE_STEPS.length);
+      expect(timelineStatusFor(state)).toHaveLength(customerKeys.length);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "aparecen para el customer Cleaning y Ready for next rental, el customer no tiene que
+//   >  saber eso, laundry y provider si, podemos agregar para customer y provider los steps de
+//   >  review? y para customer remover los dos steps que te menciono?"
+// ---------------------------------------------------------------------------
+describe('who sees which steps', () => {
+  it("leaves the laundry's work off the renter's list", () => {
+    expect(customerKeys).not.toContain('cleaning');
+    expect(customerKeys).not.toContain('readyForNextRental');
+  });
+
+  it('keeps both of them for the owner, whose rental is not over until then', () => {
+    expect(providerKeys).toContain('cleaning');
+    expect(providerKeys).toContain('readyForNextRental');
+  });
+
+  it('gives both readers a review step', () => {
+    expect(customerKeys[customerKeys.length - 1]).toBe('review');
+    expect(providerKeys[providerKeys.length - 1]).toBe('review');
+  });
+
+  it('tells the same story about the garment up to the return', () => {
+    // Everything before the split is shared, and in the same order - the two readers are
+    // watching one rental.
+    const upToReturn = keys => keys.slice(0, keys.indexOf('returnedToLaundry') + 1);
+
+    expect(upToReturn(customerKeys)).toEqual(upToReturn(providerKeys));
+  });
+
+  it('defaults to the renter, which is who reads a listing page', () => {
+    expect(rentalTimelineSteps().map(s => s.key)).toEqual(customerKeys);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The review step is the only one that is not "the rental reached this point" but "it is your
+// turn, and have you taken it" - a different question for each party, since the process
+// records the two reviews separately.
+// ---------------------------------------------------------------------------
+describe('the review step', () => {
+  const reviewStatus = (state, audience) =>
+    timelineStatusFor(state, { audience }).find(s => s.key === 'review').status;
+
+  it('waits while the rental is still going on', () => {
+    ['accepted', 'ready-for-pickup', 'picked-up', 'returned', 'cleaning'].forEach(state => {
+      expect(reviewStatus(state, TIMELINE_AUDIENCE_CUSTOMER)).toBe(STEP_PENDING);
+    });
+  });
+
+  it('becomes the current step for both once the rental is done', () => {
+    expect(reviewStatus('delivered', TIMELINE_AUDIENCE_CUSTOMER)).toBe(STEP_CURRENT);
+    expect(reviewStatus('delivered', TIMELINE_AUDIENCE_PROVIDER)).toBe(STEP_CURRENT);
+  });
+
+  // THE POINT OF DOING THIS PER READER. `reviewed-by-customer` means the CUSTOMER wrote one.
+  // Folding both review states into "finished" - which is what happened before - told the
+  // owner they had done something they had not.
+  it('is done for whoever wrote the review, and still waiting for the other', () => {
+    expect(reviewStatus('reviewed-by-customer', TIMELINE_AUDIENCE_CUSTOMER)).toBe(STEP_DONE);
+    expect(reviewStatus('reviewed-by-customer', TIMELINE_AUDIENCE_PROVIDER)).toBe(STEP_CURRENT);
+
+    expect(reviewStatus('reviewed-by-provider', TIMELINE_AUDIENCE_PROVIDER)).toBe(STEP_DONE);
+    expect(reviewStatus('reviewed-by-provider', TIMELINE_AUDIENCE_CUSTOMER)).toBe(STEP_CURRENT);
+  });
+
+  it('is done for both once both have reviewed', () => {
+    expect(reviewStatus('reviewed', TIMELINE_AUDIENCE_CUSTOMER)).toBe(STEP_DONE);
+    expect(reviewStatus('reviewed', TIMELINE_AUDIENCE_PROVIDER)).toBe(STEP_DONE);
+  });
+
+  // A rental that did not happen has nothing to review.
+  it('stays pending on a rental that never happened', () => {
+    ['declined', 'expired', 'canceled', 'payment-expired'].forEach(state => {
+      expect(reviewStatus(state, TIMELINE_AUDIENCE_CUSTOMER)).toBe(STEP_PENDING);
     });
   });
 });

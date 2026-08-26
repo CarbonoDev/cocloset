@@ -80,7 +80,10 @@ const InboxTransactionPanel = props => {
   // `getState` is the process's own reading of `lastTransition`. Asking the process rather
   // than mapping transitions here is what keeps this panel correct when the EDN changes.
   const processState = process?.getState ? process.getState(transaction) : null;
-  const steps = timelineStatusFor(processState);
+  // WHOSE STORY THIS IS. The renter does not see the laundry's work after the garment goes
+  // back, and both parties see a review step - see util/rentalTimeline.js. The panel already
+  // knows the role for its status strings, so this costs nothing but passing it along.
+  const steps = timelineStatusFor(processState, { audience: transactionRole });
 
   // WHETHER THIS VIEWER GETS THE CODE AT ALL.
   //

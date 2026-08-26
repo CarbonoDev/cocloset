@@ -85,7 +85,10 @@ describe('InboxTransactionPanel: the damage annotation on the return step', () =
   });
 
   // "el resto de los pasos debe funcionar igual" - the other seven are untouched either way.
-  it('still renders all eight steps on a damaged rental', () => {
+  // "el resto de los pasos debe funcionar igual" - the annotation replaces one step's label and
+  // touches nothing else. Which steps a reader gets is a separate rule, asserted below; this
+  // renders as the CUSTOMER, so the laundry's post-return work is not among them.
+  it("still renders the rest of the renter's steps on a damaged rental", () => {
     renderPanel({ damageReported: { flag: true, note: 'Hem torn' } });
 
     ['bookingConfirmed', 'laundryPreparing', 'readyForPickup', 'pickedUp', 'rentalActive'].forEach(
@@ -93,8 +96,52 @@ describe('InboxTransactionPanel: the damage annotation on the return step', () =
         expect(screen.getByText(`ListingPage.rentalTimeline.${key}`)).toBeInTheDocument();
       }
     );
-    expect(screen.getByText('ListingPage.rentalTimeline.cleaning')).toBeInTheDocument();
-    expect(screen.getByText('ListingPage.rentalTimeline.readyForNextRental')).toBeInTheDocument();
+    expect(screen.getByText('ListingPage.rentalTimeline.review')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "aparecen para el customer Cleaning y Ready for next rental, el customer no tiene que
+//   >  saber eso, laundry y provider si, podemos agregar para customer y provider los steps de
+//   >  review?"
+//
+// The rule lives in util/rentalTimeline.js and is tested there. This pins the WIRING - that
+// the panel passes the role it already knows, rather than rendering one list for everybody.
+// On this project that is exactly where things die: a correct helper reached by nobody looks
+// like a working feature.
+// ---------------------------------------------------------------------------
+describe('InboxTransactionPanel: whose timeline it renders', () => {
+  const asRole = role =>
+    render(
+      <InboxTransactionPanel
+        transaction={transactionWith({})}
+        transactionRole={role}
+        onManageDisableScrolling={() => null}
+      />
+    );
+
+  const step = key => screen.queryByText(`ListingPage.rentalTimeline.${key}`);
+
+  it("keeps the laundry's work off the renter's timeline", () => {
+    asRole(TX_TRANSITION_ACTOR_CUSTOMER);
+
+    expect(step('cleaning')).not.toBeInTheDocument();
+    expect(step('readyForNextRental')).not.toBeInTheDocument();
+  });
+
+  it('shows the owner both, because their rental is not over until then', () => {
+    asRole(TX_TRANSITION_ACTOR_PROVIDER);
+
+    expect(step('cleaning')).toBeInTheDocument();
+    expect(step('readyForNextRental')).toBeInTheDocument();
+  });
+
+  it('gives both of them the review step', () => {
+    [TX_TRANSITION_ACTOR_CUSTOMER, TX_TRANSITION_ACTOR_PROVIDER].forEach(role => {
+      const view = asRole(role);
+      expect(step('review')).toBeInTheDocument();
+      view.unmount();
+    });
   });
 });
 
