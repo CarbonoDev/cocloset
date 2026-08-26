@@ -7,6 +7,10 @@ import '@testing-library/jest-dom';
 jest.mock('../../../util/api', () => ({
   fetchLaundries: jest.fn(),
   assignListingLaundry: jest.fn(),
+  // The details panel fetches the brands its autocomplete suggests. Resolved rather than left
+  // undefined so these tests exercise the real 'the list never arrives is not an error' path
+  // instead of blowing up on a missing mock.
+  fetchBrands: jest.fn(() => Promise.resolve({ data: [] })),
 }));
 
 import { types as sdkTypes } from '../../../util/sdkLoader';

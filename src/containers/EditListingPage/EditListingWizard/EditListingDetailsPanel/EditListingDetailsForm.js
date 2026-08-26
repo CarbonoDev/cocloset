@@ -360,6 +360,61 @@ const getListingTypeConfig = (config, listingType) => {
  * rather than being deleted. Plain text fields, no map or autocomplete, and the same
  * required-ness the dedicated step had.
  */
+/**
+ * THE BRAND, AS AN AUTOCOMPLETE OVER THE BRANDS THAT ALREADY EXIST.
+ *
+ *   > "Podemos usar brand como un autocomplete de todas las brands que existen"
+ *
+ * BESPOKE, not a Console listing field, and it has to be. Brand was removed from Console so
+ * flex-cli could own the `pub_brand` search schema - Console owns the schema for the fields it
+ * defines, and a Console `text` field cannot produce a filterable parameter at all. That is
+ * also why this could never have been a Console field even if one existed: Console renders a
+ * plain text box, and a plain text box is not an autocomplete.
+ *
+ * A NATIVE `<datalist>` rather than a custom combobox. It gives suggestion-plus-free-text for
+ * free, keyboard and screen-reader behaviour come from the browser rather than from us, and it
+ * adds no dependency - which this project's conventions ask for before reaching for a package.
+ * The trade is that the popup cannot be styled and mobile browsers present it differently. If
+ * the design later needs the list to look like the rest of the form, this is the seam to
+ * replace, and nothing outside this component knows how the suggestions are drawn.
+ *
+ * The field is FREE TEXT on purpose: the list is a shortcut to a brand that exists, never a
+ * restriction to one. A garment whose brand nobody has listed yet has to be listable, and the
+ * first person to type it is the one person who knows how it is spelled.
+ *
+ * Snapping a typed brand onto an existing spelling happens on SUBMIT, in the panel, not here -
+ * see util/brandValue.js. Doing it on every keystroke would fight the person typing.
+ */
+const FieldBrandAutocomplete = props => {
+  const { formId, intl, brandOptions = [] } = props;
+  const listId = `${formId}brandOptions`;
+
+  return (
+    <>
+      <FieldTextInput
+        id={`${formId}brand`}
+        name="brand"
+        className={css.brand}
+        type="text"
+        // Long enough for the longest real brand and short enough to keep a paragraph out of
+        // the field; matches what Console's own short-text fields allow.
+        maxLength={70}
+        label={intl.formatMessage({ id: 'EditListingDetailsForm.brand' })}
+        placeholder={intl.formatMessage({ id: 'EditListingDetailsForm.brandPlaceholder' })}
+        helpText={intl.formatMessage({ id: 'EditListingDetailsForm.brandHelp' })}
+        // Reaches the DOM input through FieldTextInput's `...rest`.
+        list={listId}
+        autoComplete="off"
+      />
+      <datalist id={listId}>
+        {brandOptions.map(({ brand }) => (
+          <option key={brand} value={brand} />
+        ))}
+      </datalist>
+    </>
+  );
+};
+
 const FieldOwnerAddress = props => {
   const { formId, intl } = props;
 
@@ -467,6 +522,9 @@ const EditListingDetailsForm = props => (
         updateInProgress,
         fetchErrors,
         listingFieldsConfig = [],
+        // The brands that already exist, for the autocomplete. Empty until the public endpoint
+        // answers and on any failure - the input still works, it just suggests nothing.
+        brandOptions = [],
         listingCurrency,
         showOwnerAddress = false,
         values,
@@ -500,6 +558,12 @@ const EditListingDetailsForm = props => (
       );
 
       const maxLength60Message = maxLength(maxLengthMessage, TITLE_MAX_LENGTH);
+
+      // Console has no brand field today - it was removed so flex-cli could own the pub_brand
+      // search schema - which is why FieldBrandAutocomplete exists at all. Checked rather than
+      // assumed, so adding brand back in Console switches this off instead of producing two
+      // brand inputs side by side.
+      const hasHostedBrandField = listingFieldsConfig.some(config => config?.key === 'brand');
 
       const hasCategories = selectableCategories && selectableCategories.length > 0;
       const showCategories = listingType && hasCategories;
@@ -552,9 +616,18 @@ const EditListingDetailsForm = props => (
             />
           )}
 
-          {/* Brand sits with the category, not down with the rest of the listing fields - see
-              LISTING_FIELD_KEYS_BEFORE_TITLE. Same visibility condition as the block at the
-              bottom, so an early field never appears before the category has been chosen. */}
+          {/* Brand is not a Console field, so nothing renders it but this. Guarded on Console
+              NOT having one: if an operator ever adds brand back, the hosted field is the truth
+              and this would otherwise draw a second brand input beside it. Same rule as
+              listingFieldSearchConfig in util/listingFieldSearch.js - hosted wins. */}
+          {showListingFields && isCompatibleCurrency && !hasHostedBrandField && (
+            <FieldBrandAutocomplete formId={formId} intl={intl} brandOptions={brandOptions} />
+          )}
+
+          {/* A hosted brand, if one ever comes back, still sits with the category rather than
+              down with the rest of the listing fields - see LISTING_FIELD_KEYS_BEFORE_TITLE.
+              Same visibility condition as the block at the bottom, so an early field never
+              appears before the category has been chosen. */}
           {showListingFields && isCompatibleCurrency && (
             <AddListingFields
               listingType={listingType}

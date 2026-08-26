@@ -29,6 +29,12 @@
   }
 }
 
+/* Brand sits between the category and the title, so it takes the same rhythm as the fields on
+   either side of it rather than inventing its own. */
+.brand {
+  composes: formMargins;
+}
+
 .title {
   composes: formMargins;
 }
