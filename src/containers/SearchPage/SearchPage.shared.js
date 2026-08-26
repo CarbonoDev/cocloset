@@ -538,7 +538,8 @@ export const createSearchResultSchema = (
 const getSelectedSecondaryFiltersCount = (
   validQueryParams,
   filterConfigs,
-  customSecondaryFilters
+  customSecondaryFilters,
+  builtInSecondaryFilters = []
 ) => {
   const hasSecondaryFilters = !!(customSecondaryFilters && customSecondaryFilters.length > 0);
   const potentialSecondaryFilters = hasSecondaryFilters
@@ -553,7 +554,15 @@ const getSelectedSecondaryFiltersCount = (
   );
   const pickRelevant = name => relevantQueryParamNames.includes(name);
   const selectedSecondaryFilters = Object.keys(potentialSecondaryFilters).filter(pickRelevant);
-  return selectedSecondaryFilters?.length;
+
+  // A BUILT-IN filter is counted by its RAW key. Only custom listing fields are namespaced -
+  // for a default filter the key maps 1-on-1 onto the query parameter (see util/search.js), so
+  // running `keywords` through constructQueryParamName would look for `pub_keywords` and never
+  // find it. That would leave "More filters" showing no count while a keyword was active.
+  const selectedBuiltInCount = builtInSecondaryFilters.filter(f => !!validQueryParams[f.key])
+    .length;
+
+  return selectedSecondaryFilters.length + selectedBuiltInCount;
 };
 
 /**
@@ -694,19 +703,38 @@ export const getDerivedRenderData = ({
     listingFieldsConfig,
     activeListingTypes
   );
+  // ---------------------------------------------------------------------------
+  //   > "El filtro de keywords debe estar en more filters"
+  //
+  // Keywords only reaches this point when the main search is by LOCATION - Console's
+  // `mainSearch.searchType`, which is `location` on this marketplace. When it is `keywords`
+  // instead, the box lives in the topbar and the branch above has already dropped the filter,
+  // so the split below finds nothing to move and this is a no-op. That is the correct
+  // behaviour, not an accident: what the client is looking at is the location case.
+  // ---------------------------------------------------------------------------
+  const isSecondaryBuiltInFilter = f => f.key === 'keywords';
+  const builtInSecondaryFilters = builtInFilters.filter(isSecondaryBuiltInFilter);
+  const builtInPrimaryTailFilters = builtInFilters.filter(f => !isSecondaryBuiltInFilter(f));
+
   const availablePrimaryFilters = [
     ...builtInPrimaryFilters,
     ...customPrimaryFilters,
-    ...builtInFilters,
+    ...builtInPrimaryTailFilters,
   ];
   const availableFilters = [
     ...builtInPrimaryFilters,
     ...customPrimaryFilters,
-    ...builtInFilters,
+    ...builtInPrimaryTailFilters,
+    ...builtInSecondaryFilters,
     ...customSecondaryFilters,
   ];
 
-  const hasSecondaryFilters = !!(customSecondaryFilters && customSecondaryFilters.length > 0);
+  // "More filters" has to open for a built-in that was moved there too, or keywords would be
+  // banished from the primary row into a panel that never renders.
+  const hasSecondaryFilters = !!(
+    (customSecondaryFilters && customSecondaryFilters.length > 0) ||
+    builtInSecondaryFilters.length > 0
+  );
 
   const selectedFilters = validQueryParams;
   const keysOfSelectedFilters = Object.keys(selectedFilters);
@@ -720,7 +748,8 @@ export const getDerivedRenderData = ({
   const selectedSecondaryFiltersCount = getSelectedSecondaryFiltersCount(
     validQueryParams,
     filterConfigs,
-    customSecondaryFilters
+    customSecondaryFilters,
+    builtInSecondaryFilters
   );
 
   const hasPaginationInfo = !!pagination && pagination.totalItems != null;
