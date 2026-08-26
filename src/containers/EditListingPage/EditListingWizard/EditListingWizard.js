@@ -16,11 +16,16 @@ import {
   requireListingFiles,
 } from '../../../util/configHelpers';
 import {
+  createSlug,
+  LISTING_PAGE_DRAFT_VARIANT,
   LISTING_PAGE_PARAM_TYPE_DRAFT,
   LISTING_PAGE_PARAM_TYPE_NEW,
+  LISTING_PAGE_PENDING_APPROVAL_VARIANT,
 } from '../../../util/urlHelpers';
-import { createResourceLocatorString } from '../../../util/routes';
+import { createResourceLocatorString, pathByRouteName } from '../../../util/routes';
 import {
+  LISTING_STATE_DRAFT,
+  LISTING_STATE_PENDING_APPROVAL,
   SCHEMA_TYPE_ENUM,
   SCHEMA_TYPE_MULTI_ENUM,
   SCHEMA_TYPE_TEXT,
@@ -45,6 +50,7 @@ import {
 
 // Import shared components
 import {
+  ExternalLink,
   Heading,
   Modal,
   NamedRedirect,
@@ -205,6 +211,65 @@ const tabLabelAndSubmit = (intl, tab, isNewListingFlow, isPriceDisabled, process
     label: intl.formatMessage({ id: labelKey }),
     submitButton: intl.formatMessage({ id: submitButtonKey }),
   };
+};
+
+/**
+ * PREVIEW THE LISTING THE WAY A RENTER WILL SEE IT.
+ *
+ *   > "En editListingPage puedes agregar un button que permita al provider previsualizar el
+ *   >  listing como draft?"
+ *
+ * The route already exists - `/l/:slug/:id/draft` renders an owner's unpublished listing, and
+ * ManageListingsPage has linked to it all along. What was missing was a way in from the wizard,
+ * which is where somebody actually wants it: while they are still deciding whether the garment
+ * reads well.
+ *
+ * ── OPENS IN A NEW TAB, AND THAT IS THE WHOLE POINT ────────────────────────
+ * Navigating away would take the half-filled tab with it. Every unsaved edit on the current
+ * panel would be gone, and the owner would come back to a form they have to fill in again -
+ * turning "let me look at it" into a punishment. So this is an `<a target="_blank">` rather
+ * than a NamedLink, which cannot carry a target.
+ *
+ * The preview shows what has been SAVED, which is exactly what a preview of a draft means, and
+ * the tab it opens from stays untouched behind it.
+ *
+ * NOTHING TO PREVIEW UNTIL THE DRAFT EXISTS. On a brand-new listing there is no id until the
+ * details tab is submitted, so the link is not rendered rather than rendered dead. The state
+ * decides the variant, the same way ManageListingCard does it: a draft previews as a draft, a
+ * listing awaiting approval as pending-approval, and a live one goes to its real page - so this
+ * keeps meaning something on the edit flow, not just while creating.
+ */
+const PreviewListingLink = props => {
+  const { listing, routeConfiguration, intl } = props;
+
+  const id = listing?.id?.uuid;
+  const { title, state } = listing?.attributes || {};
+
+  if (!id || !title) {
+    return null;
+  }
+
+  const slug = createSlug(title);
+  const variant =
+    state === LISTING_STATE_DRAFT
+      ? LISTING_PAGE_DRAFT_VARIANT
+      : state === LISTING_STATE_PENDING_APPROVAL
+      ? LISTING_PAGE_PENDING_APPROVAL_VARIANT
+      : null;
+
+  const href = variant
+    ? pathByRouteName('ListingPageVariant', routeConfiguration, { id, slug, variant })
+    : pathByRouteName('ListingPage', routeConfiguration, { id, slug });
+
+  return (
+    <ExternalLink
+      href={href}
+      className={css.previewLink}
+      title={intl.formatMessage({ id: 'EditListingWizard.previewListingTitle' })}
+    >
+      <FormattedMessage id="EditListingWizard.previewListing" />
+    </ExternalLink>
+  );
 };
 
 /**
@@ -851,6 +916,7 @@ class EditListingWizard extends Component {
 
     return (
       <div className={classes}>
+        <PreviewListingLink listing={listing} routeConfiguration={routeConfiguration} intl={intl} />
         <Tabs
           rootClassName={css.tabsContainer}
           navRootClassName={css.nav}
