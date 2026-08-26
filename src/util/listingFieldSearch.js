@@ -99,3 +99,46 @@ export const SEARCHABLE_LISTING_FIELD_KEYS = ['brand'];
  * @returns {boolean}
  */
 export const isSearchableListingField = key => SEARCHABLE_LISTING_FIELD_KEYS.includes(key);
+
+/**
+ * FIELDS THAT ARE FILTERABLE WITHOUT BEING CONSOLE FIELDS.
+ *
+ * `brand` was REMOVED from Console so that `flex-cli` could own the `pub_brand` search schema -
+ * Console owns the schema for the fields it defines, and a Console `text` field cannot produce
+ * a filterable parameter at all (it only feeds `keywords`). The filter exists precisely because
+ * the field left.
+ *
+ * The consequence lands here. Callers resolve a field's config by looking it up in the hosted
+ * listing fields, and brand is no longer in them - so the lookup returned undefined and the
+ * brand on the listing page silently stopped being a link. It degraded to plain text, which is
+ * why nothing broke visibly and why this needs to be written down.
+ *
+ * This is the config that Console would have held. `enum` + `indexForSearch` describes the
+ * schema that was actually pushed and verified against Dev, so the link produces the same
+ * `pub_brand=<value>` the search page's own filter does. Keep the two in step: this and
+ * `withBrandFilter` in containers/SearchPage/SearchPage.shared.js describe one thing.
+ */
+const CONFIGLESS_SEARCHABLE_FIELDS = {
+  brand: {
+    key: 'brand',
+    scope: 'public',
+    schemaType: SCHEMA_TYPE_ENUM,
+    filterConfig: { indexForSearch: true },
+  },
+};
+
+/**
+ * The config to search a field by: the hosted one when Console has it, otherwise the built-in
+ * fallback above.
+ *
+ * Console WINS when both exist. If brand is ever added back as a Console field, whatever the
+ * operator configured there is the truth, and this stops applying on its own.
+ *
+ * @param {string} key - the listing field key
+ * @param {Array<Object>} listingFieldConfigs - the merged (hosted) listing field configs
+ * @returns {Object|undefined}
+ */
+export const listingFieldSearchConfig = (key, listingFieldConfigs = []) => {
+  const hosted = (listingFieldConfigs || []).find(config => config.key === key);
+  return hosted || CONFIGLESS_SEARCHABLE_FIELDS[key];
+};

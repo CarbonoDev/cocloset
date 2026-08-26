@@ -4,7 +4,11 @@ import classNames from 'classnames';
 import { FormattedMessage } from '../../util/reactIntl';
 import { stringify } from '../../util/urlHelpers';
 import { REVIEW_TYPE_OF_PROVIDER } from '../../util/types';
-import { isSearchableListingField, listingFieldSearchParams } from '../../util/listingFieldSearch';
+import {
+  isSearchableListingField,
+  listingFieldSearchConfig,
+  listingFieldSearchParams,
+} from '../../util/listingFieldSearch';
 
 import { NamedLink } from '../../components';
 
@@ -68,7 +72,10 @@ const SectionListingHeader = props => {
     reviewCount > 0 ? ratings.reduce((sum, rating) => sum + rating, 0) / reviewCount : null;
 
   const brand = publicData.brand;
-  const brandConfig = listingFieldConfigs.find(config => config.key === 'brand');
+  // NOT a plain lookup in the hosted fields. Brand left Console so that flex-cli could own
+  // the pub_brand search schema, so it is not among them - and this link quietly went dead when
+  // it did, degrading to plain text with nothing to notice. See util/listingFieldSearch.js.
+  const brandConfig = listingFieldSearchConfig('brand', listingFieldConfigs);
   const brandSearchParams =
     brand && isSearchableListingField('brand')
       ? listingFieldSearchParams(brandConfig, brand)
