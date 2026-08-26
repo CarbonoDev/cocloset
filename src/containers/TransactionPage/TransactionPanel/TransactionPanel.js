@@ -248,6 +248,7 @@ export class TransactionPanelComponent extends Component {
               processState={stateData.processState}
               transactionId={transactionId}
               metadata={metadata}
+              isCustomer={isCustomer}
             />
 
             {/* The laundry's damage report (design §10). Sits directly below the

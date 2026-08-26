@@ -2,7 +2,10 @@ import React from 'react';
 import '@testing-library/jest-dom';
 
 import { renderWithProviders as render, testingLibrary } from '../../util/testHelpers';
-import { TX_TRANSITION_ACTOR_CUSTOMER } from '../../transactions/transaction';
+import {
+  TX_TRANSITION_ACTOR_CUSTOMER,
+  TX_TRANSITION_ACTOR_PROVIDER,
+} from '../../transactions/transaction';
 
 import InboxTransactionPanel from './InboxTransactionPanel';
 
@@ -92,5 +95,64 @@ describe('InboxTransactionPanel: the damage annotation on the return step', () =
     );
     expect(screen.getByText('ListingPage.rentalTimeline.cleaning')).toBeInTheDocument();
     expect(screen.getByText('ListingPage.rentalTimeline.readyForNextRental')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "Cuando se renta, a partir de ese momento aparece el QR, puedes ocultarlo a menos que el
+//   >  provider acepte o que se autoacepte la transacción? El provider si puede ver el QR"
+//
+// The detail panel and this one are two doors to the same code. Gating only the other one
+// would have hidden it from the customer in one place and left it in the other - the
+// requirement half-met, which reads as a bug rather than as a policy. Hence a test here too.
+// ---------------------------------------------------------------------------
+describe('InboxTransactionPanel: who gets the QR', () => {
+  const atTransition = (lastTransition, role) =>
+    render(
+      <InboxTransactionPanel
+        transaction={{
+          ...transactionWith({}),
+          attributes: { ...transactionWith({}).attributes, lastTransition },
+        }}
+        transactionRole={role}
+        onManageDisableScrolling={() => null}
+      />
+    );
+
+  const qrButton = () => screen.queryByLabelText('InboxPage.panel.openQr');
+
+  it('is hidden from the customer while the booking is unanswered', () => {
+    atTransition('transition/confirm-payment', TX_TRANSITION_ACTOR_CUSTOMER);
+
+    expect(qrButton()).not.toBeInTheDocument();
+  });
+
+  it('is there for the owner in that same state', () => {
+    atTransition('transition/confirm-payment', TX_TRANSITION_ACTOR_PROVIDER);
+
+    expect(qrButton()).toBeInTheDocument();
+  });
+
+  // Auto-accept lands in the same state as a manual accept, so one rule covers both.
+  it('reaches the customer once the booking is accepted', () => {
+    atTransition('transition/accept', TX_TRANSITION_ACTOR_CUSTOMER);
+
+    expect(qrButton()).toBeInTheDocument();
+  });
+
+  // This panel had NO state gate at all before, so it also used to show a code before the
+  // payment was confirmed - never intended, just never checked.
+  it('is absent before the payment is confirmed', () => {
+    atTransition('transition/request-payment', TX_TRANSITION_ACTOR_PROVIDER);
+
+    expect(qrButton()).not.toBeInTheDocument();
+  });
+
+  it('is gone for both once the garment is back', () => {
+    [TX_TRANSITION_ACTOR_CUSTOMER, TX_TRANSITION_ACTOR_PROVIDER].forEach(role => {
+      const view = atTransition('transition/laundry-confirm-return', role);
+      expect(qrButton()).not.toBeInTheDocument();
+      view.unmount();
+    });
   });
 });

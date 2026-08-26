@@ -111,7 +111,7 @@ describe('HandoverQrMaybe', () => {
   const WAITING_COPY = /still has to bring the garment to the laundry/i;
   const READY_COPY = /Show this code at the laundry counter/i;
 
-  it('shows the code as soon as the payment is confirmed, with the waiting instructions', () => {
+  it('shows the OWNER the code as soon as the payment is confirmed, with the waiting copy', () => {
     ['preauthorized', 'accepted'].forEach(state => {
       const { queryByText, getByRole, unmount } = renderPanel({ processState: state });
       expect(getByRole('img')).toBeInTheDocument();
@@ -177,5 +177,55 @@ describe('HandoverQrMaybe', () => {
   it('renders nothing when there is no payload at all', () => {
     const { container } = renderPanel({ transactionId: undefined, metadata: {} });
     expect(container).toBeEmptyDOMElement();
+  });
+
+  // ---------------------------------------------------------------------------
+  //   > "Cuando se renta, a partir de ese momento aparece el QR, puedes ocultarlo a menos que
+  //   >  el provider acepte o que se autoacepte la transacción? El provider si puede ver el QR"
+  //
+  // This REVERSES the earlier instruction that put the customer's code on screen from payment.
+  // Both directions were asked for, months apart; the tests say which one is current.
+  // ---------------------------------------------------------------------------
+  describe('who sees the code, and from when', () => {
+    const qr = view => view.queryByRole('img');
+
+    it('hides it from the customer while the booking is unanswered', () => {
+      const view = renderPanel({ processState: 'preauthorized', isCustomer: true });
+
+      expect(qr(view)).not.toBeInTheDocument();
+    });
+
+    it('still shows it to the owner in that same state', () => {
+      const view = renderPanel({ processState: 'preauthorized', isCustomer: false });
+
+      expect(qr(view)).toBeInTheDocument();
+    });
+
+    // "que acepte o que se autoacepte" needs no branch here: auto-accept is a transition INTO
+    // `accepted`, exactly like a manual accept. The two differ in who triggered them, not in
+    // where they land, so a rule keyed on the state covers both.
+    it('gives it to the customer the moment the booking is accepted, however that happened', () => {
+      const view = renderPanel({ processState: 'accepted', isCustomer: true });
+
+      expect(qr(view)).toBeInTheDocument();
+    });
+
+    it('keeps showing it to the customer through the rest of the rental', () => {
+      ['ready-for-pickup', 'picked-up', 'overdue'].forEach(state => {
+        const view = renderPanel({ processState: state, isCustomer: true });
+        expect(qr(view)).toBeInTheDocument();
+        view.unmount();
+      });
+    });
+
+    // Unchanged by any of this: entering `returned` IS the second handover, so the code has
+    // nothing left to do for either party.
+    it('hides it from both once the garment is back', () => {
+      [true, false].forEach(isCustomer => {
+        const view = renderPanel({ processState: 'returned', isCustomer });
+        expect(qr(view)).not.toBeInTheDocument();
+        view.unmount();
+      });
+    });
   });
 });

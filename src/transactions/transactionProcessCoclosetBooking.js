@@ -408,30 +408,58 @@ export const HANDOVER_QR_TRANSITIONS = [
   transitions.LAUNDRY_CONFIRM_RETURN_LATE,
 ];
 
-// Starts at PREAUTHORIZED - the moment the customer's payment is confirmed - per the client:
+// WHO SEES THE QR, AND FROM WHEN. The two parties differ, deliberately.
 //
-//   > "el QR debe mostrarse al cliente desde que se confirma el pago pero con la instrucción
-//   >  de que debe esperar a que el provider entregue la prenda y la lavandería haga su
-//   >  proceso y que debe acudir a la lavandería por su prenda"
+// The PROVIDER's floor is PREAUTHORIZED - the moment payment is confirmed. Nothing about a
+// booking they have not answered yet makes the code harmful to them; they are the one being
+// asked to decide, and the code is part of what they are deciding about.
 //
-// The old floor was ACCEPTED, on the argument that a code for a booking the provider might
-// still decline is worse than no code. The answer to that is the copy, not the absence: see
-// HandoverQrMaybe, which says what has to happen before the garment can be collected.
-export const HANDOVER_QR_VISIBLE_STATES = [
-  states.PREAUTHORIZED,
+// The CUSTOMER's floor is ACCEPTED:
+//
+//   > "Cuando se renta, a partir de ese momento aparece el QR, puedes ocultarlo a menos que el
+//   >  provider acepte o que se autoacepte la transacción? El provider si puede ver el QR"
+//
+// This REVERSES an earlier instruction, which is worth stating plainly rather than quietly
+// overwriting. The customer floor used to be PREAUTHORIZED, at the client's request ("el QR
+// debe mostrarse al cliente desde que se confirma el pago..."), on the reasoning that a code
+// for a booking that might still be declined should be explained rather than hidden. The
+// client has now decided the other way: a code the customer might carry to a counter for a
+// rental that never happened is worse than waiting a beat for it. That is a product call, and
+// it is theirs.
+//
+// "que acepte o que se autoacepte" needs no branch. Auto-accept is a transition INTO
+// ACCEPTED, exactly like a manual accept - the two paths differ in who triggered them, not in
+// where they land - so a rule keyed on the state covers both without knowing which happened.
+const HANDOVER_QR_STATES_AFTER_ACCEPT = [
   states.ACCEPTED,
   states.READY_FOR_PICKUP,
   states.PICKED_UP,
   states.OVERDUE,
 ];
 
+export const HANDOVER_QR_VISIBLE_STATES = [
+  states.PREAUTHORIZED,
+  ...HANDOVER_QR_STATES_AFTER_ACCEPT,
+];
+
+export const HANDOVER_QR_CUSTOMER_VISIBLE_STATES = HANDOVER_QR_STATES_AFTER_ACCEPT;
+
 /**
  * Should the handover QR be shown for a transaction in this state?
  *
+ * DEFAULTS TO THE PROVIDER'S RULE when no role is given. That is the wider of the two, so a
+ * caller that forgets to say who is looking shows the code slightly early rather than hiding
+ * it from someone entitled to it - and the one caller that matters, HandoverQrMaybe, does say.
+ *
  * @param {string} [state] - a cocloset-booking state name
+ * @param {Object} [options]
+ * @param {boolean} [options.isCustomer] - is the viewer the customer?
  * @returns {boolean}
  */
-export const isHandoverQrVisibleState = state => HANDOVER_QR_VISIBLE_STATES.includes(state);
+export const isHandoverQrVisibleState = (state, { isCustomer = false } = {}) =>
+  isCustomer
+    ? HANDOVER_QR_CUSTOMER_VISIBLE_STATES.includes(state)
+    : HANDOVER_QR_VISIBLE_STATES.includes(state);
 
 // The laundry states need the laundry's attention, not the garment owner's,
 // and the laundry is not a party to the transaction in the Sharetribe sense.
