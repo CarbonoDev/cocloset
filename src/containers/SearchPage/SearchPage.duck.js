@@ -15,7 +15,7 @@ import { hasPermissionToViewData, isUserAuthorized } from '../../util/userHelper
 import { parse } from '../../util/urlHelpers';
 import { getReferralParams } from '../../util/webStorageHelpers';
 
-import { fetchLaundryOptions } from '../../util/api';
+import { fetchBrands, fetchLaundryOptions } from '../../util/api';
 import * as log from '../../util/log';
 
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -378,6 +378,29 @@ export const fetchLaundryOptionsThunk = createAsyncThunk('SearchPage/fetchLaundr
     })
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The brands a customer can filter by.
+//
+//   > "podemos usar un selector de brands que ya existen para mostrarlos en el filtro"
+//
+// Same shape as the studio lookup above, for the same reason. `pub_brand` has a live search
+// schema - verified against Dev, where `pub_brand=Reformation` returns exactly its one garment
+// while an unrecognised KEY returns the whole marketplace, which is how you tell a schema is
+// really there rather than being silently ignored. What the filter needs is the list of brands
+// to OFFER, and brand is deliberately not a Console field, so the values come from the listings.
+//
+// FAILURE IS NOT AN ERROR STATE, as above: a search page that will not render because a dropdown
+// could not be filled is worse than one filter short.
+// ─────────────────────────────────────────────────────────────────────────────
+export const fetchBrandsThunk = createAsyncThunk('SearchPage/fetchBrands', () =>
+  fetchBrands()
+    .then(response => (Array.isArray(response?.data) ? response.data : []))
+    .catch(e => {
+      log.error(e, 'fetching-brands-failed', {});
+      return [];
+    })
+);
+
 // ================ Slice ================ //
 
 const searchPageSlice = createSlice({
@@ -393,6 +416,10 @@ const searchPageSlice = createSlice({
     // until the public endpoint answers, and on any failure - the filter then renders
     // nothing rather than an empty dropdown, which would read as "there are no laundries".
     laundryOptions: [],
+    // Cocloset: the brands a customer can filter by, as { brand, count }. Empty until the
+    // public endpoint answers, and on any failure - the filter then renders nothing rather than
+    // an empty dropdown, which would read as "there are no brands".
+    brandOptions: [],
   },
   reducers: {
     setActiveListing: (state, action) => {
@@ -422,6 +449,11 @@ const searchPageSlice = createSlice({
       // improvement on a working search, not a new dependency of it.
       .addCase(fetchLaundryOptionsThunk.fulfilled, (state, action) => {
         state.laundryOptions = action.payload;
+      })
+      // Same contract: only `fulfilled`, because the payload creator resolves to an empty list
+      // instead of rejecting.
+      .addCase(fetchBrandsThunk.fulfilled, (state, action) => {
+        state.brandOptions = action.payload;
       });
   },
 });
@@ -523,6 +555,7 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
   // the filter bar renders after mount either way.
   if (typeof window !== 'undefined') {
     dispatch(fetchLaundryOptionsThunk());
+    dispatch(fetchBrandsThunk());
   }
 
   return searchPromise;

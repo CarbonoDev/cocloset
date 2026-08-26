@@ -9,6 +9,7 @@ import {
   searchParamsPicker,
   groupListingFieldConfigs,
   getDerivedRenderData,
+  withBrandFilter,
 } from './SearchPage.shared.js';
 
 const urlParams = {
@@ -722,5 +723,68 @@ describe('keywords belongs in "more filters"', () => {
   // The rest of the row is untouched: price is built-in too and must stay primary.
   it('leaves the other built-in filters where they were', () => {
     expect(keysOf(derive().availablePrimaryFilters)).toContain('price');
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "En search page, puedes agregar brand como primary filter? Es un texto a ingresar,
+//   >  entonces hay que manejarlo bien para que funcione"
+//
+// "Manejarlo bien" is the whole problem: Sharetribe cannot filter "text contains" on extended
+// data, so `pub_brand` carries an ENUM schema pushed by CLI and the options are the brands that
+// already exist. Brand is deliberately not a Console field - it had to be removed for the CLI to
+// own the schema - which is why this config is injected in code.
+// ---------------------------------------------------------------------------
+describe('withBrandFilter', () => {
+  const brandOptions = [{ brand: 'Club Monaco', count: 1 }, { brand: 'Reformation', count: 3 }];
+  const intl = { formatMessage: ({ id }) => id };
+
+  const brandField = (fields = [], options = brandOptions) =>
+    withBrandFilter(fields, options, intl).find(f => f.key === 'brand');
+
+  it('offers exactly the brands that exist, as stored', () => {
+    expect(brandField().enumOptions).toEqual([
+      { option: 'Club Monaco', label: 'Club Monaco' },
+      { option: 'Reformation', label: 'Reformation' },
+    ]);
+  });
+
+  // The stored spelling IS the query value, so the filter is an exact match on what is really
+  // on the listings. A prettified label would search for something no listing carries.
+  it('queries by the stored spelling, not a tidied one', () => {
+    const field = brandField([], [{ brand: "Lulu's", count: 1 }]);
+
+    expect(field.enumOptions[0].option).toBe("Lulu's");
+  });
+
+  it('is a primary filter, as asked', () => {
+    expect(brandField().filterConfig.group).toBe('primary');
+    expect(brandField().filterConfig.showFilter).toBe(true);
+    expect(brandField().filterConfig.indexForSearch).toBe(true);
+  });
+
+  // enum, NOT multi-enum: a multi-select would encode its query with the `has_any:` prefix that
+  // multi-enum uses, and `pub_brand` is a plain enum - the two would silently disagree.
+  it('is a single-select enum, matching the schema that was pushed', () => {
+    expect(brandField().schemaType).toBe('enum');
+    expect(brandField().filterConfig.filterType).toBe('SelectSingleFilter');
+  });
+
+  // Rendering an empty dropdown reads as "there are no brands", which is a different and
+  // wronger statement than not showing the filter at all.
+  it('adds nothing when there are no brands to offer', () => {
+    const existing = [{ key: 'size' }];
+
+    expect(withBrandFilter(existing, [], intl)).toBe(existing);
+    expect(withBrandFilter(existing, null, intl)).toBe(existing);
+    expect(withBrandFilter(existing, undefined, intl)).toBe(existing);
+  });
+
+  it('leaves the fields it was given alone', () => {
+    const existing = [{ key: 'size' }, { key: 'color' }];
+    const result = withBrandFilter(existing, brandOptions, intl);
+
+    expect(result).toHaveLength(3);
+    expect(result.slice(0, 2)).toEqual(existing);
   });
 });

@@ -1053,6 +1053,7 @@
   "SearchPage.detailNo": "Non",
   "SearchPage.detailYes": "Oui",
   "SearchPage.invalidDatesFilter": "Les valeurs du filtre de dates dans l'URL ne sont pas valides. Le filtre a été ignoré.",
+  "SearchPage.brandFilterLabel": "Brand",
   "SearchPage.laundryPickupFilterLabel": "Pickup laundry",
   "SearchPage.noResults": "Nous n'avons pas trouvé d'annonces correspondant à vos critères de recherche.",
   "SearchPage.resetAllFilters": "Effacer les filtres",

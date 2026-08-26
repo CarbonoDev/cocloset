@@ -635,6 +635,64 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
   ];
 };
 
+/**
+ * The brand filter, built from the brands that exist rather than from Console.
+ *
+ *   > "En search page, puedes agregar brand como primary filter? Es un texto a ingresar,
+ *   >  entonces hay que manejarlo bien para que funcione"
+ *   > "podemos usar un selector de brands que ya existen para mostrarlos en el filtro, pero no
+ *   >  podemos mostrar un select de brands ni poder agregar todas las brands en console"
+ *
+ * "Hay que manejarlo bien" is the whole problem. Sharetribe cannot filter "text contains" on
+ * extended data: the schema types are enum / multi-enum / boolean / long / text, and `text`
+ * gives no parameter of its own - it only feeds `keywords`, which also matches title and
+ * description, so searching a brand would return every listing that merely mentions it.
+ *
+ * So `pub_brand` carries an ENUM search schema, pushed by CLI, and the options are the brands
+ * already on listings. Brand is deliberately NOT a Console listing field - it had to be removed
+ * for the CLI to own the schema - which is exactly why this config is injected here.
+ *
+ * IDENTICAL IN SHAPE TO `withLaundryPickupFilter` above: a filter Console knows nothing about,
+ * options from a public endpoint, backed by a schema that was verified against Dev rather than
+ * assumed. If you change one, look at the other.
+ *
+ * @param {Array<Object>} listingFields
+ * @param {Array<{brand: string, count: number}>} brandOptions
+ * @param {Object} intl
+ * @returns {Array<Object>}
+ */
+export const withBrandFilter = (listingFields = [], brandOptions = [], intl) => {
+  if (!Array.isArray(brandOptions) || brandOptions.length === 0) {
+    return listingFields;
+  }
+
+  return [
+    ...listingFields,
+    {
+      key: 'brand',
+      scope: 'public',
+      // ENUM, not text. The value stored on a listing is still free text the owner typed - the
+      // schema type only describes how the API may be asked about it.
+      schemaType: 'enum',
+      // `option` is the stored spelling, so the query is an exact match on what is really there.
+      // The endpoint has already collapsed casing variants onto one spelling, so the list never
+      // shows `Zara` and `ZARA` a step apart.
+      enumOptions: brandOptions.map(({ brand }) => ({ option: brand, label: brand })),
+      filterConfig: {
+        indexForSearch: true,
+        showFilter: true,
+        // "brand como primary filter", verbatim.
+        group: 'primary',
+        // One brand at a time, matching the pickup filter. A multi-select would need the
+        // `has_any:` syntax that multi-enum uses, and `pub_brand` is a plain enum - so the two
+        // would silently disagree about how to encode a query.
+        filterType: 'SelectSingleFilter',
+        label: intl ? intl.formatMessage({ id: 'SearchPage.brandFilterLabel' }) : 'Brand',
+      },
+    },
+  ];
+};
+
 export const getDerivedRenderData = ({
   intl,
   location,
@@ -649,6 +707,9 @@ export const getDerivedRenderData = ({
   // Cocloset: the studios a customer can filter by, from the public endpoint. Empty until it
   // answers, and on any failure - see the note on `laundryFilterConfig` below.
   laundryOptions = [],
+  // Cocloset: the brands a customer can filter by, from the public endpoint. Same contract as
+  // laundryOptions - empty until it answers, and on any failure.
+  brandOptions = [],
 }) => {
   const { listingType: listingTypePathParam } = currentPathParams;
 
@@ -664,7 +725,11 @@ export const getDerivedRenderData = ({
   const categoryConfiguration = config.categoryConfiguration;
   const listingCategories = categoryConfiguration.categories;
   const listingFieldsConfig = pickListingFieldFilters({
-    listingFields: withLaundryPickupFilter(listingFields, laundryOptions, intl),
+    listingFields: withBrandFilter(
+      withLaundryPickupFilter(listingFields, laundryOptions, intl),
+      brandOptions,
+      intl
+    ),
     locationSearch: location.search,
     categoryConfiguration,
     activeListingTypes,

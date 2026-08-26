@@ -1053,6 +1053,7 @@
   "SearchPage.detailNo": "No",
   "SearchPage.detailYes": "Sí",
   "SearchPage.invalidDatesFilter": "Valores de filtro de intervalo de fechas no válidos en la URL. El filtro fue ignorado.",
+  "SearchPage.brandFilterLabel": "Marca",
   "SearchPage.laundryPickupFilterLabel": "Lavandería",
   "SearchPage.noResults": "No se pudo encontrar ningún anuncio que coincida con tus criterios de búsqueda.",
   "SearchPage.resetAllFilters": "Limpiar filtros",

@@ -1053,6 +1053,7 @@
   "SearchPage.detailNo": "Nein",
   "SearchPage.detailYes": "Ja",
   "SearchPage.invalidDatesFilter": "Ungültige Datumsbereichsfilterwerte in der URL. Der Filter wurde ignoriert.",
+  "SearchPage.brandFilterLabel": "Brand",
   "SearchPage.laundryPickupFilterLabel": "Pickup laundry",
   "SearchPage.noResults": "Es konnten keine Einträge gefunden werden, die deinen Suchkriterien entsprechen.",
   "SearchPage.resetAllFilters": "Filter zurücksetzen",
