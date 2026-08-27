@@ -7,6 +7,10 @@ import '@testing-library/jest-dom';
 jest.mock('../../../util/api', () => ({
   fetchLaundries: jest.fn(),
   assignListingLaundry: jest.fn(),
+  // The details panel fetches the brands its autocomplete suggests. Resolved rather than left
+  // undefined so these tests exercise the real 'the list never arrives is not an error' path
+  // instead of blowing up on a missing mock.
+  fetchBrands: jest.fn(() => Promise.resolve({ data: [] })),
 }));
 
 import { types as sdkTypes } from '../../../util/sdkLoader';
@@ -465,7 +469,12 @@ describe('cocloset-booking wizard: publishing from the laundry tab', () => {
     // a real change that the server refuses with 409 must not publish, and must say which
     // condition refused it.
     fetchLaundries.mockResolvedValue({
-      data: [laundry, { ...laundry, id: 'laundry-2', displayName: 'Studio Two' }],
+      // A second STUDIO, so it needs a second studio name: the card is named by
+      // `studioName` now, not by the account behind it.
+      data: [
+        laundry,
+        { ...laundry, id: 'laundry-2', displayName: 'Studio Two', studioName: 'Studio Two' },
+      ],
     });
     assignListingLaundry.mockRejectedValue({ status: 409, data: { reason: 'active-transaction' } });
 
@@ -503,6 +512,104 @@ describe('cocloset-booking wizard: publishing from the laundry tab', () => {
     await waitFor(() => {
       expect(view.getByText('EditListingLaundryForm.publishListingFailed')).toBeInTheDocument();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "En editListingPage puedes agregar un button que permita al provider previsualizar el
+//   >  listing como draft?"
+//
+// The route already existed - ManageListingsPage has linked to `/l/:slug/:id/draft` all along.
+// What was missing was a way in from the wizard, which is where somebody actually wants it.
+// ---------------------------------------------------------------------------
+describe('cocloset-booking wizard: previewing the draft', () => {
+  const renderWizardFor = listing => {
+    const hosted = hostedConfig([garmentRentalListingType]);
+    const config = mergedConfig([garmentRentalListingType]);
+    const routeConfiguration = getRouteConfiguration(config.layout);
+
+    return render(
+      <EditListingWizard
+        id="EditListingWizard"
+        params={{
+          id: listing?.id?.uuid || NIL_UUID,
+          slug: 'draft',
+          type: LISTING_PAGE_PARAM_TYPE_DRAFT,
+          // PHOTOS, because it is the first tab of this wizard and therefore the only one
+          // reachable on a fresh draft - DETAILS is not activated yet and the wizard redirects
+          // away from it before rendering anything. The link sits above the tabs either way.
+          tab: PHOTOS,
+        }}
+        listing={ensureOwnListing(listing)}
+        errors={{}}
+        fetchInProgress={false}
+        images={[]}
+        history={{ push: jest.fn(), replace: jest.fn() }}
+        currentUser={createCurrentUser('id-of-me-myself')}
+        onManageDisableScrolling={jest.fn()}
+        onCreateListingDraft={jest.fn()}
+        onUpdateListing={jest.fn()}
+        onImageUpload={jest.fn()}
+        onRemoveImage={jest.fn()}
+        titleId="EditListingPage.titleCreateListing"
+      />,
+      { config: hosted, routeConfiguration }
+    );
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    window.scrollTo = jest.fn();
+    fetchLaundries.mockResolvedValue({ data: [] });
+  });
+
+  const previewLink = view => view.queryByText('EditListingWizard.previewListing');
+
+  it('links a saved draft to its own draft preview', async () => {
+    const listing = createOwnListing('listing-1', {
+      title: 'Silk slip dress',
+      state: 'draft',
+    });
+
+    const view = renderWizardFor(listing);
+
+    expect(previewLink(view).closest('a')).toHaveAttribute(
+      'href',
+      '/l/silk-slip-dress/listing-1/draft'
+    );
+  });
+
+  // NAVIGATING AWAY WOULD TAKE THE HALF-FILLED TAB WITH IT. Every unsaved edit on the current
+  // panel would be gone and the owner would come back to a form to fill in again, which turns
+  // "let me look at it" into a punishment. This is the reason it is an anchor rather than a
+  // NamedLink, which cannot carry a target - so it is worth asserting rather than assuming.
+  it('opens in a new tab, so the wizard behind it is not lost', async () => {
+    const listing = createOwnListing('listing-1', { title: 'Silk slip dress', state: 'draft' });
+
+    const anchorEl = previewLink(renderWizardFor(listing)).closest('a');
+
+    expect(anchorEl).toHaveAttribute('target', '_blank');
+    expect(anchorEl).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  // Nothing to preview before the details tab has been submitted: there is no listing id yet,
+  // so a link would point at nothing. Not rendered beats rendered dead.
+  it('is absent on a listing that does not exist yet', async () => {
+    expect(previewLink(renderWizardFor(null))).not.toBeInTheDocument();
+  });
+
+  // The state picks the variant, the same way ManageListingCard does it, so this keeps meaning
+  // something on the edit flow rather than only while creating.
+  it('sends a published listing to its real page, not to a draft preview', async () => {
+    const listing = createOwnListing('listing-1', {
+      title: 'Silk slip dress',
+      state: 'published',
+    });
+
+    expect(previewLink(renderWizardFor(listing)).closest('a')).toHaveAttribute(
+      'href',
+      '/l/silk-slip-dress/listing-1'
+    );
   });
 });
 

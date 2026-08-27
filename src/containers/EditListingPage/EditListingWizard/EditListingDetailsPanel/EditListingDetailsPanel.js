@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import classNames from 'classnames';
 
 // Import util modules
@@ -25,6 +25,9 @@ import { H3, ListingLink } from '../../../../components';
 
 // Import modules from this directory
 import ErrorMessage from './ErrorMessage';
+import { fetchBrands } from '../../../../util/api';
+import { normalizeBrandForStorage } from '../../../../util/brandValue';
+
 import EditListingDetailsForm from './EditListingDetailsForm';
 import css from './EditListingDetailsPanel.module.css';
 
@@ -322,6 +325,10 @@ const getInitialValues = (
     ownerStreet: street,
     ownerCity: city,
     ownerPostcode: postcode,
+    // Brand is not a Console listing field, so initialValuesForListingFields below does not
+    // pick it up - it reads Console's own fields. Editing a garment has to show the brand it
+    // already carries, or saving the tab would silently clear it.
+    brand: publicData?.brand,
     ...nestedCategories,
     // Transaction type info: listingType, transactionProcessAlias, unitType
     ...getTransactionInfo({ listingTypes, existingListingTypeInfo, preselectedListingType }),
@@ -376,6 +383,10 @@ const EditListingDetailsPanel = props => {
     onSubmit,
     onListingTypeChange,
     captureOwnerAddress = false,
+    // Injectable for tests and the styleguide example; normally the panel fetches its own,
+    // below. Empty until that answers and on any failure - the input still works, it just
+    // suggests nothing.
+    brandOptions: brandOptionsProp,
     submitButtonText,
     panelUpdated,
     updateInProgress,
@@ -391,6 +402,49 @@ const EditListingDetailsPanel = props => {
   const listingFields = config.listing.listingFields;
   const listingCategories = config.categoryConfiguration.categories;
   const categoryKey = config.categoryConfiguration.key;
+  // Console has no brand field today; if one is ever added back it owns the value, and the
+  // bespoke input is not rendered - so this tab must not write brand either. Same "hosted
+  // wins" rule as listingFieldSearchConfig in util/listingFieldSearch.js.
+  const hasHostedBrandField = listingFields.some(field => field?.key === 'brand');
+
+  // THE BRANDS THE AUTOCOMPLETE OFFERS.
+  //
+  // Fetched by the panel rather than through the duck, matching EditListingLaundryPanel, which
+  // owns its own lookup for the same reason: this is wizard-tab data, not page data, and it is
+  // not needed for SSR.
+  //
+  // FAILURE IS NOT AN ERROR STATE and there is no spinner. Brand is a free-text field that
+  // happens to suggest; a list that never arrives costs the owner a convenience, not the
+  // ability to fill the form in, so blocking or shouting about it would be the wrong trade.
+  //
+  // Skipped entirely when Console owns the field, since then nothing renders the suggestions.
+  const [fetchedBrandOptions, setFetchedBrandOptions] = useState([]);
+  const skipBrandFetch = hasHostedBrandField || !!brandOptionsProp;
+
+  useEffect(() => {
+    if (skipBrandFetch) {
+      return undefined;
+    }
+    let isMounted = true;
+    // Wrapped rather than chained directly. Nothing about a suggestion list may break the form
+    // the owner is filling in, and `fetchBrands()` not returning a promise - a stubbed module,
+    // a future refactor - would otherwise throw inside an effect and take the whole panel down
+    // with it. The catch below cannot help with that; it is not a rejection.
+    Promise.resolve(fetchBrands())
+      .then(response => {
+        if (isMounted) {
+          setFetchedBrandOptions(Array.isArray(response?.data) ? response.data : []);
+        }
+      })
+      .catch(() => {
+        // Swallowed on purpose - see above. The input keeps working with no suggestions.
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [skipBrandFetch]);
+
+  const brandOptions = brandOptionsProp || fetchedBrandOptions;
 
   const { hasExistingListingType, existingListingTypeInfo } = hasSetListingType(publicData);
   const hasValidExistingListingType =
@@ -469,6 +523,7 @@ const EditListingDetailsPanel = props => {
               ownerStreet,
               ownerCity,
               ownerPostcode,
+              brand,
               ...rest
             } = values;
 
@@ -507,6 +562,21 @@ const EditListingDetailsPanel = props => {
                 }
               : {};
 
+            // THE BRAND, SNAPPED ONTO A SPELLING THAT ALREADY EXISTS.
+            //
+            // Done here rather than on every keystroke, which would fight the person typing,
+            // and here rather than in the form because this is where publicData is assembled.
+            //
+            // `null` when the field is left empty, not `undefined`: Sharetribe only removes a
+            // publicData key when it is explicitly set to null, so an owner clearing the brand
+            // has to send one - the same reason the category levels above are nulled.
+            //
+            // Brand is NOT in `pickListingFieldsData` above: that reads Console's listing
+            // fields, and brand deliberately is not one. See util/brandValue.js.
+            const brandMaybe = hasHostedBrandField
+              ? {}
+              : { brand: normalizeBrandForStorage(brand, brandOptions) };
+
             // New values for listing attributes
             const updateValues = {
               title: title.trim(),
@@ -517,6 +587,7 @@ const EditListingDetailsPanel = props => {
                 unitType,
                 ...cleanedNestedCategories,
                 ...publicListingFields,
+                ...brandMaybe,
               },
               privateData: { ...privateListingFields, ...ownerAddressMaybe },
               ...setNoAvailabilityForUnbookableListings(transactionProcessAlias),
@@ -540,6 +611,7 @@ const EditListingDetailsPanel = props => {
           pickSelectedCategories={values =>
             pickCategoryFields(values, categoryKey, 1, listingCategories)
           }
+          brandOptions={brandOptions}
           categoryPrefix={categoryKey}
           onListingTypeChange={onListingTypeChange}
           showOwnerAddress={captureOwnerAddress}

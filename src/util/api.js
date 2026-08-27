@@ -175,6 +175,19 @@ export const fetchLaundryOptions = () => {
   return request('/api/laundry-options', { method: methods.GET });
 };
 
+// The brands that exist on published listings, for the brand filter and the wizard's brand
+// autocomplete.
+//
+// Brand is NOT a Console listing field - it was removed so the `pub_brand` search schema could
+// be set by CLI, which is what makes exact-match filtering possible at all (a Console `text`
+// field only feeds `keywords`, which also matches title and description). So the values have to
+// come from the listings themselves; see the header of server/api/brands.js.
+//
+// Returns `{ data: [ { brand, count } ], meta: { truncated } }`, sorted by brand.
+export const fetchBrands = () => {
+  return request('/api/brands', { method: methods.GET });
+};
+
 // Fetch the list of laundries (users flagged with metadata.isLaundry), used by
 // the listing wizard's "Laundry Assignment" step. Requires an authenticated
 // caller.

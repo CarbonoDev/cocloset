@@ -151,6 +151,18 @@ const CategoryField = props => {
 
   const categoryConfig = findCategoryConfig(currentCategoryOptions, values[`${prefix}${level}`]);
 
+  // ONLY THE TOP CATEGORY IS REQUIRED.
+  //
+  //   > "Puedes cambiar la subcategoría para que sea opcional? Si el usuario selecciona una
+  //   >  categoria esta bien, pero si esa categoria tiene subcategorías, puedo continuar si la
+  //   >  selecciono o no"
+  //
+  // A garment has to be something; how finely it is described below that is the owner's
+  // choice. Deeper levels only exist because the level above them offered them, so making
+  // them optional is a rule about depth rather than about any particular category - it holds
+  // for a three-level tree an operator adds next year without another change here.
+  const isRequired = level === 1;
+
   return (
     <>
       {currentCategoryOptions ? (
@@ -161,17 +173,32 @@ const CategoryField = props => {
           className={css.listingTypeSelect}
           onChange={event => handleCategoryChange(event, level, currentCategoryOptions)}
           label={intl.formatMessage(
-            { id: 'EditListingDetailsForm.categoryLabel' },
+            {
+              id: isRequired
+                ? 'EditListingDetailsForm.categoryLabel'
+                : 'EditListingDetailsForm.categoryLabelOptional',
+            },
             { categoryLevel: currentCategoryKey }
           )}
-          validate={required(
-            intl.formatMessage(
-              { id: 'EditListingDetailsForm.categoryRequired' },
-              { categoryLevel: currentCategoryKey }
-            )
-          )}
+          validate={
+            isRequired
+              ? required(
+                  intl.formatMessage(
+                    { id: 'EditListingDetailsForm.categoryRequired' },
+                    { categoryLevel: currentCategoryKey }
+                  )
+                )
+              : undefined
+          }
         >
-          <option disabled value="">
+          {/* THE PLACEHOLDER IS A REAL CHOICE ON AN OPTIONAL LEVEL.
+                > "ese select no permite regresar al placeholder si selecciono una opción"
+
+              It was `disabled` on every level, which is correct for a required field - there
+              is nothing to go back TO - and a dead end on an optional one: having picked a
+              subcategory the owner could never un-pick it, only pick a different wrong one.
+              So the option is disabled exactly when the field is required. */}
+          <option disabled={isRequired} value="">
             {intl.formatMessage(
               { id: 'EditListingDetailsForm.categoryPlaceholder' },
               { categoryLevel: currentCategoryKey }
@@ -207,9 +234,11 @@ const FieldSelectCategory = props => {
 
   const { prefix, listingCategories, formApi, intl, setAllCategoriesChosen, values } = props;
 
-  // Counts the number of selected categories in the form values based on the given prefix.
+  // Counts the category levels that actually hold a choice. `Object.keys` alone counted a key
+  // whose value had been cleared to null, which now happens on purpose: an owner may empty an
+  // optional subcategory, and a level that has been emptied is not a level that was selected.
   const countSelectedCategories = () => {
-    return Object.keys(values).filter(key => key.startsWith(prefix)).length;
+    return Object.keys(values).filter(key => key.startsWith(prefix) && !!values[key]).length;
   };
 
   // Checks if initial values exist for categories and sets the state accordingly.
@@ -227,8 +256,23 @@ const FieldSelectCategory = props => {
         formApi.change(`${prefix}${i}`, null);
       }
     }
-    const categoryConfig = findCategoryConfig(currentCategoryOptions, category).subcategories;
-    setAllCategoriesChosen(!categoryConfig || categoryConfig.length === 0);
+
+    // WHAT "ALL CHOSEN" MEANS NOW THAT SUBCATEGORIES ARE OPTIONAL.
+    //
+    // This flag is what reveals the title, the description and every listing field, so it has
+    // to flip the moment the owner has said enough - which, with only level 1 required, is as
+    // soon as level 1 holds a value. It used to wait for a leaf category, so a garment whose
+    // top category happened to have subcategories showed an empty form until the owner picked
+    // one; that is precisely the wait the client asked to remove.
+    //
+    // Level-aware rather than reading `values`, which is stale inside this handler: only
+    // level 1 can take the form back to nothing, and clearing an optional subcategory must
+    // not hide a form the owner has already filled in.
+    //
+    // This also drops an unguarded `findCategoryConfig(...).subcategories` that used to
+    // decide the flag. Clearing a select calls this with an empty id, for which that lookup
+    // returns undefined - so the old line threw the moment a placeholder became reachable.
+    setAllCategoriesChosen(level > 1 ? true : !!category);
   };
 
   return (
@@ -243,9 +287,26 @@ const FieldSelectCategory = props => {
   );
 };
 
+/**
+ * LISTING FIELDS THAT COME BEFORE THE TITLE.
+ *
+ *   > "brand debe estar en el editListingPage como el primer field despues de categoria y
+ *   >  subcategoria"
+ *
+ * Everything else keeps the order Console gives it. Console orders ALL the listing fields
+ * together, after the title and the description, and has no way to say "this one belongs up
+ * with the category" - so the exception has to live here, where the title and the category are
+ * laid out.
+ *
+ * A key list, so adding a second early field is a one-word change and the rule stays readable.
+ * A key that is not configured, not for this listing type, or not for the chosen category is
+ * simply not rendered - the split below filters, it does not force anything to appear.
+ */
+const LISTING_FIELD_KEYS_BEFORE_TITLE = ['brand'];
+
 // Add collect data for listing fields (both publicData and privateData) based on configuration
 const AddListingFields = props => {
-  const { listingType, listingFieldsConfig, selectedCategories, formId, intl } = props;
+  const { listingType, listingFieldsConfig, selectedCategories, formId, intl, pickField } = props;
   const targetCategoryIds = Object.values(selectedCategories);
 
   const fields = listingFieldsConfig.reduce((pickedFields, fieldConfig) => {
@@ -256,8 +317,15 @@ const AddListingFields = props => {
     const isProviderScope = ['public', 'private'].includes(scope);
     const isTargetListingType = isFieldForListingType(listingType, fieldConfig);
     const isTargetCategory = isFieldForCategory(targetCategoryIds, fieldConfig);
+    // Which SIDE of the title this field belongs on. Defaults to rendering everything, so the
+    // component behaves exactly as before for any caller that does not split.
+    const isWantedHere = pickField ? pickField(key) : true;
 
-    return isKnownSchemaType && isProviderScope && isTargetListingType && isTargetCategory
+    return isKnownSchemaType &&
+      isProviderScope &&
+      isTargetListingType &&
+      isTargetCategory &&
+      isWantedHere
       ? [
           ...pickedFields,
           <CustomExtendedDataField
@@ -292,6 +360,61 @@ const getListingTypeConfig = (config, listingType) => {
  * rather than being deleted. Plain text fields, no map or autocomplete, and the same
  * required-ness the dedicated step had.
  */
+/**
+ * THE BRAND, AS AN AUTOCOMPLETE OVER THE BRANDS THAT ALREADY EXIST.
+ *
+ *   > "Podemos usar brand como un autocomplete de todas las brands que existen"
+ *
+ * BESPOKE, not a Console listing field, and it has to be. Brand was removed from Console so
+ * flex-cli could own the `pub_brand` search schema - Console owns the schema for the fields it
+ * defines, and a Console `text` field cannot produce a filterable parameter at all. That is
+ * also why this could never have been a Console field even if one existed: Console renders a
+ * plain text box, and a plain text box is not an autocomplete.
+ *
+ * A NATIVE `<datalist>` rather than a custom combobox. It gives suggestion-plus-free-text for
+ * free, keyboard and screen-reader behaviour come from the browser rather than from us, and it
+ * adds no dependency - which this project's conventions ask for before reaching for a package.
+ * The trade is that the popup cannot be styled and mobile browsers present it differently. If
+ * the design later needs the list to look like the rest of the form, this is the seam to
+ * replace, and nothing outside this component knows how the suggestions are drawn.
+ *
+ * The field is FREE TEXT on purpose: the list is a shortcut to a brand that exists, never a
+ * restriction to one. A garment whose brand nobody has listed yet has to be listable, and the
+ * first person to type it is the one person who knows how it is spelled.
+ *
+ * Snapping a typed brand onto an existing spelling happens on SUBMIT, in the panel, not here -
+ * see util/brandValue.js. Doing it on every keystroke would fight the person typing.
+ */
+const FieldBrandAutocomplete = props => {
+  const { formId, intl, brandOptions = [] } = props;
+  const listId = `${formId}brandOptions`;
+
+  return (
+    <>
+      <FieldTextInput
+        id={`${formId}brand`}
+        name="brand"
+        className={css.brand}
+        type="text"
+        // Long enough for the longest real brand and short enough to keep a paragraph out of
+        // the field; matches what Console's own short-text fields allow.
+        maxLength={70}
+        label={intl.formatMessage({ id: 'EditListingDetailsForm.brand' })}
+        placeholder={intl.formatMessage({ id: 'EditListingDetailsForm.brandPlaceholder' })}
+        helpText={intl.formatMessage({ id: 'EditListingDetailsForm.brandHelp' })}
+        // Reaches the DOM input through FieldTextInput's `...rest`.
+        list={listId}
+        autoComplete="off"
+      />
+      <datalist id={listId}>
+        {brandOptions.map(({ brand }) => (
+          <option key={brand} value={brand} />
+        ))}
+      </datalist>
+    </>
+  );
+};
+
 const FieldOwnerAddress = props => {
   const { formId, intl } = props;
 
@@ -399,6 +522,9 @@ const EditListingDetailsForm = props => (
         updateInProgress,
         fetchErrors,
         listingFieldsConfig = [],
+        // The brands that already exist, for the autocomplete. Empty until the public endpoint
+        // answers and on any failure - the input still works, it just suggests nothing.
+        brandOptions = [],
         listingCurrency,
         showOwnerAddress = false,
         values,
@@ -432,6 +558,12 @@ const EditListingDetailsForm = props => (
       );
 
       const maxLength60Message = maxLength(maxLengthMessage, TITLE_MAX_LENGTH);
+
+      // Console has no brand field today - it was removed so flex-cli could own the pub_brand
+      // search schema - which is why FieldBrandAutocomplete exists at all. Checked rather than
+      // assumed, so adding brand back in Console switches this off instead of producing two
+      // brand inputs side by side.
+      const hasHostedBrandField = listingFieldsConfig.some(config => config?.key === 'brand');
 
       const hasCategories = selectableCategories && selectableCategories.length > 0;
       const showCategories = listingType && hasCategories;
@@ -484,6 +616,29 @@ const EditListingDetailsForm = props => (
             />
           )}
 
+          {/* Brand is not a Console field, so nothing renders it but this. Guarded on Console
+              NOT having one: if an operator ever adds brand back, the hosted field is the truth
+              and this would otherwise draw a second brand input beside it. Same rule as
+              listingFieldSearchConfig in util/listingFieldSearch.js - hosted wins. */}
+          {showListingFields && isCompatibleCurrency && !hasHostedBrandField && (
+            <FieldBrandAutocomplete formId={formId} intl={intl} brandOptions={brandOptions} />
+          )}
+
+          {/* A hosted brand, if one ever comes back, still sits with the category rather than
+              down with the rest of the listing fields - see LISTING_FIELD_KEYS_BEFORE_TITLE.
+              Same visibility condition as the block at the bottom, so an early field never
+              appears before the category has been chosen. */}
+          {showListingFields && isCompatibleCurrency && (
+            <AddListingFields
+              listingType={listingType}
+              listingFieldsConfig={listingFieldsConfig}
+              selectedCategories={pickSelectedCategories(values)}
+              formId={formId}
+              intl={intl}
+              pickField={key => LISTING_FIELD_KEYS_BEFORE_TITLE.includes(key)}
+            />
+          )}
+
           {showTitle && isCompatibleCurrency && (
             <FieldTextInput
               id={`${formId}title`}
@@ -525,6 +680,7 @@ const EditListingDetailsForm = props => (
               selectedCategories={pickSelectedCategories(values)}
               formId={formId}
               intl={intl}
+              pickField={key => !LISTING_FIELD_KEYS_BEFORE_TITLE.includes(key)}
             />
           )}
 

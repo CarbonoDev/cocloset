@@ -119,4 +119,179 @@ describe('EditListingDetailsForm', () => {
     // Test that save button is enabled
     expect(screen.getByRole('button', { name: saveActionMsg })).toBeEnabled();
   });
+
+  // ---------------------------------------------------------------------------
+  //   > "brand debe estar en el editListingPage como el primer field despues de categoria y
+  //   >  subcategoria"
+  //
+  // Console orders ALL listing fields together, below the title and description, and cannot say
+  // that one of them belongs up with the category - so the exception lives in the form and is
+  // asserted here. DOM ORDER is the assertion: "brand is present" would pass no matter where it
+  // landed, which is the whole thing being asked for.
+  // ---------------------------------------------------------------------------
+  describe('field order', () => {
+    const listingTypes = [
+      {
+        listingType: 'sell-bicycles',
+        transactionProcessAlias: 'default-purchase/release-1',
+        unitType: 'item',
+      },
+    ];
+
+    const textField = (key, label) => ({
+      key,
+      scope: 'public',
+      listingTypeConfig: { limitToListingTypeIds: true, listingTypeIds: ['sell-bicycles'] },
+      schemaType: 'text',
+      filterConfig: { showFilter: true, label },
+      showConfig: { label, isDetail: true },
+      saveConfig: { label },
+    });
+
+    // Console hands brand over LAST here, so passing is not an accident of config order.
+    const listingFieldsConfig = [textField('material', 'Material'), textField('brand', 'Brand')];
+
+    const renderDetailsForm = () =>
+      render(
+        <EditListingDetailsForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onListingTypeChange={noop}
+          onSubmit={v => v}
+          saveActionMsg="Save details"
+          updated={false}
+          updateInProgress={false}
+          disabled={false}
+          ready={false}
+          listingFieldsConfig={listingFieldsConfig}
+          categoryPrefix="categoryLevel"
+          selectableCategories={[]}
+          pickSelectedCategories={values => pickCategoryFields(values, 'categoryLevel', 1, [])}
+          selectableListingTypes={listingTypes}
+          hasExistingListingType={true}
+          initialValues={listingTypes[0]}
+          marketplaceCurrency="EUR"
+        />
+      );
+
+    const isBefore = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    it('puts brand above the title and the description', () => {
+      renderDetailsForm();
+
+      const brand = screen.getByLabelText('Brand');
+      const title = screen.getByRole('textbox', { name: 'EditListingDetailsForm.title' });
+      const description = screen.getByRole('textbox', {
+        name: 'EditListingDetailsForm.description',
+      });
+
+      expect(isBefore(brand, title)).toBe(true);
+      expect(isBefore(brand, description)).toBe(true);
+    });
+
+    // The split must not swallow anything: every other field keeps the order Console gave it,
+    // below the description, and no field is rendered twice.
+    it('leaves every other field where Console put it', () => {
+      renderDetailsForm();
+
+      const description = screen.getByRole('textbox', {
+        name: 'EditListingDetailsForm.description',
+      });
+
+      expect(screen.getAllByLabelText('Brand')).toHaveLength(1);
+      expect(screen.getAllByLabelText('Material')).toHaveLength(1);
+      expect(isBefore(description, screen.getByLabelText('Material'))).toBe(true);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  //   > "Podemos usar brand como un autocomplete de todas las brands que existen"
+  //
+  // Brand is NOT a Console listing field - it was removed so flex-cli could own the pub_brand
+  // search schema - so nothing renders it but this bespoke input. Which also means Console
+  // could never have provided it: Console draws a plain text box, and a plain text box is not
+  // an autocomplete.
+  // ---------------------------------------------------------------------------
+  describe('the brand autocomplete', () => {
+    const listingTypes = [
+      {
+        listingType: 'sell-bicycles',
+        transactionProcessAlias: 'default-purchase/release-1',
+        unitType: 'item',
+      },
+    ];
+
+    const brandOptions = [{ brand: 'Reformation', count: 3 }, { brand: 'ZARA', count: 1 }];
+
+    const renderWithBrand = (props = {}) =>
+      render(
+        <EditListingDetailsForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onListingTypeChange={noop}
+          onSubmit={v => v}
+          saveActionMsg="Save details"
+          updated={false}
+          updateInProgress={false}
+          disabled={false}
+          ready={false}
+          listingFieldsConfig={[]}
+          brandOptions={brandOptions}
+          categoryPrefix="categoryLevel"
+          selectableCategories={[]}
+          pickSelectedCategories={values => pickCategoryFields(values, 'categoryLevel', 1, [])}
+          selectableListingTypes={listingTypes}
+          hasExistingListingType={true}
+          initialValues={listingTypes[0]}
+          marketplaceCurrency="EUR"
+          {...props}
+        />
+      );
+
+    it('renders an input for a field Console does not have', () => {
+      renderWithBrand();
+
+      expect(screen.getByLabelText('EditListingDetailsForm.brand')).toBeInTheDocument();
+    });
+
+    // The suggestions are a shortcut to a brand that exists, never a restriction to one: a
+    // garment whose brand nobody has listed yet still has to be listable.
+    it('suggests the brands that exist without limiting the input to them', () => {
+      renderWithBrand();
+
+      const input = screen.getByLabelText('EditListingDetailsForm.brand');
+      const list = document.getElementById(input.getAttribute('list'));
+
+      expect(input.tagName).toBe('INPUT');
+      expect([...list.querySelectorAll('option')].map(o => o.value)).toEqual([
+        'Reformation',
+        'ZARA',
+      ]);
+    });
+
+    it('still renders the input when no brands could be fetched', () => {
+      renderWithBrand({ brandOptions: [] });
+
+      expect(screen.getByLabelText('EditListingDetailsForm.brand')).toBeInTheDocument();
+    });
+
+    // Hosted wins, the same rule as listingFieldSearchConfig in util/listingFieldSearch.js.
+    // Without this an operator adding brand back in Console would get two brand inputs.
+    it('steps aside when Console does have a brand field', () => {
+      const hostedBrand = {
+        key: 'brand',
+        scope: 'public',
+        schemaType: 'text',
+        listingTypeConfig: { limitToListingTypeIds: true, listingTypeIds: ['sell-bicycles'] },
+        filterConfig: { showFilter: true, label: 'Brand' },
+        showConfig: { label: 'Brand', isDetail: true },
+        saveConfig: { label: 'Brand' },
+      };
+
+      renderWithBrand({ listingFieldsConfig: [hostedBrand] });
+
+      expect(screen.queryByLabelText('EditListingDetailsForm.brand')).not.toBeInTheDocument();
+      expect(screen.getAllByLabelText('Brand')).toHaveLength(1);
+    });
+  });
 });

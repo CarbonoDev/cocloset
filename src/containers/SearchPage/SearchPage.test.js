@@ -675,15 +675,20 @@ describe('Duck', () => {
     return loadData(null, null, config)(dispatch, getState, sdk).then(data => {
       const allActions = dispatchedActions(dispatch);
 
-      // FOUR now, not three: the page also fetches the studios its pickup filter offers.
-      // Asserted by PRESENCE rather than by position - it is fired without being awaited, so
-      // where it interleaves with the search's own resolution is a scheduling detail rather
-      // than a contract. The search's three actions are then checked in order, with this one
-      // filtered out, so this test keeps saying what it was written to say.
-      expect(allActions).toHaveLength(4);
-      expect(allActions.map(a => a.type)).toContain('SearchPage/fetchLaundryOptions/pending');
+      // FIVE now, not three: the page also fetches the studios its pickup filter offers and
+      // the brands its brand filter offers. Both are asserted by PRESENCE rather than by
+      // position - they are fired without being awaited, so where they interleave with the
+      // search's own resolution is a scheduling detail rather than a contract. The search's
+      // three actions are then checked in order, with these filtered out, so this test keeps
+      // saying what it was written to say.
+      const sideLookups = ['SearchPage/fetchLaundryOptions', 'SearchPage/fetchBrands'];
 
-      const actions = allActions.filter(a => !a.type.startsWith('SearchPage/fetchLaundryOptions'));
+      expect(allActions).toHaveLength(5);
+      sideLookups.forEach(prefix => {
+        expect(allActions.map(a => a.type)).toContain(`${prefix}/pending`);
+      });
+
+      const actions = allActions.filter(a => !sideLookups.some(p => a.type.startsWith(p)));
       expect(actions).toHaveLength(3);
 
       // First action should be searchListings.pending

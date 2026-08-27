@@ -2,7 +2,10 @@ import React from 'react';
 import '@testing-library/jest-dom';
 
 import { renderWithProviders as render, testingLibrary } from '../../util/testHelpers';
-import { TX_TRANSITION_ACTOR_CUSTOMER } from '../../transactions/transaction';
+import {
+  TX_TRANSITION_ACTOR_CUSTOMER,
+  TX_TRANSITION_ACTOR_PROVIDER,
+} from '../../transactions/transaction';
 
 import InboxTransactionPanel from './InboxTransactionPanel';
 
@@ -82,7 +85,10 @@ describe('InboxTransactionPanel: the damage annotation on the return step', () =
   });
 
   // "el resto de los pasos debe funcionar igual" - the other seven are untouched either way.
-  it('still renders all eight steps on a damaged rental', () => {
+  // "el resto de los pasos debe funcionar igual" - the annotation replaces one step's label and
+  // touches nothing else. Which steps a reader gets is a separate rule, asserted below; this
+  // renders as the CUSTOMER, so the laundry's post-return work is not among them.
+  it("still renders the rest of the renter's steps on a damaged rental", () => {
     renderPanel({ damageReported: { flag: true, note: 'Hem torn' } });
 
     ['bookingConfirmed', 'laundryPreparing', 'readyForPickup', 'pickedUp', 'rentalActive'].forEach(
@@ -90,7 +96,110 @@ describe('InboxTransactionPanel: the damage annotation on the return step', () =
         expect(screen.getByText(`ListingPage.rentalTimeline.${key}`)).toBeInTheDocument();
       }
     );
-    expect(screen.getByText('ListingPage.rentalTimeline.cleaning')).toBeInTheDocument();
-    expect(screen.getByText('ListingPage.rentalTimeline.readyForNextRental')).toBeInTheDocument();
+    expect(screen.getByText('ListingPage.rentalTimeline.review')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "aparecen para el customer Cleaning y Ready for next rental, el customer no tiene que
+//   >  saber eso, laundry y provider si, podemos agregar para customer y provider los steps de
+//   >  review?"
+//
+// The rule lives in util/rentalTimeline.js and is tested there. This pins the WIRING - that
+// the panel passes the role it already knows, rather than rendering one list for everybody.
+// On this project that is exactly where things die: a correct helper reached by nobody looks
+// like a working feature.
+// ---------------------------------------------------------------------------
+describe('InboxTransactionPanel: whose timeline it renders', () => {
+  const asRole = role =>
+    render(
+      <InboxTransactionPanel
+        transaction={transactionWith({})}
+        transactionRole={role}
+        onManageDisableScrolling={() => null}
+      />
+    );
+
+  const step = key => screen.queryByText(`ListingPage.rentalTimeline.${key}`);
+
+  it("keeps the laundry's work off the renter's timeline", () => {
+    asRole(TX_TRANSITION_ACTOR_CUSTOMER);
+
+    expect(step('cleaning')).not.toBeInTheDocument();
+    expect(step('readyForNextRental')).not.toBeInTheDocument();
+  });
+
+  it('shows the owner both, because their rental is not over until then', () => {
+    asRole(TX_TRANSITION_ACTOR_PROVIDER);
+
+    expect(step('cleaning')).toBeInTheDocument();
+    expect(step('readyForNextRental')).toBeInTheDocument();
+  });
+
+  it('gives both of them the review step', () => {
+    [TX_TRANSITION_ACTOR_CUSTOMER, TX_TRANSITION_ACTOR_PROVIDER].forEach(role => {
+      const view = asRole(role);
+      expect(step('review')).toBeInTheDocument();
+      view.unmount();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "Cuando se renta, a partir de ese momento aparece el QR, puedes ocultarlo a menos que el
+//   >  provider acepte o que se autoacepte la transacción? El provider si puede ver el QR"
+//
+// The detail panel and this one are two doors to the same code. Gating only the other one
+// would have hidden it from the customer in one place and left it in the other - the
+// requirement half-met, which reads as a bug rather than as a policy. Hence a test here too.
+// ---------------------------------------------------------------------------
+describe('InboxTransactionPanel: who gets the QR', () => {
+  const atTransition = (lastTransition, role) =>
+    render(
+      <InboxTransactionPanel
+        transaction={{
+          ...transactionWith({}),
+          attributes: { ...transactionWith({}).attributes, lastTransition },
+        }}
+        transactionRole={role}
+        onManageDisableScrolling={() => null}
+      />
+    );
+
+  const qrButton = () => screen.queryByLabelText('InboxPage.panel.openQr');
+
+  it('is hidden from the customer while the booking is unanswered', () => {
+    atTransition('transition/confirm-payment', TX_TRANSITION_ACTOR_CUSTOMER);
+
+    expect(qrButton()).not.toBeInTheDocument();
+  });
+
+  it('is there for the owner in that same state', () => {
+    atTransition('transition/confirm-payment', TX_TRANSITION_ACTOR_PROVIDER);
+
+    expect(qrButton()).toBeInTheDocument();
+  });
+
+  // Auto-accept lands in the same state as a manual accept, so one rule covers both.
+  it('reaches the customer once the booking is accepted', () => {
+    atTransition('transition/accept', TX_TRANSITION_ACTOR_CUSTOMER);
+
+    expect(qrButton()).toBeInTheDocument();
+  });
+
+  // This panel had NO state gate at all before, so it also used to show a code before the
+  // payment was confirmed - never intended, just never checked.
+  it('is absent before the payment is confirmed', () => {
+    atTransition('transition/request-payment', TX_TRANSITION_ACTOR_PROVIDER);
+
+    expect(qrButton()).not.toBeInTheDocument();
+  });
+
+  it('is gone for both once the garment is back', () => {
+    [TX_TRANSITION_ACTOR_CUSTOMER, TX_TRANSITION_ACTOR_PROVIDER].forEach(role => {
+      const view = atTransition('transition/laundry-confirm-return', role);
+      expect(qrButton()).not.toBeInTheDocument();
+      view.unmount();
+    });
   });
 });

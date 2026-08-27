@@ -177,6 +177,12 @@ const transitionsServedByHandoverQr = scope => HANDOVER_QR_SCOPES[scope] || [];
 // `transaction-invalid-transition` (see coclosetBookingProcess.js), so a
 // re-scanned code after the return simply cannot advance anything. Hiding is a
 // UI affordance on top of an enforcement that already exists.
+// NOT SPLIT BY ROLE, unlike the client mirror in transactions/transactionProcessCoclosetBooking.js.
+// There the customer's floor is ACCEPTED and the owner's is PREAUTHORIZED, because the client
+// asked for the customer not to be handed a code for a booking that might still be declined.
+// That is a question about who is looking at a screen, and nothing on this side has a viewer:
+// these states describe when a transaction HAS a usable code at all. Keeping the wider set here
+// is what makes the owner's view possible, and the divergence is deliberate rather than drift.
 const HANDOVER_QR_VISIBLE_STATES = [
   STATES.PREAUTHORIZED,
   STATES.ACCEPTED,

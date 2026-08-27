@@ -19,6 +19,7 @@ const deleteAccount = require('./api/delete-account');
 const laundryPartnerApplication = require('./api/laundry-partner-application');
 const laundries = require('./api/laundries');
 const laundryOptions = require('./api/laundry-options');
+const brands = require('./api/brands');
 const createAvailabilityBuffer = require('./api/create-availability-buffer');
 const laundryTransactionStatus = require('./api/laundry-transaction-status');
 const listingReadinessStatus = require('./api/listing-readiness-status');
@@ -77,6 +78,10 @@ router.get('/laundries', laundries);
 // for the search page's pickup filter. See the header of server/api/laundry-options.js for
 // what that distinction is protecting.
 router.get('/laundry-options', laundryOptions);
+// PUBLIC for the same reason: the brand autocomplete feeds a search filter anonymous visitors
+// use. Returns brands that are already printed on published listings, nothing more. See the
+// header of server/api/brands.js.
+router.get('/brands', brands);
 router.post('/create-availability-buffer', createAvailabilityBuffer);
 router.post('/laundry-transaction-status', laundryTransactionStatus);
 router.post('/listing-readiness-status', listingReadinessStatus);

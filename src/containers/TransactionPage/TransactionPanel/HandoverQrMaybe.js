@@ -42,10 +42,20 @@ const COCLOSET_BOOKING_PROCESS = 'cocloset-booking';
  *    evento" is about the screen, "la información del qr debe permanecer en la
  *    metadata" about the record, and those are not in conflict.
  *
- * Shown to BOTH parties. The customer is the one who carries it to the counter,
- * but the owner sees the same detail view (mockup 17 confirms the structure is
- * shared), and an owner being able to read out the code when a customer phones
- * them is useful rather than harmful - it is an identifier, not a credential.
+ * Shown to BOTH parties, but NOT FROM THE SAME MOMENT.
+ *
+ *   > "Cuando se renta, a partir de ese momento aparece el QR, puedes ocultarlo a menos que el
+ *   >  provider acepte o que se autoacepte la transacción? El provider si puede ver el QR"
+ *
+ * The owner sees it from `preauthorized`; the customer only once the booking has been
+ * accepted. A code the customer might carry to a counter for a rental that never happened is
+ * worse than a short wait for it - while for the owner it is part of what they are being asked
+ * to decide about. The floors live in transactionProcessCoclosetBooking.js, which also records
+ * that this reverses an earlier instruction.
+ *
+ * The customer is the one who carries it to the counter, but an owner being able to read out
+ * the code when a customer phones them is useful rather than harmful - it is an identifier,
+ * not a credential.
  *
  * @component
  * @param {Object} props
@@ -55,10 +65,19 @@ const COCLOSET_BOOKING_PROCESS = 'cocloset-booking';
  * @param {string} [props.processState] - stateData.processState
  * @param {Object} [props.transactionId] - the transaction's UUID object
  * @param {Object} [props.metadata] - transaction.attributes.metadata
+ * @param {boolean} [props.isCustomer] - is the viewer the customer rather than the owner?
  * @returns {JSX.Element|null}
  */
 const HandoverQrMaybe = props => {
-  const { className, rootClassName, processName, processState, transactionId, metadata } = props;
+  const {
+    className,
+    rootClassName,
+    processName,
+    processState,
+    transactionId,
+    metadata,
+    isCustomer = false,
+  } = props;
 
   // Every other process in this template (booking, purchase, inquiry,
   // negotiation, download) has no laundry handover and no QR.
@@ -66,7 +85,7 @@ const HandoverQrMaybe = props => {
     return null;
   }
 
-  if (!isHandoverQrVisibleState(processState)) {
+  if (!isHandoverQrVisibleState(processState, { isCustomer })) {
     return null;
   }
 
@@ -78,7 +97,10 @@ const HandoverQrMaybe = props => {
   const ticketCode = metadata?.ticketCode;
   const classes = classNames(rootClassName || css.root, className);
 
-  // "Not collectable yet" is every state before the studio has the garment ready.
+  // "Not collectable yet" is every state before the studio has the garment ready. PREAUTHORIZED
+  // is only reachable here by the owner now, but it stays in the list: this decides what the
+  // COPY says, and the owner looking at a not-yet-accepted booking needs the waiting text just
+  // as much as the customer does.
   const isWaitingForGarment = [states.PREAUTHORIZED, states.ACCEPTED].includes(processState);
   const descriptionId = isWaitingForGarment
     ? 'TransactionPanel.handoverQr.descriptionWaiting'
@@ -89,14 +111,15 @@ const HandoverQrMaybe = props => {
       <Heading as="h3" rootClassName={css.heading}>
         <FormattedMessage id="TransactionPanel.handoverQr.heading" />
       </Heading>
-      {/* The code now appears the moment the payment is confirmed, which is BEFORE the
-          garment has gone anywhere:
+      {/* The code appears before the garment has gone anywhere - for the owner from payment,
+          for the customer from acceptance - so the copy has to change with the state rather
+          than just exist:
 
-            > "el QR debe mostrarse al cliente desde que se confirma el pago pero con la
-            >  instrucción de que debe esperar a que el provider entregue la prenda y la
-            >  lavandería haga su proceso y que debe acudir a la lavandería por su prenda"
+            > "el QR debe mostrarse al cliente [...] pero con la instrucción de que debe
+            >  esperar a que el provider entregue la prenda y la lavandería haga su proceso y
+            >  que debe acudir a la lavandería por su prenda"
 
-          So the copy has to change with the state, not just exist. Before the garment is at
+          Before the garment is at
           the studio the customer is told what has to happen first and that the code is not
           usable yet; from `ready-for-pickup` onwards it is the ordinary "show this at the
           counter". One sentence covering both would have to be vague enough to be useless at

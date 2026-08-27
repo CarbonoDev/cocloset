@@ -457,4 +457,43 @@ describe('EditListingLaundryForm', () => {
       expect(radios[1]).not.toBeChecked();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  //   > "se muestra el displayName de cada laundry, pero debe ser el nombre de la laundry, no
+  //   >  del user"
+  //
+  // `displayName` is whatever the person who signed the studio up called themselves, often
+  // their own name. An owner choosing where their garment goes is choosing a PLACE. The two
+  // fixtures above give both the same value, which is why the precedence was invisible here.
+  // ---------------------------------------------------------------------------
+  describe('the name on a laundry card', () => {
+    const namedDifferently = [
+      {
+        ...laundries[0],
+        displayName: 'Jonathan P',
+        studioName: 'Studio Pigalle',
+      },
+    ];
+
+    it('is the studio name, not the account holder name', async () => {
+      await act(async () => {
+        renderForm({ laundries: namedDifferently });
+      });
+
+      expect(screen.getByText('Studio Pigalle')).toBeInTheDocument();
+      expect(screen.queryByText('Jonathan P')).not.toBeInTheDocument();
+    });
+
+    // Blank would be worse than the account name: the owner still has to tell the options
+    // apart, and a studio that has not named itself yet must remain identifiable.
+    it('falls back to the account name when the studio has not named itself', async () => {
+      await act(async () => {
+        renderForm({
+          laundries: [{ ...laundries[0], displayName: 'Jonathan P', studioName: null }],
+        });
+      });
+
+      expect(screen.getByText('Jonathan P')).toBeInTheDocument();
+    });
+  });
 });

@@ -2,7 +2,7 @@ import React from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../util/reactIntl';
-import { RENTAL_TIMELINE_STEPS } from '../../util/rentalTimeline';
+import { rentalTimelineSteps } from '../../util/rentalTimeline';
 
 import css from './ListingPage.module.css';
 
@@ -44,7 +44,9 @@ const SectionRentalTimeline = props => {
         <FormattedMessage id="ListingPage.rentalTimelineTitle" />
       </h2>
       <ol className={css.timelineSteps}>
-        {RENTAL_TIMELINE_STEPS.map((step, index) => (
+        {/* The renter's list, which is who reads a listing page: no cleaning, no
+            ready-for-next-rental, and a review at the end. See util/rentalTimeline.js. */}
+        {rentalTimelineSteps().map((step, index) => (
           <li key={step.key} className={css.timelineStep}>
             <span className={css.timelineStepNumber} aria-hidden="true">
               {index + 1}

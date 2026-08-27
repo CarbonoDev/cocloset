@@ -713,6 +713,48 @@ describe('listing-laundry-assignment', () => {
       expect(params.geolocation).toMatchObject({ lat: 48.857, lng: 2.359 });
     });
 
+    // ---------------------------------------------------------------------------
+    //   > "se muestra el displayName de cada laundry, pero debe ser el nombre de la laundry,
+    //   >  no del user"
+    //
+    // Reported against the assignment picker, but the picker only shows what this endpoint
+    // writes: `assignedLaundryName` is what the listing card, the listing page and the inbox
+    // panel all read. The default fixture gives the account and the studio the SAME name, so
+    // the precedence is invisible to every other test in this file - which is how it survived.
+    // ---------------------------------------------------------------------------
+    it('stamps the studio name, not the name on the account', async () => {
+      const { update } = setupSdk(listingEntity({ metadata: { onLaundry: false } }), {
+        laundry: laundryUserEntity({ profile: { displayName: 'Jonathan P' } }),
+      });
+
+      await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+      expect(update.mock.calls[0][0].publicData.assignedLaundryName).toBe('Maison du Marais');
+    });
+
+    // Blank is worse than the account's name: an owner picking where their garment goes has to
+    // be able to tell the options apart, and a studio that has not filled in its profile name
+    // yet must still be nameable.
+    it('falls back to the account name when the studio has not named itself', async () => {
+      const { update } = setupSdk(listingEntity({ metadata: { onLaundry: false } }), {
+        laundry: laundryUserEntity({
+          profile: {
+            displayName: 'Jonathan P',
+            publicData: {
+              laundryProfile: {
+                address: '5 Rue des Rosiers, Paris',
+                origin: { lat: 48.857, lng: 2.359 },
+              },
+            },
+          },
+        }),
+      });
+
+      await run({ listingId: LISTING_ID, assignedLaundryId: LAUNDRY_B });
+
+      expect(update.mock.calls[0][0].publicData.assignedLaundryName).toBe('Jonathan P');
+    });
+
     it('resolves the turnaround for THIS garment category, from the laundry profile', async () => {
       // The listing fixture is filed under `dresses`, and this studio takes 4 days
       // over a dress. A studio-wide average would be the wrong number as often as

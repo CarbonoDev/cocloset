@@ -4,6 +4,7 @@ import classNames from 'classnames';
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { subtractTime } from '../../util/dates';
 import { getProcess, resolveLatestProcessName } from '../../transactions/transaction';
+import { isHandoverQrVisibleState } from '../../transactions/transactionProcessCoclosetBooking';
 import {
   RENTAL_TIMELINE_STEPS,
   STEP_CURRENT,
@@ -57,6 +58,9 @@ const DATE_FORMAT = { year: 'numeric', month: 'short', day: 'numeric' };
  * @param {Function} [props.onManageDisableScrolling] - required by Modal
  * @returns {JSX.Element|null}
  */
+// Every other process in this template has no laundry handover and therefore no QR.
+const COCLOSET_BOOKING_PROCESS = 'cocloset-booking';
+
 const InboxTransactionPanel = props => {
   const { transaction, stateData, transactionRole } = props;
   const intl = useIntl();
@@ -76,7 +80,26 @@ const InboxTransactionPanel = props => {
   // `getState` is the process's own reading of `lastTransition`. Asking the process rather
   // than mapping transitions here is what keeps this panel correct when the EDN changes.
   const processState = process?.getState ? process.getState(transaction) : null;
-  const steps = timelineStatusFor(processState);
+  // WHOSE STORY THIS IS. The renter does not see the laundry's work after the garment goes
+  // back, and both parties see a review step - see util/rentalTimeline.js. The panel already
+  // knows the role for its status strings, so this costs nothing but passing it along.
+  const steps = timelineStatusFor(processState, { audience: transactionRole });
+
+  // WHETHER THIS VIEWER GETS THE CODE AT ALL.
+  //
+  //   > "Cuando se renta, a partir de ese momento aparece el QR, puedes ocultarlo a menos que
+  //   >  el provider acepte o que se autoacepte la transacción? El provider si puede ver el QR"
+  //
+  // The transaction detail panel and this one are two doors to the same code, so gating only
+  // the other one would have hidden the QR from the customer in one place and left it in the
+  // other - the requirement half-met, in the way that reads as a bug rather than as a policy.
+  //
+  // The rule itself lives in transactions/transactionProcessCoclosetBooking.js so the two
+  // doors cannot drift apart. It also means this panel now shows no code before the payment
+  // is confirmed, which was never intended here and simply had no gate.
+  const showQr =
+    processName === COCLOSET_BOOKING_PROCESS &&
+    isHandoverQrVisibleState(processState, { isCustomer: transactionRole === 'customer' });
 
   const laundryName = publicData.assignedLaundryName;
   const pickupAddress = publicData.pickupAddress;
@@ -159,17 +182,19 @@ const InboxTransactionPanel = props => {
             A <button> rather than a clickable <div>: it is keyboard-reachable and announces
             itself, and the modal it opens is the whole point of the small one existing - a
             48px code is a thumbnail, not something a scanner at a counter can read. */}
-        <button
-          className={css.panelQrButton}
-          type="button"
-          onClick={() => setQrModalOpen(true)}
-          aria-label={intl.formatMessage({ id: 'InboxPage.panel.openQr' })}
-        >
-          <HandoverQrCode payload={transaction.id?.uuid} size="small" />
-          <span className={css.panelQrLabel}>
-            <FormattedMessage id="InboxPage.panel.qrLabel" />
-          </span>
-        </button>
+        {showQr ? (
+          <button
+            className={css.panelQrButton}
+            type="button"
+            onClick={() => setQrModalOpen(true)}
+            aria-label={intl.formatMessage({ id: 'InboxPage.panel.openQr' })}
+          >
+            <HandoverQrCode payload={transaction.id?.uuid} size="small" />
+            <span className={css.panelQrLabel}>
+              <FormattedMessage id="InboxPage.panel.qrLabel" />
+            </span>
+          </button>
+        ) : null}
       </header>
 
       <div className={css.panelCards}>

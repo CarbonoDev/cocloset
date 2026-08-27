@@ -398,7 +398,7 @@ describe('EditListingPage', () => {
     // Select parent category
     // Simulate user selecting options
     await user.selectOptions(
-      screen.getByRole('combobox'),
+      screen.getByRole('combobox', { name: 'EditListingDetailsForm.categoryLabel' }),
       screen.getByRole('option', { name: 'Sneakers' })
     );
 
@@ -407,10 +407,16 @@ describe('EditListingPage', () => {
       queryAllByRole('option', { name: 'EditListingDetailsForm.categoryPlaceholder' })[0].selected
     ).toBe(false);
     expect(getByRole('option', { name: 'Sneakers' }).selected).toBe(true);
-    expect(queryAllByText('EditListingDetailsForm.categoryLabel')).toHaveLength(2);
+    // One required label and one optional one. The subcategory carries its own key now that
+    // it is optional (see EditListingDetailsForm), so counting the required key alone is what
+    // asserts the level below it did NOT come out required.
+    expect(queryAllByText('EditListingDetailsForm.categoryLabel')).toHaveLength(1);
+    expect(queryAllByText('EditListingDetailsForm.categoryLabelOptional')).toHaveLength(1);
 
     // Simulate user selecting subcategory: second combobox is the subcategory
-    const selectSubcategory = screen.getAllByRole('combobox')[1];
+    const selectSubcategory = screen.getByRole('combobox', {
+      name: 'EditListingDetailsForm.categoryLabelOptional',
+    });
     await user.selectOptions(selectSubcategory, screen.getByRole('option', { name: 'Adidas' }));
 
     expect(getByRole('option', { name: 'Adidas' }).selected).toBe(true);
@@ -529,7 +535,7 @@ describe('EditListingPage', () => {
 
     // Simulate user interaction and select parent level category
     await user.selectOptions(
-      screen.getByRole('combobox'),
+      screen.getByRole('combobox', { name: 'EditListingDetailsForm.categoryLabel' }),
       screen.getByRole('option', { name: 'Sneakers' })
     );
 
@@ -537,10 +543,16 @@ describe('EditListingPage', () => {
       queryAllByRole('option', { name: 'EditListingDetailsForm.categoryPlaceholder' })[0].selected
     ).toBe(false);
     expect(getByRole('option', { name: 'Sneakers' }).selected).toBe(true);
-    expect(queryAllByText('EditListingDetailsForm.categoryLabel')).toHaveLength(2);
+    // One required label and one optional one. The subcategory carries its own key now that
+    // it is optional (see EditListingDetailsForm), so counting the required key alone is what
+    // asserts the level below it did NOT come out required.
+    expect(queryAllByText('EditListingDetailsForm.categoryLabel')).toHaveLength(1);
+    expect(queryAllByText('EditListingDetailsForm.categoryLabelOptional')).toHaveLength(1);
 
     // Simulate user interaction and select sub level category: second combobox is subcategory
-    const selectSubcategory = screen.getAllByRole('combobox')[1];
+    const selectSubcategory = screen.getByRole('combobox', {
+      name: 'EditListingDetailsForm.categoryLabelOptional',
+    });
     await user.selectOptions(selectSubcategory, screen.getByRole('option', { name: 'Adidas' }));
 
     expect(getByRole('option', { name: 'Adidas' }).selected).toBe(true);
@@ -595,7 +607,7 @@ describe('EditListingPage', () => {
 
     // Simulate user interaction and select parent level category
     await user.selectOptions(
-      screen.getByRole('combobox'),
+      screen.getByRole('combobox', { name: 'EditListingDetailsForm.categoryLabel' }),
       screen.getByRole('option', { name: 'Sneakers' })
     );
 
@@ -686,7 +698,9 @@ describe('EditListingPage', () => {
 
     // Test intercation
     await user.selectOptions(
-      screen.getByRole('combobox'),
+      // The custom 'Cat' listing field, not the category select - named rather than picked by
+      // position, since the brand autocomplete is a combobox too.
+      screen.getByRole('combobox', { name: 'Cat' }),
       screen.getByRole('option', { name: 'Cat 1' })
     );
 
@@ -2592,7 +2606,9 @@ describe('EditListingPage', () => {
 
     // Test intercation
     await user.selectOptions(
-      screen.getByRole('combobox'),
+      // The custom 'Cat' listing field, not the category select - named rather than picked by
+      // position, since the brand autocomplete is a combobox too.
+      screen.getByRole('combobox', { name: 'Cat' }),
       screen.getByRole('option', { name: 'Cat 1' })
     );
 

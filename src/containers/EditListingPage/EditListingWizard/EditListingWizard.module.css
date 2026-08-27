@@ -66,6 +66,28 @@
 
 /* "LIST A PIECE / New garment" above the steps. Hidden on the mobile strip,
    where the rail collapses to a scrolling row and there is no space for it. */
+/* The preview link sits above the whole wizard - rail and panel both - because it is about
+   the listing rather than about the tab you happen to be on. Right-aligned and quiet: it is an
+   escape hatch, not a call to action competing with the tab's own save button. */
+.previewLink {
+  align-self: flex-end;
+  margin: 12px 24px 0 24px;
+  padding: 6px 12px;
+
+  color: var(--coclosetInk);
+  font-size: 13px;
+  font-weight: var(--fontWeightMedium);
+  text-decoration: underline;
+
+  &:hover {
+    text-decoration: none;
+  }
+
+  @media (--viewportMedium) {
+    margin: 16px 32px 0 32px;
+  }
+}
+
 .navHeader {
   display: none;
 

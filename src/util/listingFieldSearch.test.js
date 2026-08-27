@@ -1,4 +1,8 @@
-import { isSearchableListingField, listingFieldSearchParams } from './listingFieldSearch';
+import {
+  isSearchableListingField,
+  listingFieldSearchParams,
+  listingFieldSearchConfig,
+} from './listingFieldSearch';
 
 // The client asked for the brand to link to a filtered search, and said outright that the
 // field may change shape:
@@ -98,5 +102,43 @@ describe('isSearchableListingField', () => {
     ['size', 'retailValue', 'color', undefined].forEach(key => {
       expect(isSearchableListingField(key)).toBe(false);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Brand was REMOVED from Console so flex-cli could own the `pub_brand` search schema. The
+// consequence was invisible: callers resolve a field by looking it up in the hosted fields,
+// the lookup started returning undefined, and the brand on the listing page quietly stopped
+// being a link - it degraded to plain text, so nothing broke loudly enough to notice.
+// ---------------------------------------------------------------------------
+describe('listingFieldSearchConfig', () => {
+  it('describes brand even though Console does not', () => {
+    const config = listingFieldSearchConfig('brand', []);
+
+    expect(config).toMatchObject({
+      key: 'brand',
+      schemaType: 'enum',
+      filterConfig: { indexForSearch: true },
+    });
+  });
+
+  // The fallback has to produce the SAME parameter the search page's own brand filter sends,
+  // or clicking a brand would land on a search that finds nothing.
+  it('produces the exact-match param the filter uses', () => {
+    const config = listingFieldSearchConfig('brand', []);
+
+    expect(listingFieldSearchParams(config, 'Reformation')).toEqual({ pub_brand: 'Reformation' });
+  });
+
+  // If an operator ever adds brand back in Console, what they configured there is the truth and
+  // this stops applying on its own.
+  it('lets a hosted config win', () => {
+    const hosted = { key: 'brand', schemaType: 'text', filterConfig: { indexForSearch: false } };
+
+    expect(listingFieldSearchConfig('brand', [hosted])).toBe(hosted);
+  });
+
+  it('has nothing to say about a field it does not know', () => {
+    expect(listingFieldSearchConfig('size', [])).toBeUndefined();
   });
 });

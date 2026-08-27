@@ -227,6 +227,7 @@ export class SearchPageComponent extends Component {
       params: currentPathParams = {},
       currentUser,
       laundryOptions,
+      brandOptions,
     } = this.props;
 
     const {
@@ -263,6 +264,7 @@ export class SearchPageComponent extends Component {
       currentPathParams,
       currentUser,
       laundryOptions,
+      brandOptions,
     });
 
     const isWindowDefined = typeof window !== 'undefined';
@@ -514,6 +516,8 @@ const SearchPage = props => {
     // Cocloset: the studios the pickup filter offers. Empty until the public endpoint
     // answers, and on any failure - the filter is then simply not rendered.
     laundryOptions,
+    // Same contract, for the brand filter. See withBrandFilter in SearchPage.shared.js.
+    brandOptions,
   } = useSelector(state => state.SearchPage);
   const listings = useSelector(state =>
     selectListingsById(state, state.SearchPage.currentPageResultIds)
@@ -542,6 +546,7 @@ const SearchPage = props => {
       searchParams={searchParams}
       activeListingId={activeListingId}
       laundryOptions={laundryOptions}
+      brandOptions={brandOptions}
       onManageDisableScrolling={onManageDisableScrolling}
       onActivateListing={onActivateListing}
     />
