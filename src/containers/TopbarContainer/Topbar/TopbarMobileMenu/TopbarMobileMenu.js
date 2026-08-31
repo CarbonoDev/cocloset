@@ -96,6 +96,24 @@ const TopbarMobileMenu = props => {
     );
   });
 
+  // Declared above the link that uses it, and above BOTH renders below - the anonymous branch
+  // returns before `currentPageClass` further down is ever defined.
+  const currentPageClassFor = page => (currentPage === page ? css.currentPage : null);
+
+  // Mobile twin of the desktop Borrow link - the way in to browsing for everyone who
+  // borrows, which is everyone but a studio. See BorrowLinkMaybe in TopbarDesktop.
+  //
+  // Built once and rendered in BOTH branches below, because an anonymous reader is exactly
+  // who a marketplace wants browsing: a link that only appears after signing in would hide
+  // the shop from the people most likely to want it.
+  const borrowLinkMaybe = isLaundryUser(currentUser) ? null : (
+    <li className={classNames(css.navigationLink, currentPageClassFor('SearchPage'))}>
+      <NamedLink name="SearchPage">
+        <FormattedMessage id="TopbarMobileMenu.borrowLink" />
+      </NamedLink>
+    </li>
+  );
+
   const createListingsLinkMaybe = showCreateListingsLink ? (
     <NamedLink className={css.createNewListingLink} name="NewListingPage">
       <FormattedMessage id="TopbarMobileMenu.newListingLink" />
@@ -133,7 +151,10 @@ const TopbarMobileMenu = props => {
             />
           </div>
 
-          <ul className={css.customLinksWrapper}>{extraLinks}</ul>
+          <ul className={css.customLinksWrapper}>
+            {borrowLinkMaybe}
+            {extraLinks}
+          </ul>
 
           <div className={css.spacer} />
         </div>
@@ -152,8 +173,11 @@ const TopbarMobileMenu = props => {
     const isAccountSettingsPage =
       page === 'AccountSettingsPage' && ACCOUNT_SETTINGS_PAGES.includes(currentPage);
     const isInboxPage = currentPage?.indexOf('InboxPage') === 0 && page?.indexOf('InboxPage') === 0;
-    const isLaundryOpsPage = page === 'LaundryProfilePage' && LAUNDRY_OPS_PAGES.includes(currentPage);
-    return currentPage === page || isAccountSettingsPage || isInboxPage || isLaundryOpsPage ? css.currentPage : null;
+    const isLaundryOpsPage =
+      page === 'LaundryProfilePage' && LAUNDRY_OPS_PAGES.includes(currentPage);
+    return currentPage === page || isAccountSettingsPage || isInboxPage || isLaundryOpsPage
+      ? css.currentPage
+      : null;
   };
 
   const manageListingsLinkMaybe = showCreateListingsLink ? (
@@ -193,6 +217,7 @@ const TopbarMobileMenu = props => {
               {notificationCountBadge}
             </NamedLink>
           </li>
+          {borrowLinkMaybe}
           {laundryProfileLinkMaybe}
           {manageListingsLinkMaybe}
           <li className={classNames(css.navigationLink, currentPageClass('ProfileSettingsPage'))}>
