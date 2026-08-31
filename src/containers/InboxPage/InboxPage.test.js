@@ -27,7 +27,7 @@ import {
 } from '../../transactions/transaction';
 
 import { getStateData } from './InboxPage.stateData';
-import InboxPage, { InboxItem } from './InboxPage';
+import InboxPage, { InboxItem, InboxPageComponent } from './InboxPage';
 
 const { Money } = sdkTypes;
 const { screen, waitFor, within } = testingLibrary;
@@ -36,6 +36,82 @@ const noop = () => null;
 const bookingTransitions = getProcess('default-booking')?.transitions;
 const purchaseTransitions = getProcess('default-purchase')?.transitions;
 const inquiryTransitions = getProcess('default-inquiry')?.transitions;
+
+// ---------------------------------------------------------------------------
+//   > "Puedes agregar el total de earnings visible solo para el provider por sus transacciones
+//   >  completadas"
+//
+// "Solo para el provider" is guarded twice: this block renders only on the sales tab, and the
+// number comes from a query the API scopes to the caller's own sales. These pin the first
+// guard - the second one cannot be tested from here, which is rather the point of it.
+// ---------------------------------------------------------------------------
+describe("InboxPage: the owner's earnings", () => {
+  const earnings = { amount: 12500, currency: 'USD', count: 3, skippedCount: 0, truncated: false };
+
+  const renderInbox = (props = {}) =>
+    render(
+      <InboxPageComponent
+        params={{ tab: 'sales' }}
+        currentUser={createCurrentUser('me')}
+        fetchInProgress={false}
+        fetchOrdersOrSalesError={null}
+        pagination={null}
+        transactions={[]}
+        scrollingDisabled={false}
+        providerEarnings={earnings}
+        intl={fakeIntl}
+        {...props}
+      />
+    );
+
+  const label = () => screen.queryByText('InboxPage.earningsLabel');
+
+  it('shows the total on the sales tab', () => {
+    renderInbox();
+
+    expect(label()).toBeInTheDocument();
+    expect(screen.getByText('$125.00')).toBeInTheDocument();
+  });
+
+  // The orders tab is the same page with a different tab param, and it is the customer's view
+  // of their own rentals. An earnings figure there would be somebody else's business.
+  it('shows nothing on the orders tab', () => {
+    renderInbox({ params: { tab: 'orders' } });
+
+    expect(label()).not.toBeInTheDocument();
+  });
+
+  // A new owner is better served by a tab that looks like a tab than by a large confident
+  // $0.00, and a walk that failed has no business inventing a number. Both are "render
+  // nothing".
+  it('shows nothing before there is anything to show', () => {
+    [null, { ...earnings, count: 0, amount: 0 }, { ...earnings, currency: null }].forEach(
+      providerEarnings => {
+        const view = renderInbox({ providerEarnings });
+        expect(label()).not.toBeInTheDocument();
+        view.unmount();
+      }
+    );
+  });
+
+  // An owner whose sales did not all fit in the walk, or who has been paid in a second
+  // currency, is told the total is partial rather than shown a smaller number with no
+  // explanation.
+  it('says so when the total is only part of the story', () => {
+    const view = renderInbox({ providerEarnings: { ...earnings, truncated: true } });
+    expect(screen.getByText('InboxPage.earningsPartial')).toBeInTheDocument();
+    view.unmount();
+
+    renderInbox({ providerEarnings: { ...earnings, skippedCount: 2 } });
+    expect(screen.getByText('InboxPage.earningsPartial')).toBeInTheDocument();
+  });
+
+  it('does not cry partial when nothing was left out', () => {
+    renderInbox();
+
+    expect(screen.queryByText('InboxPage.earningsPartial')).not.toBeInTheDocument();
+  });
+});
 
 describe('InboxPage', () => {
   const provider = createUser('provider');

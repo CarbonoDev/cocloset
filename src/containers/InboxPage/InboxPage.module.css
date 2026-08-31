@@ -80,6 +80,41 @@
    240px sidebar and out-weighed the garment title in the panel beside it - the one heading a
    reader is actually here for. Small, muted and set in the display serif: still clearly the
    column's name, no longer competing with the rental it sits next to. */
+/* THE OWNER'S EARNINGS, above the tabs. A quiet block rather than a headline figure: it is
+   a fact about the tab, not the thing the reader came to the inbox to do. */
+.earnings {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  margin: 0 0 12px 0;
+
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 8px;
+  background-color: var(--coclosetSurfaceRaised);
+}
+
+.earningsLabel {
+  color: var(--coclosetInkMuted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.earningsAmount {
+  font-family: var(--fontFamilyDisplay);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
+}
+
+.earningsMeta {
+  color: var(--coclosetInkMuted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .title {
   align-self: center;
   font-family: var(--fontFamilyDisplay);
