@@ -267,14 +267,14 @@ export const EditListingLaundryForm = props => (
             }
           </Field>
 
-          {showCategoryWarning ? (
+          {/* {showCategoryWarning ? (
             <p className={css.warning}>
               <FormattedMessage
                 id="EditListingLaundryForm.categoryWarning"
                 values={{ category: listingCategoryLabel }}
               />
             </p>
-          ) : null}
+          ) : null} */}
 
           {/* Publish-time surfaces. These used to live only in EditListingPhotosForm,
               which was the last panel of the new-listing flow; for cocloset-booking this
