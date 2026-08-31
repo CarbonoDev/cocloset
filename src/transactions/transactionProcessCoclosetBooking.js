@@ -408,6 +408,50 @@ export const HANDOVER_QR_TRANSITIONS = [
   transitions.LAUNDRY_CONFIRM_RETURN_LATE,
 ];
 
+/**
+ * THE TRANSITIONS THAT PAY THE OWNER.
+ *
+ * Every transition in the EDN carrying `:action/stripe-create-payout`, transcribed. Read off
+ * `ext/transaction-processes/cocloset-booking/process.edn` rather than guessed, and it must be
+ * re-read whenever that file changes - a payout added there and not here would quietly go
+ * uncounted.
+ *
+ * ── WHY TRANSITIONS AND NOT STATES ─────────────────────────────────────────
+ * "Completed" could be read off the current state: money has moved by the time a rental is in
+ * `cleaning` or `delivered`. But a state is where a rental IS, and payout is something that
+ * HAPPENED. The two come apart the moment the graph grows a path that reaches those states
+ * another way, or one that leaves them - and the failure would be silent, because a wrong total
+ * still looks like a total.
+ *
+ * The transition history is the record of what actually occurred, and the API already returns it
+ * (`fields.transaction` asks for `transitions`), so asking the honest question costs nothing.
+ *
+ * Note the earliest one: payout fires when the studio opens the cleaning ticket, NOT when the
+ * rental is finally marked delivered. That is deliberate - see the note on
+ * `transition/laundry-mark-pending-cleaning` in the EDN - and it means an owner's money is
+ * theirs while the garment is still in the wash. Earnings must say so.
+ */
+export const PAYOUT_TRANSITIONS = [
+  transitions.LAUNDRY_MARK_PENDING_CLEANING,
+  transitions.AUTO_COMPLETE_FROM_READY,
+  transitions.AUTO_COMPLETE_FROM_PICKED_UP,
+  transitions.AUTO_COMPLETE_FROM_OVERDUE,
+  transitions.AUTO_COMPLETE_FROM_RETURNED,
+  transitions.COMPLETE,
+  transitions.OPERATOR_COMPLETE,
+];
+
+/**
+ * Has this transaction paid the owner yet?
+ *
+ * @param {Array<Object>} [txTransitions] - `transaction.attributes.transitions`
+ * @returns {boolean}
+ */
+export const hasPaidOut = (txTransitions = []) =>
+  (Array.isArray(txTransitions) ? txTransitions : []).some(t =>
+    PAYOUT_TRANSITIONS.includes(t?.transition)
+  );
+
 // WHO SEES THE QR, AND FROM WHEN. The two parties differ, deliberately.
 //
 // The PROVIDER's floor is PREAUTHORIZED - the moment payment is confirmed. Nothing about a

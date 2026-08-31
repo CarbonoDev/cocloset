@@ -79,6 +79,35 @@ const LaundryLinkMaybe = ({ isAuthenticated, currentUser }) => {
   );
 };
 
+/**
+ * THE WAY IN TO BROWSING, FOR EVERYONE WHO BORROWS.
+ *
+ *   > "Puedes agregar un button con label 'Borrow' en el topbar, debe llevar a /s, no debe ser
+ *   >  visible para laundries"
+ *
+ * The search form beside it is a way to look for a PARTICULAR garment, which only helps
+ * somebody who already has one in mind. This is the way in for somebody who does not.
+ *
+ * HIDDEN FROM STUDIOS, and from nobody else. A laundry does not borrow; its topbar already
+ * carries the panel where its work lives, and one more link to a shop it has no use for is
+ * one more thing between it and that panel. Anonymous readers DO get it - they are exactly
+ * who a marketplace wants browsing - which is why this is keyed on being a laundry rather
+ * than on being signed in.
+ *
+ * WHILE HYDRATING the anonymous answer is drawn, matching LaundryLinkMaybe and the signup and
+ * login links: the server does not know who is reading. That means a studio sees this link for
+ * an instant on first paint. Showing it briefly to a studio is the cheaper mistake than hiding
+ * browsing from every anonymous reader until JavaScript arrives.
+ */
+const BorrowLinkMaybe = ({ currentUser }) =>
+  isLaundryUser(currentUser) ? null : (
+    <NamedLink id="borrow-link" className={css.topbarLink} name="SearchPage">
+      <span className={css.topbarLinkLabel}>
+        <FormattedMessage id="TopbarDesktop.borrow" />
+      </span>
+    </NamedLink>
+  );
+
 const InboxLink = ({ notificationCount, inboxTab }) => {
   const notificationDot = notificationCount > 0 ? <div className={css.notificationDot} /> : null;
   return (
@@ -248,6 +277,10 @@ const TopbarDesktop = props => {
     <LaundryLinkMaybe isAuthenticated={authenticatedOnClientSide} currentUser={currentUser} />
   );
 
+  // Everyone but a studio. Uses `currentUser` rather than the hydration-gated flag because
+  // an anonymous reader must get this link too - see BorrowLinkMaybe.
+  const borrowLinkMaybe = <BorrowLinkMaybe currentUser={mounted ? currentUser : null} />;
+
   const signupLinkMaybe = isAuthenticatedOrJustHydrated ? null : <SignupLink />;
   const loginLinkMaybe = isAuthenticatedOrJustHydrated ? null : <LoginLink />;
 
@@ -289,6 +322,7 @@ const TopbarDesktop = props => {
         showCreateListingsLink={showCreateListingsLink && !isLaundryUser(currentUser)}
       />
 
+      {borrowLinkMaybe}
       {laundryLinkMaybe}
       {inboxLinkMaybe}
       {profileMenuMaybe}

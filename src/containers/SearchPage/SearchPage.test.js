@@ -376,12 +376,19 @@ describe('SearchPage', () => {
       expect(getByText('Fish')).toBeInTheDocument();
       expect(queryByText('Freshwater')).not.toBeInTheDocument();
 
-      // Has Listing type filter
-      expect(getByText('FilterComponent.listingTypeLabel')).toBeInTheDocument();
-      expect(getByText('Rent bicycles daily')).toBeInTheDocument();
-      expect(getByText('Rent bicycles nightly')).toBeInTheDocument();
-      expect(getByText('Rent bicycles hourly')).toBeInTheDocument();
-      expect(getByText('Sell bicycles')).toBeInTheDocument();
+      // NO Listing type filter.
+      //
+      //   > "Hay que remover el filtro 'Listing type' de search"
+      //
+      // This marketplace has one listing type, so the control could narrow nothing and rule
+      // nothing out.
+      expect(queryByText('FilterComponent.listingTypeLabel')).not.toBeInTheDocument();
+      // The options too: dropping the label while still rendering four unlabelled radio
+      // buttons would be the obvious way to half-do this.
+      expect(queryByText('Rent bicycles daily')).not.toBeInTheDocument();
+      expect(queryByText('Rent bicycles nightly')).not.toBeInTheDocument();
+      expect(queryByText('Rent bicycles hourly')).not.toBeInTheDocument();
+      expect(queryByText('Sell bicycles')).not.toBeInTheDocument();
 
       // Has Price filter
       expect(getByText('FilterComponent.priceLabel')).toBeInTheDocument();
@@ -463,8 +470,13 @@ describe('SearchPage', () => {
       expect(queryByText('Cats')).not.toBeInTheDocument();
       expect(queryByText('Fish')).not.toBeInTheDocument();
 
-      // Has Listing type filter
-      expect(getByText('FilterComponent.listingTypeLabel')).toBeInTheDocument();
+      // NO Listing type filter.
+      //
+      //   > "Hay que remover el filtro 'Listing type' de search"
+      //
+      // This marketplace has one listing type, so the control could narrow nothing and rule
+      // nothing out.
+      expect(queryByText('FilterComponent.listingTypeLabel')).not.toBeInTheDocument();
       expect(queryByText('Rent bicycles daily')).not.toBeInTheDocument();
       expect(queryByText('Rent bicycles nightly')).not.toBeInTheDocument();
       expect(queryByText('Rent bicycles hourly')).not.toBeInTheDocument();
@@ -583,19 +595,34 @@ describe('SearchPage', () => {
       // Has no Boat filter (primary)
       expect(queryByText('Boat')).not.toBeInTheDocument();
 
-      // Has Listing type filter
-      expect(getByText('FilterComponent.listingTypeLabel')).toBeInTheDocument();
-      expect(getByText('Rent bicycles daily')).toBeInTheDocument();
-      expect(getByText('Rent bicycles nightly')).toBeInTheDocument();
-      expect(getByText('Rent bicycles hourly')).toBeInTheDocument();
-      expect(getByText('Sell bicycles')).toBeInTheDocument();
+      // NO Listing type filter.
+      //
+      //   > "Hay que remover el filtro 'Listing type' de search"
+      //
+      // This marketplace has one listing type, so the control could narrow nothing and rule
+      // nothing out.
+      expect(queryByText('FilterComponent.listingTypeLabel')).not.toBeInTheDocument();
+      // The options too: dropping the label while still rendering four unlabelled radio
+      // buttons would be the obvious way to half-do this.
+      expect(queryByText('Rent bicycles daily')).not.toBeInTheDocument();
+      expect(queryByText('Rent bicycles nightly')).not.toBeInTheDocument();
+      expect(queryByText('Rent bicycles hourly')).not.toBeInTheDocument();
+      expect(queryByText('Sell bicycles')).not.toBeInTheDocument();
     });
 
-    // Test category intercation: click "Sell bicycles"
-    await user.click(getByRole('button', { name: 'Choose Sell bicycles.' }));
+    // The listing type now arrives through the PATH PARAM rather than through a control the
+    // reader clicks - see the note on HIDDEN_BUILT_IN_FILTER_KEYS. What is being proved is
+    // unchanged: a listing field limited to a listing type shows up once that type is chosen.
+    const scoped = render(
+      <SearchPage {...commonProps} params={{ listingType: 'sell-bicycles' }} />,
+      { initialState, config, routeConfiguration }
+    );
 
-    // Has Boat filter (enum) using SelectMultipleFilter component (it contains also legend for screen readers)
-    expect(getAllByText('Boat')).toHaveLength(2);
+    await waitFor(() => {
+      // Has Boat filter (enum) using SelectMultipleFilter component (it contains also legend
+      // for screen readers)
+      expect(scoped.getAllByText('Boat')).toHaveLength(2);
+    });
   });
 
   it('Check that Listing type filter is not revealed when using a listing type path param', async () => {
