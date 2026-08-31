@@ -756,8 +756,25 @@ export const getDerivedRenderData = ({
   const validQueryParams = urlQueryParams;
 
   const isKeywordSearch = isMainSearchTypeKeywords(config);
-  const builtInPrimaryFilters = defaultFiltersConfig.filter(f =>
-    ['categoryLevel', 'listingType'].includes(f.key)
+
+  // ---------------------------------------------------------------------------
+  //   > "Hay que remover el filtro 'Listing type' de search"
+  //
+  // This marketplace has exactly ONE listing type - garment-rental - so the control offered a
+  // choice with a single option: it could narrow nothing and rule nothing out. See the
+  // single-listing-type note in coclosetWizardFlow.test.js, which pins the same fact from the
+  // other end.
+  //
+  // DROPPED FROM THE ROW, NOT FROM THE CONFIG. `listingType` stays in `defaultFiltersConfig`,
+  // so `pub_listingType` in a URL is still validated and still applied - a saved link or a
+  // listing-type page variant keeps working. This only stops DRAWING a control for it.
+  // ---------------------------------------------------------------------------
+  const HIDDEN_BUILT_IN_FILTER_KEYS = ['listingType'];
+
+  const builtInPrimaryFilters = defaultFiltersConfig.filter(
+    f =>
+      ['categoryLevel', 'listingType'].includes(f.key) &&
+      !HIDDEN_BUILT_IN_FILTER_KEYS.includes(f.key)
   );
   const builtInFilters = isKeywordSearch
     ? defaultFiltersConfig.filter(

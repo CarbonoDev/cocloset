@@ -279,21 +279,37 @@ const LaundryOrderRow = props => {
                         does half its receptions at the counter and half at the desk must not
                         be asked two different questions about the same garment. */}
                     {action.needsLaundryCode ? (
-                      <div className={css.cleaningDaysField}>
-                        <label className={css.cleaningDaysLabel} htmlFor={laundryCodeInputId}>
-                          <FormattedMessage id="HandoverPage.laundryCode.label" />
-                        </label>
-                        <input
-                          id={laundryCodeInputId}
-                          className={css.cleaningDaysInput}
-                          type="text"
-                          maxLength={MAX_LAUNDRY_CODE_LENGTH}
-                          value={laundryCode}
-                          onChange={e => setLaundryCode(e.target.value)}
-                        />
-                        <span className={css.cleaningDaysHint}>
-                          <FormattedMessage id="HandoverPage.laundryCode.help" />
-                        </span>
+                      <div className={css.cleaningCodeContainer}>
+                        <div className={css.cleaningCodeSteps}>
+                          <p className={css.cleaningCodeStep}>
+                            <FormattedMessage
+                              id="HandoverPage.laundryCode.step1"
+                              values={{ b: chunks => <b>{chunks}</b> }}
+                            />
+                          </p>
+                          <p className={css.cleaningCodeStep}>
+                            <FormattedMessage
+                              id="HandoverPage.laundryCode.step2"
+                              values={{ b: chunks => <b>{chunks}</b> }}
+                            />
+                          </p>
+                        </div>
+                        <div className={css.cleaningDaysField}>
+                          <label className={css.cleaningDaysLabel} htmlFor={laundryCodeInputId}>
+                            <FormattedMessage id="HandoverPage.laundryCode.label" />
+                          </label>
+                          <input
+                            id={laundryCodeInputId}
+                            className={css.cleaningDaysInput}
+                            type="text"
+                            maxLength={MAX_LAUNDRY_CODE_LENGTH}
+                            value={laundryCode}
+                            onChange={e => setLaundryCode(e.target.value)}
+                          />
+                          <span className={css.cleaningDaysHint}>
+                            <FormattedMessage id="HandoverPage.laundryCode.help" />
+                          </span>
+                        </div>
                       </div>
                     ) : null}
                     {action.needsCleaningDays ? (

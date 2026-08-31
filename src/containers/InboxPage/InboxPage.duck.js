@@ -4,8 +4,25 @@ import { parse, getValidInboxSort } from '../../util/urlHelpers';
 import { getSupportedProcessesInfo } from '../../transactions/transaction';
 import { createImageVariantConfig } from '../../util/sdkLoader';
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
+import { sumProviderEarnings } from '../../util/providerEarnings';
 
 const INBOX_PAGE_SIZE = 10;
+
+// THE EARNINGS WALK.
+//
+// The inbox shows ten rentals at a time. A total computed from what is on screen would change
+// as the reader pages, which is worse than no total at all - so this walks the whole list.
+//
+// A SEPARATE, LEANER QUERY rather than reusing the page above: this needs two fields per
+// transaction and none of the images, the listing or the two users, so asking for the inbox's
+// full payload would fetch a wardrobe's worth of pictures to add up some numbers.
+//
+// PER PAGE is the API's maximum, and MAX_PAGES bounds what one page view can spend - the same
+// contract the server-side walks use. When the cap is hit the total is marked partial rather
+// than presented as complete; an owner with more sales than this deserves a caveat, not a
+// quietly wrong number.
+const EARNINGS_PER_PAGE = 100;
+const EARNINGS_MAX_PAGES = 10;
 
 // ================ Helper functions ================ //
 
@@ -24,6 +41,10 @@ const inboxPageSlice = createSlice({
     fetchOrdersOrSalesError: null,
     pagination: null,
     transactionRefs: [],
+    // Cocloset: what the owner has been paid, across every sale rather than the page on
+    // screen. Null until the walk answers, and on any failure - the inbox is not worth
+    // breaking over a summary line. See fetchProviderEarningsThunk.
+    providerEarnings: null,
   },
   reducers: {},
   extraReducers: builder => {
@@ -42,6 +63,11 @@ const inboxPageSlice = createSlice({
         console.error(action.payload || action.error);
         state.fetchInProgress = false;
         state.fetchOrdersOrSalesError = action.payload;
+      })
+      // Only `fulfilled`: the payload creator resolves to null instead of rejecting, so a
+      // failed walk leaves the initial state alone and the summary simply does not render.
+      .addCase(fetchProviderEarningsThunk.fulfilled, (state, action) => {
+        state.providerEarnings = action.payload;
       });
   },
 });
@@ -140,7 +166,59 @@ const loadDataPayloadCreator = ({ params, search }, { dispatch, rejectWithValue,
 
 export const loadDataThunk = createAsyncThunk('InboxPage/loadData', loadDataPayloadCreator);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// What the owner has earned.
+//
+//   > "Puedes agregar el total de earnings visible solo para el provider por sus transacciones
+//   >  completadas"
+//
+// SALES ONLY (`only: 'sale'`), which is what makes this the OWNER's number: the API scopes the
+// query to the caller, so there is no way for this to answer about somebody else. That is also
+// why there is no new endpoint - the browser can ask this question about itself and no other.
+//
+// FAILURE IS NOT AN ERROR STATE. Resolves to null rather than rejecting: a summary line that
+// could not be computed should disappear, not take the inbox down with it.
+// ─────────────────────────────────────────────────────────────────────────────
+const fetchSalesPage = (sdk, page, collected) =>
+  sdk.transactions
+    .query({
+      only: 'sale',
+      processNames: getSupportedProcessesInfo().map(pr => pr.name),
+      'fields.transaction': ['payoutTotal', 'transitions'],
+      page,
+      perPage: EARNINGS_PER_PAGE,
+    })
+    .then(response => {
+      const { data = [], meta = {} } = response.data || {};
+      const sales = collected.concat(data);
+      const totalPages = Number.isFinite(meta.totalPages) ? meta.totalPages : page;
+
+      if (page < totalPages && page < EARNINGS_MAX_PAGES) {
+        return fetchSalesPage(sdk, page + 1, sales);
+      }
+      return { sales, truncated: page < totalPages };
+    });
+
+const fetchProviderEarningsPayloadCreator = (_arg, { extra: sdk }) =>
+  fetchSalesPage(sdk, 1, [])
+    .then(({ sales, truncated }) => ({ ...sumProviderEarnings(sales), truncated }))
+    .catch(() => null);
+
+export const fetchProviderEarningsThunk = createAsyncThunk(
+  'InboxPage/fetchProviderEarnings',
+  fetchProviderEarningsPayloadCreator
+);
+
 // Backward compatible wrapper for the thunk
 export const loadData = (params, search) => (dispatch, getState, sdk) => {
-  return dispatch(loadDataThunk({ params, search }));
+  const promise = dispatch(loadDataThunk({ params, search }));
+
+  // Only on the sales tab, and only in the browser. Fired without being awaited: the rentals
+  // are what the reader came for, and a summary line must not hold them up. Same shape as the
+  // search page's two side lookups.
+  if (params?.tab === 'sales' && typeof window !== 'undefined') {
+    dispatch(fetchProviderEarningsThunk());
+  }
+
+  return promise;
 };

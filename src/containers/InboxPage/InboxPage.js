@@ -22,6 +22,8 @@ import {
   LINE_ITEM_FIXED,
 } from '../../util/types';
 import { subtractTime } from '../../util/dates';
+import { types as sdkTypes } from '../../util/sdkLoader';
+import { formatMoney } from '../../util/currency';
 
 import InboxTransactionPanel from './InboxTransactionPanel';
 import { createResourceLocatorString } from '../../util/routes';
@@ -292,6 +294,7 @@ export const InboxPageComponent = props => {
     fetchOrdersOrSalesError,
     pagination,
     params,
+    providerEarnings,
     providerNotificationCount = 0,
     customerNotificationCount = 0,
     scrollingDisabled,
@@ -467,6 +470,11 @@ export const InboxPageComponent = props => {
             <H2 as="h1" className={css.title}>
               <FormattedMessage id="InboxPage.title" />
             </H2>
+            {/* Sales tab only - see ProviderEarningsMaybe. Above the tabs rather than inside
+                the list, because it is a fact about the whole tab and not about the ten
+                rentals that happen to be on screen. */}
+            {!isOrders ? <ProviderEarningsMaybe earnings={providerEarnings} intl={intl} /> : null}
+
             <TabNav
               rootClassName={css.tabs}
               tabRootClassName={css.tab}
@@ -567,8 +575,61 @@ export const InboxPageComponent = props => {
   );
 };
 
+/**
+ * WHAT THE OWNER HAS EARNED, ON THE TAB WHERE THEIR SALES ARE.
+ *
+ *   > "Puedes agregar el total de earnings visible solo para el provider por sus transacciones
+ *   >  completadas"
+ *
+ * ONLY FOR THE PROVIDER, twice over. It renders only on the sales tab, and the number itself
+ * comes from a query the API scopes to the caller's own sales - so there is no arrangement of
+ * props that could show one person another's earnings.
+ *
+ * ABSENT, NOT ZERO, when there is nothing to say. A new owner with no completed rentals is
+ * better served by a tab that looks like a tab than by a large confident $0.00; and a walk that
+ * failed has no business inventing a number. Both are the same "render nothing" here.
+ *
+ * The caveat line is the reason `truncated` and `skippedCount` are carried this far: an owner
+ * whose sales did not all fit in the walk, or who has been paid in a second currency, is told
+ * that the total is partial rather than shown a smaller number with no explanation.
+ */
+const { Money } = sdkTypes;
+
+const ProviderEarningsMaybe = ({ earnings, intl }) => {
+  if (!earnings || !earnings.currency || earnings.count === 0) {
+    return null;
+  }
+
+  const { amount, currency, count, skippedCount = 0, truncated = false } = earnings;
+  const isPartial = truncated || skippedCount > 0;
+
+  return (
+    <section className={css.earnings}>
+      <span className={css.earningsLabel}>
+        <FormattedMessage id="InboxPage.earningsLabel" />
+      </span>
+      <span className={css.earningsAmount}>{formatMoney(intl, new Money(amount, currency))}</span>
+      <span className={css.earningsMeta}>
+        <FormattedMessage id="InboxPage.earningsCount" values={{ count }} />
+        {isPartial ? (
+          <>
+            {' '}
+            <FormattedMessage id="InboxPage.earningsPartial" />
+          </>
+        ) : null}
+      </span>
+    </section>
+  );
+};
+
 const mapStateToProps = state => {
-  const { fetchInProgress, fetchOrdersOrSalesError, pagination, transactionRefs } = state.InboxPage;
+  const {
+    fetchInProgress,
+    fetchOrdersOrSalesError,
+    pagination,
+    transactionRefs,
+    providerEarnings,
+  } = state.InboxPage;
   const {
     currentUser,
     currentUserSaleNotificationCount,
@@ -579,6 +640,7 @@ const mapStateToProps = state => {
     fetchInProgress,
     fetchOrdersOrSalesError,
     pagination,
+    providerEarnings,
     providerNotificationCount: currentUserSaleNotificationCount,
     customerNotificationCount: currentUserOrderNotificationCount,
     scrollingDisabled: isScrollingDisabled(state),

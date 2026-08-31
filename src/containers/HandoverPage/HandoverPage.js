@@ -339,21 +339,37 @@ export const HandoverPageComponent = props => {
                   > "cuando laundry recibe la prenda desde el provider, debe aparecer un input
                   >  para que laundry pueda ingresar un código interno para esa prenda" */}
             {takesLaundryCode ? (
-              <div className={css.cleaningDaysField}>
-                <label className={css.cleaningDaysLabel} htmlFor="handoverLaundryCode">
-                  <FormattedMessage id="HandoverPage.laundryCode.label" />
-                </label>
-                <input
-                  id="handoverLaundryCode"
-                  className={css.cleaningDaysInput}
-                  type="text"
-                  maxLength={MAX_LAUNDRY_CODE_LENGTH}
-                  value={codeInput}
-                  onChange={e => setCodeInput(e.target.value)}
-                />
-                <p className={css.cleaningDaysHelp}>
-                  <FormattedMessage id="HandoverPage.laundryCode.help" />
-                </p>
+              <div className={css.cleaningCodeContainer}>
+                <div className={css.cleaningCodeSteps}>
+                  <p className={css.cleaningCodeStep}>
+                    <FormattedMessage
+                      id="HandoverPage.laundryCode.step1"
+                      values={{ b: chunks => <b>{chunks}</b> }}
+                    />
+                  </p>
+                  <p className={css.cleaningCodeStep}>
+                    <FormattedMessage
+                      id="HandoverPage.laundryCode.step2"
+                      values={{ b: chunks => <b>{chunks}</b> }}
+                    />
+                  </p>
+                </div>
+                <div className={css.cleaningDaysField}>
+                  <label className={css.cleaningDaysLabel} htmlFor="handoverLaundryCode">
+                    <FormattedMessage id="HandoverPage.laundryCode.label" />
+                  </label>
+                  <input
+                    id="handoverLaundryCode"
+                    className={css.cleaningDaysInput}
+                    type="text"
+                    maxLength={MAX_LAUNDRY_CODE_LENGTH}
+                    value={codeInput}
+                    onChange={e => setCodeInput(e.target.value)}
+                  />
+                  <p className={css.cleaningDaysHelp}>
+                    <FormattedMessage id="HandoverPage.laundryCode.help" />
+                  </p>
+                </div>
               </div>
             ) : null}
 
