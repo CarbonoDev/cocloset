@@ -167,6 +167,30 @@
   margin: 0;
 }
 
+.cleaningCodeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cleaningCodeSteps {
+  margin-bottom: 15px;
+}
+
+.cleaningCodeStep {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  line-height: 18px;
+  word-break: break-all;
+}
+
+.damageCheckboxLabel input[type='checkbox'] {
+  margin: 0;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
 .damageNote {
   composes: marketplaceDefaultFontStyles from global;
   display: block;

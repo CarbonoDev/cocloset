@@ -102,7 +102,7 @@ const LaundryCard = props => {
           />
         </span>
       ) : null}
-      {categoryChips.length > 0 ? (
+      {/* {categoryChips.length > 0 ? (
         <span className={css.cardCategories}>
           {categoryChips.map(category => (
             <span key={category.value} className={css.cardCategory} title={category.path}>
@@ -110,7 +110,7 @@ const LaundryCard = props => {
             </span>
           ))}
         </span>
-      ) : null}
+      ) : null} */}
     </label>
   );
 };
@@ -267,14 +267,14 @@ export const EditListingLaundryForm = props => (
             }
           </Field>
 
-          {showCategoryWarning ? (
+          {/* {showCategoryWarning ? (
             <p className={css.warning}>
               <FormattedMessage
                 id="EditListingLaundryForm.categoryWarning"
                 values={{ category: listingCategoryLabel }}
               />
             </p>
-          ) : null}
+          ) : null} */}
 
           {/* Publish-time surfaces. These used to live only in EditListingPhotosForm,
               which was the last panel of the new-listing flow; for cocloset-booking this
