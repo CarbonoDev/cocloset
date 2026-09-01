@@ -346,18 +346,6 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
       view.getByRole('textbox', { name: 'EditListingDetailsForm.description' }),
       'Lorem ipsum'
     );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' }),
-      'Main Street 123'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerCity' }),
-      'Springfield'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerPostcode' }),
-      '12345'
-    );
     await user.click(view.getByLabelText('EditListingDetailsForm.specialCare.highValue'));
     await user.type(
       view.getByLabelText('EditListingDetailsForm.specialCare.note'),
@@ -389,18 +377,6 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
     await user.type(
       view.getByRole('textbox', { name: 'EditListingDetailsForm.description' }),
       'Lorem ipsum'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' }),
-      'Main Street 123'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerCity' }),
-      'Springfield'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerPostcode' }),
-      '12345'
     );
     await user.click(submitButton(view));
 
