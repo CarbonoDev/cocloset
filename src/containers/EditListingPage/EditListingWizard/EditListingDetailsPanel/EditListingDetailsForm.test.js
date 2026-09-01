@@ -294,4 +294,104 @@ describe('EditListingDetailsForm', () => {
       expect(screen.getAllByLabelText('Brand')).toHaveLength(1);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  //   > "hay que agregar una sección 'Special Care' con un conjunto de check boxes, las
+  //   >  opciones son: Embellishments (sequins, beadwork, etc.), Leather/Suede Trim, Pressed
+  //   >  Pleats, High Value Item (Over $1K), Note to Cleaner: ___"
+  //
+  // Bespoke rather than a Console field, because the data has to reach the owner and the studio
+  // and nobody else - a visibility Console cannot express. See util/specialCare.js.
+  // ---------------------------------------------------------------------------
+  describe('special care', () => {
+    const listingTypes = [
+      {
+        listingType: 'sell-bicycles',
+        transactionProcessAlias: 'default-purchase/release-1',
+        unitType: 'item',
+      },
+    ];
+
+    const renderSpecialCare = (props = {}) =>
+      render(
+        <EditListingDetailsForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onListingTypeChange={noop}
+          onSubmit={v => v}
+          saveActionMsg="Save details"
+          updated={false}
+          updateInProgress={false}
+          disabled={false}
+          ready={false}
+          listingFieldsConfig={[]}
+          categoryPrefix="categoryLevel"
+          selectableCategories={[]}
+          pickSelectedCategories={values => pickCategoryFields(values, 'categoryLevel', 1, [])}
+          selectableListingTypes={listingTypes}
+          hasExistingListingType={true}
+          initialValues={listingTypes[0]}
+          marketplaceCurrency="EUR"
+          {...props}
+        />
+      );
+
+    const OPTIONS = ['embellishments', 'leatherSuedeTrim', 'pressedPleats', 'highValue'];
+
+    it('offers the four options the client listed', () => {
+      renderSpecialCare();
+
+      OPTIONS.forEach(option => {
+        expect(
+          screen.getByLabelText(`EditListingDetailsForm.specialCare.${option}`)
+        ).toBeInTheDocument();
+      });
+    });
+
+    // A separate request asked for a standalone "High Value item" checkbox. Two controls
+    // meaning the same thing can disagree, and nothing downstream could say which was right -
+    // so there is exactly one, and it is this one.
+    it('has exactly one high-value checkbox', () => {
+      renderSpecialCare();
+
+      expect(screen.getAllByLabelText('EditListingDetailsForm.specialCare.highValue')).toHaveLength(
+        1
+      );
+    });
+
+    it('offers the free-text note', () => {
+      renderSpecialCare();
+
+      expect(screen.getByLabelText('EditListingDetailsForm.specialCare.note')).toBeInTheDocument();
+    });
+
+    it('shows what the garment already carries', () => {
+      renderSpecialCare({
+        initialValues: {
+          ...listingTypes[0],
+          specialCareFlags: ['highValue', 'pressedPleats'],
+          specialCareNote: 'Loose hem',
+        },
+      });
+
+      expect(screen.getByLabelText('EditListingDetailsForm.specialCare.highValue')).toBeChecked();
+      expect(
+        screen.getByLabelText('EditListingDetailsForm.specialCare.pressedPleats')
+      ).toBeChecked();
+      expect(
+        screen.getByLabelText('EditListingDetailsForm.specialCare.embellishments')
+      ).not.toBeChecked();
+      expect(screen.getByLabelText('EditListingDetailsForm.specialCare.note')).toHaveValue(
+        'Loose hem'
+      );
+    });
+
+    // The renter never sees any of this, so the form says so where the owner is filling it in
+    // rather than leaving them to guess who reads it.
+    it('tells the owner who can see it', () => {
+      renderSpecialCare();
+
+      expect(screen.getByText('EditListingDetailsForm.specialCareHelp')).toBeInTheDocument();
+    });
+  });
 });

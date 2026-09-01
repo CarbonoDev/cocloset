@@ -14,11 +14,13 @@ import {
   isValidCurrencyForTransactionProcess,
 } from '../../../../util/fieldHelpers';
 import { maxLength, required, composeValidators } from '../../../../util/validators';
+import { SPECIAL_CARE_NOTE_MAX_LENGTH, SPECIAL_CARE_OPTIONS } from '../../../../util/specialCare';
 
 // Import shared components
 import {
   Form,
   Button,
+  FieldCheckbox,
   FieldSelect,
   FieldTextInput,
   Heading,
@@ -415,6 +417,60 @@ const FieldBrandAutocomplete = props => {
   );
 };
 
+/**
+ * SPECIAL CARE: what the studio needs to know before it washes the garment.
+ *
+ *   > "hay que agregar una sección 'Special Care' con un conjunto de check boxes ... Note to
+ *   >  Cleaner: ___ (Aqui se puede agregar texto libre)"
+ *
+ * Bespoke rather than a Console field, and it has to be: the data must reach the owner and the
+ * studio and nobody else, which is not a visibility Console can express. See util/specialCare.js
+ * for where it is stored and why that is the only option.
+ *
+ * ONE HIGH VALUE CHECKBOX. A separate request asked for a standalone one; this list already has
+ * it. Two controls meaning the same thing can disagree, and nothing downstream could say which
+ * was right.
+ *
+ * The note is capped and counted rather than left unbounded - it is read at a counter by
+ * somebody holding a garment, so a paragraph is worse than a sentence.
+ */
+const FieldSpecialCare = props => {
+  const { formId, intl } = props;
+
+  return (
+    <div className={css.specialCare}>
+      <Heading as="h3" rootClassName={css.specialCareTitle}>
+        {intl.formatMessage({ id: 'EditListingDetailsForm.specialCareTitle' })}
+      </Heading>
+      <p className={css.specialCareHelp}>
+        {intl.formatMessage({ id: 'EditListingDetailsForm.specialCareHelp' })}
+      </p>
+
+      {SPECIAL_CARE_OPTIONS.map(option => (
+        <FieldCheckbox
+          key={option}
+          id={`${formId}specialCare_${option}`}
+          name="specialCareFlags"
+          value={option}
+          label={intl.formatMessage({ id: `EditListingDetailsForm.specialCare.${option}` })}
+        />
+      ))}
+
+      <FieldTextInput
+        id={`${formId}specialCareNote`}
+        name="specialCareNote"
+        className={css.specialCareNote}
+        type="textarea"
+        maxLength={SPECIAL_CARE_NOTE_MAX_LENGTH}
+        label={intl.formatMessage({ id: 'EditListingDetailsForm.specialCare.note' })}
+        placeholder={intl.formatMessage({
+          id: 'EditListingDetailsForm.specialCare.notePlaceholder',
+        })}
+      />
+    </div>
+  );
+};
+
 const FieldOwnerAddress = props => {
   const { formId, intl } = props;
 
@@ -682,6 +738,13 @@ const EditListingDetailsForm = props => (
               intl={intl}
               pickField={key => !LISTING_FIELD_KEYS_BEFORE_TITLE.includes(key)}
             />
+          )}
+
+          {/* With the owner address: the other block on this tab that the renter never sees.
+              Keeping the two private things together is what stops somebody later assuming
+              everything on the page is public. */}
+          {showListingFields && isCompatibleCurrency && (
+            <FieldSpecialCare formId={formId} intl={intl} />
           )}
 
           {showOwnerAddress && showListingFields && isCompatibleCurrency && (

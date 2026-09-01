@@ -326,6 +326,91 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  //   > "Este dato solo debe ser visible para el provider y laundry, nadie mas"
+  //
+  // privateData is what keeps the renter out - publicData is visible to the world, and the
+  // studio reads listings through our own Integration-API endpoints rather than through the
+  // Marketplace API, so it can still be handed exactly these fields. See util/specialCare.js.
+  //
+  // This drives the SUBMIT rather than the helper, which has its own tests: the helper being
+  // correct and the panel never calling it look identical from the outside, and that is the
+  // failure this project keeps hitting.
+  // ---------------------------------------------------------------------------
+  it('writes special care into privateData, where the renter cannot reach it', async () => {
+    const user = userEvent.setup();
+    const { view, onCreateListingDraft } = renderTab(DETAILS, { images: [createImage('i')] });
+
+    await user.type(view.getByRole('textbox', { name: 'EditListingDetailsForm.title' }), 'A frock');
+    await user.type(
+      view.getByRole('textbox', { name: 'EditListingDetailsForm.description' }),
+      'Lorem ipsum'
+    );
+    await user.type(
+      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' }),
+      'Main Street 123'
+    );
+    await user.type(
+      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerCity' }),
+      'Springfield'
+    );
+    await user.type(
+      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerPostcode' }),
+      '12345'
+    );
+    await user.click(view.getByLabelText('EditListingDetailsForm.specialCare.highValue'));
+    await user.type(
+      view.getByLabelText('EditListingDetailsForm.specialCare.note'),
+      'Hand wash only'
+    );
+    await user.click(submitButton(view));
+
+    await waitFor(() => {
+      expect(onCreateListingDraft).toHaveBeenCalledTimes(1);
+    });
+
+    const submitted = onCreateListingDraft.mock.calls[0][0];
+    expect(submitted.privateData.specialCare).toEqual({
+      flags: ['highValue'],
+      note: 'Hand wash only',
+    });
+    // And NOT in publicData, which is the half of this that matters.
+    expect(submitted.publicData.specialCare).toBeUndefined();
+  });
+
+  // `null` REMOVES the key. Sharetribe only drops extended data when it is explicitly null, so
+  // an owner who unchecks everything has to send one - otherwise the old flags stay on the
+  // listing and the form silently disagrees with what the studio reads.
+  it('nulls special care when the owner has said nothing, so the key is removed', async () => {
+    const user = userEvent.setup();
+    const { view, onCreateListingDraft } = renderTab(DETAILS, { images: [createImage('i')] });
+
+    await user.type(view.getByRole('textbox', { name: 'EditListingDetailsForm.title' }), 'A frock');
+    await user.type(
+      view.getByRole('textbox', { name: 'EditListingDetailsForm.description' }),
+      'Lorem ipsum'
+    );
+    await user.type(
+      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' }),
+      'Main Street 123'
+    );
+    await user.type(
+      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerCity' }),
+      'Springfield'
+    );
+    await user.type(
+      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerPostcode' }),
+      '12345'
+    );
+    await user.click(submitButton(view));
+
+    await waitFor(() => {
+      expect(onCreateListingDraft).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onCreateListingDraft.mock.calls[0][0].privateData.specialCare).toBeNull();
+  });
+
   it('does not ask for the owner address when the process still has a location tab', async () => {
     // The flag is off for every process that kept its LOCATION step. Asking twice would be
     // bad enough; the real hazard is that submitting details would then overwrite a saved

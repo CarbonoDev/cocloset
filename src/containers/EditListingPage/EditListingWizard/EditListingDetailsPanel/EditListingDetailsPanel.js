@@ -27,6 +27,11 @@ import { H3, ListingLink } from '../../../../components';
 import ErrorMessage from './ErrorMessage';
 import { fetchBrands } from '../../../../util/api';
 import { normalizeBrandForStorage } from '../../../../util/brandValue';
+import {
+  specialCareFlags,
+  specialCareForStorage,
+  specialCareNote,
+} from '../../../../util/specialCare';
 
 import EditListingDetailsForm from './EditListingDetailsForm';
 import css from './EditListingDetailsPanel.module.css';
@@ -329,6 +334,11 @@ const getInitialValues = (
     // pick it up - it reads Console's own fields. Editing a garment has to show the brand it
     // already carries, or saving the tab would silently clear it.
     brand: publicData?.brand,
+    // Same for special care, which is not a Console field either and for a stronger reason -
+    // see util/specialCare.js. Flattened into two form fields because that is what the
+    // checkbox group and the textarea bind to; recombined on submit.
+    specialCareFlags: specialCareFlags(privateData),
+    specialCareNote: specialCareNote(privateData) || '',
     ...nestedCategories,
     // Transaction type info: listingType, transactionProcessAlias, unitType
     ...getTransactionInfo({ listingTypes, existingListingTypeInfo, preselectedListingType }),
@@ -524,6 +534,8 @@ const EditListingDetailsPanel = props => {
               ownerCity,
               ownerPostcode,
               brand,
+              specialCareFlags: submittedSpecialCareFlags,
+              specialCareNote: submittedSpecialCareNote,
               ...rest
             } = values;
 
@@ -577,6 +589,18 @@ const EditListingDetailsPanel = props => {
               ? {}
               : { brand: normalizeBrandForStorage(brand, brandOptions) };
 
+            // WHAT THE STUDIO NEEDS TO KNOW, kept out of the renter's reach.
+            //
+            // Always sent, even when empty, and `specialCareForStorage` returns null in that
+            // case: Sharetribe only drops an extended-data key when it is explicitly null, so
+            // an owner UNCHECKING every box has to send one. Omitting the key instead would
+            // leave the old flags on the listing and the form would silently disagree with
+            // what the studio reads.
+            const specialCare = specialCareForStorage({
+              flags: submittedSpecialCareFlags,
+              note: submittedSpecialCareNote,
+            });
+
             // New values for listing attributes
             const updateValues = {
               title: title.trim(),
@@ -589,7 +613,7 @@ const EditListingDetailsPanel = props => {
                 ...publicListingFields,
                 ...brandMaybe,
               },
-              privateData: { ...privateListingFields, ...ownerAddressMaybe },
+              privateData: { ...privateListingFields, ...ownerAddressMaybe, specialCare },
               ...setNoAvailabilityForUnbookableListings(transactionProcessAlias),
               ...setFullAvailabilityForCoclosetBooking(
                 transactionProcessAlias,
