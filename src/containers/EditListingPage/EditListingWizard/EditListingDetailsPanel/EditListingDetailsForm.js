@@ -740,16 +740,16 @@ const EditListingDetailsForm = props => (
             />
           )}
 
-          {/* With the owner address: the other block on this tab that the renter never sees.
-              Keeping the two private things together is what stops somebody later assuming
-              everything on the page is public. */}
+          {/* THE ONE BLOCK ON THIS TAB THE RENTER NEVER SEES. It is boxed for that reason -
+              the boundary between what the shop shows and what the studio is told should be
+              visible rather than something you have to know. See util/specialCare.js. */}
           {showListingFields && isCompatibleCurrency && (
             <FieldSpecialCare formId={formId} intl={intl} />
           )}
 
-          {showOwnerAddress && showListingFields && isCompatibleCurrency && (
+          {/* {showOwnerAddress && showListingFields && isCompatibleCurrency && (
             <FieldOwnerAddress formId={formId} intl={intl} />
-          )}
+          )} */}
 
           {!isCompatibleCurrency && listingType && (
             <p className={css.error}>

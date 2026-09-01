@@ -34,6 +34,7 @@ const LaundryInventory = props => {
     <ul className={css.inventoryGrid}>
       {inventory.map(item => {
         const labelKey = statusLabelKey(item);
+        const ticketCode = item.ticketCode;
         return (
           <li key={item.id} className={css.inventoryCard}>
             <div className={css.inventoryImage}>
@@ -49,6 +50,11 @@ const LaundryInventory = props => {
             <span className={css.secondaryText}>
               {item.currentRack || <FormattedMessage id="LaundryOpsPage.inventory.noRack" />}
             </span>
+            {ticketCode && item.state !== "delivered" && (
+              <span className={css.secondaryText}>
+                #{ticketCode}
+              </span>
+            )}
             {labelKey ? (
               <span className={classNames(css.statusBadge, css[`tone${statusTone(item)}`])}>
                 <FormattedMessage id={labelKey} />

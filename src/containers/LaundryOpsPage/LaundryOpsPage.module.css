@@ -665,6 +665,23 @@
 /* How many days this garment will take to clean, collected at the return step.
    Drives listing.metadata.readyAt and the availability block - see
    server/api/laundry-transaction-status.js. */
+.cleaningCodeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cleaningCodeSteps {
+  margin-bottom: 15px;
+}
+
+.cleaningCodeStep {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  line-height: 18px;
+  word-break: break-all;
+}
+
 .cleaningDaysField {
   display: flex;
   flex-direction: column;
