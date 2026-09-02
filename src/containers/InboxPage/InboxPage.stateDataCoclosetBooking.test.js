@@ -98,4 +98,57 @@ describe('InboxPage state data for cocloset-booking', () => {
       isSaleNotification: true,
     });
   });
+
+  // ------------------------------------------------------------------------
+  // The colour of the two endings.
+  //
+  //   > "cuando tenemos declined aparece en texto y background verde, puedes
+  //   >  ajustar para que si es aceptado permanezca verde, pero si es declined,
+  //   >  aparezca en tonalidades de rojo?" (Jonathan, 2026-09-02)
+  //
+  // The pill was green for every `isFinal` state, so a refused request wore the
+  // colour a reader reads as "fine". These assertions are what stops a state
+  // added later from quietly inheriting that.
+  // ------------------------------------------------------------------------
+  describe('the status tone', () => {
+    it.each(['declined', 'canceled', 'expired'])('is negative for %s', state => {
+      ROLES.forEach(role =>
+        expect(stateDataFor(TRANSITION_PER_STATE[state], role).tone).toBe('negative')
+      );
+    });
+
+    it.each(['accepted', 'reviewed'])('is positive for %s', state => {
+      ROLES.forEach(role =>
+        expect(stateDataFor(TRANSITION_PER_STATE[state], role).tone).toBe('positive')
+      );
+    });
+
+    it('leaves every state still in flight untoned', () => {
+      // A rental in progress is not a verdict. Colouring the whole chain would
+      // leave nothing for the two endings to stand out against.
+      [
+        'ready-for-pickup',
+        'picked-up',
+        'overdue',
+        'returned',
+        'cleaning',
+        'delivered',
+        'preauthorized',
+        'pending-payment',
+      ].forEach(state => {
+        ROLES.forEach(role =>
+          expect(stateDataFor(TRANSITION_PER_STATE[state], role).tone).toBeUndefined()
+        );
+      });
+    });
+
+    it('never marks a final state as both endings', () => {
+      Object.entries(TRANSITION_PER_STATE).forEach(([state, transition]) => {
+        ROLES.forEach(role => {
+          const { tone } = stateDataFor(transition, role);
+          expect([undefined, 'positive', 'negative']).toContain(tone);
+        });
+      });
+    });
+  });
 });

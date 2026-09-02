@@ -8,6 +8,7 @@ import {
 } from '../../transactions/transaction';
 
 import InboxTransactionPanel from './InboxTransactionPanel';
+import { getStateData } from './InboxPage.stateData';
 
 const { screen } = testingLibrary;
 
@@ -201,5 +202,69 @@ describe('InboxTransactionPanel: who gets the QR', () => {
       expect(qrButton()).not.toBeInTheDocument();
       view.unmount();
     });
+  });
+});
+
+// ==========================================================================
+// The status pill's colour.
+//
+// The state data decides the tone and has its own tests; this pins the WIRING,
+// which is the half that goes wrong on this project - a correct rule reached by
+// nobody looks exactly like a working feature. CSS Modules are stubbed in Jest
+// so the class name comes through as written, which is what makes it readable
+// here at all.
+// ==========================================================================
+describe('InboxTransactionPanel: the status pill', () => {
+  const pillAt = lastTransition => {
+    // The real state data, not a hand-written prop: the point is that the tone
+    // survives the whole path from the process state to the class name.
+    const transaction = {
+      ...transactionWith({}),
+      attributes: { ...transactionWith({}).attributes, lastTransition },
+    };
+    const stateData = getStateData({
+      transaction,
+      transactionRole: TX_TRANSITION_ACTOR_CUSTOMER,
+    });
+
+    const { container } = render(
+      <InboxTransactionPanel
+        transaction={transaction}
+        stateData={stateData}
+        transactionRole={TX_TRANSITION_ACTOR_CUSTOMER}
+        onManageDisableScrolling={() => null}
+      />
+    );
+    return container.querySelector('[class*="panelStatus"]');
+  };
+
+  it('is red on a declined request, not green', () => {
+    const pill = pillAt('transition/decline');
+
+    expect(pill.className).toContain('panelStatusNegative');
+    expect(pill.className).not.toContain('panelStatusFinal');
+  });
+
+  it.each(['transition/cancel', 'transition/expire'])(
+    'is red on %s too, so the endings match each other',
+    lastTransition => {
+      expect(pillAt(lastTransition).className).toContain('panelStatusNegative');
+    }
+  );
+
+  it('is green once the booking is accepted', () => {
+    expect(pillAt('transition/accept').className).toContain('panelStatusPositive');
+  });
+
+  it('is green on a rental that ran its course', () => {
+    expect(pillAt('transition/expire-review-period').className).toContain('panelStatusPositive');
+  });
+
+  it('leaves a rental in flight neutral', () => {
+    const pill = pillAt('transition/laundry-confirm-pickup');
+
+    expect(pill.className).not.toContain('panelStatusNegative');
+    expect(pill.className).not.toContain('panelStatusPositive');
+    expect(pill.className).not.toContain('panelStatusFinal');
   });
 });

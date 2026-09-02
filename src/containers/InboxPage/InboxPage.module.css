@@ -628,6 +628,20 @@
   color: var(--coclosetToneGreenFg);
 }
 
+/* The two endings, told apart. Green was on every final state, refusals included.
+   Critical is the same red the damage panel uses, so "this did not go ahead" reads
+   as one thing across the app. Colour is never the only signal - the pill always
+   carries the state's name. */
+.panelStatusPositive {
+  background-color: var(--coclosetToneGreenBg);
+  color: var(--coclosetToneGreenFg);
+}
+
+.panelStatusNegative {
+  background-color: var(--coclosetToneCriticalBg);
+  color: var(--coclosetToneCriticalFg);
+}
+
 /* The small QR. A thumbnail is not something a scanner can read, so its only job is to open
    the modal — which is why it is a button and looks like one you can press. */
 .panelQrButton {
@@ -935,4 +949,15 @@
 .stateConcluded {
   background-color: var(--coclosetToneGreenBg);
   color: var(--coclosetToneGreenFg);
+}
+
+/* Same two endings on the row in the list. See .panelStatusPositive. */
+.stateTonePositive {
+  background-color: var(--coclosetToneGreenBg);
+  color: var(--coclosetToneGreenFg);
+}
+
+.stateToneNegative {
+  background-color: var(--coclosetToneCriticalBg);
+  color: var(--coclosetToneCriticalFg);
 }

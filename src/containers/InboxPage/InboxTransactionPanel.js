@@ -163,8 +163,10 @@ const InboxTransactionPanel = props => {
           {stateData?.processName && stateData?.processState ? (
             <span
               className={classNames(css.panelStatus, {
-                [css.panelStatusAction]: stateData.actionNeeded,
-                [css.panelStatusFinal]: stateData.isFinal,
+                [css.panelStatusAction]: stateData.actionNeeded && !stateData.tone,
+                [css.panelStatusFinal]: stateData.isFinal && !stateData.tone,
+                [css.panelStatusPositive]: stateData.tone === 'positive',
+                [css.panelStatusNegative]: stateData.tone === 'negative',
               })}
             >
               <FormattedMessage

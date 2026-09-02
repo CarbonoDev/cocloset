@@ -29,7 +29,27 @@ import {
  *
  * `isFinal` marks the states nothing can leave. `delivered` is deliberately
  * NOT final: the review window opens there.
+ *
+ * ON `tone`
+ *   > "cuando tenemos declined aparece en texto y background verde, puedes
+ *   >  ajustar para que si es aceptado permanezca verde, pero si es declined,
+ *   >  aparezca en tonalidades de rojo?" (Jonathan, 2026-09-02)
+ *
+ * The pill was green for every `isFinal` state, so a refused request and a
+ * completed rental looked the same - and the one colour a reader takes as
+ * meaning "fine" was on the outcome that is not. `tone` says which kind of
+ * ending it was, and nothing else: it is presentation, and it does not decide
+ * whether a state is final or needs action.
+ *
+ *   negative - declined, cancelled, expired: the rental did not happen
+ *   positive - accepted, and the states after it that ended well
+ *
+ * Everything else has no tone and keeps the neutral pill. A state in flight is
+ * not a verdict, and colouring the whole chain would leave nothing for the two
+ * endings that matter to stand out against.
  */
+const NEGATIVE = 'negative';
+const POSITIVE = 'positive';
 export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
   const { transactionRole } = txInfo;
   const { processName, processState, states } = processInfo;
@@ -47,7 +67,7 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
         return { processName, processState, actionNeeded: true, isSaleNotification: true };
       })
       .cond([states.ACCEPTED, _], () => {
-        return { processName, processState };
+        return { processName, processState, tone: POSITIVE };
       })
 
       // ---- The laundry custody chain -------------------------------------
@@ -75,13 +95,13 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
 
       // ---- Terminal and review states ------------------------------------
       .cond([states.CANCELED, _], () => {
-        return { processName, processState, isFinal: true };
+        return { processName, processState, isFinal: true, tone: NEGATIVE };
       })
       .cond([states.DECLINED, _], () => {
-        return { processName, processState, isFinal: true };
+        return { processName, processState, isFinal: true, tone: NEGATIVE };
       })
       .cond([states.EXPIRED, _], () => {
-        return { processName, processState, isFinal: true };
+        return { processName, processState, isFinal: true, tone: NEGATIVE };
       })
       .cond([states.DELIVERED, _], () => {
         return { processName, processState, actionNeeded: true };
@@ -93,7 +113,9 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
         return { processName, processState, actionNeeded: true };
       })
       .cond([states.REVIEWED, _], () => {
-        return { processName, processState, isFinal: true };
+        // A rental that ran its whole course. Green, as it already was - what
+        // changed is that the refusals no longer share the colour with it.
+        return { processName, processState, isFinal: true, tone: POSITIVE };
       })
       .default(() => {
         // Default values for other states
