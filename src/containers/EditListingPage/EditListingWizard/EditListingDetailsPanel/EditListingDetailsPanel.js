@@ -564,15 +564,31 @@ const EditListingDetailsPanel = props => {
             // wizard has no LOCATION tab (cocloset-booking); everywhere else that tab
             // still owns the field, and sending it from here as well would overwrite a
             // saved address with three undefineds the first time details were edited.
-            const ownerAddressMaybe = captureOwnerAddress
-              ? {
-                  ownerAddress: {
-                    street: ownerStreet,
-                    city: ownerCity,
-                    postcode: ownerPostcode,
-                  },
-                }
-              : {};
+            //
+            // THE SECOND GUARD IS NOT REDUNDANT. `FieldOwnerAddress` was commented out of
+            // the form on 2026-08-25 ("Remove address field no longer needed on the partner
+            // flow"), but `captureOwnerAddress` stayed on - so every details save was sending
+            // `ownerAddress: {street: undefined, city: undefined, postcode: undefined}`, and
+            // the first edit of any listing with a stored address wiped it. Exactly the
+            // failure the comment above describes, arriving from the other direction.
+            //
+            // So: send the key only when there is something to send. If the field is put
+            // back, an existing address is seeded into the form by `getInitialValues` and
+            // saves as before. The trade is that an owner cannot clear their address by
+            // emptying all three inputs; that needs an explicit null, and no UI asks for it.
+            const hasOwnerAddress = [ownerStreet, ownerCity, ownerPostcode].some(
+              value => typeof value === 'string' && value.trim() !== ''
+            );
+            const ownerAddressMaybe =
+              captureOwnerAddress && hasOwnerAddress
+                ? {
+                    ownerAddress: {
+                      street: ownerStreet,
+                      city: ownerCity,
+                      postcode: ownerPostcode,
+                    },
+                  }
+                : {};
 
             // THE BRAND, SNAPPED ONTO A SPELLING THAT ALREADY EXISTS.
             //

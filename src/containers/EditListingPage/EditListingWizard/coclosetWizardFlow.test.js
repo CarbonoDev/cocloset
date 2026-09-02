@@ -182,18 +182,6 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
       view.getByRole('textbox', { name: 'EditListingDetailsForm.description' }),
       'Lorem ipsum'
     );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' }),
-      'Main Street 123'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerCity' }),
-      'Springfield'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerPostcode' }),
-      '12345'
-    );
 
     await user.click(submitButton(view));
 
@@ -223,18 +211,6 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
       view.getByRole('textbox', { name: 'EditListingDetailsForm.description' }),
       'Lorem ipsum'
     );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' }),
-      'Main Street 123'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerCity' }),
-      'Springfield'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerPostcode' }),
-      '12345'
-    );
     await user.click(submitButton(view));
 
     await waitFor(() => {
@@ -254,18 +230,6 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
     await user.type(
       view.getByRole('textbox', { name: 'EditListingDetailsForm.description' }),
       'Lorem ipsum'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' }),
-      'Main Street 123'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerCity' }),
-      'Springfield'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerPostcode' }),
-      '12345'
     );
     await user.click(submitButton(view));
 
@@ -290,10 +254,16 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
     });
   });
 
-  it('still captures privateData.ownerAddress now that the location tab is gone', async () => {
-    // The LOCATION tab was repurposed to hold the owner's OWN private shipping address -
-    // the counterpart of the public, laundry-derived pickup address. It has no downstream
-    // readers yet, which is exactly why losing it would be silent.
+  it('sends no ownerAddress at all while the field is not on the form', async () => {
+    // The LOCATION tab was repurposed to hold the owner's OWN private shipping address, and
+    // this test asserted it was captured. On 2026-08-25 the field was commented out of
+    // EditListingDetailsForm ("Remove address field no longer needed on the partner flow")
+    // while `captureOwnerAddress` stayed on, so every save was sending three undefineds -
+    // which, on a listing that already had an address, wiped it.
+    //
+    // What is asserted now is the guard, not the field: nothing rendered means nothing sent.
+    // Put FieldOwnerAddress back and the capture returns with it, which is why this is a
+    // "not sent" assertion rather than a deleted test.
     const user = userEvent.setup();
     const { view, onCreateListingDraft } = renderTab(DETAILS, { images: [createImage('i')] });
 
@@ -302,28 +272,19 @@ describe('cocloset-booking wizard: which tab creates the draft', () => {
       view.getByRole('textbox', { name: 'EditListingDetailsForm.description' }),
       'Lorem ipsum'
     );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' }),
-      'Main Street 123'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerCity' }),
-      'Springfield'
-    );
-    await user.type(
-      view.getByRole('textbox', { name: 'EditListingDetailsForm.ownerPostcode' }),
-      '12345'
-    );
     await user.click(submitButton(view));
 
     await waitFor(() => {
       expect(onCreateListingDraft).toHaveBeenCalledTimes(1);
     });
-    expect(onCreateListingDraft.mock.calls[0][0].privateData.ownerAddress).toEqual({
-      street: 'Main Street 123',
-      city: 'Springfield',
-      postcode: '12345',
-    });
+
+    const { privateData } = onCreateListingDraft.mock.calls[0][0];
+    expect(privateData).not.toHaveProperty('ownerAddress');
+    // And the field really is off the form - if it comes back, this line fails and the
+    // assertion above needs to become the original one again.
+    expect(
+      view.queryByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' })
+    ).not.toBeInTheDocument();
   });
 
   // ---------------------------------------------------------------------------
@@ -772,18 +733,23 @@ describe('cocloset-booking wizard: the single-listing-type dependency', () => {
     });
   });
 
-  it('asks for the owner address on the details panel, but only for this process', async () => {
-    // The gate is the process, not the panel: EditListingWizard turns the capture on only
-    // when the resolved process is cocloset-booking AND its tab list has no LOCATION step.
-    // Turning it on unconditionally would ask every marketplace's owners twice and - worse -
-    // overwrite an address saved on the location tab with three undefineds.
+  it('asks no owner address on either process, and keeps LOCATION only on the stock one', async () => {
+    // This asserted the owner-address field on cocloset-booking and its absence on
+    // default-booking. The field itself is gone from the form (2026-08-25), so what is left
+    // to protect is the CONDITION the capture was gated on: cocloset-booking has no LOCATION
+    // tab, default-booking still does. Losing that is what would make the two processes ask
+    // for - or silently drop - the same address twice.
     const cocloset = renderWizard([garmentRentalListingType], DETAILS, [createImage('image-1')]);
 
     await waitFor(() => {
       expect(
-        cocloset.getByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' })
+        cocloset.getByRole('textbox', { name: 'EditListingDetailsForm.title' })
       ).toBeInTheDocument();
     });
+    expect(cocloset.queryByText('EditListingWizard.tabLabelLocation')).not.toBeInTheDocument();
+    expect(
+      cocloset.queryByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' })
+    ).not.toBeInTheDocument();
     cocloset.unmount();
 
     // `daily-booking` has no entry in LISTING_TYPE_PROCESS_OVERRIDES, so it stays on
@@ -807,6 +773,7 @@ describe('cocloset-booking wizard: the single-listing-type dependency', () => {
         stockBooking.getByRole('textbox', { name: 'EditListingDetailsForm.title' })
       ).toBeInTheDocument();
     });
+    expect(stockBooking.getByText('EditListingWizard.tabLabelLocation')).toBeInTheDocument();
     expect(
       stockBooking.queryByRole('textbox', { name: 'EditListingDetailsForm.ownerStreet' })
     ).not.toBeInTheDocument();
