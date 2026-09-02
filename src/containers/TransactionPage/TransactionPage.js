@@ -1052,6 +1052,7 @@ export const TransactionPageComponent = props => {
           sendReviewInProgress={sendReviewInProgress}
           sendReviewError={sendReviewError}
           marketplaceName={config.marketplaceName}
+          isCustomerRole={isCustomerRole}
         />
         {process?.transitions?.REPORT ? (
           <ReportModal

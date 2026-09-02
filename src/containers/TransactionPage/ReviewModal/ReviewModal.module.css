@@ -13,11 +13,6 @@
   flex-grow: 1;
 }
 
-/* Icon of the modal */
-.modalIcon {
-  composes: marketplaceModalIconStyles from global;
-}
-
 /* Title of the modal */
 .modalTitle {
   composes: marketplaceModalTitleStyles from global;
@@ -30,4 +25,10 @@
 /* Paragraph for the Modal */
 .modalMessage {
   composes: marketplaceModalParagraphStyles from global;
+}
+
+/* The "reviews take up to 7 days to appear" note: same paragraph rhythm, quieter. */
+.modalNote {
+  composes: marketplaceModalParagraphStyles from global;
+  color: var(--colorGrey700);
 }

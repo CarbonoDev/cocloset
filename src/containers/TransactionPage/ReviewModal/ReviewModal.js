@@ -3,7 +3,7 @@ import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { propTypes } from '../../../util/types';
-import { IconReviewUser, Modal } from '../../../components';
+import { Modal } from '../../../components';
 
 import ReviewForm from '../ReviewForm/ReviewForm';
 
@@ -26,6 +26,7 @@ import css from './ReviewModal.module.css';
  * @param {boolean} props.sendReviewInProgress - Whether the send review is in progress
  * @param {propTypes.error} props.sendReviewError - The send review error
  * @param {string} props.marketplaceName - The marketplace name
+ * @param {boolean} [props.isCustomerRole] - Whether the reviewer is the renter
  * @returns {JSX.Element} The ReviewModal component
  */
 const ReviewModal = props => {
@@ -44,6 +45,7 @@ const ReviewModal = props => {
     reviewSent = false,
     sendReviewInProgress = false,
     sendReviewError,
+    isCustomerRole = false,
   } = props;
 
   const classes = classNames(rootClassName || css.root, className);
@@ -62,13 +64,31 @@ const ReviewModal = props => {
       usePortal
       closeButtonMessage={closeButtonMessage}
     >
-      <IconReviewUser className={css.modalIcon} />
       <p className={css.modalTitle}>
         <FormattedMessage id="ReviewModal.title" values={{ revieweeName: reviewee }} />
       </p>
-      <p className={css.modalMessage}>
-        <FormattedMessage id="ReviewModal.description" values={{ marketplaceName }} />
-      </p>
+      {isCustomerRole ? (
+        // The renter is prompted on the two things a future renter reads a
+        // review for - fit and the lender - rather than on "what went well".
+        <>
+          <p className={css.modalMessage}>
+            <FormattedMessage id="ReviewModal.customerDescription" />
+          </p>
+          <p className={css.modalMessage}>
+            <FormattedMessage id="ReviewModal.customerFit" />
+          </p>
+          <p className={css.modalMessage}>
+            <FormattedMessage id="ReviewModal.customerLender" />
+          </p>
+          <p className={css.modalNote}>
+            <FormattedMessage id="ReviewModal.customerPublishDelay" />
+          </p>
+        </>
+      ) : (
+        <p className={css.modalMessage}>
+          <FormattedMessage id="ReviewModal.description" values={{ marketplaceName }} />
+        </p>
+      )}
       <ReviewForm
         onSubmit={onSubmitReview}
         reviewSent={reviewSent}

@@ -107,6 +107,14 @@ const DamageReportedMaybe = props => {
           {note ? note : <FormattedMessage id="TransactionPanel.damageReported.noteMissing" />}
         </p>
       </div>
+      {/* The marketplace's own position on the report, identical for both
+          roles because it is a statement about what CoCloset will do, not
+          about what either party did. It supersedes the "no compensation
+          outcome is defined" caveat in the header comment: the client stated
+          one on 2026-09-02. */}
+      <p className={css.coclosetUpdate}>
+        <FormattedMessage id="TransactionPanel.damageReported.coclosetUpdate" />
+      </p>
       <p className={css.nextSteps}>
         <FormattedMessage id={`TransactionPanel.damageReported.${roleKey}.nextSteps`} />
       </p>
