@@ -25,6 +25,17 @@
                   <li style="margin:0 0 8px">{{#if listing.public-data.assignedLaundryName}}{{t "BookingReadyForPickup.StepVisit" "Head to {laundryName} during regular business hours." laundryName=listing.public-data.assignedLaundryName}}{{else}}{{t "BookingReadyForPickup.StepVisitNoLaundry" "Head to the laundry during regular business hours."}}{{/if}}</li>
                   <li style="margin:0">{{t "BookingReadyForPickup.StepQr" "Show your pickup QR code at the counter."}}</li>
                 </ul>
+                <table style="margin:24px 0 0;background-color:#FAF7F2;border-radius:8px" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                  <tbody>
+                    <tr>
+                      <td align="center" style="padding:20px 16px">
+                        <img src="{{marketplace.url}}/api/transaction-qr?id={{url-encode id}}" width="180" height="180" alt="{{t "TransactionEmails.HandoverQrAlt" "Your pickup and return QR code"}}" style="display:block;margin:0 auto;border:0;width:180px;height:180px;max-width:100%" />
+                        <p style="font-size:14px;line-height:1.5;margin:12px 0 0;color:#484848">{{t "TransactionEmails.HandoverQrCaption" "Show this code at the counter. The same code works for the pickup and for the return."}}</p>
+                        <p style="font-size:13px;line-height:1.5;margin:8px 0 0;color:#767676">{{t "TransactionEmails.HandoverQrFallback" "No image above? Your email app is blocking pictures. Open your order page for the code, or read this reference out at the counter:"}} <span style="font-family:monospace;color:#484848">{{id}}</span></p>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
                 <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
                     <tr>

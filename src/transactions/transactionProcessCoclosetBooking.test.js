@@ -1344,6 +1344,80 @@ describe('cocloset-booking email templates', () => {
   });
 
   // -----------------------------------------------------------------------
+  // The handover QR, in the mail itself (Jonathan, 2026-09-02).
+  //
+  // `<img src="{{marketplace.url}}/api/transaction-qr?id=...">`. That endpoint
+  // renders PNG bytes and takes no authentication by design (server/api/
+  // transaction-qr.js: it encodes the handover URL for an id the caller already
+  // supplied, so there is nothing for an auth check to protect) - which is what
+  // makes it renderable from a mail client at all.
+  //
+  // WHICH TEMPLATES, AND WHY NOT ALL OF THEM. The QR belongs in the mails that
+  // send the renter to a counter, and only while the code is still live: the
+  // customer's window is accepted -> ready-for-pickup -> picked-up -> overdue
+  // (HANDOVER_QR_CUSTOMER_VISIBLE_STATES). A code printed in the owner's mail,
+  // or in one that arrives after the garment is back, is at best noise.
+  // -----------------------------------------------------------------------
+  describe('the QR is in the mails that send the renter to a counter', () => {
+    const QR_TEMPLATES = [
+      'booking-ready-for-pickup',
+      'booking-pickup-reminder',
+      'booking-return-reminder',
+      'booking-late-return',
+    ];
+
+    const hasQr = name => read(name, 'html.html').includes('/api/transaction-qr?id=');
+
+    // Every :notifications entry that sends a given template, as { role }.
+    // Comments are stripped first - this section is mostly prose, and a
+    // `:template :...` written inside it would otherwise read as data.
+    const notificationEntriesForTemplate = template => {
+      const withoutComments = fs
+        .readFileSync(EDN_PATH, 'utf8')
+        .split('\n')
+        .map(line => line.replace(/;;.*$/, ''))
+        .join('\n');
+
+      return withoutComments
+        .slice(withoutComments.indexOf('\n :notifications'))
+        .split(/\{:name\s+:notification\//)
+        .slice(1)
+        .filter(chunk => chunk.includes(`:template :${template}}`))
+        .map(chunk => ({ role: chunk.match(/:to :actor\.role\/([a-z]+)/)[1] }));
+    };
+
+    it.each(QR_TEMPLATES)('%s renders the code', name => {
+      const html = read(name, 'html.html');
+
+      expect(hasQr(name)).toEqual(true);
+      // The id has to be url-encoded like every other use of it in these
+      // templates, and the image needs an alt - a QR is a picture of a string,
+      // so an empty alt tells a screen reader nothing at all.
+      expect(html).toContain('/api/transaction-qr?id={{url-encode id}}');
+      expect(html).toContain('TransactionEmails.HandoverQrAlt');
+      // Mail clients block remote images by default, so the code cannot be the
+      // only way through: the reference is printed as text underneath.
+      expect(html).toContain('TransactionEmails.HandoverQrFallback');
+    });
+
+    it('is in no other template', () => {
+      const others = fs.readdirSync(TEMPLATES_DIR).filter(name => !QR_TEMPLATES.includes(name));
+
+      expect(others.filter(hasQr)).toEqual([]);
+    });
+
+    it('goes only to the customer, and only while the code is still live', () => {
+      // The states those four mails are sent in, read off the process rather
+      // than asserted from memory.
+      QR_TEMPLATES.forEach(template => {
+        const entries = notificationEntriesForTemplate(template);
+        expect(entries.length).toBeGreaterThan(0);
+        entries.forEach(entry => expect(entry.role).toEqual('customer'));
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // The sign-off (Jonathan, 2026-09-02: "puedes agregar esto a todos los
   // correos?"). Every template in this process ends the same way, so the test
   // is over the whole directory rather than over a list - a template added
