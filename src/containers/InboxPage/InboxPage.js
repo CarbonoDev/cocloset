@@ -178,6 +178,7 @@ export const InboxItem = props => {
     isSaleNotification,
     isOrderNotification,
     isFinal,
+    tone,
   } = stateData;
   const isCustomer = transactionRole === TX_TRANSITION_ACTOR_CUSTOMER;
 
@@ -196,9 +197,16 @@ export const InboxItem = props => {
   const linkClasses = classNames(css.itemLink, {
     [css.bannedUserLink]: isOtherUserBanned,
   });
+  // `stateConcluded` is the green pill, and it used to be applied to every final
+  // state - so a declined request and a completed rental read the same. A tone,
+  // where the process supplies one, decides the colour instead; `stateConcluded`
+  // is suppressed rather than overridden, so the result does not depend on which
+  // rule happens to come last in the stylesheet.
   const stateClasses = classNames(css.stateName, {
-    [css.stateConcluded]: isFinal,
-    [css.stateActionNeeded]: actionNeeded,
+    [css.stateConcluded]: isFinal && !tone,
+    [css.stateTonePositive]: tone === 'positive',
+    [css.stateToneNegative]: tone === 'negative',
+    [css.stateActionNeeded]: actionNeeded && !tone,
     [css.stateNoActionNeeded]: !actionNeeded,
   });
 

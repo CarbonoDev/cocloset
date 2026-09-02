@@ -23,6 +23,10 @@ export const stateDataShape = shape({
   actionNeeded: bool,
   isFinal: bool,
   isSaleNotification: bool,
+  // 'positive' | 'negative'. How the status pill is coloured, and nothing more -
+  // see InboxPage.stateDataCoclosetBooking.js. Optional, so a process that does
+  // not set it keeps the neutral/green pill it has today.
+  tone: string,
 });
 
 // Translated name of the state of the given transaction
