@@ -26,6 +26,7 @@
                     </tr>
                   </tbody>
                 </table>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700">{{t "BookingReturnCompleted.CoclosetUpdate" "CoCloset Update: We're reviewing a condition note from the dry cleaner regarding this garment. Rest assured, if any significant damage occurred, CoCloset covers the cost to make it right. We'll update you shortly."}}</p>
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompleted.DamageNextSteps" "{marketplaceName} has been notified and the renter has been told a report was filed. Nothing has been charged to anyone and no decision has been made yet. Review the note, and reply on the order page if you disagree with it or want to add photos." marketplaceName=marketplace.name}}</p>
                 {{else}}
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompleted.Content" "The laundry has received {listingTitle} back from {customerDisplayName} and recorded its condition. They reported no damage. Cleaning starts next." listingTitle=listing.title dateStart=booking.start dateEnd=(date-transform booking.end days=-1) customerDisplayName=customer.display-name}}</p>
@@ -43,6 +44,8 @@
                   </tbody>
                 </table>
                 {{/with}}
+                <p style="font-size:16px;line-height:1.4;margin:24px 0 0;color:#484848">{{t "TransactionEmails.SignOff" "Warmly,"}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:4px 0 0;color:#484848">{{t "TransactionEmails.SignOffTeam" "The {marketplaceName} Team" marketplaceName=marketplace.name}}</p>
                 <div>
                   <hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#E1E1E1;margin:20px 0" />
                   <p style="font-size:12px;line-height:15px;margin:0 auto;color:#b7b7b7;text-align:left;margin-bottom:50px">{{t "TransactionEmails.MembershipParagraph" "You're a member of {marketplaceName}. If you no longer want to receive these emails, please contact {marketplaceName} team." marketplaceName=marketplace.name }}</p>

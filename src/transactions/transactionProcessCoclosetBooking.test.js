@@ -540,6 +540,78 @@ describe('cocloset-booking owner notifications', () => {
     expect(notificationsOn(transitions.LAUNDRY_START_QUALITY_INSPECTION)).toEqual([]);
   });
 
+  // -----------------------------------------------------------------------
+  // The review reminder (Jonathan, 2026-09-02: "un reminder al customer si no
+  // ha hecho su review en 3 dias despues de haber devuelto la prenda").
+  //
+  // Sharetribe schedules a notification against ONE transition, so "three days
+  // after the review window opens" is one entry per way of reaching
+  // :state/delivered - the same shape as the review-period mails above, and
+  // the same failure mode: a way in that nobody added an entry for is a renter
+  // who is never reminded.
+  // -----------------------------------------------------------------------
+  describe('the renter is reminded to review, three days in', () => {
+    const process = getProcess(COCLOSET_BOOKING_PROCESS_NAME);
+    const ednText = () => fs.readFileSync(EDN_PATH, 'utf8');
+
+    const reminderOn = transition =>
+      notificationEntriesOn(transition).filter(e => e.template === 'booking-review-reminder');
+
+    it('covers every way of reaching delivered, not a list of our own', () => {
+      process.getTransitionsToStates([states.DELIVERED]).forEach(transition => {
+        const reminders = reminderOn(transition);
+        expect(reminders.length).toEqual(1);
+        expect(reminders[0].role).toEqual('customer');
+      });
+    });
+
+    it('survives the owner reviewing first', () => {
+      // review-1-by-provider leaves :state/delivered, which cancels everything
+      // scheduled there - including a reminder the renter still needs, since
+      // review-2-by-customer is open from :state/reviewed-by-provider.
+      const reminders = reminderOn(transitions.REVIEW_1_BY_PROVIDER);
+      expect(reminders.length).toEqual(1);
+      expect(reminders[0].role).toEqual('customer');
+    });
+
+    it('is never scheduled where the renter cannot review yet', () => {
+      // The literal reading of "three days after they returned the garment".
+      // At :state/returned there is no review transition to point at.
+      expect(reminderOn(transitions.LAUNDRY_CONFIRM_RETURN)).toEqual([]);
+      expect(reminderOn(transitions.LAUNDRY_CONFIRM_RETURN_LATE)).toEqual([]);
+      expect(reminderOn(transitions.LAUNDRY_MARK_PENDING_CLEANING)).toEqual([]);
+    });
+
+    it('is never sent to the owner', () => {
+      const toProvider = ednText()
+        .split(/\{:name\s+:notification\//)
+        .slice(1)
+        .filter(chunk => chunk.includes(':template :booking-review-reminder'))
+        .filter(chunk => chunk.includes(':to :actor.role/provider'));
+
+      expect(toProvider).toEqual([]);
+    });
+
+    it('lands inside the review window it is reminding about', () => {
+      // The window is seven days from :state/delivered
+      // (:transition/expire-review-period), and the reminder is keyed off the
+      // same timepoint - so a reminder that arrives after the window closed
+      // can only happen if these two periods drift apart.
+      const reminderChunks = ednText()
+        .split(/\{:name\s+:notification\//)
+        .slice(1)
+        .filter(chunk => chunk.includes(':template :booking-review-reminder'));
+
+      expect(reminderChunks.length).toBeGreaterThan(0);
+      reminderChunks.forEach(chunk => {
+        expect(chunk).toContain(':time/first-entered-state :state/delivered');
+        expect(chunk).toContain(':fn/period ["P3D"]');
+      });
+      expect(ednText()).toContain(':name :transition/expire-review-period');
+      expect(ednText()).toMatch(/expire-review-period[\s\S]*?:fn\/period \["P7D"\]/);
+    });
+  });
+
   it('tells the owner about the money on the transition that moves it', () => {
     expect(notificationsOn(transitions.LAUNDRY_MARK_PENDING_CLEANING)).toContain(
       'booking-money-paid-on-cleaning-start'
@@ -675,6 +747,66 @@ describe('cocloset-booking email templates', () => {
     const referenced = new Set(referencedTemplates());
     fs.readdirSync(TEMPLATES_DIR).forEach(dir => {
       expect(referenced.has(dir)).toEqual(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // ext/transaction-processes/cocloset-booking/email-texts.en.json
+  //
+  // The English that ships in these templates, extracted as one file the
+  // operator can paste into Console's `content/email-texts.json` (Jonathan,
+  // 2026-09-02). It is generated, so its only real risk is going stale: a key
+  // reworded in a template and not here would send the operator a value that
+  // no longer matches the mail. Hence a test rather than a comment.
+  // -------------------------------------------------------------------------
+  describe('email-texts.en.json', () => {
+    const EMAIL_TEXTS_PATH = path.resolve(
+      __dirname,
+      '../../ext/transaction-processes/cocloset-booking/email-texts.en.json'
+    );
+
+    // Every `{{t "Key" "default"}}` pair across every template, keyed by key.
+    const defaultsInTemplates = () => {
+      const found = {};
+      const conflicts = [];
+      fs.readdirSync(TEMPLATES_DIR)
+        .sort()
+        .forEach(name => {
+          ['subject.txt', 'html.html'].forEach(part => {
+            const source = read(name, part);
+            const re = /\{\{t "([A-Za-z.]+)" "((?:[^"\\]|\\.)*)"/g;
+            let match;
+            while ((match = re.exec(source)) !== null) {
+              const [, key, value] = match;
+              if (found[key] !== undefined && found[key] !== value) {
+                conflicts.push(`${key} in ${name}`);
+              }
+              found[key] = value;
+            }
+          });
+        });
+      return { found, conflicts };
+    };
+
+    it('holds exactly the keys and defaults the templates use', () => {
+      const { found } = defaultsInTemplates();
+      const file = JSON.parse(fs.readFileSync(EMAIL_TEXTS_PATH, 'utf8'));
+
+      expect(Object.keys(found).length).toBeGreaterThan(150);
+      expect(file).toEqual(found);
+    });
+
+    it('gives a shared key one default across every template that uses it', () => {
+      // `TransactionEmails.*` keys appear in all 26 templates. Two different
+      // defaults for one key means Console can only ever match one of them,
+      // and the file above cannot represent both.
+      const { conflicts } = defaultsInTemplates();
+      expect(conflicts).toEqual([]);
+    });
+
+    it('is sorted, so a regeneration diffs as the strings that changed', () => {
+      const file = JSON.parse(fs.readFileSync(EMAIL_TEXTS_PATH, 'utf8'));
+      expect(Object.keys(file)).toEqual([...Object.keys(file)].sort());
     });
   });
 
@@ -998,5 +1130,261 @@ describe('cocloset-booking email templates', () => {
     const payoutSentences = copy.split(/(?<=[.!?])\s+/).filter(s => /payout/i.test(s));
     expect(payoutSentences.length).toBeGreaterThan(1);
     payoutSentences.forEach(sentence => expect(sentence).toMatch(/\b(no|not|never)\b/i));
+  });
+
+  // -----------------------------------------------------------------------
+  // Ready for pickup.
+  //
+  // The client dictated this email's shape (Jonathan, 2026-09-02): subject
+  // "Ready for pickup: Your <listing> rental", a first-name greeting, one
+  // sentence naming the studio, then the two steps and a CTA that says the QR
+  // is behind it. The assertions below are about the parts that can silently
+  // break - the two data paths (`customer.first-name`, the studio name off the
+  // listing's publicData) and the fallback arm - not about the wording.
+  // -----------------------------------------------------------------------
+  describe('booking-ready-for-pickup follows the format the client asked for', () => {
+    const html = () => read('booking-ready-for-pickup', 'html.html');
+
+    it('leads with the listing name in the subject and the heading', () => {
+      const subject = read('booking-ready-for-pickup', 'subject.txt');
+
+      expect(subject).toContain('BookingReadyForPickup.Subject');
+      expect(subject).toMatch(/Ready for pickup: Your \{listingTitle\} rental/);
+      expect(subject).toContain('listingTitle=transaction.listing.title');
+      expect(html()).toMatch(
+        /BookingReadyForPickup\.Title" "Ready for pickup: Your \{listingTitle\}/
+      );
+    });
+
+    it('greets the renter by first name, not by display name', () => {
+      // `display-name` is the abbreviated public name ("Jonathan O"), which is
+      // not what "Hi [First Name]" asks for. Both are available on the
+      // customer, so the wrong one would render perfectly well.
+      expect(html()).toContain('firstName=customer.first-name');
+      expect(html()).toContain('BookingReadyForPickup.Greeting');
+      expect(html()).not.toContain('customer.display-name');
+    });
+
+    it('names the studio, and still reads if the listing has no name for it', () => {
+      // Arm names come from the damage-branch helper; here the split is on the
+      // studio name, so they read as with-studio / without-studio.
+      const { whenDamaged: withStudio, whenClean: withoutStudio } = splitIfBlock(
+        html(),
+        'listing.public-data.assignedLaundryName'
+      );
+
+      // `assignedLaundryName` is server-written onto the listing when a laundry
+      // is assigned (server/api-util/laundryAssignment.js) and is null when the
+      // studio has neither a studio name nor a display name. Unbranched, that
+      // renders "ready for pickup at ." to the renter.
+      expect(withStudio).toContain('laundryName=listing.public-data.assignedLaundryName');
+      expect(withStudio).toContain('BookingReadyForPickup.Content"');
+      expect(withStudio).toContain('BookingReadyForPickup.StepVisit"');
+
+      expect(withoutStudio).toContain('BookingReadyForPickup.ContentNoLaundry');
+      expect(withoutStudio).toContain('BookingReadyForPickup.StepVisitNoLaundry');
+      // The fallback arm must not carry a placeholder it is never given.
+      expect(withoutStudio).not.toContain('{laundryName}');
+    });
+
+    it('gives the two pickup steps and a CTA that says the QR is behind it', () => {
+      const copy = copyOf('booking-ready-for-pickup');
+
+      expect(html()).toContain('BookingReadyForPickup.StepsTitle');
+      expect(copy).toMatch(/How to pick it up:/);
+      expect(copy).toMatch(/during regular business hours/i);
+      // The QR lives on the order page (HandoverQrMaybe), which is where the
+      // button goes - so the button is allowed to promise it.
+      expect(copy).toMatch(/QR code at the counter/i);
+      expect(html()).toMatch(/BookingReadyForPickup\.Cta" "View Order Details & QR Code"/);
+    });
+
+    it('routes every string through {{t}} with its own key prefix', () => {
+      const keys = (html().match(/\{\{t "([A-Za-z.]+)"/g) || []).map(m =>
+        m.replace(/\{\{t "/, '').replace(/"$/, '')
+      );
+
+      expect(keys.length).toBeGreaterThan(0);
+      keys
+        .filter(key => !key.startsWith('TransactionEmails.'))
+        .forEach(key => expect(key.startsWith('BookingReadyForPickup.')).toEqual(true));
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // The return receipt to the renter.
+  //
+  // Same client-dictated shape as ready-for-pickup (Jonathan, 2026-09-02), but
+  // this template already branched on the damage flag, and the new copy - "your
+  // return is officially complete", a review invitation, "we can't wait to see
+  // what you rent next" - is only true on the undamaged side. What these
+  // assertions protect is that separation.
+  // -----------------------------------------------------------------------
+  describe('booking-return-completed-customer invites a review, on the clean side only', () => {
+    const armsOf = () =>
+      splitIfBlock(
+        read('booking-return-completed-customer', 'html.html'),
+        'metadata.damageReported.flag'
+      );
+
+    it('greets the renter by first name, before either branch', () => {
+      const html = read('booking-return-completed-customer', 'html.html');
+      const { whenDamaged, whenClean } = armsOf();
+
+      expect(html).toContain('BookingReturnCompletedCustomer.Greeting');
+      expect(html).toContain('firstName=customer.first-name');
+      // Outside the branch, so a damage report is not the one email that opens
+      // without a name.
+      expect(whenDamaged).not.toContain('Greeting');
+      expect(whenClean).not.toContain('Greeting');
+    });
+
+    it('names the studio that took the garment in, with a fallback', () => {
+      const { whenClean } = armsOf();
+
+      expect(whenClean).toContain('laundryName=listing.public-data.assignedLaundryName');
+      expect(whenClean).toContain('BookingReturnCompletedCustomer.ContentNoLaundry');
+      expect(copyOf('booking-return-completed-customer')).toMatch(/safely dropped off/i);
+    });
+
+    it('keeps the closing warmth off the damage report', () => {
+      const { whenDamaged, whenClean } = armsOf();
+
+      // "We can't wait to see what you rent next!" under a damage report is
+      // the tone failure this guards.
+      expect(whenClean).toContain('BookingReturnCompletedCustomer.Closing');
+      expect(whenDamaged).not.toContain('BookingReturnCompletedCustomer.Closing');
+    });
+
+    it('does not invite a review here, because the form does not exist yet', () => {
+      // Jonathan chose option (a) on 2026-09-02: this mail fires at
+      // :state/returned, and review-1-by-customer only opens at
+      // :state/delivered. It promises the invitation instead of faking it.
+      const html = read('booking-return-completed-customer', 'html.html');
+
+      expect(html).not.toContain('CtaReview');
+      expect(html).not.toMatch(/Leave a Review/i);
+      expect(html).toContain('BookingReturnCompletedCustomer.Cta" "View order details"');
+      expect(armsOf().whenClean).toContain('BookingReturnCompletedCustomer.ReviewLater');
+    });
+
+    it('says CoCloset covers significant damage, on the damaged side', () => {
+      const { whenDamaged, whenClean } = armsOf();
+
+      expect(whenDamaged).toContain('BookingReturnCompletedCustomer.CoclosetUpdate');
+      expect(copyOf('booking-return-completed-customer')).toMatch(/CoCloset covers the cost/);
+      // A renter whose return was clean has no condition note to reassure
+      // them about.
+      expect(whenClean).not.toContain('CoclosetUpdate');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Where the review invitation actually lives.
+  //
+  // booking-review-by-customer-wanted fires on every transition into
+  // :state/delivered - the moment the review form appears on the order page -
+  // so the client's review copy belongs here, not on the return receipt.
+  //
+  // NEW KEYS, NOT REWORDED ONES. `BookingReviewByCustomerWanted.Title`,
+  // `.Content` and `.Cta` already exist in Console, and Console overrides the
+  // inline default. Rewording them in the repo would have changed nothing that
+  // a renter reads. The same reasoning that retired
+  // `BookingReturnCompleted.Payout`.
+  // -----------------------------------------------------------------------
+  describe('booking-review-by-customer-wanted carries the review prompts', () => {
+    const html = () => read('booking-review-by-customer-wanted', 'html.html');
+
+    it("asks the client's two questions, by first name", () => {
+      const copy = copyOf('booking-review-by-customer-wanted');
+
+      expect(html()).toContain('firstName=customer.first-name');
+      expect(copy).toMatch(/How did everything go\?/);
+      expect(copy).toMatch(/How true to size was/i);
+      expect(html()).toContain('providerDisplayName=provider.display-name');
+    });
+
+    it('uses keys Console does not already override', () => {
+      // If this fails, the copy below is dead text: Console wins.
+      ['Heading', 'Greeting', 'Intro', 'ReviewFit', 'ReviewLender', 'CtaReview'].forEach(key =>
+        expect(html()).toContain(`BookingReviewByCustomerWanted.${key}`)
+      );
+      expect(html()).not.toContain('BookingReviewByCustomerWanted.Title"');
+      expect(html()).not.toContain('BookingReviewByCustomerWanted.Content"');
+      expect(html()).not.toContain('BookingReviewByCustomerWanted.Cta"');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // The pickup reminder (Jonathan, 2026-09-02).
+  // -----------------------------------------------------------------------
+  it('booking-pickup-reminder names the studio and the start date', () => {
+    const html = read('booking-pickup-reminder', 'html.html');
+    const copy = copyOf('booking-pickup-reminder');
+
+    expect(html).toContain('firstName=customer.first-name');
+    expect(copy).toMatch(/Make room in your closet!/);
+    expect(copy).toMatch(/rental starts tomorrow on/i);
+    // Same null-studio fallback as the other two studio-naming templates.
+    expect(html).toContain('laundryName=listing.public-data.assignedLaundryName');
+    expect(html).toContain('BookingPickupReminder.ContentNoLaundry');
+  });
+
+  it('booking-return-completed tells the owner CoCloset covers the damage', () => {
+    const arms = splitIfBlock(
+      read('booking-return-completed', 'html.html'),
+      'metadata.damageReported.flag'
+    );
+
+    expect(read('booking-return-completed', 'html.html')).toContain(
+      'BookingReturnCompleted.CoclosetUpdate'
+    );
+    expect(copyOf('booking-return-completed')).toMatch(/CoCloset covers the cost/);
+    expect(arms.whenClean).not.toContain('CoclosetUpdate');
+  });
+
+  // -----------------------------------------------------------------------
+  // The sign-off (Jonathan, 2026-09-02: "puedes agregar esto a todos los
+  // correos?"). Every template in this process ends the same way, so the test
+  // is over the whole directory rather than over a list - a template added
+  // later without it is the failure this catches.
+  // -----------------------------------------------------------------------
+  describe('every template signs off as the marketplace team', () => {
+    const templates = () => fs.readdirSync(TEMPLATES_DIR);
+
+    it('covers every template, with the shared key so Console edits it once', () => {
+      expect(templates().length).toBeGreaterThan(20);
+
+      templates().forEach(name => {
+        const html = read(name, 'html.html');
+        expect(html).toContain('{{t "TransactionEmails.SignOff" "Warmly,"}}');
+        expect(html).toContain('TransactionEmails.SignOffTeam');
+        expect(html).toContain('marketplaceName=marketplace.name}}');
+      });
+    });
+
+    it('signs off after the body and before the unsubscribe footer', () => {
+      templates().forEach(name => {
+        const html = read(name, 'html.html');
+        const signOff = html.indexOf('TransactionEmails.SignOff"');
+        const cta = html.lastIndexOf('/order/{{url-encode id}}/');
+        const footer = html.indexOf('TransactionEmails.MembershipParagraph');
+
+        expect(signOff).toBeGreaterThan(cta);
+        expect(signOff).toBeLessThan(footer);
+      });
+    });
+
+    it('reads the marketplace name outside the {{#with transaction}} block', () => {
+      // `marketplace` is a root-level key. Inside `{{#with transaction}}` the
+      // lookup depends on Handlebars' deprecated parent-scope fallback; after
+      // {{/with}} it does not. Same reason the footer sits where it does.
+      templates().forEach(name => {
+        const html = read(name, 'html.html');
+        expect(html.indexOf('TransactionEmails.SignOff"')).toBeGreaterThan(
+          html.lastIndexOf('{{/with}}')
+        );
+      });
+    });
   });
 });

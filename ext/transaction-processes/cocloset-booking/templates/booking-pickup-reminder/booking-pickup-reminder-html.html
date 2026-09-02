@@ -13,8 +13,13 @@
           <table align="center" role="presentation" cellSpacing="0" cellPadding="0" border="0" width="100%" style="max-width:600px;margin:0 auto">
             <tr style="width:100%">
               <td>
-                <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingPickupReminder.Title" "Your rental starts tomorrow" listingTitle=listing.title}}</h1>
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPickupReminder.Content" "Your rental of {listingTitle} starts on {dateStart, date, ::YYYYMMMd}. The garment is waiting for you at the laundry." listingTitle=listing.title dateStart=booking.start dateEnd=(date-transform booking.end days=-1)}}</p>
+                <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingPickupReminder.Title" "Make room in your closet!"}}</h1>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPickupReminder.Greeting" "Hi {firstName}," firstName=customer.first-name}}</p>
+                {{#if listing.public-data.assignedLaundryName}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPickupReminder.Content" "Your {listingTitle} rental starts tomorrow on {dateStart, date, ::YYYYMMMd}. The garment will be ready for pick up at {laundryName}." listingTitle=listing.title dateStart=booking.start laundryName=listing.public-data.assignedLaundryName}}</p>
+                {{else}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPickupReminder.ContentNoLaundry" "Your {listingTitle} rental starts tomorrow on {dateStart, date, ::YYYYMMMd}. The garment will be ready for pick up at the laundry." listingTitle=listing.title dateStart=booking.start}}</p>
+                {{/if}}
                 <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
                     <tr>
@@ -27,6 +32,8 @@
                   </tbody>
                 </table>
                 {{/with}}
+                <p style="font-size:16px;line-height:1.4;margin:24px 0 0;color:#484848">{{t "TransactionEmails.SignOff" "Warmly,"}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:4px 0 0;color:#484848">{{t "TransactionEmails.SignOffTeam" "The {marketplaceName} Team" marketplaceName=marketplace.name}}</p>
                 <div>
                   <hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#E1E1E1;margin:20px 0" />
                   <p style="font-size:12px;line-height:15px;margin:0 auto;color:#b7b7b7;text-align:left;margin-bottom:50px">{{t "TransactionEmails.MembershipParagraph" "You're a member of {marketplaceName}. If you no longer want to receive these emails, please contact {marketplaceName} team." marketplaceName=marketplace.name }}</p>

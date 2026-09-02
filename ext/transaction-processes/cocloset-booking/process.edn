@@ -732,6 +732,106 @@
    :template :booking-review-by-customer-wanted}
 
   ;; -------------------------------------------------------------------
+  ;; Review reminder to the renter, three days in.
+  ;;
+  ;; ANCHORED ON :state/delivered, NOT ON THE DROP-OFF. The renter cannot
+  ;; review at :state/returned: :transition/review-1-by-customer starts
+  ;; from :state/delivered, which this process reaches when cleaning
+  ;; finishes. A reminder counted from the return would point at a button
+  ;; that does not exist yet, and would be cancelled the moment the laundry
+  ;; moved the transaction on to :state/cleaning. Three days after
+  ;; :state/delivered still leaves four of the seven review days open.
+  ;;
+  ;; "ONLY IF THEY HAVE NOT REVIEWED" IS THE SCHEDULING, NOT A CONDITION.
+  ;; A scheduled notification is cancelled when the transaction moves on,
+  ;; and a renter who reviews leaves :state/delivered by
+  ;; :transition/review-1-by-customer. So there is no flag to check and no
+  ;; way for a reviewer to be nagged: reviewing cancels the reminder.
+  ;;
+  ;; The entry on :transition/review-1-by-provider is what keeps that true
+  ;; when the OWNER reviews first. That also leaves :state/delivered and
+  ;; would otherwise cancel a reminder the renter still needs, so it is
+  ;; re-scheduled from :state/reviewed-by-provider - where
+  ;; :transition/review-2-by-customer is still open - off the same
+  ;; timepoint. If the owner reviews after day three, that :at is already
+  ;; in the past; verify in Dev whether the platform then sends it at once
+  ;; or drops it (see the runbook).
+  ;; -------------------------------------------------------------------
+
+  {:name :notification/review-reminder-customer-laundry-mark-available,
+   :on :transition/laundry-mark-available,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+  {:name :notification/review-reminder-customer-complete,
+   :on :transition/complete,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+  {:name :notification/review-reminder-customer-operator-complete,
+   :on :transition/operator-complete,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+  {:name :notification/review-reminder-customer-auto-complete-from-ready,
+   :on :transition/auto-complete-from-ready,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+  {:name :notification/review-reminder-customer-auto-complete-from-picked-up,
+   :on :transition/auto-complete-from-picked-up,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+  {:name :notification/review-reminder-customer-auto-complete-from-overdue,
+   :on :transition/auto-complete-from-overdue,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+  {:name :notification/review-reminder-customer-auto-complete-from-returned,
+   :on :transition/auto-complete-from-returned,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+  {:name :notification/review-reminder-customer-auto-complete-from-cleaning,
+   :on :transition/auto-complete-from-cleaning,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+  {:name :notification/review-reminder-customer-after-provider-review,
+   :on :transition/review-1-by-provider,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+
+  ;; -------------------------------------------------------------------
   ;; Cancellation
   ;;
   ;; Until now all five cancels notified NOBODY. A customer was refunded in
