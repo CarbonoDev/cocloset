@@ -40,18 +40,74 @@
 const LISTINGS = 'listings';
 
 /**
- * Console section name -> the section type to render it as.
+ * ONE LAYOUT, SEVERAL NAMES - BECAUSE THE NAMES CHANGE.
  *
- * Keys are the names as they are spelled in Console, typos included: `tittle-section` is
- * what the asset actually contains, and matching it here is cheaper and less fragile than
- * asking for content to be renamed to suit the code.
+ * This started as a plain map keyed on the exact Console name. On 2026-09-02 the landing
+ * page was re-authored in Console and every section was renamed - `tittle-section` became
+ * `tittle's section`, `guide` became `How it works` - and every bespoke layout silently
+ * fell back to its stock component. The page was still there, still editable, and no
+ * longer the design. Nothing in the code had changed.
+ *
+ * A name is content, and content moves. So a layout now claims a LIST of names, matched
+ * after normalising away the things an editor changes without meaning to (case, hyphens,
+ * apostrophes, double spaces), plus the section's `sectionId` where the operator has set
+ * a stable one. Old names are kept alongside new ones: an asset that has not been
+ * re-authored yet - Test and Live, until Console is pushed - must keep working.
+ *
+ * When this breaks again, the fix is to add the new name here, not to ask for the content
+ * to be renamed back.
  */
-export const SECTION_TYPE_BY_NAME = {
-  'tittle-section': 'coclosetHero',
-  guide: 'coclosetSteps',
-  'noteworthy-section': LISTINGS,
-  'laundry-section': 'coclosetLaundry',
+const normalizeName = value =>
+  typeof value === 'string'
+    ? value
+        .toLowerCase()
+        .replace(/['‘’]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+    : '';
+
+/**
+ * Section type -> every Console name or sectionId that should render as it.
+ *
+ * Spellings are listed as they appear in Console, typos included (`tittle`), and
+ * normalised on both sides at lookup time.
+ */
+export const SECTION_NAMES_BY_TYPE = {
+  // The landing page's opening split. Two blocks: type on the left, image with a card
+  // floated over it on the right.
+  coclosetHero: ['tittle-section', "tittle's section", 'peer_to_peer_clothing_rental'],
+  // The numbered steps. On the landing page they are the renter's three; on
+  // /p/provider_landing_page they are the studio's (Drop Off / Clean / Pick Up), which is
+  // the same layout for the same kind of content - the client asked for "el mismo diseño"
+  // on that page.
+  coclosetSteps: ['guide', 'How it works'],
+  // The partner panel with the tile grid.
+  coclosetLaundry: ['laundry-section'],
+  [LISTINGS]: ['noteworthy-section', 'In the wardrobe this week', 'new-noteworthy-section'],
 };
+
+// A Map rather than an object, and not only for taste: a plain object would answer
+// `TYPE_BY_NORMALIZED_NAME['constructor']` from Object.prototype and retype a section named
+// "constructor" to a function. A Map has no inherited keys, so the lookup can stay a plain
+// `get` instead of an `Object.hasOwn` dance.
+const TYPE_BY_NORMALIZED_NAME = new Map(
+  Object.entries(SECTION_NAMES_BY_TYPE).flatMap(([sectionType, names]) =>
+    names.map(name => [normalizeName(name), sectionType])
+  )
+);
+
+/**
+ * The section type to render a section as, or undefined if this module does not claim it.
+ *
+ * `sectionId` is tried first: it is the anchor id, so an operator who changes the visible
+ * name is less likely to have changed it in the same edit.
+ *
+ * @param {Object} section
+ * @returns {string|undefined}
+ */
+const claimedTypeOf = section =>
+  TYPE_BY_NORMALIZED_NAME.get(normalizeName(section?.sectionId)) ||
+  TYPE_BY_NORMALIZED_NAME.get(normalizeName(section?.sectionName));
 
 /**
  * DEFAULTS for fields Console may not have asked the operator for.
@@ -67,8 +123,10 @@ export const SECTION_TYPE_BY_NAME = {
  * editor is the thing that makes a hosted page stop feeling hosted. The defaults remain as a
  * floor for the case where the section type is reverted.
  */
-const DEFAULT_PROPS_BY_NAME = {
-  'noteworthy-section': { listingSelection: 'newest', numColumns: 4 },
+// Keyed by the TYPE the section is claimed as rather than by its name, so a rename cannot
+// take the defaults with it - which is the same failure this module was rewritten for.
+const DEFAULT_PROPS_BY_TYPE = {
+  [LISTINGS]: { listingSelection: 'newest', numColumns: 4 },
 };
 
 // Console omits a field it never asked for, and writes '' for one left blank. Both mean "the
@@ -87,8 +145,7 @@ const withDefaults = (section, defaults = {}) =>
  * @param {Object} section - a section from the page asset
  * @returns {boolean}
  */
-export const isCoclosetSection = section =>
-  !!section?.sectionName && Object.hasOwn(SECTION_TYPE_BY_NAME, section.sectionName);
+export const isCoclosetSection = section => !!claimedTypeOf(section);
 
 /**
  * Rewrite one section's type from its Console name.
@@ -100,13 +157,13 @@ export const isCoclosetSection = section =>
  * @returns {Object}
  */
 export const mapCoclosetSection = section => {
-  if (!isCoclosetSection(section)) {
+  const sectionType = claimedTypeOf(section);
+  if (!sectionType) {
     return section;
   }
-  const { sectionName } = section;
   return {
-    ...withDefaults(section, DEFAULT_PROPS_BY_NAME[sectionName]),
-    sectionType: SECTION_TYPE_BY_NAME[sectionName],
+    ...withDefaults(section, DEFAULT_PROPS_BY_TYPE[sectionType]),
+    sectionType,
   };
 };
 

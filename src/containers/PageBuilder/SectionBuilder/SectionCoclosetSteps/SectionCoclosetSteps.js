@@ -28,6 +28,12 @@ import css from './SectionCoclosetSteps.module.css';
  * reordering the blocks in Console would then see numbers that disagree with what they
  * typed, and no way to tell which one the page was going to believe.
  */
+// "01", "2", "3." and "III" are step numbers; "Drop Off" is a step name. Deliberately
+// narrow - anything it is unsure about is treated as a name, because a name rendered as a
+// name is merely plain, while a name rendered as a numeral is wrong twice over.
+const isNumeral = value =>
+  typeof value === 'string' && /^\s*(?:\d{1,2}|[ivx]{1,4})\s*[.)]?\s*$/i.test(value);
+
 const SectionCoclosetSteps = props => {
   const {
     sectionId,
@@ -64,11 +70,20 @@ const SectionCoclosetSteps = props => {
         <ol className={css.steps}>
           {blocks.map((block, index) => {
             const { heading, body } = splitLeadingHeading(block?.text?.content);
-            // The markdown heading is the step's name; the block's own `blockName` is the
-            // fallback because Console shows it in the editor's block list and an operator
-            // who fills that in but not the markdown still means it as the name.
-            const stepTitle = heading || block?.blockName || null;
-            const numeral = block?.title?.content;
+            const blockTitle = block?.title?.content;
+            // A NUMERAL IS A NUMERAL. On the landing page the block title holds "01", "02",
+            // "03" and the step's name is a markdown heading in the body. On
+            // /p/provider_landing_page the same layout is used for content authored the
+            // other way round - the title IS the name ("Drop Off", "Clean", "Pick Up") and
+            // there are no numbers. Printing that as the small terracotta marker, with the
+            // blockName repeated underneath as the title, is not the design and not what
+            // the operator typed.
+            const numeral = isNumeral(blockTitle) ? blockTitle : null;
+            // The markdown heading is the step's name; a non-numeral block title is the next
+            // best thing, and the block's own `blockName` is the fallback because Console
+            // shows it in the editor's block list and an operator who fills that in but not
+            // the markdown still means it as the name.
+            const stepTitle = heading || (numeral ? null : blockTitle) || block?.blockName || null;
 
             return (
               <li className={css.step} key={block?.blockId || `step-${index}`}>
