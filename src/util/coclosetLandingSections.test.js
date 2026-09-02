@@ -1,5 +1,5 @@
 import {
-  SECTION_TYPE_BY_NAME,
+  SECTION_NAMES_BY_TYPE,
   isCoclosetSection,
   mapCoclosetSection,
   mapCoclosetSections,
@@ -72,7 +72,11 @@ describe('a section this module has never heard of', () => {
 });
 
 describe('the four Cocloset sections are retyped', () => {
-  it.each(Object.entries(SECTION_TYPE_BY_NAME))('maps %s to %s', (sectionName, sectionType) => {
+  const everyClaimedName = Object.entries(SECTION_NAMES_BY_TYPE).flatMap(([sectionType, names]) =>
+    names.map(name => [name, sectionType])
+  );
+
+  it.each(everyClaimedName)('maps %s to %s', (sectionName, sectionType) => {
     expect(mapCoclosetSection({ sectionName, sectionType: 'columns' }).sectionType).toBe(
       sectionType
     );
@@ -147,6 +151,111 @@ describe('the noteworthy section is handed to the stock listings machinery', () 
       listingSelection: value,
     });
     expect(mapped.listingSelection).toBe('newest');
+  });
+});
+
+// ===========================================================================
+// The rename of 2026-09-02.
+//
+// The landing page was re-authored in Console: every section kept its content and got a
+// new name, so every bespoke layout fell back to its stock component and the page stopped
+// being the design - with no code change and nothing in any log to say why.
+//
+// These sections are the LIVE asset, read from the Asset Delivery API on the day, trimmed
+// to the fields this module looks at. They are the regression test for that.
+// ===========================================================================
+describe('the landing page as Console holds it today', () => {
+  const liveSections = () => [
+    {
+      sectionName: "tittle's section",
+      sectionId: 'peer_to_peer_clothing_rental',
+      sectionType: 'columns',
+      numColumns: 2,
+    },
+    { sectionName: 'How it works', sectionId: '', sectionType: 'carousel', numColumns: 3 },
+    {
+      sectionName: 'In the wardrobe this week',
+      sectionId: 'new-noteworthy-section',
+      sectionType: 'listings',
+      numColumns: 4,
+      listingSelection: 'newest',
+    },
+    { sectionName: 'How lending works', sectionType: 'columns', numColumns: 3 },
+    { sectionName: 'Partner with us', sectionType: 'article' },
+  ];
+
+  it('still gets the hero, the steps and the listings row', () => {
+    const mapped = mapCoclosetSections({ sections: liveSections() });
+
+    expect(mapped.sections.map(s => s.sectionType)).toEqual([
+      'coclosetHero',
+      'coclosetSteps',
+      'listings',
+      // Authored after the bespoke layouts existed and matching none of them: these render
+      // through the stock component for their own type, in the Cocloset skin.
+      'columns',
+      'article',
+    ]);
+  });
+
+  it('matches a name whose only change is punctuation or case', () => {
+    // "tittle-section" -> "tittle's section" is the actual rename. Case and stray double
+    // spaces are the ones that will happen next.
+    ['tittle-section', "tittle's section", "Tittle's  Section", 'TITTLE SECTION'].forEach(
+      sectionName =>
+        expect(mapCoclosetSection({ sectionName, sectionType: 'columns' }).sectionType).toBe(
+          'coclosetHero'
+        )
+    );
+  });
+
+  it('falls back to the sectionId when the name has moved on entirely', () => {
+    // The anchor id survives edits the visible name does not, so it is tried first.
+    const section = {
+      sectionName: 'Something the operator renamed it to',
+      sectionId: 'new-noteworthy-section',
+      sectionType: 'features',
+    };
+    expect(mapCoclosetSection(section).sectionType).toBe('listings');
+  });
+
+  it('keeps the listings defaults attached to the type, not to the old name', () => {
+    // The defaults used to be keyed by section NAME, so the rename would have taken them
+    // with it - a `features` section retyped to `listings` with no listingSelection never
+    // fetches, and the row spins forever.
+    const mapped = mapCoclosetSection({
+      sectionName: 'In the wardrobe this week',
+      sectionType: 'features',
+    });
+
+    expect(mapped.sectionType).toBe('listings');
+    expect(mapped.listingSelection).toBe('newest');
+    expect(mapped.numColumns).toBe(4);
+  });
+});
+
+describe('the provider landing page gets the same steps layout', () => {
+  //   > "lo mismo para provider... ahi hay que integrar el mismo diseño"
+  //
+  // /p/provider_landing_page names its steps section "How it Works" too, so one entry
+  // covers both pages. Its blocks are authored the other way round - the title is the step
+  // NAME, not a numeral - which SectionCoclosetSteps handles; see the test beside it.
+  it('claims "How it Works" wherever it appears', () => {
+    expect(
+      mapCoclosetSection({ sectionName: 'How it Works', sectionType: 'carousel' }).sectionType
+    ).toBe('coclosetSteps');
+  });
+
+  it('leaves the benefits and the two heroes to the stock components', () => {
+    // There is no bespoke layout for these shapes. Claiming them would mean rendering
+    // partner copy through a component built for different content, which is worse than
+    // rendering it plainly in the Cocloset skin.
+    ['Benefits', 'Grow Your Dry Cleaning Business with CoCloset', 'Apply Now '].forEach(
+      sectionName => {
+        const section = { sectionName, sectionType: 'columns' };
+        expect(mapCoclosetSection(section)).toBe(section);
+      }
+    );
   });
 });
 

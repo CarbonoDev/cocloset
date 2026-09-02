@@ -24,29 +24,47 @@ const IMAGE_GALLERY_OPTIONS = {
   showPlayButton: false,
   disableThumbnailScroll: true,
 };
-const MAX_LANDSCAPE_ASPECT_RATIO = 2; // 2:1
-const MAX_PORTRAIT_ASPECT_RATIO = 4 / 3;
+// The gallery frame is PORTRAIT, always.
+//
+// Stock behaviour was the opposite and is what the client saw ("se muestra en
+// square y es necesario un portrait mode", Jonathan 2026-09-02): the frame took
+// the first image's ratio, but anything at or below 4:3 - which is every
+// portrait photo ever taken - was widened to 4:3 landscape, and an image whose
+// dimensions had not loaded fell back to 1:1. A garment shot head to hem then
+// sat letterboxed in a wide box with white bars down both sides.
+//
+// Garments are photographed vertically, so the frame is clamped INTO portrait
+// instead of out of it: never wider than 3:4, never taller than 2:3. A landscape
+// or square photo is letterboxed in a portrait frame rather than the other way
+// round, and - the part that matters on a grid of listings - every listing page
+// reserves the same shape before its images load, so the page does not jump.
+const WIDEST_PORTRAIT_ASPECT_RATIO = 3 / 4;
+const TALLEST_PORTRAIT_ASPECT_RATIO = 2 / 3;
+const DEFAULT_ASPECT = { aspectWidth: 3, aspectHeight: 4 };
 
 const getFirstImageAspectRatio = (firstImage, scaledVariant) => {
   if (!firstImage) {
-    return { aspectWidth: 1, aspectHeight: 1 };
+    return DEFAULT_ASPECT;
   }
 
   const v = firstImage?.attributes?.variants?.[scaledVariant];
   const w = v?.width;
   const h = v?.height;
   const hasDimensions = !!w && !!h;
+
+  if (!hasDimensions) {
+    return DEFAULT_ASPECT;
+  }
+
   const aspectRatio = w / h;
 
   // We keep the fractions separated as these are given to AspectRatioWrapper
   // which expects separate width and height
-  return hasDimensions && aspectRatio >= MAX_LANDSCAPE_ASPECT_RATIO
-    ? { aspectWidth: 2, aspectHeight: 1 }
-    : hasDimensions && aspectRatio <= MAX_PORTRAIT_ASPECT_RATIO
-    ? { aspectWidth: 4, aspectHeight: 3 }
-    : hasDimensions
-    ? { aspectWidth: w, aspectHeight: h }
-    : { aspectWidth: 1, aspectHeight: 1 };
+  return aspectRatio >= WIDEST_PORTRAIT_ASPECT_RATIO
+    ? DEFAULT_ASPECT
+    : aspectRatio <= TALLEST_PORTRAIT_ASPECT_RATIO
+    ? { aspectWidth: 2, aspectHeight: 3 }
+    : { aspectWidth: w, aspectHeight: h };
 };
 
 /**

@@ -68,6 +68,19 @@
   overflow-wrap: anywhere;
 }
 
+/* CoCloset's own position on the report. It carries the only promise on this
+   panel - that the marketplace covers significant damage - so it is set at full
+   ink weight rather than muted like .nextSteps. */
+.coclosetUpdate {
+  margin: 14px 0 0 0;
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+
+  @media (--viewportMedium) {
+    margin: 18px 0 0 0;
+  }
+}
+
 .nextSteps {
   margin: 14px 0 0 0;
   color: var(--coclosetInkMuted);

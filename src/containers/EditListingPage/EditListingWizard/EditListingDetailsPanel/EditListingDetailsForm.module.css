@@ -35,6 +35,33 @@
   composes: formMargins;
 }
 
+/* SPECIAL CARE. Sits with the owner address as the other block the renter never sees; boxed
+   so the boundary between what the shop shows and what the studio is told is visible rather
+   than something you have to know. */
+.specialCare {
+  composes: formMargins;
+  padding: 16px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 8px;
+  background-color: var(--coclosetSurfaceRaised);
+}
+
+.specialCareTitle {
+  margin: 0 0 4px 0;
+  color: var(--coclosetInk);
+}
+
+.specialCareHelp {
+  margin: 0 0 12px 0;
+  color: var(--coclosetInkMuted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.specialCareNote {
+  margin-top: 12px;
+}
+
 .title {
   composes: formMargins;
 }

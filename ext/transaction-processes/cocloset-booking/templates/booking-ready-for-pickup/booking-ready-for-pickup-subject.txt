@@ -1,1 +1,1 @@
-{{set-translations (asset "content/email-texts.json")}}{{t "BookingReadyForPickup.Subject" "Your rental of {listingTitle} is ready for pickup" listingTitle=transaction.listing.title}}
+{{set-translations (asset "content/email-texts.json")}}{{t "BookingReadyForPickup.Subject" "Ready for pickup: Your {listingTitle} rental" listingTitle=transaction.listing.title}}

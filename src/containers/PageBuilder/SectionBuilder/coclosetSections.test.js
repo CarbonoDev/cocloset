@@ -184,6 +184,45 @@ describe('SectionCoclosetSteps', () => {
     expect(screen.getByText('Return, walk away')).toBeInTheDocument();
     expect(screen.getByText('Drop the garment back at the same counter.')).toBeInTheDocument();
   });
+
+  // The provider landing page authors the same layout the other way round: the block title
+  // is the step's NAME and there are no numbers at all. Fixture from the live
+  // /p/provider_landing_page asset.
+  describe('when the block title is a name rather than a numeral', () => {
+    const providerProps = () => ({
+      blocks: [
+        {
+          blockId: 'drop-off',
+          blockName: 'Drop-Off',
+          title: { content: 'Drop Off', fieldType: 'heading3' },
+          text: {
+            fieldType: 'markdown',
+            content: 'Partners scan a QR code to pull up transaction details.',
+          },
+        },
+      ],
+    });
+
+    it('sets it as the step title, not as the numeral', () => {
+      renderSection(SectionCoclosetSteps, providerProps());
+
+      // Once - as the title. Rendering it as the numeral AND falling back to the blockName
+      // for the title printed "Drop Off" over "Drop-Off", which is how this was found.
+      expect(screen.getAllByText('Drop Off')).toHaveLength(1);
+      expect(screen.queryByText('Drop-Off')).not.toBeInTheDocument();
+      expect(
+        screen.getByText('Partners scan a QR code to pull up transaction details.')
+      ).toBeInTheDocument();
+    });
+
+    it('draws no numeral marker at all rather than a made-up one', () => {
+      // Numbering from the array index would be inventing content the operator did not
+      // write, on a page where the steps are named rather than numbered.
+      renderSection(SectionCoclosetSteps, providerProps());
+      expect(screen.queryByText('01')).not.toBeInTheDocument();
+      expect(screen.queryByText('1')).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe('SectionCoclosetLaundry', () => {

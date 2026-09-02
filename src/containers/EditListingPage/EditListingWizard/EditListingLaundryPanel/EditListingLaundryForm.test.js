@@ -160,7 +160,17 @@ describe('EditListingLaundryForm', () => {
     expect(screen.getByRole('button', { name: saveActionMsg })).toBeEnabled();
   });
 
-  it('shows a soft warning when the listing category is not in the selected laundry accepted categories', async () => {
+  // ================ The category warning, currently hidden ================
+  //
+  // Commit 989ecce09 (2026-08-31) commented the warning out of the form: "Hide category
+  // list for dry cleaning partners, since every partner is assumed to handle all
+  // categories". `showCategoryWarning` is still computed, so restoring the JSX restores
+  // the behaviour - which is why these are "not shown" assertions rather than deletions.
+  //
+  // The three negative tests below now pass for this reason rather than for the reason
+  // they were written for. They are kept because they are what has to start failing if
+  // the warning comes back for a category the studio DOES accept.
+  it('does NOT show the category warning even when the category is not accepted', async () => {
     const user = userEvent.setup();
 
     await act(async () => {
@@ -186,12 +196,9 @@ describe('EditListingLaundryForm', () => {
     });
     await user.click(radios[0]);
 
-    expect(screen.getByText('EditListingLaundryForm.categoryWarning')).toBeInTheDocument();
+    expect(screen.queryByText('EditListingLaundryForm.categoryWarning')).not.toBeInTheDocument();
   });
 
-  // NEGATIVE CASE for the soft category validation. Without this, an
-  // implementation that ALWAYS shows the warning passes the test above - which
-  // is how the dead `publicData.category` read slipped through review.
   it('does NOT show the category warning when the category IS accepted', async () => {
     const user = userEvent.setup();
 
@@ -266,13 +273,18 @@ describe('EditListingLaundryForm', () => {
 
   // ================ Console category ids on both sides ================
 
-  it('shows human category names on the laundry cards, never raw Console ids', async () => {
+  it('lists no accepted categories on a laundry card, and never a raw Console id', async () => {
+    // Same removal as the warning (9cdecc241, 2026-08-25): every partner is assumed to
+    // handle every category, so the chips are gone. The half of this test that still
+    // matters is the second line - whatever the card does show, it is never a raw id.
     await act(async () => {
       renderForm();
     });
 
-    expect(screen.getByText('Dresses')).toBeInTheDocument();
+    expect(screen.queryByText('Dresses')).not.toBeInTheDocument();
     expect(screen.queryByText('dresses')).not.toBeInTheDocument();
+    // The card is not empty, though: name, address, hours and turnaround are still on it.
+    expect(screen.getAllByRole('radio').length).toBeGreaterThan(0);
   });
 
   // THE HIERARCHY RULE. The listing carries every level of its chain, so accepting the
@@ -303,7 +315,9 @@ describe('EditListingLaundryForm', () => {
     expect(screen.queryByText('EditListingLaundryForm.categoryWarning')).not.toBeInTheDocument();
   });
 
-  it('warns when no level of the listing category chain is accepted', async () => {
+  it('stays silent when no level of the listing category chain is accepted', async () => {
+    // The case the warning existed for. It is the one that has to be revisited first if
+    // the marketplace ever stops assuming every partner handles every category.
     const user = userEvent.setup();
     await act(async () => {
       renderForm({ listingCategories: ['pants'] });
@@ -311,31 +325,12 @@ describe('EditListingLaundryForm', () => {
 
     await selectFirstLaundry(user);
 
-    expect(screen.getByText('EditListingLaundryForm.categoryWarning')).toBeInTheDocument();
+    expect(screen.queryByText('EditListingLaundryForm.categoryWarning')).not.toBeInTheDocument();
   });
 
-  // Ids alone in the warning ("dresses / midi_dress") told the garment owner nothing.
-  // The default test messages don't interpolate, so this one supplies a real message.
-  it('names the listing category in the warning the way Console names it', async () => {
-    const user = userEvent.setup();
-    await act(async () => {
-      renderForm(
-        {
-          laundries: [{ ...idBasedLaundries[0], acceptedCategories: ['pants'] }],
-          listingCategories: ['dresses', 'midi_dress'],
-        },
-        { messages: { 'EditListingLaundryForm.categoryWarning': 'Not accepted: {category}' } }
-      );
-    });
-
-    await selectFirstLaundry(user);
-
-    expect(screen.getByText('Not accepted: Dresses › Midi Dress')).toBeInTheDocument();
-  });
-
-  // Laundries that never revisited their profile still have free text stored. It can't
-  // match a Console id, so the warning fires — but it must not crash, and the chip must
-  // still read as words.
+  // Laundries that never revisited their profile still have free text stored where a
+  // Console id is expected. Nothing renders it now, but it still reaches
+  // `getCategoryLabels`, so the guard against crashing on it is still worth having.
   it('renders pre-migration free-text accepted categories without crashing', async () => {
     const user = userEvent.setup();
     await act(async () => {
@@ -345,10 +340,10 @@ describe('EditListingLaundryForm', () => {
       });
     });
 
-    expect(screen.getByText('Eveningwear')).toBeInTheDocument();
+    expect(screen.getByText('Studio Pigalle')).toBeInTheDocument();
 
     await selectFirstLaundry(user);
-    expect(screen.getByText('EditListingLaundryForm.categoryWarning')).toBeInTheDocument();
+    expect(screen.queryByText('EditListingLaundryForm.categoryWarning')).not.toBeInTheDocument();
   });
   // The turnaround on a card is now resolved for the garment being assigned (a laundry
   // sets hours per top-level category), so the card has to say WHICH kind of number it
