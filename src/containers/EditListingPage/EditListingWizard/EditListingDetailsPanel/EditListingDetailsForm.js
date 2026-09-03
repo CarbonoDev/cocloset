@@ -407,6 +407,9 @@ const FieldBrandAutocomplete = props => {
         // Reaches the DOM input through FieldTextInput's `...rest`.
         list={listId}
         autoComplete="off"
+        validate={required(
+          intl.formatMessage({ id: 'EditListingDetailsForm.brandRequired' })
+        )}
       />
       <datalist id={listId}>
         {brandOptions.map(({ brand }) => (
