@@ -952,6 +952,7 @@
   "ListingPage.pickupLocationTurnaround": "Turnaround {days, plural, one {# day} other {# days}}",
   "ListingPage.rentalTimeline.bookingConfirmed": "Booking confirmed",
   "ListingPage.rentalTimeline.cleaning": "Cleaning",
+  "ListingPage.rentalTimeline.dropOffAtCleaners": "Drop off at cleaners",
   "ListingPage.rentalTimeline.laundryPreparing": "Laundry preparing garment",
   "ListingPage.rentalTimeline.pickedUp": "Picked up by renter",
   "ListingPage.rentalTimeline.readyForNextRental": "Ready for next rental",

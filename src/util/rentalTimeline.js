@@ -48,6 +48,21 @@ const ALL_AUDIENCES = [TIMELINE_AUDIENCE_CUSTOMER, TIMELINE_AUDIENCE_PROVIDER];
 /** The steps, in order. Each key has a `ListingPage.rentalTimeline.<key>` translation. */
 export const RENTAL_TIMELINE_STEPS = [
   { key: 'bookingConfirmed', state: coclosetStates.ACCEPTED, audience: ALL_AUDIENCES },
+  // THE STEP THE GARMENT ACTUALLY WAITS ON.
+  //
+  //   > "Podemos agregar el paso 'drop of at cleaners' despues de Booking
+  //   >  confirmed en el listado de pasos de la transacción?" (Jonathan, 2026-09-03)
+  //
+  // Between a confirmed booking and a studio preparing the garment there is a
+  // person carrying it there. The list jumped straight from one to the other, so
+  // the wait had no name - and it is the step most likely to be the reason a
+  // rental is not moving.
+  //
+  // Shares `accepted` with the two steps around it, as `laundryPreparing`
+  // already does: the process has one state for the whole run-up, and
+  // `lastIndexForState` resolves a tie to the last step carrying it, so the
+  // three read as "done, done, current" rather than fighting each other.
+  { key: 'dropOffAtCleaners', state: coclosetStates.ACCEPTED, audience: ALL_AUDIENCES },
   { key: 'laundryPreparing', state: coclosetStates.ACCEPTED, audience: ALL_AUDIENCES },
   { key: 'readyForPickup', state: coclosetStates.READY_FOR_PICKUP, audience: ALL_AUDIENCES },
   { key: 'pickedUp', state: coclosetStates.PICKED_UP, audience: ALL_AUDIENCES },
