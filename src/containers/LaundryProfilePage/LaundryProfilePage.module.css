@@ -14,19 +14,23 @@
   }
 }
 
+/* THE RAIL IS DEFINED ONCE, NOT COPIED.
+     > "Al entrar al apartado de Settings en laundry-profile, la barra lateral se
+     >  hace demasiado ancha, no es similar a como se ve en el resto de las
+     >  pantallas" (Jonathan, 2026-09-03)
+
+   This page had its own copy of the rule, and the copy was missing the one
+   declaration that matters: the width. `LayoutSideNavigation` sets
+   `width: unset` on the aside from --viewportLarge, so without it the column is
+   as wide as its widest child - and `.opsNavHint` is a two-sentence paragraph
+   with nothing capping it, which resolved to ~570px of mostly empty rail. That
+   is the same bug that was fixed on the ops screens in August; it survived here
+   because "matches LaundryOpsPage" was a comment rather than a reference.
+
+   Composing the real rule makes the two pages the same rail by construction, so
+   the next change to it cannot land on one screen and miss the other. */
 .opsSideNav {
-  background-color: var(--coclosetSurfaceRaised);
-  border-top-color: var(--coclosetBorder);
-
-  @media (--viewportLarge) {
-    background-color: var(--coclosetSurfaceRaised);
-  }
-
-  /* Matches LaundryOpsPage.module.css .opsSideNav so the rail doesn't jump
-     position when the user moves between Settings and the other ops screens. */
-  @media (--viewportLargeWithPaddings) {
-    padding: 48px 0 82px 36px;
-  }
+  composes: opsSideNav from '../LaundryOpsPage/LaundryOpsPage.module.css';
 }
 
 .content {
