@@ -217,7 +217,6 @@ describe('LaundryOpsPage.helpers', () => {
         dropOffsToday: 1,
         currentlyRented: 2,
         pendingCleaning: 2,
-        qualityInspection: 1,
         lateReturns: 1,
         damaged: 1,
       });

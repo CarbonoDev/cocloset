@@ -57,6 +57,44 @@ describe('laundryStatuses', () => {
     });
   });
 
+  // ------------------------------------------------------------------------
+  // Quality inspection, removed from the workflow on 2026-09-03.
+  //
+  //   > "Hay que remover Quality inspection" (Jonathan)
+  //
+  // The TRANSITION is still in the process - taking it out of the EDN needs a
+  // push, and would strand whatever is sitting in that phase at that moment. So
+  // what these pin is the shape of the removal: nothing can enter the phase,
+  // and anything already in it can still get out.
+  // ------------------------------------------------------------------------
+  describe('quality inspection is no longer part of the workflow', () => {
+    it('is not a phase a garment can be moved into', () => {
+      expect(CLEANING_PHASES).not.toContain('quality-inspection');
+      expect(LAUNDRY_ACTION_STATUSES).not.toContain('quality-inspection');
+    });
+
+    it('is never the next action from any state', () => {
+      const everyNextStatus = ['accepted', 'ready-for-pickup', 'picked-up', 'overdue', 'returned']
+        .map(state => laundryActionsFor(row({ state })))
+        .concat(
+          CLEANING_PHASES.map(cleaningPhase =>
+            laundryActionsFor(row({ state: 'cleaning', cleaningPhase }))
+          )
+        )
+        .flat()
+        .map(action => action.status);
+
+      expect(everyNextStatus).not.toContain('quality-inspection');
+    });
+
+    it('still lets a garment already in it reach the rack', () => {
+      const [action] = laundryActionsFor(
+        row({ state: 'cleaning', cleaningPhase: 'quality-inspection' })
+      );
+      expect(action.status).toBe('available-for-booking');
+    });
+  });
+
   describe('laundryActionsFor', () => {
     it.each([
       ['accepted', null, 'ready-for-pickup'],
@@ -65,7 +103,10 @@ describe('laundryStatuses', () => {
       ['overdue', null, 'returned'],
       ['returned', null, 'pending-cleaning'],
       ['cleaning', 'pending-cleaning', 'cleaning-in-progress'],
-      ['cleaning', 'cleaning-in-progress', 'quality-inspection'],
+      ['cleaning', 'cleaning-in-progress', 'available-for-booking'],
+      // Quality inspection is gone from the workflow (2026-09-03), but the
+      // transition still exists and a transaction can be sitting in it right
+      // now. It has to have a way out, or the garment never returns to the rack.
       ['cleaning', 'quality-inspection', 'available-for-booking'],
     ])('from state %s (phase %s) offers %s', (state, cleaningPhase, expected) => {
       const actions = laundryActionsFor(row({ state, cleaningPhase }));

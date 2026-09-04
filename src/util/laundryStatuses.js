@@ -43,14 +43,21 @@ export const LAUNDRY_STATES = [
 ];
 
 /**
- * The three cleaning sub-phases, in order.
+ * The cleaning sub-phases, in order.
  *
- * These are `transaction.metadata.cleaningPhase` values, not states: all three
- * cleaning transitions leave the transaction in `cleaning`, and the sub-phase
- * is what distinguishes them. They exist as separate transitions so each is
- * timestamped and audited.
+ * These are `transaction.metadata.cleaningPhase` values, not states: the
+ * cleaning transitions all leave the transaction in `cleaning`, and the
+ * sub-phase is what distinguishes them. They exist as separate transitions so
+ * each is timestamped and audited.
+ *
+ * QUALITY INSPECTION IS GONE FROM THE WORKFLOW (Jonathan, 2026-09-03: "hay que
+ * remover Quality inspection"). The TRANSITION still exists in the process:
+ * removing it from the EDN needs a `flex-cli process push`, and would strand
+ * any transaction sitting in that phase at the moment of the push. So this list
+ * is what stops a studio ever being offered it - nothing new can enter the
+ * phase - while `laundryActionsFor` still knows how to get an existing one out.
  */
-export const CLEANING_PHASES = ['pending-cleaning', 'cleaning-in-progress', 'quality-inspection'];
+export const CLEANING_PHASES = ['pending-cleaning', 'cleaning-in-progress'];
 
 // Listing readiness - the garment's physical state, independent of any
 // booking (design doc §8). Unchanged: this is a listing lifecycle, not a
@@ -73,7 +80,6 @@ export const LAUNDRY_ACTION_STATUSES = [
   'returned',
   'pending-cleaning',
   'cleaning-in-progress',
-  'quality-inspection',
   'available-for-booking',
 ];
 
@@ -184,8 +190,12 @@ export const laundryActionsFor = row => {
         return 'pending-cleaning';
       case 'cleaning':
         switch (row.cleaningPhase) {
+          // Cleaning is now the last thing that happens to the garment before
+          // it goes back into inventory. A transaction ALREADY parked in
+          // quality inspection still has to be able to leave it, which is why
+          // that case remains: dropping it would strand a garment nobody could
+          // return to the rack.
           case 'cleaning-in-progress':
-            return 'quality-inspection';
           case 'quality-inspection':
             return 'available-for-booking';
           case 'pending-cleaning':

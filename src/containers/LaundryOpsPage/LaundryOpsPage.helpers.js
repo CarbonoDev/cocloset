@@ -83,9 +83,15 @@ export const isDamaged = row => row?.damageReported?.flag === true;
  */
 export const isLate = row => isOverdue(row) || wasReturnedLate(row);
 
-// The three cleaning sub-phases plus the 'returned' hand-off that feeds them
+// The cleaning sub-phases plus the `returned` hand-off that feeds them
 // (design doc §9: all of these map to the single customer-facing "Cleaning"
-// step, and mockup 05.jpg shows all three on the Cleaning screen).
+// step, and mockup 05.jpg shows them on the Cleaning screen).
+//
+// `quality-inspection` is still here on purpose, even though the phase was
+// removed from the workflow on 2026-09-03 and nothing can enter it any more:
+// this list decides what the Cleaning SCREEN shows, not what a studio is
+// offered. A garment parked in that phase when the change shipped has to stay
+// visible, or there is no screen from which to finish it.
 export const CLEANING_STATUSES = [
   'returned',
   'pending-cleaning',
@@ -177,7 +183,6 @@ export const DASHBOARD_TILES = [
   'dropOffsToday',
   'currentlyRented',
   'pendingCleaning',
-  'qualityInspection',
   'lateReturns',
   'damaged',
 ];
@@ -217,7 +222,6 @@ export const dashboardCounts = (rows, now = new Date()) => ({
   // true after it goes overdue.
   currentlyRented: rows.filter(r => ['picked-up', 'overdue'].includes(opsStatus(r))).length,
   pendingCleaning: rows.filter(r => opsStatus(r) === 'pending-cleaning').length,
-  qualityInspection: rows.filter(r => opsStatus(r) === 'quality-inspection').length,
   lateReturns: rows.filter(isLate).length,
   damaged: rows.filter(isDamaged).length,
 });
@@ -282,7 +286,6 @@ export const STATUS_TONES = {
   returned: 'Amber',
   'pending-cleaning': 'Blue',
   'cleaning-in-progress': 'Blue',
-  'quality-inspection': 'Violet',
   'available-for-booking': 'Green',
   // Listing readiness statuses
   incoming: 'Amber',
@@ -308,7 +311,6 @@ export const statusTone = row =>
  */
 export const TILE_TONES = {
   pendingCleaning: 'Blue',
-  qualityInspection: 'Violet',
   lateReturns: 'Critical',
   damaged: 'Critical',
 };
