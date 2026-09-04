@@ -572,6 +572,54 @@ describe('LaundryOpsPage', () => {
       expect(screen.getByText('LaundryOpsPage.readiness.stored')).toBeInTheDocument();
     });
 
+    it("shows the studio's own code for the garment, not the rental's ticket", () => {
+      //   > "hay que mostrar el ticket que se haya ingresado internamente, no el
+      //   >  ticket de la transacción" (Jonathan, 2026-09-03)
+      //
+      // The two are different labels for different things: `ticketCode` belongs
+      // to a rental, `laundryCode` is where the garment is on this studio's
+      // shelving - which is the question this screen exists to answer.
+      const inventory = [
+        {
+          id: 'listing:1',
+          listingId: '1',
+          title: 'Camel hair wrap coat',
+          currentRack: 'Rack C-07',
+          readinessStatus: 'stored',
+          laundryCode: 'A-04',
+          ticketCode: 'PIG-2032',
+          state: null,
+          cleaningPhase: null,
+          imageUrl: null,
+        },
+      ];
+      render(<LaundryOpsPageComponent {...baseProps} inventory={inventory} tab="inventory" />);
+
+      expect(screen.getByText('#A-04')).toBeInTheDocument();
+      expect(screen.queryByText('#PIG-2032')).not.toBeInTheDocument();
+    });
+
+    it('shows the code on a garment back in stock, which is when it is needed most', () => {
+      // The old condition hid it on `delivered` - the garment sitting on the
+      // rack waiting to be found again.
+      const inventory = [
+        {
+          id: 'listing:2',
+          listingId: '2',
+          title: 'Silk slip dress',
+          currentRack: null,
+          readinessStatus: 'available',
+          laundryCode: 'B-11',
+          state: 'delivered',
+          cleaningPhase: null,
+          imageUrl: null,
+        },
+      ];
+      render(<LaundryOpsPageComponent {...baseProps} inventory={inventory} tab="inventory" />);
+
+      expect(screen.getByText('#B-11')).toBeInTheDocument();
+    });
+
     it('shows an empty state with no garments', () => {
       render(<LaundryOpsPageComponent {...baseProps} inventory={[]} tab="inventory" />);
       expect(screen.getByText('LaundryOpsPage.inventory.empty')).toBeInTheDocument();

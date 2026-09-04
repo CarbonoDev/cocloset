@@ -34,7 +34,22 @@ const LaundryInventory = props => {
     <ul className={css.inventoryGrid}>
       {inventory.map(item => {
         const labelKey = statusLabelKey(item);
-        const ticketCode = item.ticketCode;
+        // THE STUDIO'S OWN CODE, NOT THE TRANSACTION'S TICKET.
+        //
+        //   > "en la sección de inventory, hay que mostrar el ticket que se haya
+        //   >  ingresado internamente, no el ticket de la transacción"
+        //   >  (Jonathan, 2026-09-03)
+        //
+        // `ticketCode` belongs to a rental. `laundryCode` is what this studio
+        // wrote on the garment when it received it - the label that says where
+        // it is on their own shelving (server/api-util/laundryCode.js) - which
+        // is the only one of the two that answers the question this screen is
+        // for: go and find that garment.
+        //
+        // It is also shown regardless of state now. The old condition hid it on
+        // `delivered`, which is precisely the garment sitting in stock waiting
+        // to be found again.
+        const internalCode = item.laundryCode;
         return (
           <li key={item.id} className={css.inventoryCard}>
             <div className={css.inventoryImage}>
@@ -50,11 +65,7 @@ const LaundryInventory = props => {
             <span className={css.secondaryText}>
               {item.currentRack || <FormattedMessage id="LaundryOpsPage.inventory.noRack" />}
             </span>
-            {ticketCode && item.state !== "delivered" && (
-              <span className={css.secondaryText}>
-                #{ticketCode}
-              </span>
-            )}
+            {internalCode ? <span className={css.secondaryText}>#{internalCode}</span> : null}
             {labelKey ? (
               <span className={classNames(css.statusBadge, css[`tone${statusTone(item)}`])}>
                 <FormattedMessage id={labelKey} />
