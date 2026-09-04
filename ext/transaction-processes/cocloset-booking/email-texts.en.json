@@ -2,7 +2,7 @@
   "BookingAcceptedRequest.BookingBreakdown": "Your card has been charged for {amount,number,::.00} {currency}. Here's the booking breakdown.",
   "BookingAcceptedRequest.Cta": "View order details",
   "BookingAcceptedRequest.DescriptionDaily": "{providerDisplayName} has accepted your booking request for {listingTitle} from {dateStart,date,::YYYYMMMd} to {dateEnd,date,::YYYYMMMd}.",
-  "BookingAcceptedRequest.DescriptionFixed": "{providerDisplayName} has accepted your booking request for {listingTitle} from {dateStart,date,::hmmaYYYYMMMd} to {dateEnd,date,::hmmaYYYYMMMd}.",
+  "BookingAcceptedRequest.DescriptionFixed": "{providerDisplayName} has accepted your booking request for {listingTitle} from {dateStart,date,::jmmYYYYMMMd} to {dateEnd,date,::jmmYYYYMMMd}.",
   "BookingAcceptedRequest.DescriptionHourly": "{providerDisplayName} has accepted your booking request for {listingTitle} from {dateStart,date,::jmmYYYYMMMd} to {dateEnd,date,::jmmYYYYMMMd}.",
   "BookingAcceptedRequest.End": "End",
   "BookingAcceptedRequest.MarketplaceFeeLabel": "{marketplaceName} fee",
