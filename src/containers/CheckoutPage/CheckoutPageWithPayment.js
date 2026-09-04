@@ -43,6 +43,7 @@ import MobileListingImage from './MobileListingImage';
 import MobileOrderBreakdown from './MobileOrderBreakdown';
 
 import css from './CheckoutPage.module.css';
+import { bookingWeeksBetween } from '../../util/rentalWeeks';
 
 // Stripe PaymentIntent statuses, where user actions are already completed
 // https://stripe.com/docs/payments/payment-intents/status
@@ -128,9 +129,28 @@ const getOrderParams = (
 
   const customerDefaultMessageMaybe = customerDefaultMessage ? { customerDefaultMessage } : {};
 
+  // THE RENTAL'S LENGTH IN WEEKS, CARRIED SO AN EMAIL CAN PRINT IT.
+  //
+  //   > "el breakdown de dicho correo tiene que tener x 1 week o x 2 weeks dependiendo el
+  //   >  caso" (Jonathan, 2026-09-03)
+  //
+  // The breakdown is printed by the transaction email templates, and Sharetribe's template
+  // language has no arithmetic - there is no way to divide a day count by seven where the
+  // answer is needed. So it travels with the transaction, in `protectedData`, right next to
+  // `unitType`, which those same templates already read for this kind of branch.
+  //
+  // Absent when the rental is not a whole number of weeks: the breakdown falls back to days,
+  // which is still true, where "3 weeks" for a 20-day rental would not be.
+  const bookingWeeks = bookingWeeksBetween(
+    pageData.orderData?.bookingDates?.startDate,
+    pageData.orderData?.bookingDates?.endDate
+  );
+  const bookingWeeksMaybe = bookingWeeks ? { bookingWeeks } : {};
+
   const protectedDataMaybe = {
     protectedData: {
       ...getTransactionTypeData(listingType, unitType, config),
+      ...bookingWeeksMaybe,
       ...deliveryMethodMaybe,
       ...shippingDetails,
       ...priceVariantMaybe,
