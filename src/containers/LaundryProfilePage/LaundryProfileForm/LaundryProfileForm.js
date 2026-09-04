@@ -16,6 +16,12 @@ import {
   getTurnaroundCategoryIds,
   splitAcceptedCategories,
 } from '../../../util/fieldHelpers';
+import {
+  BUSINESS_DAYS,
+  dayCloseField,
+  dayEnabledField,
+  dayOpenField,
+} from '../../../util/businessHours';
 import { useConfiguration } from '../../../context/configurationContext';
 import {
   autocompleteSearchRequired,
@@ -404,18 +410,57 @@ const LaundryProfileForm = props => (
             </p>
           ) : null}
 
-          <FieldTextInput
-            className={css.field}
-            type="text"
-            id={`${formId}.businessHours`}
-            name="businessHours"
-            labelClassName={css.fieldLabel}
-            label={intl.formatMessage({ id: 'LaundryProfileForm.businessHoursLabel' })}
-            placeholder={intl.formatMessage({ id: 'LaundryProfileForm.businessHoursPlaceholder' })}
-            validate={required(
-              intl.formatMessage({ id: 'LaundryProfileForm.businessHoursRequired' })
-            )}
-          />
+          {/* ONE ROW PER DAY, ALL TICKED TO START WITH.
+                > "un listado con checkboxes por cada día, cada día debe tener un input
+                >  para hora de abrir y un input para hora de cerrar, por default todos
+                >  los días deben estar checkeados"
+
+              This replaced a single free-text box, which is why nothing could ever answer
+              "are they open on Sunday" - it held a sentence. The times are `type="time"`,
+              so the browser gives a picker and enforces HH:MM rather than this form
+              inventing a parser for whatever somebody types.
+
+              A day's inputs are disabled rather than hidden when it is unticked: the row
+              stays in place, so the grid does not reflow under the cursor as a studio
+              works down it, and the hours it had are still there when it is ticked back. */}
+          <fieldset className={css.hoursFieldset}>
+            <legend className={css.fieldLabel}>
+              {intl.formatMessage({ id: 'LaundryProfileForm.businessHoursLabel' })}
+            </legend>
+            <p className={css.hoursHelp}>
+              <FormattedMessage id="LaundryProfileForm.businessHoursHelp" />
+            </p>
+
+            {BUSINESS_DAYS.map(day => {
+              const isOpen = !!values[dayEnabledField(day)];
+              return (
+                <div className={css.hoursRow} key={day}>
+                  <FieldCheckbox
+                    className={css.hoursDay}
+                    id={`${formId}.${dayEnabledField(day)}`}
+                    name={dayEnabledField(day)}
+                    label={intl.formatMessage({ id: `LaundryProfileForm.day.${day}` })}
+                  />
+                  <FieldTextInput
+                    className={css.hoursTime}
+                    type="time"
+                    id={`${formId}.${dayOpenField(day)}`}
+                    name={dayOpenField(day)}
+                    disabled={!isOpen}
+                    label={intl.formatMessage({ id: 'LaundryProfileForm.opensAt' })}
+                  />
+                  <FieldTextInput
+                    className={css.hoursTime}
+                    type="time"
+                    id={`${formId}.${dayCloseField(day)}`}
+                    name={dayCloseField(day)}
+                    disabled={!isOpen}
+                    label={intl.formatMessage({ id: 'LaundryProfileForm.closesAt' })}
+                  />
+                </div>
+              );
+            })}
+          </fieldset>
 
           <FieldTextInput
             className={css.field}

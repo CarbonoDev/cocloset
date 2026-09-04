@@ -374,3 +374,46 @@
   color: var(--coclosetInkMuted);
   font-style: italic;
 }
+
+/* ================ Opening hours ================ */
+
+/* A fieldset because the seven rows are one answer to one question, and a screen reader
+   should hear the legend before any of them. */
+.hoursFieldset {
+  margin: 0 0 24px 0;
+  padding: 0;
+  border: none;
+}
+
+.hoursHelp {
+  margin: 0 0 12px 0;
+  color: var(--coclosetInkMuted);
+}
+
+/* The day and its two times on one line from the medium breakpoint, stacked below it -
+   three controls side by side on a phone would put each of them under a tappable width. */
+.hoursRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--coclosetBorder);
+
+  @media (--viewportMedium) {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+.hoursDay {
+  @media (--viewportMedium) {
+    flex: 0 0 140px;
+  }
+}
+
+.hoursTime {
+  @media (--viewportMedium) {
+    flex: 0 0 150px;
+  }
+}

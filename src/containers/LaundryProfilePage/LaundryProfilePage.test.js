@@ -136,7 +136,10 @@ describe('LaundryProfilePage', () => {
     });
 
     expect(screen.getByDisplayValue('Studio Pigalle')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Mon-Sat 11-21')).toBeInTheDocument();
+    // The hours grid, seeded. This fixture has only the OLD free-text line stored, so every
+    // day comes back ticked at the defaults - the string is a sentence and parsing it would
+    // put words in the studio's mouth about when it is open.
+    expect(screen.getByRole('checkbox', { name: 'LaundryProfileForm.day.mon' })).toBeChecked();
     expect(screen.getByDisplayValue('3')).toBeInTheDocument();
     // The legacy stored fee has no input to appear in any more.
     expect(screen.queryByDisplayValue('12.5')).not.toBeInTheDocument();
@@ -184,10 +187,12 @@ describe('LaundryProfilePage', () => {
       );
     });
 
-    const businessHours = screen.getByDisplayValue('Mon-Sat 11-21');
+    // The grid: untick the weekend, leave the five weekdays at their defaults. The stored
+    // `businessHours` string is DERIVED from that, which is the half worth asserting - every
+    // reader that prints a studio's hours still gets a sentence.
     await act(async () => {
-      await userEvent.clear(businessHours);
-      await userEvent.type(businessHours, 'Mon-Fri 09-19');
+      await userEvent.click(screen.getByRole('checkbox', { name: 'LaundryProfileForm.day.sat' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'LaundryProfileForm.day.sun' }));
     });
 
     await act(async () => {
@@ -201,7 +206,14 @@ describe('LaundryProfilePage', () => {
     // would keep a value alive that nothing reads and the studio cannot see.
     expect(submitted.privateData.cleaningFee).toBeUndefined();
     expect(submitted.privateData).not.toHaveProperty('cleaningFee');
-    expect(submitted.publicData.laundryProfile.businessHours).toBe('Mon-Fri 09-19');
+    expect(submitted.publicData.laundryProfile.businessHours).toBe('Mon-Fri 09:00-18:00');
+    expect(submitted.publicData.laundryProfile.businessHoursByDay).toEqual({
+      mon: { open: '09:00', close: '18:00' },
+      tue: { open: '09:00', close: '18:00' },
+      wed: { open: '09:00', close: '18:00' },
+      thu: { open: '09:00', close: '18:00' },
+      fri: { open: '09:00', close: '18:00' },
+    });
     expect(submitted.publicData.laundryProfile.studioName).toBe('Studio Pigalle');
     expect(submitted.publicData.laundryProfile.origin).toEqual(ORIGIN);
     expect(submitted.publicData.acceptedCategories).toEqual(['Eveningwear', 'Sequins']);

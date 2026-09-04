@@ -69,9 +69,14 @@ describe('LaundryProfileForm', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('LaundryProfileForm.addressLabel')).toBeInTheDocument();
     expect(screen.getByTestId('location-search')).toBeInTheDocument();
-    expect(
-      screen.getByRole('textbox', { name: 'LaundryProfileForm.businessHoursLabel' })
-    ).toBeInTheDocument();
+    // Opening hours is a row per day now, not one free-text line - see
+    // util/businessHours.js. Seven checkboxes, and two time inputs on each row.
+    expect(screen.getByText('LaundryProfileForm.businessHoursLabel')).toBeInTheDocument();
+    ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].forEach(day => {
+      expect(
+        screen.getByRole('checkbox', { name: `LaundryProfileForm.day.${day}` })
+      ).toBeInTheDocument();
+    });
     expect(
       screen.getByRole('spinbutton', { name: 'LaundryProfileForm.turnaroundDaysLabel' })
     ).toBeInTheDocument();
@@ -137,7 +142,12 @@ describe('LaundryProfileForm', () => {
     });
 
     expect(screen.getByText('LaundryProfileForm.acceptedCategoriesEmpty')).toBeInTheDocument();
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    // No CATEGORY checkbox. The seven opening-hours ones are a different fieldset and are
+    // always there, so this asserts the absence by name rather than by role alone.
+    expect(
+      screen.queryByRole('checkbox', { name: 'LaundryProfileForm.acceptedCategoriesLabel' })
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(7);
   });
 
   it('prefills fields from initialValues and keeps the submit button disabled when pristine', async () => {
