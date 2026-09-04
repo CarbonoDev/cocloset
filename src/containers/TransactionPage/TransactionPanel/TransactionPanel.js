@@ -19,6 +19,8 @@ import BookingLocationMaybe from './BookingLocationMaybe';
 import FeedSection from './FeedSection';
 import DiminishedActionButtonMaybe from './DiminishedActionButtonMaybe';
 import PanelHeading from './PanelHeading';
+import { isGarmentAtLaundry } from '../../../util/laundryStatuses';
+
 import HandoverQrMaybe from './HandoverQrMaybe';
 import DamageReportedMaybe from './DamageReportedMaybe';
 
@@ -249,6 +251,7 @@ export class TransactionPanelComponent extends Component {
               transactionId={transactionId}
               metadata={metadata}
               isCustomer={isCustomer}
+              isAtLaundry={isGarmentAtLaundry(listing?.attributes?.metadata?.readinessStatus)}
             />
 
             {/* The laundry's damage report (design §10). Sits directly below the

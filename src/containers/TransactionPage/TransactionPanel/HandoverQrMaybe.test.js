@@ -32,6 +32,10 @@ const renderPanel = (props = {}) =>
       processState="ready-for-pickup"
       transactionId={transactionId}
       metadata={{ handoverQr: record }}
+      // The renter is the default subject: they are the one who carries the code
+      // through every state below. The owner's much narrower window is asserted
+      // on its own, with the role and the garment's whereabouts stated.
+      isCustomer
       {...props}
     />
   );
@@ -111,9 +115,20 @@ describe('HandoverQrMaybe', () => {
   const WAITING_COPY = /still has to bring the garment to the laundry/i;
   const READY_COPY = /Show this code at the laundry counter/i;
 
-  it('shows the OWNER the code as soon as the payment is confirmed, with the waiting copy', () => {
-    ['preauthorized', 'accepted'].forEach(state => {
-      const { queryByText, getByRole, unmount } = renderPanel({ processState: state });
+  // The copy, not the visibility rule - which party sees what and when is asserted in "who
+  // sees the code, and from when" below. What matters here is that whoever DOES see a code
+  // before the garment is ready is told it is not usable yet.
+  it('carries the waiting copy while the garment is not at the counter yet', () => {
+    const viewers = [
+      // The renter, from the moment the booking is accepted.
+      { processState: 'accepted', isCustomer: true },
+      // The owner, in the one pre-acceptance state they can still see it in.
+      { processState: 'preauthorized', isCustomer: false, isAtLaundry: true },
+      { processState: 'accepted', isCustomer: false },
+    ];
+
+    viewers.forEach(props => {
+      const { queryByText, getByRole, unmount } = renderPanel(props);
       expect(getByRole('img')).toBeInTheDocument();
       expect(queryByText(WAITING_COPY)).toBeInTheDocument();
       expect(queryByText(READY_COPY)).not.toBeInTheDocument();
@@ -195,10 +210,50 @@ describe('HandoverQrMaybe', () => {
       expect(qr(view)).not.toBeInTheDocument();
     });
 
-    it('still shows it to the owner in that same state', () => {
+    // ------------------------------------------------------------------------
+    //   > "El QR no debe poder verse hasta que el provider apruebe la transacción,
+    //   >  esto aplica solo si la prenda no esta en una laundry, a su vez, si los
+    //   >  pasos siguientes aplican para el customer, el provider no debe ver el
+    //   >  QR" (Jonathan, 2026-09-03)
+    //
+    // This narrows the owner's window from both ends, and REVERSES the previous
+    // rule that showed them the code from payment. Three assertions, one per
+    // clause, because each is a separate promise.
+    // ------------------------------------------------------------------------
+    it('hides it from the owner too, until they have answered the booking', () => {
       const view = renderPanel({ processState: 'preauthorized', isCustomer: false });
 
+      expect(qr(view)).not.toBeInTheDocument();
+    });
+
+    it('shows it to the owner before they answer IF the garment is already at a studio', () => {
+      // Nothing about the code is theirs to act on in that case - the handover it
+      // describes is between the studio and the renter either way - so their
+      // approval is not what gates it.
+      const view = renderPanel({
+        processState: 'preauthorized',
+        isCustomer: false,
+        isAtLaundry: true,
+      });
+
       expect(qr(view)).toBeInTheDocument();
+    });
+
+    it('gives it to the owner once they accept', () => {
+      const view = renderPanel({ processState: 'accepted', isCustomer: false });
+
+      expect(qr(view)).toBeInTheDocument();
+    });
+
+    it("takes it from the owner the moment the next steps are the renter's", () => {
+      // From ready-for-pickup on, every remaining handover is the renter's errand.
+      ['ready-for-pickup', 'picked-up', 'overdue'].forEach(state => {
+        [false, true].forEach(isAtLaundry => {
+          const view = renderPanel({ processState: state, isCustomer: false, isAtLaundry });
+          expect(qr(view)).not.toBeInTheDocument();
+          view.unmount();
+        });
+      });
     });
 
     // "que acepte o que se autoacepte" needs no branch here: auto-accept is a transition INTO

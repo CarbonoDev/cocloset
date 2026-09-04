@@ -5,6 +5,7 @@ import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { subtractTime } from '../../util/dates';
 import { getProcess, resolveLatestProcessName } from '../../transactions/transaction';
 import { isHandoverQrVisibleState } from '../../transactions/transactionProcessCoclosetBooking';
+import { isGarmentAtLaundry } from '../../util/laundryStatuses';
 import {
   RENTAL_TIMELINE_STEPS,
   STEP_CURRENT,
@@ -99,7 +100,10 @@ const InboxTransactionPanel = props => {
   // is confirmed, which was never intended here and simply had no gate.
   const showQr =
     processName === COCLOSET_BOOKING_PROCESS &&
-    isHandoverQrVisibleState(processState, { isCustomer: transactionRole === 'customer' });
+    isHandoverQrVisibleState(processState, {
+      isCustomer: transactionRole === 'customer',
+      isAtLaundry: isGarmentAtLaundry(listing?.attributes?.metadata?.readinessStatus),
+    });
 
   const laundryName = publicData.assignedLaundryName;
   const pickupAddress = publicData.pickupAddress;

@@ -65,6 +65,23 @@ export const CLEANING_PHASES = ['pending-cleaning', 'cleaning-in-progress'];
 export const READINESS_STATUSES = ['incoming', 'stored', 'available'];
 
 /**
+ * Is the garment physically in a studio's custody right now?
+ *
+ * `incoming` is the owner still on their way with it - the studio is expecting the garment,
+ * not holding it. `stored` and `available` are both "it is on our rack"; they differ in
+ * whether it can be booked, which is not what this question asks.
+ *
+ * Used by the handover QR rules (Jonathan, 2026-09-03: the owner's code is gated on their own
+ * approval "solo si la prenda no esta en una laundry"), so a missing or unknown value has to
+ * mean NOT at the studio: that is the answer that hides the code rather than leaking it.
+ *
+ * @param {string} [readinessStatus] - `listing.metadata.readinessStatus`
+ * @returns {boolean}
+ */
+export const isGarmentAtLaundry = readinessStatus =>
+  ['stored', 'available'].includes(readinessStatus);
+
+/**
  * The wire vocabulary POSTed to /api/laundry-transaction-status.
  *
  * The client sends a *status* (the step to advance to) rather than a
