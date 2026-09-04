@@ -1,5 +1,6 @@
 {
   "BookingAcceptedRequest.BookingBreakdown": "Your card has been charged for {amount,number,::.00} {currency}. Here's the booking breakdown.",
+  "BookingAcceptedRequest.CleaningFeeLabel": "Cleaning fee",
   "BookingAcceptedRequest.Cta": "View order details",
   "BookingAcceptedRequest.DescriptionDaily": "{providerDisplayName} has accepted your booking request for {listingTitle} from {dateStart,date,::YYYYMMMd} to {dateEnd,date,::YYYYMMMd}.",
   "BookingAcceptedRequest.DescriptionFixed": "{providerDisplayName} has accepted your booking request for {listingTitle} from {dateStart,date,::jmmYYYYMMMd} to {dateEnd,date,::jmmYYYYMMMd}.",
@@ -69,6 +70,7 @@
   "BookingLateReturnOwner.Subject": "{listingTitle} has not been returned yet",
   "BookingLateReturnOwner.Title": "Your garment is overdue",
   "BookingMoneyPaid.BookingBreakdownTitle": "Here's the booking breakdown.",
+  "BookingMoneyPaid.CleaningFeeLabel": "Cleaning fee",
   "BookingMoneyPaid.ContentForDaily": "We have sent you {amount,number,::.00} {currency} for the booking of {listingTitle} from {dateStart,date,::YYYYMMMd} to {dateEnd,date,::YYYYMMMd} by {customerDisplayName}. It might take up to 7 days for the money to reach your bank account.",
   "BookingMoneyPaid.ContentForFixed": "We have sent you {amount,number,::.00} {currency} for the booking of {listingTitle} from {dateStart,date,::jmmYYYYMMMd} to {dateEnd,date,::jmmYYYYMMMd} by {customerDisplayName}. It might take up to 7 days for the money to reach your bank account.",
   "BookingMoneyPaid.ContentForHourly": "We have sent you {amount,number,::.00} {currency} for the booking of {listingTitle} from {dateStart,date,::jmmYYYYMMMd} to {dateEnd,date,::jmmYYYYMMMd} by {customerDisplayName}. It might take up to 7 days for the money to reach your bank account.",
