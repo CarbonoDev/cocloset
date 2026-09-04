@@ -214,7 +214,7 @@ describe('LaundryOpsPage.helpers', () => {
       expect(dashboardCounts(rows, NOW)).toEqual({
         readyForPickup: 1,
         pickupsToday: 1,
-        returnsExpectedToday: 1,
+        dropOffsToday: 1,
         currentlyRented: 2,
         pendingCleaning: 2,
         qualityInspection: 1,
@@ -223,11 +223,34 @@ describe('LaundryOpsPage.helpers', () => {
       });
     });
 
+    it('counts a lender bringing a garment in as a drop-off too', () => {
+      //   > "el que era returns expected today, puedes integrar Lender or Renter
+      //   >  drop offs?" (Jonathan, 2026-09-03)
+      //
+      // Two different people walk in with a garment. The tile counted only the
+      // renter's return, so a studio expecting three garments today saw one.
+      const withIncoming = [
+        ...rows,
+        { id: 'incoming-1', readinessStatus: 'incoming' },
+        { id: 'incoming-2', readinessStatus: 'incoming' },
+      ];
+
+      expect(dashboardCounts(withIncoming, NOW).dropOffsToday).toBe(3);
+    });
+
+    it('does not count a garment the studio already has as an incoming drop-off', () => {
+      // `stored` and `available` are garments already on the rack. Only
+      // `incoming` is someone still to walk through the door.
+      const stored = [{ id: 's', readinessStatus: 'stored' }];
+
+      expect(dashboardCounts(stored, NOW).dropOffsToday).toBe(0);
+    });
+
     it('counts date-driven tiles as zero when no row has a booking', () => {
       const undated = [row({ id: 'x', state: 'picked-up' })];
       const counts = dashboardCounts(undated, NOW);
       expect(counts.pickupsToday).toBe(0);
-      expect(counts.returnsExpectedToday).toBe(0);
+      expect(counts.dropOffsToday).toBe(0);
     });
   });
 

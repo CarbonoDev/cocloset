@@ -174,7 +174,7 @@ export const filterBySearch = (rows, query) => {
 export const DASHBOARD_TILES = [
   'readyForPickup',
   'pickupsToday',
-  'returnsExpectedToday',
+  'dropOffsToday',
   'currentlyRented',
   'pendingCleaning',
   'qualityInspection',
@@ -185,10 +185,10 @@ export const DASHBOARD_TILES = [
 /**
  * Counts for the dashboard stat tiles.
  *
- * NOTE on the two date-driven tiles (`pickupsToday`, `returnsExpectedToday`):
- * they read `bookingStart`/`bookingEnd`, which only exist once a transaction
- * has a real Sharetribe booking. Inquiry-stage rows have none and are counted
- * as zero rather than guessed at.
+ * NOTE on the two date-driven tiles (`pickupsToday`, `dropOffsToday`): they read
+ * `bookingStart`/`bookingEnd`, which only exist once a transaction has a real
+ * Sharetribe booking. Inquiry-stage rows have none and are counted as zero
+ * rather than guessed at.
  *
  * @param {Array} rows
  * @param {Date} now
@@ -196,7 +196,23 @@ export const DASHBOARD_TILES = [
 export const dashboardCounts = (rows, now = new Date()) => ({
   readyForPickup: rows.filter(r => opsStatus(r) === 'ready-for-pickup').length,
   pickupsToday: rows.filter(r => isSameDayAs(r.bookingStart, now)).length,
-  returnsExpectedToday: rows.filter(r => isSameDayAs(r.bookingEnd, now)).length,
+  // BOTH KINDS OF DROP-OFF, NOT JUST THE RENTER'S.
+  //
+  //   > "el que era returns expected today, puedes integrar Lender or Renter
+  //   >  drop offs?" (Jonathan, 2026-09-03)
+  //
+  // Two different people walk in with a garment: a RENTER returning one whose
+  // booking ends today, and a LENDER bringing one in for the first time. The
+  // tile counted only the first, so the counter staff's own question - how many
+  // garments am I taking in - had no answer on the dashboard.
+  //
+  // A lender drop-off has no booking date to be "today": the garment is
+  // `incoming` until the studio receives it, and it stays that way for as long
+  // as it takes the owner to turn up. So it is counted as outstanding rather
+  // than as due today, which is what the label says.
+  dropOffsToday:
+    rows.filter(r => isSameDayAs(r.bookingEnd, now)).length +
+    rows.filter(r => r?.readinessStatus === 'incoming' && !opsStatus(r)).length,
   // "Currently rented" is the garment being out with the customer, which stays
   // true after it goes overdue.
   currentlyRented: rows.filter(r => ['picked-up', 'overdue'].includes(opsStatus(r))).length,
