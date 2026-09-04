@@ -92,19 +92,26 @@ describe('laundry-options', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({
-      data: [{ id: 'l1', name: 'Maison du Marais' }, { id: 'l2', name: 'Studio Pigalle' }],
+      data: [
+        { id: 'l1', name: 'Maison du Marais', neighborhood: null },
+        { id: 'l2', name: 'Studio Pigalle', neighborhood: null },
+      ],
     });
   });
 
-  it('sends nothing but an id and a name', async () => {
+  it('sends nothing but an id, a name and a neighbourhood', async () => {
     // The shape IS the security contract: this endpoint is public, and the authenticated
     // directory it sits beside carries addresses, coordinates, hours and a turnaround
     // resolved from privateData.
+    //
+    // The neighbourhood joined that list deliberately on 2026-09-03, to label the search
+    // filter. It is a district the studio typed about itself - the granularity a shopper
+    // picks a pickup point by - and the street address it sits near is still not sent.
     setupSdk([laundryUser('l1', 'Maison du Marais')]);
 
     const res = await run();
 
-    expect(Object.keys(res.body.data[0]).sort()).toEqual(['id', 'name']);
+    expect(Object.keys(res.body.data[0]).sort()).toEqual(['id', 'name', 'neighborhood']);
     expect(JSON.stringify(res.body)).not.toContain('somewhere');
     expect(JSON.stringify(res.body)).not.toContain('turnaround');
   });

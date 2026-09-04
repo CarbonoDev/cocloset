@@ -219,6 +219,22 @@ const buildLaundryOptions = (users = []) =>
     .map(user => ({
       id: user?.id?.uuid || null,
       name: user?.attributes?.profile?.publicData?.laundryProfile?.studioName || null,
+      // THE LABEL THE SEARCH FILTER SHOWS.
+      //
+      //   > "filtremos por laundry pero usando el nombre del vecindario que tenga
+      //   >  en su dirección, solo es cambiar el label en las opciones de búsqueda"
+      //   >  (Jonathan, 2026-09-03)
+      //
+      // Someone choosing where to collect a garment is choosing a PART OF TOWN,
+      // not a business - "Sant Antoni" answers that question and "Studio Pigalle"
+      // does not, unless you already know the city well enough not to need the
+      // filter.
+      //
+      // Sent ALONGSIDE the studio name rather than replacing it: the name is what
+      // every listing card and every email prints, and one endpoint quietly
+      // returning a different string under the same key is how those start
+      // disagreeing. The client picks which one to show.
+      neighborhood: user?.attributes?.profile?.publicData?.neighborhood || null,
     }))
     .filter(option => !!option.id && !!option.name)
     .sort((a, b) => a.name.localeCompare(b.name));

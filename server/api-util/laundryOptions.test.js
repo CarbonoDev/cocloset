@@ -9,13 +9,14 @@ const { buildLaundryOptions } = require('./laundryDirectory');
 // business hours and a turnaround resolved from its privateData, and requires a session for
 // exactly that reason (see server/api/laundries.js).
 
-const laundryUser = (id, studioName, extra = {}) => ({
+const laundryUser = (id, studioName, extra = {}, neighborhood = undefined) => ({
   id: { uuid: id },
   attributes: {
     profile: {
       displayName: `${studioName} owner`,
       metadata: { isLaundry: true },
       publicData: {
+        ...(neighborhood ? { neighborhood } : {}),
         laundryProfile: {
           studioName,
           address: '47 Rue Vieille du Temple',
@@ -35,12 +36,35 @@ const plainUser = id => ({
 });
 
 describe('buildLaundryOptions', () => {
-  it('returns exactly an id and a name, and nothing else', () => {
+  it('returns exactly an id, a name and a neighbourhood, and nothing else', () => {
     // THE WHOLE POINT. Adding a key here is adding it to a public surface, so it has to be a
     // decision rather than a spread - and this test is what makes it one.
+    //
+    // `neighborhood` was added on 2026-09-03 for the search filter's label. It is a district
+    // name the studio typed about itself, at the granularity a shopper picks a pickup point
+    // by - not the street address the test below still guards.
     const [option] = buildLaundryOptions([laundryUser('l1', 'Maison du Marais')]);
-    expect(Object.keys(option).sort()).toEqual(['id', 'name']);
-    expect(option).toEqual({ id: 'l1', name: 'Maison du Marais' });
+    expect(Object.keys(option).sort()).toEqual(['id', 'name', 'neighborhood']);
+    expect(option).toEqual({ id: 'l1', name: 'Maison du Marais', neighborhood: null });
+  });
+
+  //   > "filtremos por laundry pero usando el nombre del vecindario que tenga en su
+  //   >  dirección, solo es cambiar el label en las opciones de búsqueda"
+  it('carries the neighbourhood when the studio has given one', () => {
+    const [option] = buildLaundryOptions([
+      laundryUser('l1', 'Maison du Marais', {}, 'Le Marais'),
+    ]);
+    expect(option.neighborhood).toBe('Le Marais');
+    // The name still goes too: it is the fallback label, and it is what every listing card
+    // and every email prints.
+    expect(option.name).toBe('Maison du Marais');
+  });
+
+  it('sends null rather than dropping the key when there is no neighbourhood', () => {
+    // A missing key and an absent value would be indistinguishable to the client, which has
+    // to choose a fallback label from exactly this.
+    const [option] = buildLaundryOptions([laundryUser('l1', 'Maison du Marais')]);
+    expect(option.neighborhood).toBeNull();
   });
 
   it('leaks no address, coordinates, hours or turnaround', () => {
