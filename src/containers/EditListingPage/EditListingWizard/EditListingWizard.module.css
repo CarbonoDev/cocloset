@@ -66,25 +66,46 @@
 
 /* "LIST A PIECE / New garment" above the steps. Hidden on the mobile strip,
    where the rail collapses to a scrolling row and there is no space for it. */
-/* The preview link sits above the whole wizard - rail and panel both - because it is about
-   the listing rather than about the tab you happen to be on. Right-aligned and quiet: it is an
-   escape hatch, not a call to action competing with the tab's own save button. */
+/* THE FOOTER ROW EVERY PANEL'S FORM ENDS WITH.
+     > "El button de preview listing debe estar al lado de next como un botón
+     >  secundario, donde esta pierde visibilidad" (Jonathan, 2026-09-03)
+
+   Defined here, once, and composed by each form's stylesheet rather than copied
+   into four of them - the laundry rail is what copying this kind of rule costs.
+   The row wraps on narrow screens so the two buttons stack instead of shrinking
+   below a tappable width. */
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The preview, as the secondary half of that pair. It used to be a quiet
+   underlined link floated above the whole wizard - rail and panel both - which
+   is nowhere near where an owner is looking when they might want it. Same height
+   and shape as the submit button beside it, outlined rather than filled, so it
+   reads as the second option rather than as competition for Next. */
 .previewLink {
-  align-self: flex-end;
-  margin: 12px 24px 0 24px;
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 59px;
+  padding: 0 24px;
+
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadius);
 
   color: var(--coclosetInk);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: var(--fontWeightMedium);
-  text-decoration: underline;
+  text-align: center;
+  text-decoration: none;
 
-  &:hover {
+  &:hover,
+  &:focus {
+    border-color: var(--coclosetInk);
     text-decoration: none;
-  }
-
-  @media (--viewportMedium) {
-    margin: 16px 32px 0 32px;
   }
 }
 

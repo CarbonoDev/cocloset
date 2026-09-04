@@ -398,6 +398,7 @@ const EditListingDetailsPanel = props => {
     // suggests nothing.
     brandOptions: brandOptionsProp,
     submitButtonText,
+    previewListingLink,
     panelUpdated,
     updateInProgress,
     errors,
@@ -523,6 +524,7 @@ const EditListingDetailsPanel = props => {
           className={css.form}
           initialValues={initialValues}
           saveActionMsg={submitButtonText}
+          previewListingLink={previewListingLink}
           onSubmit={values => {
             const {
               title,

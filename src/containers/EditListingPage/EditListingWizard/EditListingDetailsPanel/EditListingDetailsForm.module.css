@@ -145,3 +145,9 @@
     margin-bottom: 24px;
   }
 }
+
+/* The submit button and the preview, side by side. Defined once in
+   EditListingWizard.module.css so the four panels cannot drift apart. */
+.formActions {
+  composes: formActions from '../EditListingWizard.module.css';
+}

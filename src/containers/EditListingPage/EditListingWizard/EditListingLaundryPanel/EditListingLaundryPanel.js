@@ -113,6 +113,7 @@ const EditListingLaundryPanel = props => {
     ready,
     onSubmit,
     submitButtonText,
+    previewListingLink,
     panelUpdated,
     updateInProgress,
     errors,
@@ -335,6 +336,7 @@ const EditListingLaundryPanel = props => {
           return refreshDerivedFields.then(() => onSubmit({}));
         }}
         saveActionMsg={submitButtonText}
+        previewListingLink={previewListingLink}
         disabled={disabled}
         ready={ready}
         updated={panelUpdated}

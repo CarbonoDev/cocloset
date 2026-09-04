@@ -407,9 +407,7 @@ const FieldBrandAutocomplete = props => {
         // Reaches the DOM input through FieldTextInput's `...rest`.
         list={listId}
         autoComplete="off"
-        validate={required(
-          intl.formatMessage({ id: 'EditListingDetailsForm.brandRequired' })
-        )}
+        validate={required(intl.formatMessage({ id: 'EditListingDetailsForm.brandRequired' }))}
       />
       <datalist id={listId}>
         {brandOptions.map(({ brand }) => (
@@ -577,6 +575,7 @@ const EditListingDetailsForm = props => (
         pickSelectedCategories,
         categoryPrefix,
         saveActionMsg,
+        previewListingLink,
         updated,
         updateInProgress,
         fetchErrors,
@@ -763,15 +762,18 @@ const EditListingDetailsForm = props => (
             </p>
           )}
 
-          <Button
-            className={css.submitButton}
-            type="submit"
-            inProgress={submitInProgress}
-            disabled={submitDisabled}
-            ready={submitReady}
-          >
-            {saveActionMsg}
-          </Button>
+          <div className={css.formActions}>
+            <Button
+              className={css.submitButton}
+              type="submit"
+              inProgress={submitInProgress}
+              disabled={submitDisabled}
+              ready={submitReady}
+            >
+              {saveActionMsg}
+            </Button>
+            {previewListingLink}
+          </div>
         </Form>
       );
     }}
