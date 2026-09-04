@@ -143,7 +143,14 @@ describe('LaundryOpsPage', () => {
 
     it('does not close the detail when the operator clicks inside it', async () => {
       const user = userEvent.setup();
-      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+      // A row at the cleaning step: it is the one with a box to click into.
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          orders={[orderRow({ state: 'returned' })]}
+          tab="orders"
+        />
+      );
 
       await user.click(screen.getByText('LaundryOpsPage.table.open'));
       await user.click(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1'));
@@ -218,9 +225,11 @@ describe('LaundryOpsPage', () => {
       expect(document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1')).toHaveValue('RACK 12');
     });
 
-    // Every step after reception only READS the code. A box at the return step would collect
-    // one the server discards.
-    it('does not ask for the internal code at the return step', async () => {
+    //   > "1. Confirm return, donde solo se cambia de estado" (Jonathan, 2026-09-03)
+    //
+    // Confirming a return asks nothing. Both boxes belong to the next step, and a box here
+    // would collect an answer the server no longer reads at this transition.
+    it('asks nothing at the return step itself', async () => {
       const user = userEvent.setup();
       render(
         <LaundryOpsPageComponent
@@ -233,8 +242,33 @@ describe('LaundryOpsPage', () => {
       await user.click(screen.getByText('LaundryOpsPage.table.open'));
 
       expect(document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1')).toBeNull();
-      // The days box belongs to this step, so its absence would mean the wrong thing was tested.
+      expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).toBeNull();
+      // ...but the damage report is still here, which is the half that did NOT move.
+      expect(screen.getByText('LaundryOpsPage.action.returned')).toBeInTheDocument();
+    });
+
+    //   > "se debe preguntar a la laundry los días que necesita para el lavado y que ingrese
+    //   >  nuevamente el ticket, por si debe cambiarlo, el valor por default debe ser el
+    //   >  ticket anterior"
+    it('asks for both the days and the ticket when processing for cleaning', async () => {
+      const user = userEvent.setup();
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ state: 'returned', laundryCode: 'A-04' })]}
+        />
+      );
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+
       expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).toBeInTheDocument();
+      const codeBox = document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1');
+      expect(codeBox).toBeInTheDocument();
+      // Prefilled with the code the garment already carries: the common case is confirming
+      // it, not retyping it.
+      expect(codeBox).toHaveValue('A-04');
+      expect(screen.getByText('LaundryOpsPage.action.pending-cleaning')).toBeInTheDocument();
     });
 
     // A blank box is "not decided yet", never a delete: sending an empty string would ask the
@@ -269,13 +303,20 @@ describe('LaundryOpsPage', () => {
     });
 
     it('pre-fills the cleaning-days box with the studio own turnaround', async () => {
+      // At the cleaning step now, which is where the box lives.
       //   > "estos días deben tener un default de los días que indique la laundry, pero
       //   >  pueden modificarse al recibir"
       //
       // It used to start blank under "leave it blank to use your configured turnaround",
       // which asked the operator to accept a number they could not see.
       const user = userEvent.setup();
-      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          orders={[orderRow({ state: 'returned' })]}
+          tab="orders"
+        />
+      );
 
       await user.click(screen.getByText('LaundryOpsPage.table.open'));
       const input = document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1');
@@ -402,12 +443,12 @@ describe('LaundryOpsPage', () => {
       await userEvent.type(screen.getByRole('textbox'), 'Small pull at left cuff.');
       await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
 
+      // No cleaningDays: the return is one thing now, and the days are asked at the next
+      // step. This is the assertion that would have caught them being collected here and
+      // applied from there.
       expect(onAdvanceStatus).toHaveBeenCalledWith({
         transactionId: 'tx-1',
         status: 'returned',
-        // The pre-filled turnaround rides along untouched; this test is about the damage
-        // report, and the operator did not change the days.
-        cleaningDays: 3,
         damaged: true,
         damageNote: 'Small pull at left cuff.',
       });
@@ -427,17 +468,22 @@ describe('LaundryOpsPage', () => {
     it('sends the cleaning-days estimate the laundry typed', async () => {
       const onAdvanceStatus = jest.fn();
       render(
-        <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
+        <LaundryOpsPageComponent
+          {...baseProps}
+          orders={[orderRow({ state: 'returned' })]}
+          tab="orders"
+          onAdvanceStatus={onAdvanceStatus}
+        />
       );
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
       // Cleared first: the box now arrives pre-filled with the studio's configured
       // turnaround, so typing into it would append rather than replace.
       await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.type(screen.getByRole('spinbutton'), '5');
-      await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.pending-cleaning'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'returned', cleaningDays: 5 })
+        expect.objectContaining({ status: 'pending-cleaning', cleaningDays: 5 })
       );
     });
 
@@ -448,11 +494,16 @@ describe('LaundryOpsPage', () => {
       // deliberate clear - which is the honest version of the old "leave it blank".
       const onAdvanceStatus = jest.fn();
       render(
-        <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
+        <LaundryOpsPageComponent
+          {...baseProps}
+          orders={[orderRow({ state: 'returned' })]}
+          tab="orders"
+          onAdvanceStatus={onAdvanceStatus}
+        />
       );
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
       await userEvent.clear(screen.getByRole('spinbutton'));
-      await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.pending-cleaning'));
 
       expect(onAdvanceStatus.mock.calls[0][0]).not.toHaveProperty('cleaningDays');
     });
@@ -460,18 +511,23 @@ describe('LaundryOpsPage', () => {
     it('sends an explicit 0 - "ready today" is a real answer', async () => {
       const onAdvanceStatus = jest.fn();
       render(
-        <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
+        <LaundryOpsPageComponent
+          {...baseProps}
+          orders={[orderRow({ state: 'returned' })]}
+          tab="orders"
+          onAdvanceStatus={onAdvanceStatus}
+        />
       );
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
       await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.type(screen.getByRole('spinbutton'), '0');
-      await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.pending-cleaning'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(expect.objectContaining({ cleaningDays: 0 }));
     });
 
-    it('does not offer the cleaning-days field at a non-returned step', async () => {
-      const rows = [orderRow({ state: 'returned' })];
+    it('does not offer the cleaning-days field outside the cleaning step', async () => {
+      const rows = [orderRow({ state: 'accepted' })];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
 

@@ -176,11 +176,36 @@ describe('laundryStatuses', () => {
       expect(new Set(cleaningDaysSteps)).toEqual(new Set([CLEANING_DAYS_STATUS]));
     });
 
-    it('offers the cleaning-days field from both picked-up and overdue', () => {
-      // The two states a garment can come back from. A late return needs the
-      // estimate at least as much as an on-time one.
-      expect(laundryActionsFor(row({ state: 'picked-up' }))[0].needsCleaningDays).toBe(true);
-      expect(laundryActionsFor(row({ state: 'overdue' }))[0].needsCleaningDays).toBe(true);
+    //   > "1. Confirm return, donde solo se cambia de estado y una vez hecho esto, se debe
+    //   >  preguntar a la laundry los días que necesita para el lavado" (Jonathan, 2026-09-03)
+    it('asks for the cleaning days when the wash starts, not when the garment arrives', () => {
+      // Confirming the return is one thing now: the garment is back. The estimate belongs to
+      // the step where the studio actually starts working on it.
+      expect(laundryActionsFor(row({ state: 'returned' }))[0].needsCleaningDays).toBe(true);
+
+      ['picked-up', 'overdue'].forEach(state => {
+        expect(laundryActionsFor(row({ state }))[0].needsCleaningDays).toBeFalsy();
+      });
+    });
+
+    it("still asks about damage at the return, where the garment is in someone's hands", () => {
+      // The two questions were separate constants for exactly this reason: the report is
+      // about the garment ARRIVING, the days are about the work STARTING. Moving one must
+      // not drag the other along.
+      ['picked-up', 'overdue'].forEach(state => {
+        expect(laundryActionsFor(row({ state }))[0].needsDamageReport).toBe(true);
+      });
+      expect(laundryActionsFor(row({ state: 'returned' }))[0].needsDamageReport).toBe(false);
+    });
+
+    it('asks for the ticket again when processing for cleaning', () => {
+      //   > "que ingrese nuevamente el ticket, por si debe cambiarlo, el valor por default
+      //   >  debe ser el ticket anterior, pero debe solicitarlo siempre"
+      //
+      // A garment coming back from a rental often does not go back on the shelf it left.
+      expect(laundryActionsFor(row({ state: 'returned' }))[0].needsLaundryCode).toBe(true);
+      // ...and still at reception, which is where it first gets one.
+      expect(laundryActionsFor(row({ state: 'accepted' }))[0].needsLaundryCode).toBe(true);
     });
 
     it('keeps "confirm return" and "start cleaning" as two separate steps', () => {

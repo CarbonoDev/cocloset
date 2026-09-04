@@ -656,11 +656,20 @@ module.exports = (req, res) => {
         });
       }
 
-      const isReturn =
-        transition === TRANSITIONS.LAUNDRY_CONFIRM_RETURN ||
-        transition === TRANSITIONS.LAUNDRY_CONFIRM_RETURN_LATE;
+      // THE WASH IS SCHEDULED WHEN THE WASH STARTS, NOT WHEN THE GARMENT ARRIVES.
+      //
+      // This hung off the two RETURN transitions, because that was the step that asked for
+      // the cleaning days. The question moved to "Process for Cleaning", so the readiness it
+      // feeds - when the garment can be booked again, and the availability block that
+      // reserves the time - moves with it. Collecting the days at one step and applying them
+      // from another is the bug this avoids.
+      //
+      // Counting from NOW rather than from the return is also the more honest clock: this is
+      // the moment the studio says it is starting, and the days it just typed are days of
+      // work, not days since a garment landed on a counter.
+      const isCleaningStart = transition === TRANSITIONS.LAUNDRY_MARK_PENDING_CLEANING;
 
-      const returnPromise = isReturn
+      const returnPromise = isCleaningStart
         ? handleRealReturn({
             integrationSdk,
             listing,

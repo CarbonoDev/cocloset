@@ -772,7 +772,7 @@
   "LandingPage.schemaTitle": "{marketplaceName}",
   "LaundryOpsPage.action.available-for-booking": "Mark available for booking",
   "LaundryOpsPage.action.cleaning-in-progress": "Mark cleaning in progress",
-  "LaundryOpsPage.action.pending-cleaning": "Start cleaning",
+  "LaundryOpsPage.action.pending-cleaning": "Process for Cleaning",
   "LaundryOpsPage.action.picked-up": "Confirm pickup",
   "LaundryOpsPage.action.ready-for-pickup": "Mark ready for pickup",
   "LaundryOpsPage.action.returned": "Confirm return",

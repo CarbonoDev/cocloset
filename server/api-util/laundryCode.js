@@ -127,7 +127,14 @@ const currentLaundryCodeFor = listing => {
  * @param {string} status
  * @returns {boolean}
  */
-const takesLaundryCode = status => status === 'ready-for-pickup';
+// Reception, and again at "Process for Cleaning" (Jonathan, 2026-09-03: "que ingrese
+// nuevamente el ticket, por si debe cambiarlo"). A garment coming back from a rental often
+// does not go back on the shelf it left.
+//
+// MUST match LAUNDRY_CODE_STATUSES in src/util/laundryStatuses.js. This is the half that
+// decides whether the code is READ; a step the client asks at and this does not would take an
+// operator's input and drop it silently.
+const takesLaundryCode = status => ['ready-for-pickup', 'pending-cleaning'].includes(status);
 
 module.exports = {
   LISTING_CODE_KEY,

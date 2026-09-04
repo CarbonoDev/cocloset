@@ -104,36 +104,45 @@ export const LAUNDRY_ACTION_STATUSES = [
 // Both return transitions accept one.
 export const DAMAGE_REPORT_STATUS = 'returned';
 
-// The step at which the laundry may say how long cleaning will take.
+// The step at which the laundry says how long cleaning will take.
 //
-//   > "Al momento en que una laundry recibe una prenda (cuando el cliente la
-//   >  devuelve) puede determinar cuantos días va a tardar en lavar para habilitar
-//   >  la disponibilidad, por default son los días que establece en su
-//   >  configuración de la laundry"
+//   > "se divide en dos pasos: 1. Confirm return, donde solo se cambia de estado y una vez
+//   >  hecho esto, se debe preguntar a la laundry los días que necesita para el lavado (...)
+//   >  el botón para completar este form será Process for Cleaning" (Jonathan, 2026-09-03)
 //
-// Same step as the damage report, and for the same reason: confirming the return
-// is the one moment a human is holding the garment and looking at it. Kept as its
-// own constant rather than reusing DAMAGE_REPORT_STATUS, because they are two
-// unrelated facts that happen to be collected together - if the damage report
-// ever moves, this must not follow it by accident.
+// MOVED OFF THE RETURN. Confirming the return is now one thing only: the garment is back.
+// The questions that belong to the WASH are asked at the next step, which is where the studio
+// actually starts working on it - and it puts the cleaning-days answer AFTER the damage
+// report rather than beside it, which matters: a studio that has just found a stain has a
+// different answer about how long it needs, and the old form asked both in one breath.
 //
-// The field is OPTIONAL. Sending nothing means "use the turnaround I configured",
-// which is the documented default and is resolved server-side from the laundry's
-// per-category settings - the client neither knows nor guesses it.
-export const CLEANING_DAYS_STATUS = 'returned';
+// The damage report deliberately did NOT move. It is about the garment arriving; this is
+// about the work starting. They were separate constants for exactly this reason.
+//
+// The field is OPTIONAL. Sending nothing means "use the turnaround I configured", which is
+// resolved server-side from the laundry's per-category settings - the client neither knows
+// nor guesses it.
+export const CLEANING_DAYS_STATUS = 'pending-cleaning';
 
-// The step at which the studio names the garment on its own shelving.
+// The steps at which the studio names the garment on its own shelving.
 //
 //   > "cuando laundry recibe la prenda desde el provider, debe aparecer un input
 //   >  para que laundry pueda ingresar un código interno para esa prenda"
 //
-// The reception step, which is the one moment the garment is on the counter coming
-// IN from its owner. MUST match `takesLaundryCode` in server/api-util/laundryCode.js -
-// the server decides whether the code is read at all, and a client that offers the box
-// at a step the server ignores would take an operator's input and drop it silently.
-// That is exactly what the ops table did: the handover page asked, this one did not,
-// so the same reception done from a desk lost the code with nothing on screen to say so.
-export const LAUNDRY_CODE_STATUS = 'ready-for-pickup';
+// TWO STEPS NOW, NOT ONE. Reception is still where a garment first gets a code; "Process for
+// Cleaning" asks again - "que ingrese nuevamente el ticket, por si debe cambiarlo, el valor
+// por default debe ser el ticket anterior, pero debe solicitarlo siempre" - because a garment
+// coming back from a rental often does not go back on the shelf it left. The box is prefilled
+// with the current code, so the common case is confirming rather than retyping.
+//
+// MUST match `takesLaundryCode` in server/api-util/laundryCode.js - the server decides
+// whether the code is read at all, and a client that offers the box at a step the server
+// ignores would take an operator's input and drop it silently. That is exactly what the ops
+// table did once already: the handover page asked, this one did not, so the same reception
+// done from a desk lost the code with nothing on screen to say so.
+export const LAUNDRY_CODE_STATUSES = ['ready-for-pickup', 'pending-cleaning'];
+
+export const takesLaundryCode = status => LAUNDRY_CODE_STATUSES.includes(status);
 
 // Mirrors MAX_CODE_LENGTH in server/api-util/laundryCode.js, which is the authority and will
 // reject anything longer. Held here so both screens that ask for a code cap it the same way -
@@ -236,7 +245,7 @@ export const laundryActionsFor = row => {
       labelKey: `LaundryOpsPage.action.${nextStatus}`,
       needsDamageReport: nextStatus === DAMAGE_REPORT_STATUS,
       needsCleaningDays: nextStatus === CLEANING_DAYS_STATUS,
-      needsLaundryCode: nextStatus === LAUNDRY_CODE_STATUS,
+      needsLaundryCode: takesLaundryCode(nextStatus),
       firesPayout: nextStatus === PAYOUT_ACTION_STATUS,
     },
   ];
