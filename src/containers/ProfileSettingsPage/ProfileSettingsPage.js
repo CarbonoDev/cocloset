@@ -105,6 +105,21 @@ export const ProfileSettingsPageComponent = props => {
       bio,
       publicData: {
         ...pickUserFieldsData(rest, 'public', userType, userFields),
+        // THE NEIGHBOURHOOD, WRITTEN BY THE MEMBER THEMSELVES.
+        //
+        //   > "En mi form de profile settings, puedo ingresar el nombre de mi
+        //   >  vecindario y éste se debe mostrar en mi perfil" (Jonathan, 2026-09-03)
+        //
+        // `publicData`, because the whole point is that other members read it on
+        // the profile. Not a Console user field: those are configured per
+        // marketplace and this one is part of how Cocloset works - a wardrobe
+        // organised around where people actually are - so it ships with the app
+        // rather than depending on an operator having added it.
+        //
+        // `null` rather than `''` when cleared: Sharetribe only removes a
+        // publicData key when it is explicitly set to null, so an empty string
+        // would leave the profile rendering a blank line forever.
+        neighborhood: rest.neighborhood?.trim() ? rest.neighborhood.trim() : null,
       },
     };
     const uploadedImage = props.image;
@@ -140,6 +155,7 @@ export const ProfileSettingsPageComponent = props => {
         lastName,
         ...displayNameMaybe,
         bio,
+        neighborhood: publicData?.neighborhood || '',
         profileImage: user.profileImage,
         ...initialValuesForUserFields(publicData, 'public', userType, userFields),
       }}

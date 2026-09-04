@@ -10,6 +10,7 @@ import {
   groupListingFieldConfigs,
   getDerivedRenderData,
   withBrandFilter,
+  withLaundryPickupFilter,
 } from './SearchPage.shared.js';
 
 const urlParams = {
@@ -786,5 +787,46 @@ describe('withBrandFilter', () => {
 
     expect(result).toHaveLength(3);
     expect(result.slice(0, 2)).toEqual(existing);
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "filtremos por laundry pero usando el nombre del vecindario que tenga en su
+//   >  dirección, solo es cambiar el label en las opciones de búsqueda"
+//   >  (Jonathan, 2026-09-03)
+//
+// The option's VALUE is still the studio id - that is what the search schema filters on, and
+// changing it would silently return the whole marketplace. Only the label moved.
+// ---------------------------------------------------------------------------
+describe('withLaundryPickupFilter labels', () => {
+  const optionsFor = laundryOptions => {
+    const [filter] = withLaundryPickupFilter([], laundryOptions, { formatMessage: () => 'Pickup' });
+    return filter.enumOptions;
+  };
+
+  it('labels a studio by its neighbourhood', () => {
+    expect(optionsFor([{ id: 'l1', name: 'Maison du Marais', neighborhood: 'Le Marais' }])).toEqual(
+      [{ option: 'l1', label: 'Le Marais' }]
+    );
+  });
+
+  it('falls back to the studio name when there is no neighbourhood', () => {
+    // A studio that has not filled it in would otherwise be a blank row in the dropdown,
+    // which is worse than a name the reader has to look up.
+    expect(optionsFor([{ id: 'l1', name: 'Maison du Marais', neighborhood: null }])).toEqual([
+      { option: 'l1', label: 'Maison du Marais' },
+    ]);
+  });
+
+  it('keeps filtering by the studio id, whatever the label says', () => {
+    const [option] = optionsFor([
+      { id: 'l1', name: 'Maison du Marais', neighborhood: 'Le Marais' },
+    ]);
+    expect(option.option).toBe('l1');
+  });
+
+  it('adds no filter at all when there are no studios', () => {
+    // An empty dropdown reads as "this marketplace has no stores", which is worse than none.
+    expect(withLaundryPickupFilter([], [], { formatMessage: () => 'Pickup' })).toEqual([]);
   });
 });

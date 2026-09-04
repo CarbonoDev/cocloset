@@ -31,7 +31,9 @@ describe('timelineStatusFor', () => {
   });
 
   it('marks the step a rental is on, and everything before it as done', () => {
+    // Three done: booking confirmed, drop off at cleaners, laundry preparing.
     expect(statuses('ready-for-pickup')).toEqual([
+      STEP_DONE,
       STEP_DONE,
       STEP_DONE,
       STEP_CURRENT,
@@ -42,10 +44,28 @@ describe('timelineStatusFor', () => {
     ]);
   });
 
+  //   > "Podemos agregar el paso 'drop of at cleaners' despues de Booking
+  //   >  confirmed en el listado de pasos de la transacción?" (Jonathan, 2026-09-03)
+  //
+  // Between a confirmed booking and a studio preparing the garment there is a
+  // person carrying it there, and the list had no name for that wait.
+  it('names the drop-off, immediately after the booking is confirmed', () => {
+    expect(customerKeys.indexOf('dropOffAtCleaners')).toBe(
+      customerKeys.indexOf('bookingConfirmed') + 1
+    );
+    expect(providerKeys.indexOf('dropOffAtCleaners')).toBe(
+      providerKeys.indexOf('bookingConfirmed') + 1
+    );
+    expect(customerKeys.indexOf('dropOffAtCleaners')).toBeLessThan(
+      customerKeys.indexOf('laundryPreparing')
+    );
+  });
+
   it('lands on the LATER of two steps that share one process state', () => {
     // The design splits "booking confirmed" from "laundry preparing", and "picked up" from
     // "rental active"; each pair is one process state. Marking the earlier twin would leave a
     // rental that is out with the customer showing "picked up" as still happening.
+    // Three steps share `accepted` now, and the rule is unchanged: the last one wins.
     expect(keyAt('accepted')).toBe('laundryPreparing');
     expect(keyAt('picked-up')).toBe('rentalActive');
   });

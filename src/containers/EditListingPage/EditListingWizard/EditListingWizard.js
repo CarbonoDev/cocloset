@@ -916,7 +916,6 @@ class EditListingWizard extends Component {
 
     return (
       <div className={classes}>
-        <PreviewListingLink listing={listing} routeConfiguration={routeConfiguration} intl={intl} />
         <Tabs
           rootClassName={css.tabsContainer}
           navRootClassName={css.nav}
@@ -963,6 +962,13 @@ class EditListingWizard extends Component {
                   />
                 }
                 tabSubmitButtonText={tabTranslations.submitButton}
+                previewListingLink={
+                  <PreviewListingLink
+                    listing={listing}
+                    routeConfiguration={routeConfiguration}
+                    intl={intl}
+                  />
+                }
                 tabLinkProps={tabLink(tab)}
                 selected={selectedTab === tab}
                 disabled={isNewListingFlow && !tabsStatus[tab]}

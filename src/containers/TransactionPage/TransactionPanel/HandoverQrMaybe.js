@@ -42,20 +42,20 @@ const COCLOSET_BOOKING_PROCESS = 'cocloset-booking';
  *    evento" is about the screen, "la información del qr debe permanecer en la
  *    metadata" about the record, and those are not in conflict.
  *
- * Shown to BOTH parties, but NOT FROM THE SAME MOMENT.
+ * Shown to BOTH parties, but over DIFFERENT stretches of the rental.
  *
- *   > "Cuando se renta, a partir de ese momento aparece el QR, puedes ocultarlo a menos que el
- *   >  provider acepte o que se autoacepte la transacción? El provider si puede ver el QR"
+ *   > "El QR no debe poder verse hasta que el provider apruebe la transacción, esto aplica
+ *   >  solo si la prenda no esta en una laundry, a su vez, si los pasos siguientes aplican
+ *   >  para el customer, el provider no debe ver el QR"
  *
- * The owner sees it from `preauthorized`; the customer only once the booking has been
- * accepted. A code the customer might carry to a counter for a rental that never happened is
- * worse than a short wait for it - while for the owner it is part of what they are being asked
- * to decide about. The floors live in transactionProcessCoclosetBooking.js, which also records
- * that this reverses an earlier instruction.
+ * The RENTER has it from acceptance to the moment the garment is back - they are the one
+ * standing at the counter, twice. The OWNER has it only while the rental is theirs to act on:
+ * from their own approval until the studio marks it ready, plus the one earlier state where
+ * the garment is already at a studio and their approval gates nothing.
  *
- * The customer is the one who carries it to the counter, but an owner being able to read out
- * the code when a customer phones them is useful rather than harmful - it is an identifier,
- * not a credential.
+ * Both floors reverse earlier instructions, months apart. The rules live in
+ * transactionProcessCoclosetBooking.js, which records each reversal rather than quietly
+ * overwriting it.
  *
  * @component
  * @param {Object} props
@@ -66,6 +66,8 @@ const COCLOSET_BOOKING_PROCESS = 'cocloset-booking';
  * @param {Object} [props.transactionId] - the transaction's UUID object
  * @param {Object} [props.metadata] - transaction.attributes.metadata
  * @param {boolean} [props.isCustomer] - is the viewer the customer rather than the owner?
+ * @param {boolean} [props.isAtLaundry] - is the garment already in a studio's custody? Only
+ *   affects the owner, and only before they have accepted - see isHandoverQrVisibleState.
  * @returns {JSX.Element|null}
  */
 const HandoverQrMaybe = props => {
@@ -77,6 +79,7 @@ const HandoverQrMaybe = props => {
     transactionId,
     metadata,
     isCustomer = false,
+    isAtLaundry = false,
   } = props;
 
   // Every other process in this template (booking, purchase, inquiry,
@@ -85,7 +88,7 @@ const HandoverQrMaybe = props => {
     return null;
   }
 
-  if (!isHandoverQrVisibleState(processState, { isCustomer })) {
+  if (!isHandoverQrVisibleState(processState, { isCustomer, isAtLaundry })) {
     return null;
   }
 

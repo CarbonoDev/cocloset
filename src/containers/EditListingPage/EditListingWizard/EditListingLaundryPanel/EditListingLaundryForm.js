@@ -169,6 +169,7 @@ export const EditListingLaundryForm = props => (
         invalid,
         pristine,
         saveActionMsg,
+        previewListingLink,
         updated,
         updateInProgress = false,
         fetchErrors,
@@ -306,15 +307,18 @@ export const EditListingLaundryForm = props => (
             </p>
           ) : null}
 
-          <Button
-            className={css.submitButton}
-            type="submit"
-            inProgress={submitInProgress}
-            disabled={submitDisabled}
-            ready={submitReady}
-          >
-            {saveActionMsg}
-          </Button>
+          <div className={css.formActions}>
+            <Button
+              className={css.submitButton}
+              type="submit"
+              inProgress={submitInProgress}
+              disabled={submitDisabled}
+              ready={submitReady}
+            >
+              {saveActionMsg}
+            </Button>
+            {previewListingLink}
+          </div>
         </Form>
       );
     }}

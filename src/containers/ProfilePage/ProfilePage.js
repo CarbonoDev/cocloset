@@ -270,6 +270,9 @@ export const MainContent = props => {
       ? window.matchMedia(`(max-width: ${MAX_MOBILE_SCREEN_WIDTH}px)`)?.matches
       : true;
 
+  // Written by the member on their settings page; absent on a profile that has not said.
+  const neighborhood = publicData?.neighborhood;
+
   const hasBio = !!bio;
   const bioWithLinks = richText(bio, {
     linkify: true,
@@ -293,6 +296,15 @@ export const MainContent = props => {
       <H2 as="h1" className={css.desktopHeading}>
         <FormattedMessage id="ProfilePage.desktopHeading" values={{ name: displayName }} />
       </H2>
+      {/* Where this member is, in their own words - written on the settings page
+          (Jonathan, 2026-09-03). Directly under the name because that is what it
+          qualifies: a wardrobe organised around neighbourhoods answers "is this
+          person near me" before it answers anything else. Absent when they have
+          not said, rather than rendered as an empty line. */}
+      {/* The member's own words, rendered as content rather than through a message -
+          the same treatment the bio below gets, and for the same reason: there is no
+          UI text here to translate, only what they typed. */}
+      {neighborhood ? <p className={css.neighborhood}>{neighborhood}</p> : null}
       {hasBio ? <p className={css.bio}>{bioWithLinks}</p> : null}
 
       {displayName ? (

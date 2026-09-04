@@ -27,6 +27,11 @@ import LaundryProfileForm from './LaundryProfileForm/LaundryProfileForm';
 
 import { updateProfile } from './LaundryProfilePage.duck';
 import css from './LaundryProfilePage.module.css';
+import {
+  businessHoursSummary,
+  toBusinessHoursByDay,
+  toFormValues as businessHoursToFormValues,
+} from '../../util/businessHours';
 
 const { LatLng } = sdkTypes;
 
@@ -57,7 +62,7 @@ const toLatLng = origin => {
 const getInitialValues = currentUser => {
   const { publicData = {}, privateData = {} } = currentUser?.attributes?.profile || {};
   const { laundryProfile = {}, acceptedCategories = [] } = publicData;
-  const { studioName, address, businessHours } = laundryProfile;
+  const { studioName, address, businessHours, businessHoursByDay } = laundryProfile;
   const origin = toLatLng(laundryProfile.origin);
   // No cleaningFee is read: fees are marketplace-level server env configuration now
   // (CLEANING_FEE_<CATEGORY_ID>, see server/api-util/cleaningFeeEnv.js), the form has no
@@ -66,7 +71,10 @@ const getInitialValues = currentUser => {
 
   return {
     studioName,
-    businessHours,
+    // The old free-text line is still read for display elsewhere; the FORM is the grid now.
+    // A studio that has not re-saved since this shipped gets every day ticked at the
+    // defaults rather than a parse of a sentence somebody typed.
+    ...businessHoursToFormValues(businessHoursByDay),
     turnaroundDays,
     // The per-category table is flattened into one form field per value
     // (`categoryPricing__turnaroundDays__dresses`). Flat, not nested, because React
@@ -132,7 +140,12 @@ const LaundryProfileFormSection = props => {
   const addressEditable = canChangeLaundryAddress(currentUser);
 
   const handleSubmit = values => {
-    const { studioName, businessHours, turnaroundDays, acceptedCategories, location } = values;
+    const { studioName, turnaroundDays, acceptedCategories, location } = values;
+    // The grid is the source of truth; `businessHours` is the one-line summary written from
+    // it, because that string is what the listing wizard's laundry card, the public directory
+    // and this page's own header print. See util/businessHours.js.
+    const businessHoursByDay = toBusinessHoursByDay(values);
+    const businessHours = businessHoursSummary(businessHoursByDay);
     const { address, origin } = location?.selectedPlace || {};
 
     // The category table hands back an array of Console category ids, plus any legacy
@@ -206,6 +219,7 @@ const LaundryProfileFormSection = props => {
         laundryProfile: {
           studioName,
           businessHours,
+          businessHoursByDay,
           // Absent keys are omitted rather than written as undefined: a studio
           // setting its FIRST address has nothing stored to preserve, and the
           // address call right after this one is what puts it there.
@@ -252,7 +266,7 @@ const LaundryProfileFormSection = props => {
     setState({
       initialValues: {
         studioName,
-        businessHours,
+        ...businessHoursToFormValues(businessHoursByDay),
         turnaroundDays: nextTurnaroundDays,
         acceptedCategories: acceptedCategoriesArray,
         ...categoryPricingToFormValues(nextCategoryPricing),

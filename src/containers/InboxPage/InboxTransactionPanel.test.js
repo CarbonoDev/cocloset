@@ -155,17 +155,27 @@ describe('InboxTransactionPanel: whose timeline it renders', () => {
 // requirement half-met, which reads as a bug rather than as a policy. Hence a test here too.
 // ---------------------------------------------------------------------------
 describe('InboxTransactionPanel: who gets the QR', () => {
-  const atTransition = (lastTransition, role) =>
-    render(
+  const atTransition = (lastTransition, role, { isAtLaundry = false } = {}) => {
+    const base = transactionWith({});
+    return render(
       <InboxTransactionPanel
         transaction={{
-          ...transactionWith({}),
-          attributes: { ...transactionWith({}).attributes, lastTransition },
+          ...base,
+          attributes: { ...base.attributes, lastTransition },
+          listing: {
+            ...base.listing,
+            attributes: {
+              ...base.listing.attributes,
+              // `stored` is the studio holding it; anything else is not.
+              metadata: { readinessStatus: isAtLaundry ? 'stored' : 'incoming' },
+            },
+          },
         }}
         transactionRole={role}
         onManageDisableScrolling={() => null}
       />
     );
+  };
 
   const qrButton = () => screen.queryByLabelText('InboxPage.panel.openQr');
 
@@ -175,10 +185,23 @@ describe('InboxTransactionPanel: who gets the QR', () => {
     expect(qrButton()).not.toBeInTheDocument();
   });
 
-  it('is there for the owner in that same state', () => {
-    atTransition('transition/confirm-payment', TX_TRANSITION_ACTOR_PROVIDER);
+  //   > "El QR no debe poder verse hasta que el provider apruebe la transacción,
+  //   >  esto aplica solo si la prenda no esta en una laundry" (Jonathan, 2026-09-03)
+  it('is hidden from the owner too, until they answer - unless the studio already has it', () => {
+    atTransition('transition/confirm-payment', TX_TRANSITION_ACTOR_PROVIDER).unmount();
+    expect(qrButton()).not.toBeInTheDocument();
 
+    atTransition('transition/confirm-payment', TX_TRANSITION_ACTOR_PROVIDER, {
+      isAtLaundry: true,
+    });
     expect(qrButton()).toBeInTheDocument();
+  });
+
+  //   > "si los pasos siguientes aplican para el customer, el provider no debe ver el QR"
+  it("leaves the owner once the remaining handovers are the renter's", () => {
+    atTransition('transition/laundry-mark-ready', TX_TRANSITION_ACTOR_PROVIDER);
+
+    expect(qrButton()).not.toBeInTheDocument();
   });
 
   // Auto-accept lands in the same state as a manual accept, so one rule covers both.

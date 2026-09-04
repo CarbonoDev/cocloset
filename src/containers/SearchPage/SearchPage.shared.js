@@ -602,7 +602,7 @@ const getSelectedSecondaryFiltersCount = (
  * which is worse than no dropdown.
  *
  * @param {Array<Object>} listingFields - from config.listing
- * @param {Array<{id: string, name: string}>} laundryOptions
+ * @param {Array<{id: string, name: string, neighborhood: string}>} laundryOptions
  * @param {Object} intl - the label is TEXT here, not a key: Console supplies a human label for
  *   every other filter and the components render it verbatim.
  * @returns {Array<Object>}
@@ -618,7 +618,19 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
       key: 'assignedLaundryId',
       scope: 'meta',
       schemaType: 'enum',
-      enumOptions: laundryOptions.map(option => ({ option: option.id, label: option.name })),
+      // LABELLED BY NEIGHBOURHOOD, NOT BY BUSINESS NAME.
+      //
+      //   > "filtremos por laundry pero usando el nombre del vecindario que tenga en su
+      //   >  dirección, solo es cambiar el label en las opciones de búsqueda"
+      //
+      // Someone choosing where to collect is choosing a part of town. The studio name is
+      // the fallback rather than the default: a studio that has not filled its
+      // neighbourhood in would otherwise become a blank row in the dropdown, which is
+      // worse than a name the reader has to look up.
+      enumOptions: laundryOptions.map(option => ({
+        option: option.id,
+        label: option.neighborhood || option.name,
+      })),
       filterConfig: {
         // The search schema for this key is live - verified against Dev, where filtering by
         // each studio returns exactly its own garments. Without it Sharetribe would ignore the

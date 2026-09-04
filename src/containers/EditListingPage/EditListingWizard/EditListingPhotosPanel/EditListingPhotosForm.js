@@ -185,6 +185,7 @@ export const EditListingPhotosForm = props => {
           disabled,
           ready,
           saveActionMsg,
+          previewListingLink,
           updated,
           updateInProgress,
           touched,
@@ -326,15 +327,18 @@ export const EditListingPhotosForm = props => {
                 </p>
               ) : null}
 
-              <Button
-                className={css.submitButton}
-                type="submit"
-                inProgress={submitInProgress}
-                disabled={submitDisabled}
-                ready={submitReady}
-              >
-                {saveActionMsg}
-              </Button>
+              <div className={css.formActions}>
+                <Button
+                  className={css.submitButton}
+                  type="submit"
+                  inProgress={submitInProgress}
+                  disabled={submitDisabled}
+                  ready={submitReady}
+                >
+                  {saveActionMsg}
+                </Button>
+                {previewListingLink}
+              </div>
             </div>
           </Form>
         );

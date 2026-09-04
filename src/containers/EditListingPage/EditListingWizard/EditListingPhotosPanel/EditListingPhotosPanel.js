@@ -48,6 +48,7 @@ const EditListingPhotosPanel = props => {
     listing,
     onImageUpload,
     submitButtonText,
+    previewListingLink,
     panelUpdated,
     updateInProgress,
     onSubmit,
@@ -101,6 +102,7 @@ const EditListingPhotosPanel = props => {
         }}
         onRemoveImage={onRemoveImage}
         saveActionMsg={submitButtonText}
+        previewListingLink={previewListingLink}
         updated={panelUpdated}
         updateInProgress={updateInProgress}
         listingImageConfig={listingImageConfig}

@@ -114,6 +114,7 @@ const EditListingPricingPanel = props => {
     ready,
     onSubmit,
     submitButtonText,
+    previewListingLink,
     listingTypes,
     panelUpdated,
     updateInProgress,
@@ -238,6 +239,7 @@ const EditListingPricingPanel = props => {
           isPriceVariationsInUse={isPriceVariationsInUse}
           listingMinimumPriceSubUnits={listingMinimumPriceSubUnits}
           saveActionMsg={submitButtonText}
+          previewListingLink={previewListingLink}
           disabled={disabled}
           ready={ready}
           updated={panelUpdated}

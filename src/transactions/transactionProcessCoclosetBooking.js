@@ -481,29 +481,72 @@ const HANDOVER_QR_STATES_AFTER_ACCEPT = [
   states.OVERDUE,
 ];
 
+export const HANDOVER_QR_CUSTOMER_VISIBLE_STATES = HANDOVER_QR_STATES_AFTER_ACCEPT;
+
+// THE OWNER'S RULE, NARROWED TWICE (Jonathan, 2026-09-03).
+//
+//   > "El QR no debe poder verse hasta que el provider apruebe la transacción, esto aplica
+//   >  solo si la prenda no esta en una laundry, a su vez, si los pasos siguientes aplican
+//   >  para el customer, el provider no debe ver el QR"
+//
+// FLOOR. The owner used to see the code from PREAUTHORIZED, on the reasoning that the code is
+// part of what they are being asked to decide about. It is not: what an unanswered booking
+// needs from them is an answer. So the floor is ACCEPTED - their own approval.
+//
+// The exception is the whole point of the sentence. If the garment is ALREADY at a studio,
+// there is nothing for the owner to do with a code and nothing their approval gates: the
+// handover it describes is between the studio and the renter either way. Hiding it there
+// would be hiding a code from the one party who might be asked to read it out over the phone,
+// for a reason that does not apply. So PREAUTHORIZED stays visible in that case only.
+//
+// CEILING. Once the transaction reaches READY_FOR_PICKUP the remaining handovers are the
+// RENTER's - collect it, bring it back - and the owner is not at the counter for either. A
+// code on their screen then is an identifier for someone else's errand.
+export const HANDOVER_QR_PROVIDER_VISIBLE_STATES = [states.ACCEPTED];
+
+// The one state whose visibility depends on where the garment physically is, rather than on
+// what the process says.
+export const HANDOVER_QR_PROVIDER_AT_LAUNDRY_STATES = [
+  states.PREAUTHORIZED,
+  ...HANDOVER_QR_PROVIDER_VISIBLE_STATES,
+];
+
+// Kept as the union of everything either party can ever see, for callers that only ask "could
+// this state ever show a code" - not as a role's rule. It is no longer anyone's own list.
 export const HANDOVER_QR_VISIBLE_STATES = [
   states.PREAUTHORIZED,
   ...HANDOVER_QR_STATES_AFTER_ACCEPT,
 ];
 
-export const HANDOVER_QR_CUSTOMER_VISIBLE_STATES = HANDOVER_QR_STATES_AFTER_ACCEPT;
-
 /**
  * Should the handover QR be shown for a transaction in this state?
  *
- * DEFAULTS TO THE PROVIDER'S RULE when no role is given. That is the wider of the two, so a
- * caller that forgets to say who is looking shows the code slightly early rather than hiding
- * it from someone entitled to it - and the one caller that matters, HandoverQrMaybe, does say.
+ * DEFAULTS TO THE PROVIDER'S RULE when no role is given, and that is now the NARROWER of the
+ * two - it used to be the wider one. Both defaults err the same way on purpose: a caller that
+ * does not say who is looking, or does not know where the garment is, hides the code rather
+ * than showing it to someone who should not have it yet.
  *
  * @param {string} [state] - a cocloset-booking state name
  * @param {Object} [options]
  * @param {boolean} [options.isCustomer] - is the viewer the customer?
+ * @param {boolean} [options.isAtLaundry] - is the garment already in a studio's custody?
+ *   Only widens the OWNER's window, and only over PREAUTHORIZED.
  * @returns {boolean}
  */
-export const isHandoverQrVisibleState = (state, { isCustomer = false } = {}) =>
-  isCustomer
-    ? HANDOVER_QR_CUSTOMER_VISIBLE_STATES.includes(state)
-    : HANDOVER_QR_VISIBLE_STATES.includes(state);
+export const isHandoverQrVisibleState = (
+  state,
+  { isCustomer = false, isAtLaundry = false } = {}
+) => {
+  if (isCustomer) {
+    return HANDOVER_QR_CUSTOMER_VISIBLE_STATES.includes(state);
+  }
+  // `isAtLaundry` widens the owner's window by exactly one state, and defaults to false -
+  // so a caller that does not know where the garment is hides the code a beat early rather
+  // than showing it to an owner who has not answered the booking yet.
+  return isAtLaundry
+    ? HANDOVER_QR_PROVIDER_AT_LAUNDRY_STATES.includes(state)
+    : HANDOVER_QR_PROVIDER_VISIBLE_STATES.includes(state);
+};
 
 // The laundry states need the laundry's attention, not the garment owner's,
 // and the laundry is not a party to the transaction in the Sharetribe sense.

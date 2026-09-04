@@ -68,13 +68,17 @@ exports[`EditListingDeliveryForm matches snapshot 1`] = `
     <div
       class="submitSection"
     >
-      <button
-        class="root submitButton"
-        disabled=""
-        type="submit"
+      <div
+        class="formActions"
       >
-        Save photos
-      </button>
+        <button
+          class="root submitButton"
+          disabled=""
+          type="submit"
+        >
+          Save photos
+        </button>
+      </div>
     </div>
   </form>
 </DocumentFragment>

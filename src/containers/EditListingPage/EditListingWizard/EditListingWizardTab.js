@@ -142,6 +142,7 @@ const EditListingWizardTab = props => {
     allFilesUploadedAndVerified,
     filesRequired,
     captureOwnerAddress,
+    previewListingLink,
   } = props;
 
   const { type } = params;
@@ -250,6 +251,21 @@ const EditListingWizardTab = props => {
         fetchInProgress ||
         (isLastTab(tab) && filesRequired && (fileUploadsDisabled || !allFilesUploadedAndVerified)),
       submitButtonText: tabSubmitButtonText,
+      // THE PREVIEW, WHERE THE READER IS ALREADY LOOKING.
+      //
+      //   > "El button de preview listing debe estar al lado de next como un
+      //   >  botón secundario, donde esta pierde visibilidad" (Jonathan, 2026-09-03)
+      //
+      // It used to be a quiet underlined link above the whole wizard - rail and
+      // panel both - which is nowhere near the place an owner's attention is at
+      // the moment they might want it. Passing it down means the FORM decides
+      // where it goes, so it lands in the same footer row as the submit button
+      // rather than approximating that position from outside the form.
+      //
+      // A node rather than a flag: the wizard already has the listing and the
+      // route configuration needed to build the href, and a form has no business
+      // knowing how a listing URL is assembled.
+      previewListingLink,
       listingTypes: config.listing.listingTypes,
       onManageDisableScrolling,
       onSubmit: values => {

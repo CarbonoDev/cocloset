@@ -83,9 +83,15 @@ export const isDamaged = row => row?.damageReported?.flag === true;
  */
 export const isLate = row => isOverdue(row) || wasReturnedLate(row);
 
-// The three cleaning sub-phases plus the 'returned' hand-off that feeds them
+// The cleaning sub-phases plus the `returned` hand-off that feeds them
 // (design doc §9: all of these map to the single customer-facing "Cleaning"
-// step, and mockup 05.jpg shows all three on the Cleaning screen).
+// step, and mockup 05.jpg shows them on the Cleaning screen).
+//
+// `quality-inspection` is still here on purpose, even though the phase was
+// removed from the workflow on 2026-09-03 and nothing can enter it any more:
+// this list decides what the Cleaning SCREEN shows, not what a studio is
+// offered. A garment parked in that phase when the change shipped has to stay
+// visible, or there is no screen from which to finish it.
 export const CLEANING_STATUSES = [
   'returned',
   'pending-cleaning',
@@ -174,10 +180,9 @@ export const filterBySearch = (rows, query) => {
 export const DASHBOARD_TILES = [
   'readyForPickup',
   'pickupsToday',
-  'returnsExpectedToday',
+  'dropOffsToday',
   'currentlyRented',
   'pendingCleaning',
-  'qualityInspection',
   'lateReturns',
   'damaged',
 ];
@@ -185,10 +190,10 @@ export const DASHBOARD_TILES = [
 /**
  * Counts for the dashboard stat tiles.
  *
- * NOTE on the two date-driven tiles (`pickupsToday`, `returnsExpectedToday`):
- * they read `bookingStart`/`bookingEnd`, which only exist once a transaction
- * has a real Sharetribe booking. Inquiry-stage rows have none and are counted
- * as zero rather than guessed at.
+ * NOTE on the two date-driven tiles (`pickupsToday`, `dropOffsToday`): they read
+ * `bookingStart`/`bookingEnd`, which only exist once a transaction has a real
+ * Sharetribe booking. Inquiry-stage rows have none and are counted as zero
+ * rather than guessed at.
  *
  * @param {Array} rows
  * @param {Date} now
@@ -196,12 +201,27 @@ export const DASHBOARD_TILES = [
 export const dashboardCounts = (rows, now = new Date()) => ({
   readyForPickup: rows.filter(r => opsStatus(r) === 'ready-for-pickup').length,
   pickupsToday: rows.filter(r => isSameDayAs(r.bookingStart, now)).length,
-  returnsExpectedToday: rows.filter(r => isSameDayAs(r.bookingEnd, now)).length,
+  // BOTH KINDS OF DROP-OFF, NOT JUST THE RENTER'S.
+  //
+  //   > "el que era returns expected today, puedes integrar Lender or Renter
+  //   >  drop offs?" (Jonathan, 2026-09-03)
+  //
+  // Two different people walk in with a garment: a RENTER returning one whose
+  // booking ends today, and a LENDER bringing one in for the first time. The
+  // tile counted only the first, so the counter staff's own question - how many
+  // garments am I taking in - had no answer on the dashboard.
+  //
+  // A lender drop-off has no booking date to be "today": the garment is
+  // `incoming` until the studio receives it, and it stays that way for as long
+  // as it takes the owner to turn up. So it is counted as outstanding rather
+  // than as due today, which is what the label says.
+  dropOffsToday:
+    rows.filter(r => isSameDayAs(r.bookingEnd, now)).length +
+    rows.filter(r => r?.readinessStatus === 'incoming' && !opsStatus(r)).length,
   // "Currently rented" is the garment being out with the customer, which stays
   // true after it goes overdue.
   currentlyRented: rows.filter(r => ['picked-up', 'overdue'].includes(opsStatus(r))).length,
   pendingCleaning: rows.filter(r => opsStatus(r) === 'pending-cleaning').length,
-  qualityInspection: rows.filter(r => opsStatus(r) === 'quality-inspection').length,
   lateReturns: rows.filter(isLate).length,
   damaged: rows.filter(isDamaged).length,
 });
@@ -266,7 +286,6 @@ export const STATUS_TONES = {
   returned: 'Amber',
   'pending-cleaning': 'Blue',
   'cleaning-in-progress': 'Blue',
-  'quality-inspection': 'Violet',
   'available-for-booking': 'Green',
   // Listing readiness statuses
   incoming: 'Amber',
@@ -292,7 +311,6 @@ export const statusTone = row =>
  */
 export const TILE_TONES = {
   pendingCleaning: 'Blue',
-  qualityInspection: 'Violet',
   lateReturns: 'Critical',
   damaged: 'Critical',
 };
