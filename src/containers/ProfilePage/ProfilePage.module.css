@@ -94,6 +94,17 @@
   hyphens: auto;
 }
 
+/* Sits between the name and the bio, so it reads as part of the heading rather than as the
+   first sentence of the bio. Quieter than both. */
+.neighborhood {
+  margin: 0 0 8px 0;
+  color: var(--coclosetInkMuted);
+
+  @media (--viewportMedium) {
+    margin: 0 0 12px 0;
+  }
+}
+
 .bio {
   /* Preserve newlines, but collapse other whitespace */
   white-space: pre-line;

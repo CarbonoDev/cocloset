@@ -28,6 +28,10 @@ import css from './ProfileSettingsForm.module.css';
 const ACCEPT_IMAGES = 'image/*';
 const UPLOAD_CHANGE_DELAY = 2000; // Show spinner so that browser has time to load img srcset
 
+// Long enough for "Sant Antoni, Eixample", short enough that it stays a place name rather than
+// becoming a second bio.
+const NEIGHBORHOOD_MAX_LENGTH = 60;
+
 const DisplayNameMaybe = props => {
   const { userTypeConfig, intl } = props;
 
@@ -387,6 +391,34 @@ class ProfileSettingsFormComponent extends Component {
                 />
                 <p className={css.extraInfo}>
                   <FormattedMessage id="ProfileSettingsForm.bioInfo" values={{ marketplaceName }} />
+                </p>
+              </div>
+
+              {/* WHERE THIS MEMBER IS, IN THE WORDS THEY USE FOR IT.
+                    > "En mi form de profile settings, puedo ingresar el nombre de mi
+                    >  vecindario y éste se debe mostrar en mi perfil"
+
+                  Free text, and deliberately not a picker: a neighbourhood is what
+                  people who live somewhere call it, and no geocoder's list agrees
+                  with all of them. It is also optional - a member who does not want
+                  to say leaves it blank and their profile simply does not carry a
+                  line about it. */}
+              <div className={classNames(css.sectionContainer)}>
+                <H4 as="h2" className={css.sectionTitle}>
+                  <FormattedMessage id="ProfileSettingsForm.neighborhoodHeading" />
+                </H4>
+                <FieldTextInput
+                  type="text"
+                  id={`${formId}neighborhood`}
+                  name="neighborhood"
+                  label={intl.formatMessage({ id: 'ProfileSettingsForm.neighborhoodLabel' })}
+                  placeholder={intl.formatMessage({
+                    id: 'ProfileSettingsForm.neighborhoodPlaceholder',
+                  })}
+                  maxLength={NEIGHBORHOOD_MAX_LENGTH}
+                />
+                <p className={css.extraInfo}>
+                  <FormattedMessage id="ProfileSettingsForm.neighborhoodInfo" />
                 </p>
               </div>
               <div className={classNames(css.sectionContainer, css.lastSection)}>

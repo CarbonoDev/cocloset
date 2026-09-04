@@ -44,6 +44,7 @@ const attributes = {
       kitchenDescription: 'This is a kitchen description!',
       numberOfCookbooks: 10,
       userType: 'a',
+      neighborhood: 'Sant Antoni',
       notShownInProfileAttribute: 'Do not show this in profile',
     },
   },
@@ -128,6 +129,35 @@ describe('ProfilePage', () => {
     });
     expect(screen.getByText('ProfilePage.desktopHeading')).toBeInTheDocument();
     expect(screen.getByText('I am a great cook!')).toBeInTheDocument();
+  });
+
+  //   > "puedo ingresar el nombre de mi vecindario y éste se debe mostrar en mi
+  //   >  perfil" (Jonathan, 2026-09-03)
+  //
+  // It is written on the settings page into publicData; this is the half that
+  // reads it back. Not a Console user field, so it does not arrive through
+  // CustomUserFields and has to be rendered on its own.
+  it('shows the neighborhood the member entered', async () => {
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: getInitialState(), config });
+    });
+
+    expect(screen.getByText('Sant Antoni')).toBeInTheDocument();
+  });
+
+  it('says nothing at all when the member has not given one', async () => {
+    // An empty line under the name would read as a rendering fault.
+    const stateWithout = getInitialState();
+    const users = stateWithout.marketplaceData.entities.user;
+    Object.keys(users).forEach(id => {
+      delete users[id].attributes.profile.publicData.neighborhood;
+    });
+
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: stateWithout, config });
+    });
+
+    expect(screen.queryByText('Sant Antoni')).not.toBeInTheDocument();
   });
 
   it('Check that custom user information is shown correctly', async () => {
