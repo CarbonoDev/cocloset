@@ -1104,6 +1104,7 @@
   "OrderBreakdown.baseUnitNightSeats": "{unitPrice} x {quantity, number} {quantity, plural, one {night} other {nights}} x { seats, number } { seats, plural, one {seat} other {seats} }",
   "OrderBreakdown.baseUnitOffer": "Price",
   "OrderBreakdown.baseUnitQuantity": "{quantity, plural, one {Unit price} other {{unitPrice} x #}}",
+  "OrderBreakdown.baseUnitRentalPeriodWeeks": "{unitPrice} for {weeks, plural, one {# week} other {# weeks}}",
   "OrderBreakdown.baseUnitRentalPeriod": "{unitPrice} for {days, plural, one {# day} other {# days}}",
   "OrderBreakdown.baseUnitRequest": "Price",
   "OrderBreakdown.bookingEnd": "Booking end",
