@@ -25,6 +25,21 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DAYS_PER_WEEK = 7;
 
 /**
+ * The same question asked of a day count that has already been worked out.
+ *
+ * The order breakdown (checkout, transaction page) resolves the rental's length in days
+ * itself, from the booking; it does not need the dates again. Sharing this rather than
+ * writing `days % 7` there keeps "what counts as a whole number of weeks" in one place -
+ * the mail and the screen disagreeing about that is exactly the kind of thing a reader
+ * notices and we would not.
+ *
+ * @param {number} [days]
+ * @returns {number|null} whole weeks, or null
+ */
+export const weeksFromDays = days =>
+  Number.isInteger(days) && days > 0 && days % DAYS_PER_WEEK === 0 ? days / DAYS_PER_WEEK : null;
+
+/**
  * @param {Date|string|number} [start] - booking start
  * @param {Date|string|number} [end] - booking end, exclusive (as Sharetribe stores it)
  * @returns {number|null} whole weeks, or null
