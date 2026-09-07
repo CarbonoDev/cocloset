@@ -6,13 +6,13 @@ jest.mock('../api-util/integrationSdk', () => ({
   getIntegrationSdk: jest.fn(),
 }));
 
-jest.mock('../api-util/listingOwnerAuth', () => ({
-  authorizeLaundryOrOwnerCaller: jest.fn(),
+jest.mock('../api-util/laundryAuth', () => ({
+  authorizeLaundryCaller: jest.fn(),
 }));
 
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
-const { authorizeLaundryOrOwnerCaller } = require('../api-util/listingOwnerAuth');
+const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
 
 const listingCustodyStatus = require('./listing-custody-status');
 
@@ -82,7 +82,7 @@ const run = async (body, res = mockRes()) => {
 describe('listing-custody-status', () => {
   beforeEach(() => {
     // The shared jest config sets `resetMocks: true`.
-    authorizeLaundryOrOwnerCaller.mockResolvedValue({ currentUser: {}, role: 'owner' });
+    authorizeLaundryCaller.mockResolvedValue({});
     handleError.mockImplementation((res, e) => {
       res.status(e.status || 500);
       res.json({ error: e.statusText || 'error' });
@@ -116,13 +116,22 @@ describe('listing-custody-status', () => {
   });
 
   describe('authorization', () => {
-    it('writes nothing when the caller is neither the laundry nor the owner', async () => {
+    // ---------------------------------------------------------------------------
+    //   > "Es preferible que el provider no pueda cambiar el status (...) pero laundry
+    //   >  siempre tiene que estar ahi para recolectar la prenda" (Jonathan, 2026-09-07)
+    //
+    // This REVERSES the earlier "lo puede modificar laundry o el dueño". The owner branch is
+    // gone: a studio hands the garment over the counter, and an owner who could flip this
+    // alone could take a garment out of the studio's inventory without anyone at the studio
+    // agreeing that it left.
+    // ---------------------------------------------------------------------------
+    it('writes nothing when the caller is not the assigned laundry', async () => {
       const { update } = setupSdk();
       const error = new Error('nope');
       error.status = 403;
       error.statusText = 'nope';
       error.data = {};
-      authorizeLaundryOrOwnerCaller.mockRejectedValue(error);
+      authorizeLaundryCaller.mockRejectedValue(error);
 
       const res = await run({ listingId: LISTING_ID, onLaundry: false });
 
@@ -130,13 +139,13 @@ describe('listing-custody-status', () => {
       expect(update).not.toHaveBeenCalled();
     });
 
-    it('authorizes against the fetched listing, not against the request body', async () => {
+    it("authorizes against the FETCHED listing's assigned laundry, not the request body", async () => {
       setupSdk();
       await run({ listingId: LISTING_ID, onLaundry: false });
-      expect(authorizeLaundryOrOwnerCaller).toHaveBeenCalledWith(
+      expect(authorizeLaundryCaller).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        listing
+        LAUNDRY_ID
       );
     });
 
@@ -152,9 +161,11 @@ describe('listing-custody-status', () => {
       expect(show).toHaveBeenCalledWith(expect.objectContaining({ include: ['author'] }));
     });
 
-    it('reports which principal was recognised', async () => {
+    it('answers with the one principal there is', async () => {
+      // The field is kept rather than dropped: it is part of a response shape a client
+      // already reads, and narrowing the principals is not a reason to change the answer's
+      // shape.
       setupSdk();
-      authorizeLaundryOrOwnerCaller.mockResolvedValue({ currentUser: {}, role: 'laundry' });
       const res = await run({ listingId: LISTING_ID, onLaundry: false });
       expect(res.body.data).toEqual({ onLaundry: false, role: 'laundry' });
     });
@@ -167,7 +178,7 @@ describe('listing-custody-status', () => {
       error.status = 403;
       error.statusText = 'nope';
       error.data = {};
-      authorizeLaundryOrOwnerCaller.mockRejectedValue(error);
+      authorizeLaundryCaller.mockRejectedValue(error);
 
       await run({ listingId: LISTING_ID, onLaundry: false });
 

@@ -1,7 +1,8 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
-const { authorizeLaundryOrOwnerCaller } = require('../api-util/listingOwnerAuth');
+const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
 const { assertNoActiveTransaction, writeCustodyMetadata } = require('../api-util/listingCustody');
+const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
 
 // Hand a garment over: `listing.metadata.onLaundry`.
 //
@@ -9,6 +10,20 @@ const { assertNoActiveTransaction, writeCustodyMetadata } = require('../api-util
 //   >  listing de onLaundry true, pero si se devuelve al dueño de la prenda cambia
 //   >  a false, este status lo puede modificar laundry o el dueño (siempre que no
 //   >  este en una transacción activa)"
+//
+// THE OWNER WAS TAKEN OFF THIS, and it is worth stating plainly rather than quietly
+// overwriting the sentence above:
+//
+//   > "Es preferible que el provider no pueda cambiar el status, siempre tiene que estar en
+//   >  la transacción o en el inventario de laundry, pero laundry siempre tiene que estar ahi
+//   >  para recolectar la prenda" (Jonathan, 2026-09-07)
+//
+// The physical fact is that a studio hands the garment over the counter. An owner who could
+// flip this alone could take a garment out of the studio's inventory without anyone at the
+// studio agreeing that it left - and the two things this flag feeds, whether the laundry can
+// be reassigned and whether the studio still lists the garment as theirs, would then disagree
+// with the shelf. So: LAUNDRY ONLY. The owner collecting is still the common case; it is the
+// studio that records it, because the studio is the one who was there.
 //
 // POST /api/listing-custody-status
 // Request body: { listingId, onLaundry }
@@ -58,11 +73,13 @@ const { assertNoActiveTransaction, writeCustodyMetadata } = require('../api-util
 // decision a human is making. Only the latter needs a precondition.
 //
 // Success response (200): { data: { onLaundry, role } }
-//   `role` is 'owner' or 'laundry' - which of the two principals was recognised.
+//   `role` is always 'laundry'. The field is kept rather than dropped: it is part of a
+//   response shape a client already reads, and narrowing the principals is not a reason to
+//   change what the answer looks like.
 // Failure responses:
 //   400 - missing listingId, or onLaundry not a boolean
 //   401 - no usable session
-//   403 - caller is neither the assigned laundry nor the owner
+//   403 - caller is not the laundry assigned to this listing
 //   409 - the listing has an active transaction (or we could not prove it hasn't)
 //   otherwise: standard handleError() shape (see api-util/sdk.js).
 
@@ -97,10 +114,10 @@ module.exports = (req, res) => {
     .then(listingResponse => {
       const listing = listingResponse.data.data;
 
-      return authorizeLaundryOrOwnerCaller(req, res, listing).then(({ role }) =>
+      return authorizeLaundryCaller(req, res, readAssignedLaundryId(listing)).then(() =>
         assertNoActiveTransaction({ integrationSdk, listingId })
           .then(() => writeCustodyMetadata({ integrationSdk, listingId, onLaundry }))
-          .then(() => role)
+          .then(() => 'laundry')
       );
     })
     .then(role => {
