@@ -62,7 +62,7 @@ const toLatLng = origin => {
 const getInitialValues = currentUser => {
   const { publicData = {}, privateData = {} } = currentUser?.attributes?.profile || {};
   const { laundryProfile = {}, acceptedCategories = [] } = publicData;
-  const { studioName, address, businessHours, businessHoursByDay } = laundryProfile;
+  const { studioName, address, businessHours, businessHoursByDay, neighborhood } = laundryProfile;
   const origin = toLatLng(laundryProfile.origin);
   // No cleaningFee is read: fees are marketplace-level server env configuration now
   // (CLEANING_FEE_<CATEGORY_ID>, see server/api-util/cleaningFeeEnv.js), the form has no
@@ -71,6 +71,8 @@ const getInitialValues = currentUser => {
 
   return {
     studioName,
+    // Typed only when the geocoder could not answer - see the submit handler.
+    neighborhood: neighborhood || '',
     // The old free-text line is still read for display elsewhere; the FORM is the grid now.
     // A studio that has not re-saved since this shipped gets every day ticked at the
     // defaults rather than a parse of a sentence somebody typed.
@@ -147,6 +149,21 @@ const LaundryProfileFormSection = props => {
     const businessHoursByDay = toBusinessHoursByDay(values);
     const businessHours = businessHoursSummary(businessHoursByDay);
     const { address, origin } = location?.selectedPlace || {};
+    // THE NEIGHBOURHOOD, FROM THE ADDRESS THE STUDIO ALREADY PICKED.
+    //
+    //   > "las laundries tienen el input de autocomplete, de ahi hay que obtener el
+    //   >  vecindario, si no es posible obtenerlo se utilizará un field de vecindario, pero
+    //   >  debe estar en settings de laundry" (Jonathan, 2026-09-07)
+    //
+    // Mapbox carries it in the feature's `context` (see GeocoderMapbox.placeNeighborhood).
+    // Preferred over the typed field because it is the same source as the address itself:
+    // a studio that moves picks a new address and the district follows, with nothing to
+    // remember. The typed value is the fallback for the addresses Mapbox has no district
+    // for, and it is kept when the geocoder answers nothing rather than being wiped.
+    const geocodedNeighborhood = location?.selectedPlace?.neighborhood;
+    const typedNeighborhood =
+      typeof values.neighborhood === 'string' ? values.neighborhood.trim() : '';
+    const resolvedNeighborhood = geocodedNeighborhood || typedNeighborhood || null;
 
     // The category table hands back an array of Console category ids, plus any legacy
     // free-text values that were already stored and haven't been removed. Normalised
@@ -220,6 +237,7 @@ const LaundryProfileFormSection = props => {
           studioName,
           businessHours,
           businessHoursByDay,
+          neighborhood: resolvedNeighborhood,
           // Absent keys are omitted rather than written as undefined: a studio
           // setting its FIRST address has nothing stored to preserve, and the
           // address call right after this one is what puts it there.
@@ -266,6 +284,7 @@ const LaundryProfileFormSection = props => {
     setState({
       initialValues: {
         studioName,
+        neighborhood: resolvedNeighborhood || '',
         ...businessHoursToFormValues(businessHoursByDay),
         turnaroundDays: nextTurnaroundDays,
         acceptedCategories: acceptedCategoriesArray,

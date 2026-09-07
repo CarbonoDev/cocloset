@@ -417,3 +417,12 @@
     flex: 0 0 150px;
   }
 }
+
+/* Sits under a field to say when it is needed, rather than what it is - the label already
+   does that. Quieter than the label and than the value. */
+.fieldHint {
+  margin: -12px 0 24px 0;
+  color: var(--coclosetInkMuted);
+  font-size: 13px;
+  line-height: 18px;
+}
