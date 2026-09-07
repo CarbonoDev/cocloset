@@ -330,10 +330,39 @@ export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
       // first. The booking then simply waits for the provider, which is the behaviour that
       // existed before this feature - it degrades to the old path rather than breaking. The
       // real fix for both is a server-side worker on Sharetribe's transaction events.
-      autoAcceptBooking({ transactionId: order?.id }).catch(() => {
-        // Swallowed on purpose: the endpoint logs its own failures server-side, and there is
-        // nothing a customer could do about this one.
-      });
+      autoAcceptBooking({ transactionId: order?.id })
+        .then(response => {
+          // AND THE PAGE FOLLOWS, WITHOUT A RELOAD.
+          //
+          //   > "se hace el autoaccept y esto funciona, pero el customer debe hacer refresh
+          //   >  para ver el nuevo status" (Jonathan, 2026-09-07)
+          //
+          // The order persisted above is the PRE-acceptance transaction - it has to be, the
+          // acceptance had not happened yet - so the confirmation page rendered
+          // `preauthorized` and stayed there until something re-read it. A refresh was that
+          // something.
+          //
+          // Re-persisting the entity the endpoint returns closes that, and it does NOT
+          // change the fire-and-continue shape above: nothing awaits this, the page paints
+          // immediately, and it flips to the accepted state when the call lands - usually
+          // before the customer has finished reading. Awaiting instead would put a second
+          // network call between them and their confirmation, and make an auto-accept
+          // failure look like a failed payment.
+          const acceptedTransaction = response?.data?.transaction;
+          if (acceptedTransaction) {
+            persistTransaction(
+              acceptedTransaction,
+              pageData,
+              storeData,
+              setPageData,
+              sessionStorageKey
+            );
+          }
+        })
+        .catch(() => {
+          // Swallowed on purpose: the endpoint logs its own failures server-side, and there is
+          // nothing a customer could do about this one.
+        });
     });
 
     return orderPromise;

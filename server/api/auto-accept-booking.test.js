@@ -129,6 +129,23 @@ beforeEach(() => {
 });
 
 describe('auto-accept-booking: when it fires', () => {
+  //   > "se hace el autoaccept y esto funciona, pero el customer debe hacer refresh para ver
+  //   >  el nuevo status" (Jonathan, 2026-09-07)
+  //
+  // The browser persists the order BEFORE calling this, so its page is rendering the
+  // pre-acceptance transaction. `expand: true` on the transition already returns the
+  // accepted one; returning it is what lets the page replace what it stored, without
+  // awaiting this call and without the client inventing the new state for itself.
+  it('returns the accepted transaction, so the caller can replace what it stored', () => {
+    setup();
+
+    return run().then(res => {
+      expect(res.body.data.accepted).toBe(true);
+      expect(res.body.data.transaction).toBeTruthy();
+      expect(res.body.data.transaction).toHaveProperty('id');
+    });
+  });
+
   it('accepts a paid booking whose garment is already at its laundry', () => {
     const { transition } = setup();
 

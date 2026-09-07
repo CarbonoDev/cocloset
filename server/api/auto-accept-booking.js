@@ -175,7 +175,7 @@ module.exports = (req, res) => {
           { id: transactionId, transition: TRANSITIONS.OPERATOR_ACCEPT, params: {} },
           { expand: true }
         )
-        .then(() =>
+        .then(transitionResponse =>
           // The calendar block normally rides on a browser hook fired after the PROVIDER
           // accepts (server/api/create-availability-buffer.js). That hook cannot run here -
           // nobody accepted from a sale page - so the same work happens inline, through the
@@ -186,18 +186,23 @@ module.exports = (req, res) => {
             transaction,
             included,
             txIdForLog,
-          }).catch(e => {
-            // The booking IS accepted at this point. A failed block is serious - the garment
-            // is double-bookable until someone notices - but it is not a reason to tell the
-            // customer their payment did not go through. Logged loudly, reported in the body.
-            log.error(e, 'auto-accept-booking-buffer-failed', {
-              txId: txIdForLog,
-              message: e?.message,
-            });
-            return { skipped: true, reason: 'buffer-failed' };
           })
+            .catch(e => {
+              // The booking IS accepted at this point. A failed block is serious - the garment
+              // is double-bookable until someone notices - but it is not a reason to tell the
+              // customer their payment did not go through. Logged loudly, reported in the body.
+              log.error(e, 'auto-accept-booking-buffer-failed', {
+                txId: txIdForLog,
+                message: e?.message,
+              });
+              return { skipped: true, reason: 'buffer-failed' };
+            })
+            .then(bufferResult => ({
+              bufferResult,
+              acceptedTransaction: transitionResponse?.data?.data || null,
+            }))
         )
-        .then(bufferResult => {
+        .then(({ bufferResult, acceptedTransaction }) => {
           res
             .status(200)
             .set('Content-Type', 'application/json')
@@ -205,6 +210,22 @@ module.exports = (req, res) => {
               data: {
                 accepted: true,
                 transition: TRANSITIONS.OPERATOR_ACCEPT,
+                // THE ACCEPTED TRANSACTION ITSELF.
+                //
+                //   > "se hace el autoaccept y esto funciona, pero el customer debe hacer
+                //   >  refresh para ver el nuevo status" (Jonathan, 2026-09-07)
+                //
+                // The caller persisted the order BEFORE calling this, so what its page is
+                // rendering is the pre-acceptance transaction. It has been sitting here all
+                // along - `expand: true` on the transition above returns it - and returning
+                // it lets the browser replace what it stored instead of waiting for a
+                // reload.
+                //
+                // The ENTITY, not a flag the client turns back into one: a locally patched
+                // `lastTransition` would be a second source of truth for a state the process
+                // owns, and the first time our guess and Sharetribe's record diverged, nobody
+                // would see it.
+                transaction: acceptedTransaction,
                 buffer: bufferResult?.skipped ? null : bufferResult,
                 bufferSkippedReason: bufferResult?.skipped ? bufferResult.reason : null,
               },
