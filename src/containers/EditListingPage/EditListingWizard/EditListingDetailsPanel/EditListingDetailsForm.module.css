@@ -98,13 +98,18 @@
 }
 
 .submitButton {
-  margin-top: auto;
-  margin-bottom: 24px;
-  flex-shrink: 0;
-
   @media (--viewportLarge) {
     display: inline-block;
     width: 241px;
+  }
+}
+
+.submitSection {
+  flex-shrink: 0;
+  margin-top: auto;
+  margin-bottom: 24px;
+
+  @media (--viewportLarge) {
     margin-top: 100px;
   }
 }

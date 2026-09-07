@@ -307,17 +307,19 @@ export const EditListingLaundryForm = props => (
             </p>
           ) : null}
 
-          <div className={css.formActions}>
-            <Button
-              className={css.submitButton}
-              type="submit"
-              inProgress={submitInProgress}
-              disabled={submitDisabled}
-              ready={submitReady}
-            >
-              {saveActionMsg}
-            </Button>
-            {previewListingLink}
+          <div className={css.submitSection}>
+            <div className={css.formActions}>
+              <Button
+                className={css.submitButton}
+                type="submit"
+                inProgress={submitInProgress}
+                disabled={submitDisabled}
+                ready={submitReady}
+              >
+                {saveActionMsg}
+              </Button>
+              {previewListingLink}
+            </div>
           </div>
         </Form>
       );

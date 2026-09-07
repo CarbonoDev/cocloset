@@ -92,6 +92,7 @@
   justify-content: center;
   min-height: 59px;
   padding: 0 24px;
+  width: 100%;
 
   border: 1px solid var(--coclosetBorder);
   border-radius: var(--coclosetRadius);
@@ -101,6 +102,10 @@
   font-weight: var(--fontWeightMedium);
   text-align: center;
   text-decoration: none;
+
+  @media (--viewportLarge) {
+    width: auto;
+  }
 
   &:hover,
   &:focus {
