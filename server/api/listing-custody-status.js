@@ -3,6 +3,8 @@ const { handleError } = require('../api-util/sdk');
 const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
 const { assertNoActiveTransaction, writeCustodyMetadata } = require('../api-util/listingCustody');
 const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
+const { notifyGarmentHandedBack } = require('../api-util/laundryMailer');
+const log = require('../log');
 
 // Hand a garment over: `listing.metadata.onLaundry`.
 //
@@ -113,11 +115,48 @@ module.exports = (req, res) => {
     .show({ id: listingId, include: ['author'] })
     .then(listingResponse => {
       const listing = listingResponse.data.data;
+      // `include: ['author']` above is what puts the owner in `included`; the Integration
+      // API is also the only place their email address is readable at all.
+      const owner = (listingResponse.data.included || []).find(entity => entity.type === 'user');
 
-      return authorizeLaundryCaller(req, res, readAssignedLaundryId(listing)).then(() =>
+      return authorizeLaundryCaller(req, res, readAssignedLaundryId(listing)).then(currentUser =>
         assertNoActiveTransaction({ integrationSdk, listingId })
           .then(() => writeCustodyMetadata({ integrationSdk, listingId, onLaundry }))
-          .then(() => 'laundry')
+          .then(() => {
+            // TELLING THE OWNER, AFTER THE FACT AND WITHOUT BLOCKING IT.
+            //
+            //   > "se debe enviar un correo al provider confirmando la operación"
+            //
+            // Only on the handover itself: `onLaundry: true` is a studio receiving a
+            // garment, which already has its own notification, and mailing an owner "your
+            // garment is at the studio" the moment they dropped it off is noise.
+            //
+            // Fire-and-continue, like every other mail on this project: the custody write
+            // has already succeeded and the garment has physically changed hands. Failing
+            // the request over a mail would make the ops screen retry a handover that
+            // already happened.
+            if (onLaundry === false) {
+              try {
+                notifyGarmentHandedBack({
+                  to: owner?.attributes?.email,
+                  ownerName: owner?.attributes?.profile?.displayName,
+                  garmentTitle: listing?.attributes?.title,
+                  // The studio's own name, not the account holder's - the same rule every
+                  // other surface follows (api-util/laundryDirectory.js).
+                  laundryName:
+                    currentUser?.attributes?.profile?.publicData?.laundryProfile?.studioName ||
+                    currentUser?.attributes?.profile?.displayName,
+                  handedBackAt: new Date(),
+                  listingId: listingId?.uuid || listingId,
+                });
+              } catch (mailError) {
+                log.error(mailError, 'garment-handed-back-mail-failed', {
+                  listingId: listingId?.uuid || listingId,
+                });
+              }
+            }
+            return 'laundry';
+          })
       );
     })
     .then(role => {

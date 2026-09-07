@@ -10,9 +10,14 @@ jest.mock('../api-util/laundryAuth', () => ({
   authorizeLaundryCaller: jest.fn(),
 }));
 
+jest.mock('../api-util/laundryMailer', () => ({
+  notifyGarmentHandedBack: jest.fn(),
+}));
+
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
+const { notifyGarmentHandedBack } = require('../api-util/laundryMailer');
 
 const listingCustodyStatus = require('./listing-custody-status');
 
@@ -51,7 +56,26 @@ const listing = {
 
 // activeTransactions: array of lastTransition strings to pretend the listing has.
 const setupSdk = ({ activeTransactions = [], updateImpl, queryImpl } = {}) => {
-  const show = jest.fn(() => Promise.resolve({ data: { data: listing } }));
+  // `included` is where the author actually arrives, and the Integration API is the only
+  // place their email is readable at all - which is why the mail is sent from here rather
+  // than from anywhere the browser can reach.
+  const show = jest.fn(() =>
+    Promise.resolve({
+      data: {
+        data: listing,
+        included: [
+          {
+            id: { uuid: OWNER_ID },
+            type: 'user',
+            attributes: {
+              email: 'owner@example.com',
+              profile: { displayName: 'Ana Rivera' },
+            },
+          },
+        ],
+      },
+    })
+  );
   const query =
     queryImpl ||
     jest.fn(() =>
@@ -263,6 +287,48 @@ describe('listing-custody-status', () => {
       // this write IS the request. Reporting success would tell an owner their
       // garment is home when the marketplace still says otherwise.
       expect(res.statusCode).toBe(403);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  //   > "se debe enviar un correo al provider confirmando la operación"
+  //   >  (Jonathan, 2026-09-07)
+  //
+  // The handover is a physical act with a data consequence the owner cannot see: until it is
+  // recorded, the garment is still in that studio's inventory and its laundry cannot be
+  // reassigned. Hence a mail, and hence one that says what changed.
+  // ---------------------------------------------------------------------------
+  describe('telling the owner', () => {
+    it('mails the owner when the garment goes home', async () => {
+      setupSdk();
+      await run({ listingId: LISTING_ID, onLaundry: false });
+
+      expect(notifyGarmentHandedBack).toHaveBeenCalledTimes(1);
+      expect(notifyGarmentHandedBack).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'owner@example.com' })
+      );
+    });
+
+    it('sends nothing when a studio is RECEIVING a garment', async () => {
+      // That direction already has its own notification, and "your garment is at the studio"
+      // the moment an owner dropped it off is noise.
+      setupSdk();
+      await run({ listingId: LISTING_ID, onLaundry: true });
+
+      expect(notifyGarmentHandedBack).not.toHaveBeenCalled();
+    });
+
+    it('still answers 200 when the mail throws', async () => {
+      // The custody write has already succeeded and the garment has physically changed
+      // hands. Failing here would make the ops screen retry a handover that happened.
+      setupSdk();
+      notifyGarmentHandedBack.mockImplementation(() => {
+        throw new Error('mailgun down');
+      });
+
+      const res = await run({ listingId: LISTING_ID, onLaundry: false });
+
+      expect(res.statusCode).toBe(200);
     });
   });
 });

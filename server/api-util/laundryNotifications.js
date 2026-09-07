@@ -322,7 +322,50 @@ const cleaningRequiredNotification = ({
   });
 };
 
+/**
+ * THE ONE THAT GOES TO THE OWNER, NOT TO A STUDIO.
+ *
+ *   > "se debe enviar un correo al provider confirmando la operación" (Jonathan, 2026-09-07)
+ *
+ * Every other notification in this file is addressed to a laundry. This one confirms to a
+ * garment's owner that the studio has recorded handing it back - which matters because the
+ * handover is a physical act with a data consequence the owner cannot see: until it is
+ * recorded, the garment is still in that studio's inventory and its laundry cannot be
+ * reassigned. So the mail says what CHANGED, not just that something happened.
+ *
+ * @param {Object} data
+ * @param {string} [data.ownerName]
+ * @param {string} [data.garmentTitle]
+ * @param {string} [data.laundryName]
+ * @param {Date|string|number} [data.handedBackAt]
+ * @param {string} [data.marketplaceName]
+ * @returns {{subject: string, text: string, html: string}}
+ */
+const garmentHandedBackNotification = ({
+  ownerName,
+  garmentTitle,
+  laundryName,
+  handedBackAt,
+  marketplaceName,
+} = {}) => {
+  const name = resolveMarketplaceName(marketplaceName);
+  const garment = garmentTitle || UNKNOWN_GARMENT;
+  return renderEmail({
+    subject: `${name}: ${garment} is back with you`,
+    greetingName: ownerName,
+    intro: `${laundryName ||
+      'The store'} has recorded handing ${garment} back to you. It is no longer in their inventory.`,
+    rows: [
+      ['Garment', garmentTitle],
+      ['Handed back by', laundryName],
+      ['Recorded', formatDateTime(handedBackAt)],
+    ],
+    outro: `Your garment cannot be rented while it is with you. When you want it listed again, take it to a ${name} partner store and they will receive it back in.`,
+  });
+};
+
 module.exports = {
+  garmentHandedBackNotification,
   newIncomingGarmentNotification,
   pickupScheduledNotification,
   returnScheduledNotification,
