@@ -6,13 +6,18 @@ jest.mock('../api-util/integrationSdk', () => ({
   getIntegrationSdk: jest.fn(),
 }));
 
-jest.mock('../api-util/listingOwnerAuth', () => ({
-  authorizeLaundryOrOwnerCaller: jest.fn(),
+jest.mock('../api-util/laundryAuth', () => ({
+  authorizeLaundryCaller: jest.fn(),
+}));
+
+jest.mock('../api-util/laundryMailer', () => ({
+  notifyGarmentHandedBack: jest.fn(),
 }));
 
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
-const { authorizeLaundryOrOwnerCaller } = require('../api-util/listingOwnerAuth');
+const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
+const { notifyGarmentHandedBack } = require('../api-util/laundryMailer');
 
 const listingCustodyStatus = require('./listing-custody-status');
 
@@ -51,7 +56,26 @@ const listing = {
 
 // activeTransactions: array of lastTransition strings to pretend the listing has.
 const setupSdk = ({ activeTransactions = [], updateImpl, queryImpl } = {}) => {
-  const show = jest.fn(() => Promise.resolve({ data: { data: listing } }));
+  // `included` is where the author actually arrives, and the Integration API is the only
+  // place their email is readable at all - which is why the mail is sent from here rather
+  // than from anywhere the browser can reach.
+  const show = jest.fn(() =>
+    Promise.resolve({
+      data: {
+        data: listing,
+        included: [
+          {
+            id: { uuid: OWNER_ID },
+            type: 'user',
+            attributes: {
+              email: 'owner@example.com',
+              profile: { displayName: 'Ana Rivera' },
+            },
+          },
+        ],
+      },
+    })
+  );
   const query =
     queryImpl ||
     jest.fn(() =>
@@ -82,7 +106,7 @@ const run = async (body, res = mockRes()) => {
 describe('listing-custody-status', () => {
   beforeEach(() => {
     // The shared jest config sets `resetMocks: true`.
-    authorizeLaundryOrOwnerCaller.mockResolvedValue({ currentUser: {}, role: 'owner' });
+    authorizeLaundryCaller.mockResolvedValue({});
     handleError.mockImplementation((res, e) => {
       res.status(e.status || 500);
       res.json({ error: e.statusText || 'error' });
@@ -116,13 +140,22 @@ describe('listing-custody-status', () => {
   });
 
   describe('authorization', () => {
-    it('writes nothing when the caller is neither the laundry nor the owner', async () => {
+    // ---------------------------------------------------------------------------
+    //   > "Es preferible que el provider no pueda cambiar el status (...) pero laundry
+    //   >  siempre tiene que estar ahi para recolectar la prenda" (Jonathan, 2026-09-07)
+    //
+    // This REVERSES the earlier "lo puede modificar laundry o el dueño". The owner branch is
+    // gone: a studio hands the garment over the counter, and an owner who could flip this
+    // alone could take a garment out of the studio's inventory without anyone at the studio
+    // agreeing that it left.
+    // ---------------------------------------------------------------------------
+    it('writes nothing when the caller is not the assigned laundry', async () => {
       const { update } = setupSdk();
       const error = new Error('nope');
       error.status = 403;
       error.statusText = 'nope';
       error.data = {};
-      authorizeLaundryOrOwnerCaller.mockRejectedValue(error);
+      authorizeLaundryCaller.mockRejectedValue(error);
 
       const res = await run({ listingId: LISTING_ID, onLaundry: false });
 
@@ -130,13 +163,13 @@ describe('listing-custody-status', () => {
       expect(update).not.toHaveBeenCalled();
     });
 
-    it('authorizes against the fetched listing, not against the request body', async () => {
+    it("authorizes against the FETCHED listing's assigned laundry, not the request body", async () => {
       setupSdk();
       await run({ listingId: LISTING_ID, onLaundry: false });
-      expect(authorizeLaundryOrOwnerCaller).toHaveBeenCalledWith(
+      expect(authorizeLaundryCaller).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        listing
+        LAUNDRY_ID
       );
     });
 
@@ -152,9 +185,11 @@ describe('listing-custody-status', () => {
       expect(show).toHaveBeenCalledWith(expect.objectContaining({ include: ['author'] }));
     });
 
-    it('reports which principal was recognised', async () => {
+    it('answers with the one principal there is', async () => {
+      // The field is kept rather than dropped: it is part of a response shape a client
+      // already reads, and narrowing the principals is not a reason to change the answer's
+      // shape.
       setupSdk();
-      authorizeLaundryOrOwnerCaller.mockResolvedValue({ currentUser: {}, role: 'laundry' });
       const res = await run({ listingId: LISTING_ID, onLaundry: false });
       expect(res.body.data).toEqual({ onLaundry: false, role: 'laundry' });
     });
@@ -167,7 +202,7 @@ describe('listing-custody-status', () => {
       error.status = 403;
       error.statusText = 'nope';
       error.data = {};
-      authorizeLaundryOrOwnerCaller.mockRejectedValue(error);
+      authorizeLaundryCaller.mockRejectedValue(error);
 
       await run({ listingId: LISTING_ID, onLaundry: false });
 
@@ -252,6 +287,48 @@ describe('listing-custody-status', () => {
       // this write IS the request. Reporting success would tell an owner their
       // garment is home when the marketplace still says otherwise.
       expect(res.statusCode).toBe(403);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  //   > "se debe enviar un correo al provider confirmando la operación"
+  //   >  (Jonathan, 2026-09-07)
+  //
+  // The handover is a physical act with a data consequence the owner cannot see: until it is
+  // recorded, the garment is still in that studio's inventory and its laundry cannot be
+  // reassigned. Hence a mail, and hence one that says what changed.
+  // ---------------------------------------------------------------------------
+  describe('telling the owner', () => {
+    it('mails the owner when the garment goes home', async () => {
+      setupSdk();
+      await run({ listingId: LISTING_ID, onLaundry: false });
+
+      expect(notifyGarmentHandedBack).toHaveBeenCalledTimes(1);
+      expect(notifyGarmentHandedBack).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'owner@example.com' })
+      );
+    });
+
+    it('sends nothing when a studio is RECEIVING a garment', async () => {
+      // That direction already has its own notification, and "your garment is at the studio"
+      // the moment an owner dropped it off is noise.
+      setupSdk();
+      await run({ listingId: LISTING_ID, onLaundry: true });
+
+      expect(notifyGarmentHandedBack).not.toHaveBeenCalled();
+    });
+
+    it('still answers 200 when the mail throws', async () => {
+      // The custody write has already succeeded and the garment has physically changed
+      // hands. Failing here would make the ops screen retry a handover that happened.
+      setupSdk();
+      notifyGarmentHandedBack.mockImplementation(() => {
+        throw new Error('mailgun down');
+      });
+
+      const res = await run({ listingId: LISTING_ID, onLaundry: false });
+
+      expect(res.statusCode).toBe(200);
     });
   });
 });

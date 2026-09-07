@@ -676,6 +676,97 @@ describe('LaundryOpsPage', () => {
       expect(screen.getByText('#B-11')).toBeInTheDocument();
     });
 
+    // ---------------------------------------------------------------------------
+    //   > "no hay ninguna manera en que un provider pueda recoger la prenda y se pueda
+    //   >  cambiar ese status (...) laundry siempre tiene que estar ahi para recolectar la
+    //   >  prenda" (Jonathan, 2026-09-07)
+    //
+    // The endpoint and its authorization already existed; NOTHING CALLED THEM, which is
+    // indistinguishable from a missing feature and is what the client reported. These pin
+    // the wiring, which is the half that was missing.
+    // ---------------------------------------------------------------------------
+    it('offers to hand a garment back once it is on the rack with no rental', async () => {
+      const onHandBackToOwner = jest.fn();
+      const inventory = [
+        {
+          id: 'listing:1',
+          listingId: 'listing-1',
+          title: 'Camel hair wrap coat',
+          onLaundry: true,
+          readinessStatus: 'available',
+          state: null,
+          cleaningPhase: null,
+          imageUrl: null,
+        },
+      ];
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          inventory={inventory}
+          tab="inventory"
+          onHandBackToOwner={onHandBackToOwner}
+        />
+      );
+
+      await userEvent.click(screen.getByText('LaundryOpsPage.inventory.handBack'));
+
+      expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
+    });
+
+    it('does not offer it on a garment that is out on a rental', () => {
+      // The server refuses with 409 anyway - `cleaning` counts as an active transaction and
+      // `delivered` does not, which is what enforces "una vez que finalice la limpieza" -
+      // but a button that is going to be refused is its own kind of wrong.
+      const inventory = [
+        {
+          id: 'listing:1',
+          listingId: 'listing-1',
+          title: 'Camel hair wrap coat',
+          onLaundry: true,
+          readinessStatus: 'stored',
+          state: 'picked-up',
+          cleaningPhase: null,
+          imageUrl: null,
+        },
+      ];
+      render(<LaundryOpsPageComponent {...baseProps} inventory={inventory} tab="inventory" />);
+
+      expect(screen.queryByText('LaundryOpsPage.inventory.handBack')).not.toBeInTheDocument();
+    });
+
+    it('does not offer it on a garment the studio is not holding', () => {
+      const inventory = [
+        {
+          id: 'listing:2',
+          listingId: 'listing-2',
+          title: 'Silk slip dress',
+          onLaundry: false,
+          readinessStatus: 'available',
+          state: null,
+          cleaningPhase: null,
+          imageUrl: null,
+        },
+      ];
+      render(<LaundryOpsPageComponent {...baseProps} inventory={inventory} tab="inventory" />);
+
+      expect(screen.queryByText('LaundryOpsPage.inventory.handBack')).not.toBeInTheDocument();
+    });
+
+    it('explains a 409 as an active rental rather than as a generic failure', () => {
+      // The one refusal an operator will actually hit. A generic error there reads as a
+      // broken button.
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          inventory={[{ id: 'listing:1', listingId: 'listing-1', title: 'Coat' }]}
+          tab="inventory"
+          handBackError={{ status: 409 }}
+        />
+      );
+
+      expect(screen.getByText('LaundryOpsPage.inventory.handBackActiveRental')).toBeInTheDocument();
+    });
+
     it('shows an empty state with no garments', () => {
       render(<LaundryOpsPageComponent {...baseProps} inventory={[]} tab="inventory" />);
       expect(screen.getByText('LaundryOpsPage.inventory.empty')).toBeInTheDocument();

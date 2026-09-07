@@ -961,3 +961,30 @@
   height: 100%;
   border: none;
 }
+
+/* The one action on an inventory card. Quiet by default - most cards are just being read -
+   but a real button, because pressing it takes a garment out of the studio's inventory. */
+.handBackButton {
+  appearance: none;
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 6px 12px;
+
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 999px;
+  background-color: var(--coclosetSurface);
+
+  color: var(--coclosetInk);
+  font-size: 13px;
+  font-weight: var(--fontWeightMedium);
+  cursor: pointer;
+
+  &:hover:enabled {
+    border-color: var(--coclosetInk);
+  }
+
+  &:disabled {
+    color: var(--coclosetInkMuted);
+    cursor: default;
+  }
+}

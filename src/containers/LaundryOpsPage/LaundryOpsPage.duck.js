@@ -1,7 +1,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 import { storableError } from '../../util/errors';
-import { fetchLaundryOrders, updateLaundryTransactionStatus } from '../../util/api';
+import {
+  fetchLaundryOrders,
+  updateLaundryTransactionStatus,
+  updateListingCustodyStatus,
+} from '../../util/api';
 
 // Redux state for every laundry ops screen (Dashboard / Orders / Pickups /
 // Returns / Cleaning / Inventory). They all render the same payload from
@@ -60,10 +64,39 @@ export const advanceStatusThunk = createAsyncThunk(
       .catch(e => rejectWithValue(storableError(e)))
 );
 
+// HANDING A GARMENT BACK TO ITS OWNER.
+//
+//   > "no hay ninguna manera en que un provider pueda recoger la prenda y se pueda cambiar
+//   >  ese status" (Jonathan, 2026-09-07)
+//
+// The endpoint and its authorization have existed since the custody work; nothing called
+// them, which looks exactly like a missing feature and is why the client reported one.
+//
+// It is a LISTING write, not a transaction one - the garment's whereabouts outlive any
+// booking - so it re-fetches the orders afterwards rather than assuming: the row's readiness
+// and custody both come from that query, and a screen that keeps showing a garment the studio
+// just handed over is the bug this would otherwise introduce.
+//
+// The server refuses with 409 while the listing has an active transaction, which is what
+// enforces "una vez que finalice la limpieza": `cleaning` counts as active and `delivered`
+// does not, so the button becomes usable exactly when the wash is finished.
+export const handBackToOwnerThunk = createAsyncThunk(
+  'LaundryOpsPage/handBackToOwner',
+  ({ listingId }, { dispatch, rejectWithValue }) =>
+    updateListingCustodyStatus({ listingId, onLaundry: false })
+      .then(response => {
+        dispatch(fetchOrdersThunk());
+        return response.data;
+      })
+      .catch(e => rejectWithValue(storableError(e)))
+);
+
 // Backward compatible wrappers, matching LaundryProfilePage.duck.js's style.
 export const fetchOrders = () => dispatch => dispatch(fetchOrdersThunk());
 
 export const advanceStatus = params => dispatch => dispatch(advanceStatusThunk(params));
+
+export const handBackToOwner = params => dispatch => dispatch(handBackToOwnerThunk(params));
 
 // ================ Slice ================ //
 
@@ -81,6 +114,8 @@ const initialState = {
   // spinner without disabling the whole table.
   advanceStatusTransactionId: null,
   advanceStatusError: null,
+  handBackListingId: null,
+  handBackError: null,
 };
 
 const laundryOpsPageSlice = createSlice({
@@ -111,6 +146,17 @@ const laundryOpsPageSlice = createSlice({
       })
       .addCase(advanceStatusThunk.fulfilled, state => {
         state.advanceStatusTransactionId = null;
+      })
+      .addCase(handBackToOwnerThunk.pending, (state, action) => {
+        state.handBackListingId = action.meta.arg?.listingId || null;
+        state.handBackError = null;
+      })
+      .addCase(handBackToOwnerThunk.fulfilled, state => {
+        state.handBackListingId = null;
+      })
+      .addCase(handBackToOwnerThunk.rejected, (state, action) => {
+        state.handBackListingId = null;
+        state.handBackError = action.payload;
       })
       .addCase(advanceStatusThunk.rejected, (state, action) => {
         state.advanceStatusTransactionId = null;

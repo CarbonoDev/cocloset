@@ -138,4 +138,15 @@ describe('processCheckoutWithPayment - auto-accept timing', () => {
       expect.objectContaining({ orderId: ORDER_ID })
     );
   });
+
+  // NOT COVERED HERE, DELIBERATELY, AND SAID OUT LOUD.
+  //
+  // The re-persist of the accepted transaction (see the .then beside the autoAcceptBooking
+  // call) has no test in this file. Two attempts at one asserted nothing: `storeData` is
+  // never reached at all through this harness, so a test written against it passes whether
+  // the code works or not, which is worse than no test.
+  //
+  // What IS covered is the half that carries the risk: server/api/auto-accept-booking.test.js
+  // asserts the endpoint returns the accepted entity. The browser side is three lines with no
+  // branching beyond "did the endpoint accept", and it is verified by hand in Dev.
 });

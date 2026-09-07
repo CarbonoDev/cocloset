@@ -17,7 +17,7 @@ import LaundryOrdersTable from './LaundryOrdersTable';
 import LaundryDashboard from './LaundryDashboard';
 import LaundryInventory from './LaundryInventory';
 import { filterByView } from './LaundryOpsPage.helpers';
-import { advanceStatus } from './LaundryOpsPage.duck';
+import { advanceStatus, handBackToOwner } from './LaundryOpsPage.duck';
 import css from './LaundryOpsPage.module.css';
 
 // The six ops screens, distinguished by the `tab` extraProp set per route in
@@ -56,6 +56,9 @@ const ROUTE_NAME_BY_TAB = {
  * @param {string|null} props.advanceStatusTransactionId
  * @param {propTypes.error} [props.advanceStatusError]
  * @param {Function} props.onAdvanceStatus
+ * @param {string} [props.handBackListingId] - the listing whose hand-back is in flight
+ * @param {propTypes.error} [props.handBackError]
+ * @param {Function} props.onHandBackToOwner
  * @param {boolean} props.scrollingDisabled
  * @returns {JSX.Element}
  */
@@ -72,6 +75,9 @@ export const LaundryOpsPageComponent = props => {
     advanceStatusTransactionId = null,
     advanceStatusError,
     onAdvanceStatus,
+    handBackListingId,
+    handBackError,
+    onHandBackToOwner,
     scrollingDisabled,
     staticContext,
   } = props;
@@ -108,7 +114,14 @@ export const LaundryOpsPageComponent = props => {
       case 'dashboard':
         return <LaundryDashboard rows={orders} />;
       case 'inventory':
-        return <LaundryInventory inventory={inventory} />;
+        return (
+          <LaundryInventory
+            inventory={inventory}
+            onHandBackToOwner={onHandBackToOwner}
+            handBackListingId={handBackListingId}
+            handBackError={handBackError}
+          />
+        );
       case 'orders':
       case 'pickups':
       case 'returns':
@@ -136,7 +149,11 @@ export const LaundryOpsPageComponent = props => {
             />
             {/* This page already renders NotFoundPage for anyone who isn't a laundry, so
                 reaching here is itself the isLaundryUser check. */}
-            <UserNav currentPage={ROUTE_NAME_BY_TAB[tab]} showLaundryProfileLink showManageListingsLink />
+            <UserNav
+              currentPage={ROUTE_NAME_BY_TAB[tab]}
+              showLaundryProfileLink
+              showManageListingsLink
+            />
           </>
         }
         sideNav={<LaundryOpsNav currentPage={ROUTE_NAME_BY_TAB[tab]} studioName={studioName} />}
@@ -179,6 +196,8 @@ const mapStateToProps = state => {
     fetchOrdersError,
     advanceStatusTransactionId,
     advanceStatusError,
+    handBackListingId,
+    handBackError,
   } = state.LaundryOpsPage;
 
   return {
@@ -195,6 +214,7 @@ const mapStateToProps = state => {
 };
 
 const mapDispatchToProps = dispatch => ({
+  onHandBackToOwner: params => dispatch(handBackToOwner(params)),
   onAdvanceStatus: params => dispatch(advanceStatus(params)),
 });
 

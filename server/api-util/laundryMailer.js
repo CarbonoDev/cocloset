@@ -4,6 +4,7 @@ const {
   pickupScheduledNotification,
   returnScheduledNotification,
   cleaningRequiredNotification,
+  garmentHandedBackNotification,
 } = require('./laundryNotifications');
 const log = require('../log');
 
@@ -153,7 +154,19 @@ const notifyCleaningRequired = ({ to, ...data }) =>
     logContext: { txId: data.transactionId },
   });
 
+// The only one addressed to a garment's OWNER rather than to a studio. It shares `send`
+// because everything that makes that function worth having - the not-configured log, the
+// no-recipient log, never rejecting - is about the transport, not about who reads the mail.
+const notifyGarmentHandedBack = ({ to, ...data }) =>
+  send({
+    name: 'garment-handed-back',
+    to,
+    compose: () => garmentHandedBackNotification(data),
+    logContext: { listingId: data.listingId },
+  });
+
 module.exports = {
+  notifyGarmentHandedBack,
   notifyNewIncomingGarment,
   notifyPickupScheduled,
   notifyReturnScheduled,
