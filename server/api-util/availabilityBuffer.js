@@ -87,6 +87,45 @@ const reconcileBufferWindow = ({ integrationSdk, listingId, start, end, txIdForL
       }));
   });
 
+// The transaction metadata key holding the availability exceptions this booking created.
+//
+// ON THE TRANSACTION rather than on the listing: a listing accumulates bookings, and the
+// question this answers is always "which blocks belong to THIS rental" - the one being
+// cancelled, or the one being swept. A listing-level list would have to be filtered by
+// something, and the something would be the transaction id anyway.
+const BUFFER_EXCEPTION_IDS_KEY = 'bufferExceptionIds';
+
+/**
+ * Record the exceptions a booking's buffer created, merged with any already recorded.
+ *
+ * @param {Object} params
+ * @param {Object} params.integrationSdk
+ * @param {Object} params.transaction - the transaction entity (for its id and current metadata)
+ * @param {Array<string>} params.exceptionIds - ids created by this run
+ * @param {string} params.txIdForLog
+ * @returns {Promise<Array<string>>} the full recorded list
+ */
+const writeBufferExceptionIds = ({
+  integrationSdk,
+  transaction,
+  exceptionIds = [],
+  txIdForLog,
+}) => {
+  if (!Array.isArray(exceptionIds) || exceptionIds.length === 0) {
+    return Promise.resolve([]);
+  }
+  const previous = transaction?.attributes?.metadata?.[BUFFER_EXCEPTION_IDS_KEY];
+  const merged = [...new Set([...(Array.isArray(previous) ? previous : []), ...exceptionIds])];
+
+  return integrationSdk.transactions
+    .updateMetadata({ id: transaction.id, metadata: { [BUFFER_EXCEPTION_IDS_KEY]: merged } })
+    .then(() => merged)
+    .catch(e => {
+      log.error(e, 'buffer-exception-ids-write-failed', { txId: txIdForLog });
+      return merged;
+    });
+};
+
 /**
  * Block a newly accepted booking's window: the rental dates plus the assigned laundry's
  * turnaround afterwards.
@@ -188,20 +227,52 @@ const buildBufferForAcceptedTransaction = ({
       start,
       end,
       txIdForLog,
-    }).then(exceptionResult => ({
-      skipped: false,
-      ...exceptionResult,
-      listingId: listing.id.uuid,
-      start,
-      end,
-      bufferBeforeDays,
-      bufferAfterDays,
-      totalBufferDays,
-    }));
+    })
+      .then(exceptionResult =>
+        // REMEMBER WHAT WE BLOCKED, AND FOR WHOM.
+        //
+        //   > "habia hecho una reservación ya para el mismo artículo y la cancelé como
+        //   >  operator, por lo tanto, los días reservados deberían estar disponibles, sin
+        //   >  embargo no lo estan" (Jonathan, 2026-09-07)
+        //
+        // These ids were previously returned in the HTTP response and then forgotten. That is
+        // what made a cancelled rental's block permanent: the days stayed unavailable and
+        // nothing on the platform could say which exception had come from which booking, so
+        // there was no safe way to find it again. An owner's own availability exceptions are
+        // indistinguishable from ours to the API - same shape, same seats: 0 - so "delete the
+        // blocks over these dates" is not a thing anybody can do without this record.
+        //
+        // Appended, not replaced: a retry blocks the segments the first attempt missed, and
+        // both sets belong to this booking.
+        //
+        // Fire-and-continue, like every other post-write side effect here. The window is
+        // already blocked, which is the part that protects the garment; losing this record
+        // costs the cleanup, not the booking.
+        writeBufferExceptionIds({
+          integrationSdk,
+          transaction,
+          exceptionIds: exceptionResult.exceptionIds,
+          txIdForLog,
+        })
+          .catch(() => null)
+          .then(() => exceptionResult)
+      )
+      .then(exceptionResult => ({
+        skipped: false,
+        ...exceptionResult,
+        listingId: listing.id.uuid,
+        start,
+        end,
+        bufferBeforeDays,
+        bufferAfterDays,
+        totalBufferDays,
+      }));
   });
 };
 
 module.exports = {
+  BUFFER_EXCEPTION_IDS_KEY,
   reconcileBufferWindow,
+  writeBufferExceptionIds,
   buildBufferForAcceptedTransaction,
 };

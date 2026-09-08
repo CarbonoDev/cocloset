@@ -3,7 +3,11 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { types as sdkTypes, createImageVariantConfig } from '../../util/sdkLoader';
 import { storableError } from '../../util/errors';
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
-import { fetchListingInitialCleaning, transactionLineItems } from '../../util/api';
+import {
+  fetchListingInitialCleaning,
+  sweepListingAvailability,
+  transactionLineItems,
+} from '../../util/api';
 import * as log from '../../util/log';
 import { denormalisedResponseEntities } from '../../util/data';
 import {
@@ -702,6 +706,29 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
       const hasAssignedLaundry = !!listing?.attributes?.metadata?.assignedLaundryId;
       if (typeof window !== 'undefined' && listing?.id && hasAssignedLaundry) {
         dispatch(fetchInitialCleaningDaysThunk({ listingId: listing.id }));
+
+        // GIVE BACK THE DAYS A FINISHED BOOKING IS STILL BLOCKING.
+        //
+        //   > "habia hecho una reservación (...) y la cancelé como operator, por lo tanto, los
+        //   >  días reservados deberían estar disponibles, sin embargo no lo estan"
+        //   >   (Jonathan, 2026-09-07)
+        //
+        // Accepting a booking blocks its window; nothing ever unblocked it, and a cancellation
+        // made from Console runs no code of ours at all. So the cleanup is triggered by the
+        // read instead - here, where a stale block is visible, and by the page that shows it.
+        //
+        // NOT AWAITED, NOT DISPATCHED, AND FAILURES ARE SWALLOWED. It changes no Redux state:
+        // the calendar this fixes is the one fetchMonthlyTimeSlots loads above, so freed days
+        // appear on the NEXT load rather than this one. That is the honest trade - the
+        // alternative is holding a listing page open on a write - and it converges, because
+        // every visitor runs it.
+        // Wrapped so a SYNCHRONOUS throw inside the call lands in the same `catch` as a
+        // rejected request. Without it such a throw escapes into loadData and takes the whole
+        // listing page down - for a cleanup nobody is waiting on. The same shape as the guard
+        // on HandoverPage.duck's fetch, and for the same reason.
+        Promise.resolve()
+          .then(() => sweepListingAvailability(listing.id.uuid))
+          .catch(() => null);
       }
     }
     return response;

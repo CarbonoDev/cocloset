@@ -379,6 +379,13 @@ export const assignListingLaundry = body => {
 // See `server/api/listing-initial-cleaning.js`. It is public and rate limited,
 // and it returns one integer and nothing else: per-category cleaning FEES live in
 // the same laundry privateData and must not reach the browser.
+// Ask the server to give back the days a finished booking is still blocking. Fired on listing
+// page load and deliberately not awaited: it is a cleanup, and a page that renders is worth
+// more than a calendar that is right on this particular load rather than the next one.
+export const sweepListingAvailability = listingId => {
+  return post('/api/listing-availability-sweep', { listingId });
+};
+
 export const fetchListingInitialCleaning = listingId => {
   return request(`/api/listing-initial-cleaning?listingId=${encodeURIComponent(listingId)}`, {
     method: methods.GET,
