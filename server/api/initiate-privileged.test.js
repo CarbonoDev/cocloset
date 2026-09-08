@@ -129,6 +129,7 @@ const req = ({
   isSpeculative = false,
   priceVariantName = '7-days',
   variantIn = 'params',
+  protectedData,
 }) => ({
   body: {
     isSpeculative,
@@ -143,6 +144,7 @@ const req = ({
         bookingStart: daysFromToday(startsInDays),
         bookingEnd: daysFromToday(startsInDays + days),
         ...(variantIn === 'params' ? { priceVariantName } : {}),
+        ...(protectedData ? { protectedData } : {}),
       },
     },
     queryParams: {},
@@ -794,5 +796,62 @@ describe('initiate-privileged: the cleaning gap between two rentals', () => {
     setup({ ...AT_LAUNDRY, readyAt: daysFromToday(5).toISOString() });
     await run({ days: 7, startsInDays: 3 });
     expect(handleError.mock.calls[0][1].data.code).toBe('booking-before-cleaning-ready');
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "en el correo que se recibe como customer 'Your booking request was accepted', aun se ve
+//   >  x n days, cuando debe ser por 1 o 2 semanas" (Jonathan, 2026-09-08)
+//
+// The email templates cannot divide a day count by seven, so the week count has to be stored
+// on the transaction. It was computed in the browser from session-stored checkout data, and a
+// real transaction on Dev arrived with every other protectedData key present and this one
+// missing. It is written HERE now, from the dates the booking is actually made from - the same
+// ones the line items and the cleaning gates are computed from.
+// ---------------------------------------------------------------------------
+describe('initiate-privileged: the week count the emails print', () => {
+  const paramsSent = initiate => initiate.mock.calls[0][0].params;
+
+  it('records a whole number of weeks', async () => {
+    const { initiate } = setup({ priceVariants: PERIODS });
+
+    await run({ isSpeculative: false, days: 7, priceVariantName: '7-days' });
+
+    expect(paramsSent(initiate).protectedData.bookingWeeks).toBe(1);
+  });
+
+  it('records two weeks for a fortnight', async () => {
+    const { initiate } = setup({ priceVariants: PERIODS });
+
+    await run({ isSpeculative: false, days: 14, priceVariantName: '14-days' });
+
+    expect(paramsSent(initiate).protectedData.bookingWeeks).toBe(2);
+  });
+
+  it('keeps everything else the checkout sent', async () => {
+    // Merged over, not replacing: unitType and the price-variant fields are what the rest of
+    // the templates and the order breakdown read.
+    const { initiate } = setup({ priceVariants: PERIODS });
+
+    await run({
+      isSpeculative: false,
+      days: 7,
+      priceVariantName: '7-days',
+      protectedData: { unitType: 'day', priceVariantName: '7-days' },
+    });
+
+    expect(paramsSent(initiate).protectedData).toEqual({
+      unitType: 'day',
+      priceVariantName: '7-days',
+      bookingWeeks: 1,
+    });
+  });
+
+  it('writes it on the speculative call too, so the preview and the charge agree', async () => {
+    const { initiateSpeculative } = setup({ priceVariants: PERIODS });
+
+    await run({ isSpeculative: true, days: 7, priceVariantName: '7-days' });
+
+    expect(initiateSpeculative.mock.calls[0][0].params.protectedData.bookingWeeks).toBe(1);
   });
 });
