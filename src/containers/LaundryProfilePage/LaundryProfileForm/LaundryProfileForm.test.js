@@ -69,6 +69,15 @@ describe('LaundryProfileForm', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('LaundryProfileForm.addressLabel')).toBeInTheDocument();
     expect(screen.getByTestId('location-search')).toBeInTheDocument();
+    //   > "si no es posible obtenerlo se utilizará un field de vecindario, pero debe estar
+    //   >  en settings de laundry, no en profile settings del user" (Jonathan, 2026-09-07)
+    //
+    // The fallback for addresses Mapbox has no district for. It lives HERE and not on the
+    // user's profile settings: a studio's neighbourhood is a fact about the shop.
+    expect(
+      screen.getByRole('textbox', { name: 'LaundryProfileForm.neighborhoodLabel' })
+    ).toBeInTheDocument();
+
     // Opening hours is a row per day now, not one free-text line - see
     // util/businessHours.js. Seven checkboxes, and two time inputs on each row.
     expect(screen.getByText('LaundryProfileForm.businessHoursLabel')).toBeInTheDocument();

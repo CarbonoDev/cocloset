@@ -234,7 +234,14 @@ const buildLaundryOptions = (users = []) =>
       // every listing card and every email prints, and one endpoint quietly
       // returning a different string under the same key is how those start
       // disagreeing. The client picks which one to show.
-      neighborhood: user?.attributes?.profile?.publicData?.neighborhood || null,
+      // The STUDIO's, from its own settings page, where it is resolved from the address the
+      // studio picked (GeocoderMapbox.placeNeighborhood) or typed as a fallback. The
+      // user-level `neighborhood` is the garment owner's field and is only read here as a
+      // second choice, for a studio that filled it in before this moved.
+      neighborhood:
+        user?.attributes?.profile?.publicData?.laundryProfile?.neighborhood ||
+        user?.attributes?.profile?.publicData?.neighborhood ||
+        null,
     }))
     .filter(option => !!option.id && !!option.name)
     .sort((a, b) => a.name.localeCompare(b.name));

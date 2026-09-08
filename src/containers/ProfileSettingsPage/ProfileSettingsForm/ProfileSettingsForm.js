@@ -10,7 +10,7 @@ import { ensureCurrentUser } from '../../../util/data';
 import { propTypes } from '../../../util/types';
 import * as validators from '../../../util/validators';
 import { isUploadImageOverLimitError } from '../../../util/errors';
-import { getPropsForCustomUserFieldInputs } from '../../../util/userHelpers';
+import { getPropsForCustomUserFieldInputs, isLaundryUser } from '../../../util/userHelpers';
 
 import {
   Form,
@@ -394,7 +394,19 @@ class ProfileSettingsFormComponent extends Component {
                 </p>
               </div>
 
-              {/* WHERE THIS MEMBER IS, IN THE WORDS THEY USE FOR IT.
+              {/* NOT FOR STUDIOS.
+                    > "el field de neighborhood aplica solo para providers, las laundries
+                    >  tienen el input de autocomplete, de ahi hay que obtener el vecindario
+                    >  (...) pero debe estar en settings de laundry, no en profile settings
+                    >  del user" (Jonathan, 2026-09-07)
+
+                  A studio's neighbourhood comes from its address, on its own settings page,
+                  and is a fact about the shop rather than about the person who signed it up.
+                  Two boxes for one answer is how they end up disagreeing - and the search
+                  filter reads the studio's, so the one here would look ignored. */}
+              {isLaundryUser(user) ? null : (
+                <>
+                  {/* WHERE THIS MEMBER IS, IN THE WORDS THEY USE FOR IT.
                     > "En mi form de profile settings, puedo ingresar el nombre de mi
                     >  vecindario y éste se debe mostrar en mi perfil"
 
@@ -403,24 +415,26 @@ class ProfileSettingsFormComponent extends Component {
                   with all of them. It is also optional - a member who does not want
                   to say leaves it blank and their profile simply does not carry a
                   line about it. */}
-              <div className={classNames(css.sectionContainer)}>
-                <H4 as="h2" className={css.sectionTitle}>
-                  <FormattedMessage id="ProfileSettingsForm.neighborhoodHeading" />
-                </H4>
-                <FieldTextInput
-                  type="text"
-                  id={`${formId}neighborhood`}
-                  name="neighborhood"
-                  label={intl.formatMessage({ id: 'ProfileSettingsForm.neighborhoodLabel' })}
-                  placeholder={intl.formatMessage({
-                    id: 'ProfileSettingsForm.neighborhoodPlaceholder',
-                  })}
-                  maxLength={NEIGHBORHOOD_MAX_LENGTH}
-                />
-                <p className={css.extraInfo}>
-                  <FormattedMessage id="ProfileSettingsForm.neighborhoodInfo" />
-                </p>
-              </div>
+                  <div className={classNames(css.sectionContainer)}>
+                    <H4 as="h2" className={css.sectionTitle}>
+                      <FormattedMessage id="ProfileSettingsForm.neighborhoodHeading" />
+                    </H4>
+                    <FieldTextInput
+                      type="text"
+                      id={`${formId}neighborhood`}
+                      name="neighborhood"
+                      label={intl.formatMessage({ id: 'ProfileSettingsForm.neighborhoodLabel' })}
+                      placeholder={intl.formatMessage({
+                        id: 'ProfileSettingsForm.neighborhoodPlaceholder',
+                      })}
+                      maxLength={NEIGHBORHOOD_MAX_LENGTH}
+                    />
+                    <p className={css.extraInfo}>
+                      <FormattedMessage id="ProfileSettingsForm.neighborhoodInfo" />
+                    </p>
+                  </div>
+                </>
+              )}
               <div className={classNames(css.sectionContainer, css.lastSection)}>
                 {userFieldProps.map(({ key, ...fieldProps }) => (
                   <CustomExtendedDataField key={key} {...fieldProps} formId={formId} />

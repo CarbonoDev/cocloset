@@ -410,6 +410,34 @@ const LaundryProfileForm = props => (
             </p>
           ) : null}
 
+          {/* THE FALLBACK, ASKED ONLY WHEN THE ADDRESS COULD NOT ANSWER.
+                > "de ahi hay que obtener el vecindario, si no es posible obtenerlo se
+                >  utilizará un field de vecindario, pero debe estar en settings de laundry,
+                >  no en profile settings del user" (Jonathan, 2026-09-07)
+
+              The address autocomplete carries the district in its Mapbox context, and the
+              submit handler prefers it - a studio that moves picks a new address and the
+              district follows on its own. This box exists for the addresses Mapbox has no
+              district for, and it is here rather than on the user's profile settings because
+              a studio's neighbourhood is a fact about the shop, not about the person who
+              signed it up.
+
+              Always shown rather than revealed after a failed lookup: the geocoder runs on
+              save, so a box that appeared only afterwards would appear only after the studio
+              had already left the page. */}
+          <FieldTextInput
+            className={css.field}
+            type="text"
+            id={`${formId}.neighborhood`}
+            name="neighborhood"
+            labelClassName={css.fieldLabel}
+            label={intl.formatMessage({ id: 'LaundryProfileForm.neighborhoodLabel' })}
+            placeholder={intl.formatMessage({ id: 'LaundryProfileForm.neighborhoodPlaceholder' })}
+          />
+          <p className={css.fieldHint}>
+            <FormattedMessage id="LaundryProfileForm.neighborhoodHelp" />
+          </p>
+
           {/* ONE ROW PER DAY, ALL TICKED TO START WITH.
                 > "un listado con checkboxes por cada día, cada día debe tener un input
                 >  para hora de abrir y un input para hora de cerrar, por default todos
