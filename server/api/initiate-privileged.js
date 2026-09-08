@@ -9,6 +9,7 @@ const {
   fetchCommission,
 } = require('../api-util/sdk');
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
+const { bookingWeeksBetween } = require('../api-util/rentalWeeks');
 const { isCoclosetBookingListing } = require('../api-util/coclosetBookingProcess');
 const {
   assertInitialCleaningLeadTime,
@@ -224,12 +225,34 @@ module.exports = (req, res) => {
     .then(trustedSdk => {
       const { params } = bodyParams;
 
+      // HOW MANY WEEKS THIS RENTAL IS, written where the dates are authoritative.
+      //
+      //   > "en el correo (...) aun se ve x n days, cuando debe ser por 1 o 2 semanas"
+      //   >   (Jonathan, 2026-09-08)
+      //
+      // The email templates cannot do arithmetic, so the count has to travel with the
+      // transaction. It used to be computed in the browser from the checkout's session-stored
+      // `bookingDates`; a real transaction on Dev came back with every other protectedData key
+      // present and this one missing, which is what that indirection buys. `bookingStart` and
+      // `bookingEnd` here are the dates the booking is about to be made from - the same ones
+      // the line items and the cleaning gates above are computed from.
+      //
+      // Absent when the rental is not a whole number of weeks: the breakdown then falls back
+      // to days, which is still true, where "3 weeks" for a 20-day rental would not be.
+      //
+      // Merged OVER whatever the client sent, and last, so there is one writer of this key.
+      const bookingWeeks = bookingWeeksBetween(params?.bookingStart, params?.bookingEnd);
+      const protectedDataMaybe = bookingWeeks
+        ? { protectedData: { ...(params?.protectedData || {}), bookingWeeks } }
+        : {};
+
       // Add lineItems to the body params
       const body = {
         ...bodyParams,
         params: {
           ...params,
           lineItems,
+          ...protectedDataMaybe,
           ...metadataMaybe,
         },
       };
