@@ -30,14 +30,25 @@ import { denormalisedResponseEntities } from '../util/data';
  * object that every reader would then have to unwrap. See util/data.js for the same argument
  * about extended data generally.
  *
- * ── WHY THE WRITE IS A WHOLE-LIST REPLACE ───────────────────────────────────
+ * ── WHY THE WRITE IS A WHOLE-LIST REPLACE, AND WHAT THAT COSTS ──────────────
  * There is no "append to an array" in the API: `updateProfile` merges per TOP-LEVEL key, so
- * writing `privateData.favoriteListingIds` replaces the array wholesale. Every write here
- * therefore reads the current list from state and sends the full result. The consequence is
- * real and worth stating: two tabs saving different garments at the same moment will have the
- * later write win, and the earlier garment will not be saved. That is acceptable for a
- * favourites list - the user can see it did not stick and press again - and the alternative
- * is a read-modify-write against the API on every heart, which is slower and still racy.
+ * writing `privateData.favoriteListingIds` replaces the array wholesale. Whatever is sent
+ * becomes the list.
+ *
+ *   > "puedes cambiar el comportamiento por si un usuario abre varias pestañas no debería
+ *   >  perder sus favoritos guardados" (Jonathan, 2026-09-08)
+ *
+ * So the list is READ FROM THE API immediately before every write, not from this tab's Redux
+ * state. A second tab opened an hour ago holds the list as it was an hour ago; saving one
+ * garment there would otherwise send that stale list back and silently delete everything
+ * saved since. That is not an edge case - leaving tabs open is how people browse a
+ * marketplace - and the loss is invisible until they next look at the page.
+ *
+ * The extra round trip buys exactly that. What it does NOT buy is safety against two writes
+ * in the same instant: the API has no compare-and-set, so two tabs saving within the same
+ * few hundred milliseconds still resolve to whichever request the server handles last. That
+ * window is now the length of one request rather than the lifetime of a tab, and closing it
+ * completely is not something this API can express.
  */
 
 // ================ Selectors ================ //
@@ -54,8 +65,21 @@ const FAVORITES_KEY = 'favoriteListingIds';
  * @param {Object} state - the Redux state
  * @returns {Array<string>} listing ids, never null
  */
-export const favoriteListingIdsSelector = state => {
-  const ids = state?.user?.currentUser?.attributes?.profile?.privateData?.[FAVORITES_KEY];
+export const favoriteListingIdsSelector = state =>
+  favoriteListingIdsFromUser(state?.user?.currentUser);
+
+/**
+ * The same read, off a user entity rather than off the store.
+ *
+ * Shared so the selector and the pre-write API read cannot disagree about the shape - which
+ * would be a very quiet bug: one of them would see a list the other did not, and the write
+ * would then persist the wrong one.
+ *
+ * @param {Object} [user] - a currentUser entity
+ * @returns {Array<string>} listing ids, never null
+ */
+export const favoriteListingIdsFromUser = user => {
+  const ids = user?.attributes?.profile?.privateData?.[FAVORITES_KEY];
   // Anything that is not an array of strings is treated as no favourites at all. This is
   // user-writable data and it has been round-tripped through JSON; a malformed value must
   // degrade to an empty heart rather than throwing on a listing page.
@@ -79,16 +103,26 @@ export const toggleFavoriteThunk = createAsyncThunk(
       return rejectWithValue(storableError(new Error('No listing id to favorite.')));
     }
 
-    const current = favoriteListingIdsSelector(getState());
-    const isFavorite = current.includes(listingId);
-    // Appended at the END when saving, so the favourites page can read oldest-first and stay
-    // in a stable order as the list grows. A set would be the natural shape for "is it in
-    // there" but would throw away the only ordering the user has.
-    const next = isFavorite ? current.filter(id => id !== listingId) : [...current, listingId];
-
+    // The SERVER's list, fetched now - see the note above. What this tab happens to hold is
+    // only good enough for drawing a heart; it is not good enough to write back as the whole
+    // truth. On a failure the local copy is used rather than refusing: a user who cannot save
+    // anything is worse off than one whose stale tab loses a race it was going to lose anyway.
     return sdk.currentUser
-      .updateProfile({ privateData: { [FAVORITES_KEY]: next } }, { expand: true })
-      .then(response => {
+      .show()
+      .then(response => favoriteListingIdsFromUser(response?.data?.data))
+      .catch(() => favoriteListingIdsSelector(getState()))
+      .then(current => {
+        const isFavorite = current.includes(listingId);
+        // Appended at the END when saving, so the favourites page can read oldest-first and
+        // stay in a stable order as the list grows. A set would be the natural shape for "is
+        // it in there" but would throw away the only ordering the user has.
+        const next = isFavorite ? current.filter(id => id !== listingId) : [...current, listingId];
+
+        return sdk.currentUser
+          .updateProfile({ privateData: { [FAVORITES_KEY]: next } }, { expand: true })
+          .then(updateResponse => ({ updateResponse, isFavorite }));
+      })
+      .then(({ updateResponse: response, isFavorite }) => {
         const entities = denormalisedResponseEntities(response);
         if (entities.length !== 1) {
           throw new Error('Expected a resource in the sdk.currentUser.updateProfile response');

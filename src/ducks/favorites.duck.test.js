@@ -50,18 +50,35 @@ describe('the saved list, read', () => {
 });
 
 describe('the saved list, written', () => {
-  const run = ({ current, listingId }) => {
+  // `stale` is what THIS tab holds; `current` is what the server holds. They differ whenever
+  // another tab has saved something since this one loaded, which is the case the client asked
+  // about - and the write has to be built from the server's copy, not this tab's.
+  const run = ({ current, stale = current, listingId, showFails = false }) => {
     const updateProfile = jest.fn(() =>
       Promise.resolve({
         data: { data: { id: { uuid: 'user-1' }, type: 'currentUser', attributes: {} } },
       })
     );
+    const show = jest.fn(() =>
+      showFails
+        ? Promise.reject(new Error('offline'))
+        : Promise.resolve({
+            data: {
+              data: {
+                id: { uuid: 'user-1' },
+                attributes: {
+                  profile: { privateData: current ? { favoriteListingIds: current } : {} },
+                },
+              },
+            },
+          })
+    );
     const dispatch = jest.fn(action =>
-      typeof action === 'function' ? action(dispatch, () => stateWith(current)) : action
+      typeof action === 'function' ? action(dispatch, () => stateWith(stale)) : action
     );
     const thunk = toggleFavoriteThunk({ listingId });
 
-    return thunk(dispatch, () => stateWith(current), { currentUser: { updateProfile } }).then(
+    return thunk(dispatch, () => stateWith(stale), { currentUser: { updateProfile, show } }).then(
       () => updateProfile
     );
   };
@@ -93,6 +110,39 @@ describe('the saved list, written', () => {
     const updateProfile = await run({ current: [A], listingId: A });
 
     expect(updateProfile.mock.calls[0][0].privateData.favoriteListingIds).toEqual([]);
+  });
+
+  // -------------------------------------------------------------------------
+  //   > "puedes cambiar el comportamiento por si un usuario abre varias pestañas no debería
+  //   >  perder sus favoritos guardados" (Jonathan, 2026-09-08)
+  //
+  // The write replaces the whole array, so a tab that sends the list it loaded with deletes
+  // everything saved since. Leaving tabs open is how people browse a marketplace, and the
+  // loss is invisible until they next open the page.
+  // -------------------------------------------------------------------------
+  it('keeps what another tab saved, instead of sending a stale list back', async () => {
+    // This tab loaded when only A was saved. Another tab has since saved B.
+    const updateProfile = await run({ stale: [A], current: [A, B], listingId: 'c-listing' });
+
+    expect(updateProfile.mock.calls[0][0].privateData.favoriteListingIds).toEqual([
+      A,
+      B,
+      'c-listing',
+    ]);
+  });
+
+  it('removes against the server list, not the one this tab remembers', async () => {
+    const updateProfile = await run({ stale: [A], current: [A, B], listingId: A });
+
+    expect(updateProfile.mock.calls[0][0].privateData.favoriteListingIds).toEqual([B]);
+  });
+
+  it('still saves when the list cannot be re-read', async () => {
+    // A user who cannot save anything is worse off than one whose stale tab loses a race it
+    // was going to lose anyway. Falls back to the local copy rather than refusing.
+    const updateProfile = await run({ stale: [A], current: [A, B], listingId: B, showFails: true });
+
+    expect(updateProfile.mock.calls[0][0].privateData.favoriteListingIds).toEqual([A, B]);
   });
 });
 

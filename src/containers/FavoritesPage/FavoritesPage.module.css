@@ -1,6 +1,10 @@
 @import '../../styles/customMediaQueries.css';
 
 .content {
+  /* EXPLICIT width, not just a max. This block sits inside a layout that sizes its children,
+     and without it the column collapsed to the width of its content - which on a page holding
+     ONE saved garment is the width of one small card. That is what the client saw. */
+  width: 100%;
   max-width: var(--contentMaxWidthPages, 1056px);
   margin: 0 auto;
   padding: 24px 24px 96px 24px;
@@ -14,21 +18,26 @@
   margin: 0 0 24px 0;
 }
 
-/* Same three-across shape as search, so a saved garment looks like the card it was saved from. */
+/* Cards sized by a MINIMUM rather than by a column count.
+   > "El tamaño de la listingCard en el listado de favoritos se ve muy pequeño"
+   >   (Jonathan, 2026-09-08)
+
+   `repeat(3, 1fr)` divides whatever width the container happens to have, so a container that
+   is narrower than expected produces three unreadably small cards rather than one readable
+   one. `auto-fill` with a floor asks the opposite question - how many cards of a usable size
+   fit - and a garment photo below about 260px is not something anybody can judge a garment
+   from, which is the entire job of this page. */
 .grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 24px;
   margin: 0;
   padding: 0;
   list-style: none;
 
   @media (--viewportMedium) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  @media (--viewportLarge) {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 32px;
   }
 }
 
