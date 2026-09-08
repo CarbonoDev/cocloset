@@ -176,6 +176,18 @@ const ProfileMenu = ({ currentPage, currentUser, onLogout, showManageListingsLin
             </NamedLink>
           </MenuItem>
         ) : null}
+        {/* Saved garments. In the user menu rather than as a topbar icon: it is a personal
+            list, it sits beside the other "things of mine" entries, and the topbar is already
+            carrying search on a narrow screen. */}
+        <MenuItem key="FavoritesPage">
+          <NamedLink
+            className={classNames(css.menuLink, currentPageClass('FavoritesPage'))}
+            name="FavoritesPage"
+          >
+            <span className={css.menuItemBorder} />
+            <FormattedMessage id="TopbarDesktop.favoritesLink" />
+          </NamedLink>
+        </MenuItem>
         <MenuItem key="ProfileSettingsPage">
           <NamedLink
             className={classNames(css.menuLink, currentPageClass('ProfileSettingsPage'))}

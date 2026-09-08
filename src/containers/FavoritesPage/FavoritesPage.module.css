@@ -1,0 +1,60 @@
+@import '../../styles/customMediaQueries.css';
+
+.content {
+  max-width: var(--contentMaxWidthPages, 1056px);
+  margin: 0 auto;
+  padding: 24px 24px 96px 24px;
+
+  @media (--viewportMedium) {
+    padding: 40px 36px 120px 36px;
+  }
+}
+
+.heading {
+  margin: 0 0 24px 0;
+}
+
+/* Same three-across shape as search, so a saved garment looks like the card it was saved from. */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @media (--viewportMedium) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (--viewportLarge) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.gridItem {
+  min-width: 0;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.emptyText {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted, var(--colorGrey600));
+  margin: 0;
+}
+
+.emptyLink {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--marketplaceColor);
+}
+
+.error {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--colorFail);
+}
