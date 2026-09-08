@@ -280,14 +280,34 @@ describe('handover-status: what it says is next', () => {
     });
   });
 
-  it('offers no step, and no confirm, once the garment is back', () => {
-    // `returned` and everything after it is studio-internal work. A confirm button here would
-    // advance a cleaning phase because somebody scanned an old code.
+  it('names no counter event once the garment is back, but still gives the studio its work', () => {
+    //   > "el handover tiene que funcionar igual que en la pestaña orders de laundry"
+    //   >   (Jonathan, 2026-09-08)
+    //
+    // `returned` and everything after it is studio-internal: nobody is handing anything over,
+    // so there is no step to name. There IS something to do, though, and the page used to say
+    // "nothing due" and offer no button - which is the parity the client asked for.
     setup({ lastTransition: 'transition/laundry-confirm-return' });
 
     return run().then(res => {
       expect(res.statusCode).toBe(200);
       expect(res.body.data.step).toBeNull();
+      expect(res.body.data.action.status).toBe('pending-cleaning');
+      expect(res.body.data.canConfirm).toBe(true);
+    });
+  });
+
+  it('gives the customer no action at a studio-internal step', () => {
+    // The step was what stopped a scanned old code advancing a cleaning phase; now that the
+    // button no longer needs one, the role check is the whole guard. So assert it.
+    setup({
+      callerId: CUSTOMER_ID,
+      isLaundry: false,
+      lastTransition: 'transition/laundry-confirm-return',
+    });
+
+    return run().then(res => {
+      expect(res.body.data.action).toBeNull();
       expect(res.body.data.canConfirm).toBe(false);
     });
   });
@@ -297,12 +317,24 @@ describe('handover-status: the cleaning-days default', () => {
   //   > "estos días deben tener un default de los días que indique la laundry, pero pueden
   //   >  modificarse al recibir"
 
-  it('tells the laundry its own turnaround at the return step', () => {
+  it('tells the laundry its own turnaround where the wash starts', () => {
+    // MOVED off the return (Jonathan, 2026-09-08). The endpoint only reads the days at
+    // `transition/laundry-start-cleaning`, so this is the only step at which offering the box
+    // is honest - the phone used to ask at the return and have the answer discarded.
+    setup({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+
+    return run().then(res => {
+      expect(res.body.data.action.status).toBe('cleaning-in-progress');
+      expect(res.body.data.defaultCleaningDays).toBe(4);
+    });
+  });
+
+  it('does not offer it at the return any more', () => {
     setup({ lastTransition: 'transition/laundry-confirm-pickup' }); // -> picked-up, next: returned
 
     return run().then(res => {
-      expect(res.body.data.step.status).toBe('returned');
-      expect(res.body.data.defaultCleaningDays).toBe(4);
+      expect(res.body.data.action.status).toBe('returned');
+      expect(res.body.data).not.toHaveProperty('defaultCleaningDays');
     });
   });
 
@@ -333,7 +365,7 @@ describe('handover-status: the cleaning-days default', () => {
   it('falls back to a usable number when the studio has configured nothing', () => {
     // The chain bottoms out in a hardcoded default: a studio that has set nothing still needs
     // time to clean, and an empty box would be worse than a defensible guess.
-    setup({ lastTransition: 'transition/laundry-confirm-pickup', laundryPrivateData: {} });
+    setup({ lastTransition: 'transition/laundry-mark-pending-cleaning', laundryPrivateData: {} });
 
     return run().then(res => {
       expect(Number.isInteger(res.body.data.defaultCleaningDays)).toBe(true);
@@ -402,6 +434,9 @@ describe('handover-status: what it discloses', () => {
           // permission, and it is a permission to move a garment rather than money.
           'listingId',
           'canHandBack',
+          // The studio's next action, resolved from the same table the ops worklist reads so
+          // the two screens ask the same questions. See api-util/laundryActions.js.
+          'action',
         ].sort()
       );
     });

@@ -10,6 +10,7 @@ const {
   stateFromLastTransition,
 } = require('../api-util/coclosetBookingProcess');
 const { handoverStepFor } = require('../api-util/handoverSteps');
+const { laundryActionFor } = require('../api-util/laundryActions');
 const { createRateLimiter } = require('../api-util/rateLimit');
 const { maxCleaningDaysBeforeNextBooking } = require('../api-util/listingCustody');
 const { resolveNextBookingStart } = require('../api-util/listingCleaningGaps');
@@ -188,6 +189,26 @@ module.exports = (req, res) => {
       const processState = stateFromLastTransition(transaction?.attributes?.lastTransition);
       const step = handoverStepFor(processState, { onLaundry });
 
+      // WHAT THE STUDIO DOES NEXT, from the same table the ops worklist uses.
+      //
+      //   > "el handover tiene que funcionar igual que en la pestaña orders de laundry"
+      //   >   (Jonathan, 2026-09-08)
+      //
+      // `step` answers WHO IS AT THE COUNTER, which is what the customer and the owner are
+      // told. It is not the same question as which button the studio gets, and the two
+      // diverge: the cleaning phases are studio-internal work with nobody handing anything
+      // over, so they have no step at all - and the page, driving its boxes off `step`, both
+      // offered nothing there and asked for the cleaning days at the return, where the write
+      // does not read them. See api-util/laundryActions.js.
+      const action =
+        viewerRole === ROLE_LAUNDRY
+          ? laundryActionFor({
+              state: processState,
+              cleaningPhase: transaction?.attributes?.metadata?.cleaningPhase,
+              onLaundry,
+            })
+          : null;
+
       // How many days this studio needs to clean THIS garment, so the confirm screen can
       // pre-fill the box instead of asking the operator to remember their own configuration.
       //
@@ -208,7 +229,7 @@ module.exports = (req, res) => {
       // the page infer it from `defaultCleaningDays`: they happen to coincide today, and a
       // client that assumed they always would is a client that breaks silently the first time
       // they do not.
-      const takesCleaningDays = viewerRole === ROLE_LAUNDRY && step?.status === 'returned';
+      const takesCleaningDays = action?.needsCleaningDays === true;
       const defaultCleaningDaysMaybe = takesCleaningDays
         ? {
             defaultCleaningDays: resolveInitialCleaningDays({
@@ -266,7 +287,12 @@ module.exports = (req, res) => {
               // A step being due is not the same as this caller being able to advance it. Only
               // the assigned laundry ever gets `true`; the client renders a button off this
               // field alone, so the rule lives here rather than in the page.
-              canConfirm: viewerRole === ROLE_LAUNDRY && !!step,
+              canConfirm: !!action,
+              // The whole action, so the page renders the same button with the same boxes the
+              // ops table would. It is deliberately the SERVER's answer, like `canConfirm`:
+              // a client re-deriving which step takes a code is a client that breaks silently
+              // when the rule moves, which is exactly what happened to the cleaning days.
+              action,
               // THE GARMENT THIS IS ABOUT, and whether the studio may release it here.
               //
               //   > "el botón para devolver la prenda en el lado de laundry debe aparecer en
@@ -301,7 +327,7 @@ module.exports = (req, res) => {
                 : null,
               ...defaultCleaningDaysMaybe,
               ...cleaningCeilingMaybe,
-              takesDamageReport: takesCleaningDays,
+              takesDamageReport: action?.needsDamageReport === true,
               listingTitle: listing?.attributes?.title || null,
               bookingStart: booking?.attributes?.displayStart || booking?.attributes?.start || null,
               bookingEnd: booking?.attributes?.displayEnd || booking?.attributes?.end || null,
@@ -320,7 +346,7 @@ module.exports = (req, res) => {
               // to go onto a shelf. Its own flag rather than something the page infers from
               // the status string, matching `takesDamageReport` - a client that re-derives a
               // server rule is a client that breaks silently when the rule moves.
-              takesLaundryCode: viewerRole === ROLE_LAUNDRY && takesLaundryCode(step?.status),
+              takesLaundryCode: action?.needsLaundryCode === true,
             },
           })
           .end();

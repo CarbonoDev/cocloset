@@ -228,6 +228,7 @@ export const HandoverPageComponent = props => {
       step,
       viewerRole,
       canConfirm,
+      action,
       canHandBack,
       listingId,
       processState,
@@ -312,15 +313,23 @@ export const HandoverPageComponent = props => {
           </>
         ) : (
           <H3 as="h2" className={css.stepTitle}>
-            <FormattedMessage id="HandoverPage.nothingDue.title" />
+            {/* NOT ALWAYS "nothing to do". The cleaning phases are studio-internal work with
+                nobody at the counter, so they have no step - but the studio standing in its
+                own shop with the garment in its hands very much has something to do, and this
+                page told it otherwise. */}
+            <FormattedMessage
+              id={action ? `HandoverPage.status.${processState}` : 'HandoverPage.nothingDue.title'}
+            />
           </H3>
         )}
 
         {canConfirm ? (
           <>
-            <p className={css.instruction}>
-              <FormattedMessage id={handoverStepMessageId(step, 'laundry')} />
-            </p>
+            {step ? (
+              <p className={css.instruction}>
+                <FormattedMessage id={handoverStepMessageId(step, 'laundry')} />
+              </p>
+            ) : null}
 
             {takesDamageReport ? (
               <div className={css.damageField}>
@@ -450,7 +459,7 @@ export const HandoverPageComponent = props => {
               onClick={() =>
                 onConfirm({
                   transactionId: handover.transactionId,
-                  status: step.status,
+                  status: action.status,
                   // Only sent when this step takes it AND the box holds a usable whole
                   // number. A blank box is NOT a zero: the server reads "absent" as "apply
                   // the configured turnaround", while 0 means "ready today" and would block
@@ -479,7 +488,20 @@ export const HandoverPageComponent = props => {
                 })
               }
             >
-              <FormattedMessage id={handoverStepMessageId(step, 'confirm')} />
+              {/* THE SAME LABEL THE OPS TABLE PRINTS.
+                    > "el handover tiene que funcionar igual que en la pestaña orders de
+                    >  laundry" (Jonathan, 2026-09-08)
+
+                  Keyed on the ACTION, not the step, because the two do not always coincide:
+                  the cleaning phases have no counter event at all, and the page used to offer
+                  nothing there. `step` is still what names the counter above. */}
+              <FormattedMessage
+                id={
+                  step
+                    ? handoverStepMessageId(step, 'confirm')
+                    : `LaundryOpsPage.action.${action.status}`
+                }
+              />
             </PrimaryButton>
           </>
         ) : (
