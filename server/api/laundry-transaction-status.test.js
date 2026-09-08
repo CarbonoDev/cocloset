@@ -548,8 +548,8 @@ describe('laundry-transaction-status', () => {
       Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 
     it('stamps custody and the readiness moment onto the LISTING', async () => {
-      const { listingsUpdate } = setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
-      const res = await run({ transactionId: TX_ID, status: 'pending-cleaning' });
+      const { listingsUpdate } = setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+      const res = await run({ transactionId: TX_ID, status: 'cleaning-in-progress' });
 
       expect(listingsUpdate).toHaveBeenCalledTimes(1);
       const params = listingsUpdate.mock.calls[0][0];
@@ -576,8 +576,8 @@ describe('laundry-transaction-status', () => {
     });
 
     it('blocks from the day the garment came back, not from the booking', async () => {
-      setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
-      await run({ transactionId: TX_ID, status: 'pending-cleaning' });
+      setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+      await run({ transactionId: TX_ID, status: 'cleaning-in-progress' });
 
       expect(reconcileBufferWindow).toHaveBeenCalledTimes(1);
       const call = reconcileBufferWindow.mock.calls[0][0];
@@ -595,8 +595,8 @@ describe('laundry-transaction-status', () => {
       //
       // 13th -> 18th is five calendar days blocked for four days of washing: the day the
       // garment is handed back over the counter is not a wash day.
-      setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
-      await run({ transactionId: TX_ID, status: 'pending-cleaning', cleaningDays: 4 });
+      setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+      await run({ transactionId: TX_ID, status: 'cleaning-in-progress', cleaningDays: 4 });
 
       const call = reconcileBufferWindow.mock.calls[0][0];
       expect(call.start.getTime()).toBe(utcMidnight(new Date()));
@@ -607,21 +607,21 @@ describe('laundry-transaction-status', () => {
       // The case the old implementation got closest to wrong: with the window computed
       // from the exact return instant, a one-day turnaround only ever blocked the tail of
       // today and the whole of tomorrow when the clock happened to cooperate.
-      setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
-      await run({ transactionId: TX_ID, status: 'pending-cleaning', cleaningDays: 1 });
+      setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+      await run({ transactionId: TX_ID, status: 'cleaning-in-progress', cleaningDays: 1 });
 
       const call = reconcileBufferWindow.mock.calls[0][0];
       expect((call.end.getTime() - call.start.getTime()) / dayMs).toBe(2);
     });
 
     it('treats an on-time and a late return identically', async () => {
-      setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
-      await run({ transactionId: TX_ID, status: 'pending-cleaning' });
+      setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+      await run({ transactionId: TX_ID, status: 'cleaning-in-progress' });
       const onTime = reconcileBufferWindow.mock.calls[0][0];
 
       reconcileBufferWindow.mockClear();
       setupSdk({ lastTransition: 'transition/mark-overdue' });
-      await run({ transactionId: TX_ID, status: 'pending-cleaning' });
+      await run({ transactionId: TX_ID, status: 'cleaning-in-progress' });
       const late = reconcileBufferWindow.mock.calls[0][0];
 
       // Lateness is no longer a separate availability branch - it is just a return
@@ -632,8 +632,8 @@ describe('laundry-transaction-status', () => {
     });
 
     it("uses the laundry's own cleaningDays over its configured turnaround", async () => {
-      setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
-      const res = await run({ transactionId: TX_ID, status: 'pending-cleaning', cleaningDays: 5 });
+      setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+      const res = await run({ transactionId: TX_ID, status: 'cleaning-in-progress', cleaningDays: 5 });
 
       expect(res.body.data.custody).toMatchObject({
         cleaningDays: 5,
@@ -644,8 +644,8 @@ describe('laundry-transaction-status', () => {
     });
 
     it('blocks nothing for cleaningDays: 0, but still records custody and readiness', async () => {
-      const { listingsUpdate } = setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
-      const res = await run({ transactionId: TX_ID, status: 'pending-cleaning', cleaningDays: 0 });
+      const { listingsUpdate } = setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+      const res = await run({ transactionId: TX_ID, status: 'cleaning-in-progress', cleaningDays: 0 });
 
       // "Ready today" means there is nothing to block. It does NOT mean the
       // garment is not in the studio.
@@ -657,8 +657,8 @@ describe('laundry-transaction-status', () => {
     it('rejects an unusable cleaningDays BEFORE firing the transition', async () => {
       // The transition is irreversible; a 400 after it fired would leave the
       // garment returned with an unblockable calendar and no way to correct it.
-      const { transition } = setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
-      const res = await run({ transactionId: TX_ID, status: 'pending-cleaning', cleaningDays: -1 });
+      const { transition } = setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+      const res = await run({ transactionId: TX_ID, status: 'cleaning-in-progress', cleaningDays: -1 });
 
       expect(res.statusCode).toBe(400);
       expect(transition).not.toHaveBeenCalled();
@@ -667,8 +667,8 @@ describe('laundry-transaction-status', () => {
     it.each([['a fractional value', 1.5], ['a numeric string', '3'], ['past the cap', 400]])(
       'rejects %s for cleaningDays',
       async (_label, cleaningDays) => {
-        const { transition } = setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
-        const res = await run({ transactionId: TX_ID, status: 'pending-cleaning', cleaningDays });
+        const { transition } = setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
+        const res = await run({ transactionId: TX_ID, status: 'cleaning-in-progress', cleaningDays });
 
         expect(res.statusCode).toBe(400);
         expect(transition).not.toHaveBeenCalled();
@@ -698,14 +698,14 @@ describe('laundry-transaction-status', () => {
 
     it('still answers 200 when the calendar write fails', async () => {
       reconcileBufferWindow.mockRejectedValue(new Error('exception overlap'));
-      setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
+      setupSdk({ lastTransition: 'transition/laundry-mark-pending-cleaning' });
 
-      const res = await run({ transactionId: TX_ID, status: 'pending-cleaning' });
+      const res = await run({ transactionId: TX_ID, status: 'cleaning-in-progress' });
 
       // The wash was recorded by Sharetribe. Failing the request would make the ops UI retry
       // a transition the platform would then answer 409 for.
       expect(res.statusCode).toBe(200);
-      expect(res.body.data.transition).toBe('transition/laundry-mark-pending-cleaning');
+      expect(res.body.data.transition).toBe('transition/laundry-start-cleaning');
     });
 
     it('still answers 200 when the custody write fails', async () => {
@@ -714,7 +714,7 @@ describe('laundry-transaction-status', () => {
         listingsUpdateImpl: jest.fn(() => Promise.reject(new Error('403 Forbidden'))),
       });
 
-      const res = await run({ transactionId: TX_ID, status: 'pending-cleaning' });
+      const res = await run({ transactionId: TX_ID, status: 'cleaning-in-progress' });
 
       expect(listingsUpdate).toHaveBeenCalled();
       expect(res.statusCode).toBe(200);
@@ -748,8 +748,72 @@ describe('laundry-transaction-status', () => {
         },
       });
 
-      const res = await run({ transactionId: TX_ID, status: 'pending-cleaning' });
+      const res = await run({ transactionId: TX_ID, status: 'cleaning-in-progress' });
       expect(res.statusCode).toBe(200);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "puede ocurrir que no sea el mismo ticket con el que inició, pero al ser asi, no se
+//   >  guarda en la transaction, solo se queda el primer ticket, deben guardarse los dos sin
+//   >  sobreescribirse" (Jonathan, 2026-09-08)
+//
+// The studio is asked for the code twice in a rental, and the second answer used to overwrite
+// the first - so a garment that changed shelves lost the record of where it had been.
+// ---------------------------------------------------------------------------
+describe('laundry-transaction-status: the codes a rental has been given', () => {
+  beforeEach(() => {
+    authorizeLaundryCaller.mockResolvedValue(laundryUser);
+    handleError.mockImplementation((res, e) => {
+      res.status(e.status || 500);
+      res.json({ error: e.statusText || 'error' });
+      res.end();
+    });
+    reconcileBufferWindow.mockResolvedValue({
+      exceptionIds: [],
+      segmentsCreated: 0,
+      alreadyBlocked: false,
+      unblockedOverlaps: [],
+    });
+  });
+
+  const metadataSent = transition => transition.mock.calls[0][0].params.metadata;
+
+  it('keeps the earlier code when a new one is given', async () => {
+    const { transition } = setupSdk({
+      lastTransition: 'transition/laundry-confirm-return',
+      metadata: { laundryCode: 'A-04', laundryCodes: [{ code: 'A-04', at: '2026-09-01T00:00:00.000Z' }] },
+    });
+
+    await run({ transactionId: TX_ID, status: 'pending-cleaning', laundryCode: 'B-11' });
+
+    const metadata = metadataSent(transition);
+    // The CURRENT one, which is what every reader asks for.
+    expect(metadata.laundryCode).toBe('B-11');
+    // And the trail, in order, with the first one intact.
+    expect(metadata.laundryCodes.map(entry => entry.code)).toEqual(['A-04', 'B-11']);
+  });
+
+  it('starts the trail for a rental that had no code yet', async () => {
+    const { transition } = setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
+
+    await run({ transactionId: TX_ID, status: 'pending-cleaning', laundryCode: 'A-04' });
+
+    expect(metadataSent(transition).laundryCodes.map(entry => entry.code)).toEqual(['A-04']);
+  });
+
+  it('does not record confirming the same code again', async () => {
+    // The box is prefilled with the current code, so the common case is an operator pressing
+    // through. A trail full of the same string is not a trail.
+    const { transition } = setupSdk({
+      lastTransition: 'transition/laundry-confirm-return',
+      metadata: { laundryCode: 'A-04', laundryCodes: [{ code: 'A-04', at: '2026-09-01T00:00:00.000Z' }] },
+    });
+
+    await run({ transactionId: TX_ID, status: 'pending-cleaning', laundryCode: 'A-04' });
+
+    expect(metadataSent(transition)).not.toHaveProperty('laundryCodes');
+    expect(metadataSent(transition).laundryCode).toBe('A-04');
   });
 });

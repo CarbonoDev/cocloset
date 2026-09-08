@@ -124,10 +124,22 @@ export const DAMAGE_REPORT_STATUS = 'returned';
 // The damage report deliberately did NOT move. It is about the garment arriving; this is
 // about the work starting. They were separate constants for exactly this reason.
 //
+// MOVED AGAIN, ONE STEP LATER.
+//
+//   > "el que inicia el proceso de lavado y me pregunta un ticket y el numero de días de
+//   >  lavado, sin embargo, luego de ahi viene otro paso con un unico button 'Mark cleaning in
+//   >  progress', en ese paso es cuando se pregunta el número de días de lavado"
+//   >   (Jonathan, 2026-09-08)
+//
+// "Process for Cleaning" is the studio putting the garment into its queue - ticket, payout,
+// done. The days are the studio's estimate of the WORK, and it is the next button that says
+// the work has started. Asking a step early meant a garment could sit in the queue for a day
+// with a countdown already running against it.
+//
 // The field is OPTIONAL. Sending nothing means "use the turnaround I configured", which is
 // resolved server-side from the laundry's per-category settings - the client neither knows
 // nor guesses it.
-export const CLEANING_DAYS_STATUS = 'pending-cleaning';
+export const CLEANING_DAYS_STATUS = 'cleaning-in-progress';
 
 // The steps at which the studio names the garment on its own shelving.
 //

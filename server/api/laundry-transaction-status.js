@@ -18,6 +18,7 @@ const {
   LISTING_CODE_KEY,
   MAX_CODE_LENGTH,
   TRANSACTION_CODE_KEY,
+  TRANSACTION_CODE_HISTORY_KEY,
   buildListingCodeRecord,
   validateLaundryCode,
 } = require('../api-util/laundryCode');
@@ -133,6 +134,7 @@ const buildTransitionMetadata = ({
   studioName,
   txIdForLog,
   existingTicketCode,
+  existingLaundryCodes,
   laundryCode,
 }) => {
   const metadata = {};
@@ -164,24 +166,60 @@ const buildTransitionMetadata = ({
     if (currentRack) {
       metadata.currentRack = currentRack;
     }
+  }
 
-    // THE STUDIO'S OWN CODE FOR THIS GARMENT, typed at the counter as it takes delivery.
+  // THE STUDIO'S OWN CODE FOR THIS GARMENT.
+  //
+  //   > "cuando laundry recibe la prenda desde el provider, debe aparecer un input para que
+  //   >  laundry pueda ingresar un código interno para esa prenda, ese código se le debe
+  //   >  mostrar a todas las partes de la transacción"
+  //
+  // NOT INSIDE THE mark-ready BRANCH ANY MORE, and that is the other half of the bug the
+  // client reported. This whole block used to sit under `transition === LAUNDRY_MARK_READY`
+  // while the ops screens asked for a code at TWO steps, so the second answer - the one typed
+  // when the garment goes for cleaning, which is the one most likely to differ - was parsed,
+  // validated, sent, and then dropped on the floor with nothing on screen to say so.
+  //
+  // Whether a step takes a code is `takesLaundryCode`'s answer, in one place, and this now
+  // simply records whatever arrived.
+  //
+  // On the TRANSACTION it is a plain string, and that is what makes it visible to both
+  // parties: transaction metadata rides along on every `transactions.show` for a party,
+  // while the listing record it is also written to is not something a customer can read
+  // usefully. It also makes a finished rental honest - it keeps the code that was true while
+  // it ran, even after the garment has moved to another studio and been given a new one.
+  //
+  // Absent when the studio did not type one. See validateLaundryCode for why that is allowed
+  // rather than refused: a garment physically on the counter must not be stuck in the app
+  // because nobody has decided where it goes yet.
+  if (laundryCode) {
+    metadata[TRANSACTION_CODE_KEY] = laundryCode;
+    // AND THE ONES BEFORE IT.
     //
-    //   > "cuando laundry recibe la prenda desde el provider, debe aparecer un input para que
-    //   >  laundry pueda ingresar un código interno para esa prenda, ese código se le debe
-    //   >  mostrar a todas las partes de la transacción"
+    //   > "puede ocurrir que no sea el mismo ticket con el que inició, pero al ser asi, no
+    //   >  se guarda en la transaction, solo se queda el primer ticket, deben guardarse los
+    //   >  dos sin sobreescribirse" (Jonathan, 2026-09-08)
     //
-    // On the TRANSACTION it is a plain string, and that is what makes it visible to both
-    // parties: transaction metadata rides along on every `transactions.show` for a party,
-    // while the listing record it is also written to is not something a customer can read
-    // usefully. It also makes a finished rental honest - it keeps the code that was true while
-    // it ran, even after the garment has moved to another studio and been given a new one.
+    // The studio is asked for the code more than once in a rental - on the way in, and
+    // again when the garment goes for cleaning, because a coat coming back rarely returns
+    // to the shelf it left. The second answer used to overwrite the first, so a garment
+    // that moved shelves lost the record of where it had been.
     //
-    // Absent when the studio did not type one. See validateLaundryCode for why that is allowed
-    // rather than refused: a garment physically on the counter must not be stuck in the app
-    // because nobody has decided where it goes yet.
-    if (laundryCode) {
-      metadata[TRANSACTION_CODE_KEY] = laundryCode;
+    // `laundryCode` stays the CURRENT one: every reader already looks there, and a rental
+    // has exactly one place its garment is right now. The history is a separate key, in
+    // order, appended rather than replaced - and only when the code actually changed, so
+    // confirming the prefilled box does not fill the list with the same string.
+    //
+    // Read from the transaction we already fetched. Sharetribe merges metadata per TOP-LEVEL
+    // key, so writing this array replaces the stored one wholesale - which is exactly why it
+    // has to be built from what was there rather than sent as a single new entry.
+    const previous = Array.isArray(existingLaundryCodes) ? existingLaundryCodes : [];
+    const latest = previous[previous.length - 1];
+    if (!latest || latest.code !== laundryCode) {
+      metadata[TRANSACTION_CODE_HISTORY_KEY] = [
+        ...previous,
+        { code: laundryCode, at: new Date().toISOString() },
+      ];
     }
   }
 
@@ -546,6 +584,7 @@ module.exports = (req, res) => {
           studioName: laundry.studioName,
           txIdForLog,
           existingTicketCode: data.attributes?.metadata?.ticketCode,
+          existingLaundryCodes: data.attributes?.metadata?.[TRANSACTION_CODE_HISTORY_KEY],
           laundryCode: laundryCodeCheck.value,
         });
 
@@ -667,7 +706,20 @@ module.exports = (req, res) => {
       // Counting from NOW rather than from the return is also the more honest clock: this is
       // the moment the studio says it is starting, and the days it just typed are days of
       // work, not days since a garment landed on a counter.
-      const isCleaningStart = transition === TRANSITIONS.LAUNDRY_MARK_PENDING_CLEANING;
+      // THE MOMENT THE WORK STARTS, not the moment the garment joins the queue.
+      //
+      //   > "luego de ahi viene otro paso con un unico button 'Mark cleaning in progress', en
+      //   >  ese paso es cuando se pregunta el número de días de lavado" (Jonathan, 2026-09-08)
+      //
+      // This is where the days the studio typed are consumed - the availability block and the
+      // ready-at date are both computed from them - so it has to be the same transition the
+      // client asks the question at (CLEANING_DAYS_STATUS in src/util/laundryStatuses.js). A
+      // question asked at one step and read at another is an answer thrown away in silence.
+      //
+      // It also makes the clock honest, which was already the argument for counting from now
+      // rather than from the return: a garment can sit in the queue for a day before anybody
+      // touches it, and those are not days of work.
+      const isCleaningStart = transition === TRANSITIONS.LAUNDRY_START_CLEANING;
 
       const returnPromise = isCleaningStart
         ? handleRealReturn({

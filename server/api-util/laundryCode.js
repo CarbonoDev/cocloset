@@ -36,6 +36,12 @@
 const LISTING_CODE_KEY = 'laundryCode';
 const TRANSACTION_CODE_KEY = 'laundryCode';
 
+// Every code this rental has been given, oldest first, as { code, at }. A SEPARATE key rather
+// than turning TRANSACTION_CODE_KEY into an array: every reader - the ops table, the handover
+// page, the emails - wants the one that is true now, and one place a garment is right now is
+// the honest shape for that. This is the audit trail beside it.
+const TRANSACTION_CODE_HISTORY_KEY = 'laundryCodes';
+
 // Long enough for "A-04 / RACK 12 / BIN 7", short enough that it is a label rather than a
 // note. Studios name their own shelving; this puts no format on it beyond a length and a
 // trim, because inventing one would be inventing somebody else's system.
@@ -142,6 +148,7 @@ const takesLaundryCode = status => ['garment-received', 'pending-cleaning'].incl
 module.exports = {
   LISTING_CODE_KEY,
   TRANSACTION_CODE_KEY,
+  TRANSACTION_CODE_HISTORY_KEY,
   MAX_CODE_LENGTH,
   validateLaundryCode,
   buildListingCodeRecord,

@@ -156,7 +156,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
         />
       );
@@ -260,7 +260,7 @@ describe('LaundryOpsPage', () => {
     //   > "se debe preguntar a la laundry los días que necesita para el lavado y que ingrese
     //   >  nuevamente el ticket, por si debe cambiarlo, el valor por default debe ser el
     //   >  ticket anterior"
-    it('asks for both the days and the ticket when processing for cleaning', async () => {
+    it('asks for the ticket when processing for cleaning, and the days at the next step', async () => {
       const user = userEvent.setup();
       render(
         <LaundryOpsPageComponent
@@ -272,13 +272,31 @@ describe('LaundryOpsPage', () => {
 
       await user.click(screen.getByText('LaundryOpsPage.table.open'));
 
-      expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).toBeInTheDocument();
+      // The days moved one step later (Jonathan, 2026-09-08) - "Process for Cleaning" is the
+      // garment joining the queue, and the next button is the work starting.
+      expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).not.toBeInTheDocument();
       const codeBox = document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1');
       expect(codeBox).toBeInTheDocument();
       // Prefilled with the code the garment already carries: the common case is confirming
       // it, not retyping it.
       expect(codeBox).toHaveValue('A-04');
       expect(screen.getByText('LaundryOpsPage.action.pending-cleaning')).toBeInTheDocument();
+    });
+
+    it('asks for the days at the step that says the work has started', async () => {
+      const user = userEvent.setup();
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
+        />
+      );
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+
+      expect(screen.getByText('LaundryOpsPage.action.cleaning-in-progress')).toBeInTheDocument();
+      expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).toBeInTheDocument();
     });
 
     // A blank box is "not decided yet", never a delete: sending an empty string would ask the
@@ -323,7 +341,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
         />
       );
@@ -498,7 +516,7 @@ describe('LaundryOpsPage', () => {
     });
 
     it('does not offer a damage report at a non-returned step', async () => {
-      const rows = [orderRow({ state: 'returned' })];
+      const rows = [orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
 
@@ -513,7 +531,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
           onAdvanceStatus={onAdvanceStatus}
         />
@@ -523,10 +541,10 @@ describe('LaundryOpsPage', () => {
       // turnaround, so typing into it would append rather than replace.
       await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.type(screen.getByRole('spinbutton'), '5');
-      await userEvent.click(screen.getByText('LaundryOpsPage.action.pending-cleaning'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.cleaning-in-progress'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'pending-cleaning', cleaningDays: 5 })
+        expect.objectContaining({ status: 'cleaning-in-progress', cleaningDays: 5 })
       );
     });
 
@@ -539,14 +557,14 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
           onAdvanceStatus={onAdvanceStatus}
         />
       );
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
       await userEvent.clear(screen.getByRole('spinbutton'));
-      await userEvent.click(screen.getByText('LaundryOpsPage.action.pending-cleaning'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.cleaning-in-progress'));
 
       expect(onAdvanceStatus.mock.calls[0][0]).not.toHaveProperty('cleaningDays');
     });
@@ -556,7 +574,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
           onAdvanceStatus={onAdvanceStatus}
         />
@@ -564,7 +582,7 @@ describe('LaundryOpsPage', () => {
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
       await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.type(screen.getByRole('spinbutton'), '0');
-      await userEvent.click(screen.getByText('LaundryOpsPage.action.pending-cleaning'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.cleaning-in-progress'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(expect.objectContaining({ cleaningDays: 0 }));
     });

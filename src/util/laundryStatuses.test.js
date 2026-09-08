@@ -213,11 +213,19 @@ describe('laundryStatuses', () => {
     //   > "1. Confirm return, donde solo se cambia de estado y una vez hecho esto, se debe
     //   >  preguntar a la laundry los días que necesita para el lavado" (Jonathan, 2026-09-03)
     it('asks for the cleaning days when the wash starts, not when the garment arrives', () => {
-      // Confirming the return is one thing now: the garment is back. The estimate belongs to
-      // the step where the studio actually starts working on it.
-      expect(laundryActionsFor(row({ state: 'returned' }))[0].needsCleaningDays).toBe(true);
+      //   > "luego de ahi viene otro paso con un unico button 'Mark cleaning in progress', en
+      //   >  ese paso es cuando se pregunta el número de días de lavado" (Jonathan, 2026-09-08)
+      //
+      // Confirming the return is one thing: the garment is back. "Process for Cleaning" is the
+      // second: it joins the queue. The estimate belongs to the third, which is the studio
+      // saying the work has started - a garment can sit in a queue for a day, and those are
+      // not days of work.
+      expect(
+        laundryActionsFor(row({ state: 'cleaning', cleaningPhase: 'pending-cleaning' }))[0]
+          .needsCleaningDays
+      ).toBe(true);
 
-      ['picked-up', 'overdue'].forEach(state => {
+      ['picked-up', 'overdue', 'returned'].forEach(state => {
         expect(laundryActionsFor(row({ state }))[0].needsCleaningDays).toBeFalsy();
       });
     });
