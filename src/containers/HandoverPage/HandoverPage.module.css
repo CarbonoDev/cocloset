@@ -63,6 +63,11 @@
   margin: 0;
 }
 
+.handBackTrigger {
+  composes: buttonPrimary from global;
+  margin: 0;
+}
+
 /* Ruled off from the step above: releasing the garment is a different question from
    confirming the rental's next move, and both can be on screen at once. */
 .handBack {

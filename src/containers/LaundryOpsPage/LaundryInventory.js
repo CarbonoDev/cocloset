@@ -2,6 +2,7 @@ import React from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../util/reactIntl';
+import { HandBackToOwnerButton } from '../../components';
 import { canHandBackToOwner, statusLabelKey } from '../../util/laundryStatuses';
 
 import { statusTone } from './LaundryOpsPage.helpers';
@@ -26,7 +27,13 @@ import css from './LaundryOpsPage.module.css';
 // question from what it already knows. Shared with the orders table and the handover page,
 // because the same garment has to answer the same way on all three (util/laundryStatuses.js).
 const LaundryInventory = props => {
-  const { inventory, onHandBackToOwner, handBackListingId, handBackError } = props;
+  const {
+    inventory,
+    onHandBackToOwner,
+    handBackListingId,
+    handBackError,
+    onManageDisableScrolling,
+  } = props;
 
   if (inventory.length === 0) {
     return (
@@ -99,14 +106,14 @@ const LaundryInventory = props => {
                 true, so a garment that went home stayed in the studio's inventory forever -
                 and its laundry could never be reassigned. */}
               {canHandBackToOwner(item) ? (
-                <button
-                  type="button"
+                <HandBackToOwnerButton
+                  id={`LaundryInventory.handBack.${item.listingId}`}
                   className={css.handBackButton}
-                  disabled={handBackListingId === item.listingId}
-                  onClick={() => onHandBackToOwner({ listingId: item.listingId })}
-                >
-                  <FormattedMessage id="LaundryOpsPage.inventory.handBack" />
-                </button>
+                  garmentTitle={item.title}
+                  inProgress={handBackListingId === item.listingId}
+                  onManageDisableScrolling={onManageDisableScrolling}
+                  onConfirm={() => onHandBackToOwner({ listingId: item.listingId })}
+                />
               ) : null}
             </li>
           );

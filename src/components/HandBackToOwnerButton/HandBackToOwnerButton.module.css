@@ -1,0 +1,40 @@
+@import '../../styles/customMediaQueries.css';
+
+/* No look of its own. Each surface passes the styling it wants for its own layout - see the
+   comment on the trigger in HandBackToOwnerButton.js. This exists so the element still has a
+   class when nothing is passed. */
+.trigger {
+  appearance: none;
+  cursor: pointer;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.question {
+  composes: marketplaceModalTitleStyles from global;
+  margin: 0;
+}
+
+.consequence {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+}
+
+/* Confirm first, cancel beside it. Stacked on a phone, because the studio doing this at the
+   counter is holding a garment in one hand. */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+
+  @media (--viewportMedium) {
+    flex-direction: row;
+    align-items: center;
+  }
+}

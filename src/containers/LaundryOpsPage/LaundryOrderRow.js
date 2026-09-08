@@ -9,7 +9,7 @@ import {
   statusLabelKey,
 } from '../../util/laundryStatuses';
 import { isLate } from './LaundryOpsPage.helpers';
-import { InlineTextButton, PrimaryButton } from '../../components';
+import { HandBackToOwnerButton, InlineTextButton, PrimaryButton } from '../../components';
 
 import { statusTone } from './LaundryOpsPage.helpers';
 import css from './LaundryOpsPage.module.css';
@@ -48,11 +48,19 @@ const lastBookedDayIso = isoString => {
  * @param {boolean} props.advanceInProgress - true while this row's update is in flight
  * @param {Function} [props.onHandBackToOwner] - ({listingId}) => void
  * @param {boolean} [props.handBackInProgress] - true while this garment's hand-back is in flight
+ * @param {Function} [props.onManageDisableScrolling] - modal scroll lock, for the confirm dialog
  * @returns {JSX.Element}
  */
 const LaundryOrderRow = props => {
   const intl = useIntl();
-  const { row, onAdvanceStatus, advanceInProgress, onHandBackToOwner, handBackInProgress } = props;
+  const {
+    row,
+    onAdvanceStatus,
+    advanceInProgress,
+    onHandBackToOwner,
+    handBackInProgress,
+    onManageDisableScrolling,
+  } = props;
 
   const [isOpen, setIsOpen] = useState(false);
   const [damaged, setDamaged] = useState(false);
@@ -405,14 +413,14 @@ const LaundryOrderRow = props => {
                     <p className={css.detailLine}>
                       <FormattedMessage id="LaundryOpsPage.detail.handBackHint" />
                     </p>
-                    <button
-                      type="button"
+                    <HandBackToOwnerButton
+                      id={`LaundryOrderRow.handBack.${row.id}`}
                       className={css.handBackButton}
-                      disabled={handBackInProgress}
-                      onClick={() => onHandBackToOwner({ listingId: row.listingId })}
-                    >
-                      <FormattedMessage id="LaundryOpsPage.inventory.handBack" />
-                    </button>
+                      garmentTitle={row.title}
+                      inProgress={handBackInProgress}
+                      onManageDisableScrolling={onManageDisableScrolling}
+                      onConfirm={() => onHandBackToOwner({ listingId: row.listingId })}
+                    />
                   </div>
                 ) : null}
               </div>

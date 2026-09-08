@@ -56,7 +56,16 @@ const baseProps = {
   advanceStatusTransactionId: null,
   advanceStatusError: null,
   onAdvanceStatus: noop,
+  // Required by the confirm dialog's Modal, which calls it on mount whether or not it is open.
+  onManageDisableScrolling: noop,
   scrollingDisabled: false,
+};
+
+// The confirm dialog renders through a portal, so its root has to exist. Clicking the trigger
+// only ASKS - `onHandBackToOwner` fires from the dialog, which is the whole point of it.
+const handBack = async () => {
+  await userEvent.click(screen.getByText('HandBackToOwnerButton.trigger'));
+  await userEvent.click(screen.getByText('HandBackToOwnerButton.confirm'));
 };
 
 describe('LaundryOpsPage', () => {
@@ -705,10 +714,11 @@ describe('LaundryOpsPage', () => {
           inventory={inventory}
           tab="inventory"
           onHandBackToOwner={onHandBackToOwner}
-        />
+        />,
+        { withPortals: true }
       );
 
-      await userEvent.click(screen.getByText('LaundryOpsPage.inventory.handBack'));
+      await handBack();
 
       expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
     });
@@ -723,7 +733,7 @@ describe('LaundryOpsPage', () => {
     // transaction at all, so a cancelled rental hid it - and it existed on one screen out of
     // the three where a studio does this work.
     // ---------------------------------------------------------------------------
-    it('offers it when the rental was cancelled', () => {
+    it('offers it when the rental was cancelled', async () => {
       const onHandBackToOwner = jest.fn();
       const inventory = [
         {
@@ -743,12 +753,13 @@ describe('LaundryOpsPage', () => {
           inventory={inventory}
           tab="inventory"
           onHandBackToOwner={onHandBackToOwner}
-        />
+        />,
+        { withPortals: true }
       );
 
-      return userEvent.click(screen.getByText('LaundryOpsPage.inventory.handBack')).then(() => {
-        expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
-      });
+      await handBack();
+
+      expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
     });
 
     it('offers it from the orders worklist too, on the row that was cancelled', async () => {
@@ -761,11 +772,12 @@ describe('LaundryOpsPage', () => {
           orders={[orderRow({ state: 'canceled', onLaundry: true })]}
           tab="orders"
           onHandBackToOwner={onHandBackToOwner}
-        />
+        />,
+        { withPortals: true }
       );
 
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
-      await userEvent.click(screen.getByText('LaundryOpsPage.inventory.handBack'));
+      await handBack();
 
       expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
     });
@@ -782,7 +794,7 @@ describe('LaundryOpsPage', () => {
 
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
 
-      expect(screen.queryByText('LaundryOpsPage.inventory.handBack')).not.toBeInTheDocument();
+      expect(screen.queryByText('HandBackToOwnerButton.trigger')).not.toBeInTheDocument();
     });
 
     it('does not offer it on a garment that is out on a rental', () => {
@@ -803,7 +815,7 @@ describe('LaundryOpsPage', () => {
       ];
       render(<LaundryOpsPageComponent {...baseProps} inventory={inventory} tab="inventory" />);
 
-      expect(screen.queryByText('LaundryOpsPage.inventory.handBack')).not.toBeInTheDocument();
+      expect(screen.queryByText('HandBackToOwnerButton.trigger')).not.toBeInTheDocument();
     });
 
     it('does not offer it on a garment the studio is not holding', () => {
@@ -821,7 +833,7 @@ describe('LaundryOpsPage', () => {
       ];
       render(<LaundryOpsPageComponent {...baseProps} inventory={inventory} tab="inventory" />);
 
-      expect(screen.queryByText('LaundryOpsPage.inventory.handBack')).not.toBeInTheDocument();
+      expect(screen.queryByText('HandBackToOwnerButton.trigger')).not.toBeInTheDocument();
     });
 
     it('explains a 409 as an active rental rather than as a generic failure', () => {

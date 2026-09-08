@@ -51,8 +51,11 @@ const renderPage = (props = {}) =>
       handBackInProgress={false}
       handBackError={null}
       onHandBack={() => null}
+      onManageDisableScrolling={() => null}
       {...props}
-    />
+    />,
+    // The confirm dialog renders through a portal.
+    { withPortals: true }
   );
 
 const confirmButton = () =>
@@ -417,7 +420,7 @@ describe('HandoverPage: failures', () => {
 // ---------------------------------------------------------------------------
 
 const handBackButton = () =>
-  screen.queryByRole('button', { name: 'HandoverPage.handBack.confirm' });
+  screen.queryByRole('button', { name: 'HandBackToOwnerButton.trigger' });
 
 describe('HandoverPage: handing the garment back', () => {
   const handedBack = (overrides = {}) =>
@@ -434,7 +437,12 @@ describe('HandoverPage: handing the garment back', () => {
     const onHandBack = jest.fn();
     renderPage({ handover: handedBack(), onHandBack });
 
+    // Clicking the button only ASKS. Nothing is written until the dialog is confirmed - the
+    // studio is one click from a garment leaving its inventory, on three different screens.
     fireEvent.click(handBackButton());
+    expect(onHandBack).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('HandBackToOwnerButton.confirm'));
 
     expect(onHandBack).toHaveBeenCalledWith({ transactionId: TX_ID, listingId: 'listing-1' });
   });

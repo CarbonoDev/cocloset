@@ -216,10 +216,14 @@ describe('listing-custody-status', () => {
       const res = await run({ listingId: LISTING_ID, onLaundry: false });
 
       expect(res.statusCode).toBe(200);
-      expect(update).toHaveBeenCalledWith(
-        { id: LISTING_ID, metadata: { onLaundry: false } },
-        { expand: true }
-      );
+      const params = update.mock.calls[0][0];
+      expect(params.id).toBe(LISTING_ID);
+      expect(params.metadata.onLaundry).toBe(false);
+      // Stamped so the studio's inventory can drop the garment - see isInStudioInventory in
+      // server/api/laundry-orders.js. The clock is real here rather than injected, so this
+      // asserts the shape rather than the instant.
+      expect(typeof params.metadata.handedBackAt).toBe('string');
+      expect(update.mock.calls[0][1]).toEqual({ expand: true });
     });
 
     it('refuses with 409 while a booking is live, and writes nothing', async () => {
@@ -271,7 +275,7 @@ describe('listing-custody-status', () => {
 
       const params = update.mock.calls[0][0];
       expect(Object.keys(params).sort()).toEqual(['id', 'metadata']);
-      expect(params.metadata).toEqual({ onLaundry: false });
+      expect(Object.keys(params.metadata).sort()).toEqual(['handedBackAt', 'onLaundry']);
     });
 
     it('surfaces a failed write as an error rather than a false 200', async () => {

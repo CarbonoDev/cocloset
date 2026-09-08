@@ -4,7 +4,7 @@ import { connect } from 'react-redux';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { isLaundryUser } from '../../util/userHelpers';
-import { isScrollingDisabled } from '../../ducks/ui.duck';
+import { isScrollingDisabled, manageDisableScrolling } from '../../ducks/ui.duck';
 
 import { H3, IconSpinner, Page, UserNav, LayoutSideNavigation } from '../../components';
 
@@ -58,6 +58,7 @@ const ROUTE_NAME_BY_TAB = {
  * @param {Function} props.onAdvanceStatus
  * @param {string} [props.handBackListingId] - the listing whose hand-back is in flight
  * @param {propTypes.error} [props.handBackError]
+ * @param {Function} [props.onManageDisableScrolling] - modal scroll lock, for the confirm dialog
  * @param {Function} props.onHandBackToOwner
  * @param {boolean} props.scrollingDisabled
  * @returns {JSX.Element}
@@ -78,6 +79,7 @@ export const LaundryOpsPageComponent = props => {
     handBackListingId,
     handBackError,
     onHandBackToOwner,
+    onManageDisableScrolling,
     scrollingDisabled,
     staticContext,
   } = props;
@@ -120,6 +122,7 @@ export const LaundryOpsPageComponent = props => {
             onHandBackToOwner={onHandBackToOwner}
             handBackListingId={handBackListingId}
             handBackError={handBackError}
+            onManageDisableScrolling={onManageDisableScrolling}
           />
         );
       case 'orders':
@@ -136,6 +139,7 @@ export const LaundryOpsPageComponent = props => {
             onHandBackToOwner={onHandBackToOwner}
             handBackListingId={handBackListingId}
             handBackError={handBackError}
+            onManageDisableScrolling={onManageDisableScrolling}
           />
         );
     }
@@ -218,6 +222,8 @@ const mapStateToProps = state => {
 
 const mapDispatchToProps = dispatch => ({
   onHandBackToOwner: params => dispatch(handBackToOwner(params)),
+  onManageDisableScrolling: (componentId, disableScrolling) =>
+    dispatch(manageDisableScrolling(componentId, disableScrolling)),
   onAdvanceStatus: params => dispatch(advanceStatus(params)),
 });
 
