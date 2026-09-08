@@ -100,14 +100,23 @@ const HandoverQrMaybe = props => {
   const ticketCode = metadata?.ticketCode;
   const classes = classNames(rootClassName || css.root, className);
 
-  // "Not collectable yet" is every state before the studio has the garment ready. PREAUTHORIZED
-  // is only reachable here by the owner now, but it stays in the list: this decides what the
-  // COPY says, and the owner looking at a not-yet-accepted booking needs the waiting text just
-  // as much as the customer does.
+  // WHAT THIS CODE IS FOR, WHICH IS NOT THE SAME SENTENCE FOR EVERYONE.
+  //
+  //   > "La key TransactionPanel.handoverQr.descriptionWaiting se muestra a un provider aunque
+  //   >  en ese momento no es necesario que se le muestre el QR" (Jonathan, 2026-09-08)
+  //
+  // `descriptionWaiting` is the RENTER's sentence - wait for the owner to drop it off and the
+  // studio to clean it. An owner was reading it about their own garment, which they are the
+  // one holding. The owner now has exactly two errands (see HANDOVER_QR_PROVIDER_*_STATES)
+  // and each gets the sentence for the walk they are about to make.
   const isWaitingForGarment = [states.PREAUTHORIZED, states.ACCEPTED].includes(processState);
-  const descriptionId = isWaitingForGarment
-    ? 'TransactionPanel.handoverQr.descriptionWaiting'
-    : 'TransactionPanel.handoverQr.description';
+  const descriptionId = isCustomer
+    ? isWaitingForGarment
+      ? 'TransactionPanel.handoverQr.descriptionWaiting'
+      : 'TransactionPanel.handoverQr.description'
+    : isAtLaundry
+    ? 'TransactionPanel.handoverQr.descriptionOwnerCollect'
+    : 'TransactionPanel.handoverQr.descriptionOwnerDropOff';
 
   return (
     <section className={classes}>

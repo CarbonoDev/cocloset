@@ -19,7 +19,6 @@ import BookingLocationMaybe from './BookingLocationMaybe';
 import FeedSection from './FeedSection';
 import DiminishedActionButtonMaybe from './DiminishedActionButtonMaybe';
 import PanelHeading from './PanelHeading';
-import { isGarmentAtLaundry } from '../../../util/laundryStatuses';
 
 import HandoverQrMaybe from './HandoverQrMaybe';
 import DamageReportedMaybe from './DamageReportedMaybe';
@@ -245,13 +244,23 @@ export class TransactionPanelComponent extends Component {
                 quickly by someone standing at a laundry counter. It renders
                 nothing outside `cocloset-booking` and nothing once both
                 handovers are done - see HandoverQrMaybe. */}
+            {/* CUSTODY, from the flag that means custody.
+                  > "Yo como provider tengo la prenda en mi poder (onLaundry = false)"
+                  >   (Jonathan, 2026-09-08)
+
+                `isAtLaundry` read `readinessStatus`, which is the studio's ops vocabulary for
+                what it intends to do with a garment on its rack. `onLaundry` is the answer to
+                "is it on the rack at all", it is what the owner's two errands turn on, and it
+                is the one the client named. They agree in the ordinary case and come apart
+                exactly where it matters: a garment handed back keeps whatever readiness it
+                had, and only this flag is cleared. */}
             <HandoverQrMaybe
               processName={stateData.processName}
               processState={stateData.processState}
               transactionId={transactionId}
               metadata={metadata}
               isCustomer={isCustomer}
-              isAtLaundry={isGarmentAtLaundry(listing?.attributes?.metadata?.readinessStatus)}
+              isAtLaundry={listing?.attributes?.metadata?.onLaundry === true}
             />
 
             {/* The laundry's damage report (design §10). Sits directly below the

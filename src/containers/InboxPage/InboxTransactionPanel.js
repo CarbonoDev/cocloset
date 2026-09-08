@@ -5,7 +5,6 @@ import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { subtractTime } from '../../util/dates';
 import { getProcess, resolveLatestProcessName } from '../../transactions/transaction';
 import { isHandoverQrVisibleState } from '../../transactions/transactionProcessCoclosetBooking';
-import { isGarmentAtLaundry } from '../../util/laundryStatuses';
 import {
   RENTAL_TIMELINE_STEPS,
   STEP_CURRENT,
@@ -102,7 +101,10 @@ const InboxTransactionPanel = props => {
     processName === COCLOSET_BOOKING_PROCESS &&
     isHandoverQrVisibleState(processState, {
       isCustomer: transactionRole === 'customer',
-      isAtLaundry: isGarmentAtLaundry(listing?.attributes?.metadata?.readinessStatus),
+      // The custody flag, not the readiness one - see the same read in TransactionPanel.js.
+      // It is what the owner's two errands turn on, and the two disagree exactly where it
+      // matters: a garment handed back keeps its readiness and only this is cleared.
+      isAtLaundry: listing?.attributes?.metadata?.onLaundry === true,
     });
 
   const laundryName = publicData.assignedLaundryName;
