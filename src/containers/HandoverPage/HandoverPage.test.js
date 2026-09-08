@@ -48,6 +48,9 @@ const renderPage = (props = {}) =>
       confirmInProgress={false}
       confirmError={null}
       onConfirm={() => null}
+      handBackInProgress={false}
+      handBackError={null}
+      onHandBack={() => null}
       {...props}
     />
   );
@@ -398,5 +401,77 @@ describe('HandoverPage: failures', () => {
 
     expect(screen.getByText('HandoverPage.error.confirmFailed')).toBeInTheDocument();
     expect(confirmButton()).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "el botón para devolver la prenda en el lado de laundry debe aparecer en order,
+//   >  handover o inventory"
+//   > "si la transacción aparece como cancelada tambien puedo devolver la prenda"
+//   >   (Jonathan, 2026-09-07)
+//
+// The counter phone is where a studio is standing when the owner turns up to collect, and it
+// was the one screen with no way to record that. The cancelled rental is the case that put it
+// here: there is no step to confirm, so without this the page is a dead end with a garment
+// still on the shelf.
+// ---------------------------------------------------------------------------
+
+const handBackButton = () =>
+  screen.queryByRole('button', { name: 'HandoverPage.handBack.confirm' });
+
+describe('HandoverPage: handing the garment back', () => {
+  const handedBack = (overrides = {}) =>
+    handoverFor({
+      processState: 'canceled',
+      canConfirm: false,
+      step: null,
+      canHandBack: true,
+      listingId: 'listing-1',
+      ...overrides,
+    });
+
+  it('offers it when the server says the studio may release the garment', async () => {
+    const onHandBack = jest.fn();
+    renderPage({ handover: handedBack(), onHandBack });
+
+    fireEvent.click(handBackButton());
+
+    expect(onHandBack).toHaveBeenCalledWith({ transactionId: TX_ID, listingId: 'listing-1' });
+  });
+
+  it('does not offer it when the server says no', () => {
+    // The page does not re-derive the rule. `canHandBack` false is the whole answer, whatever
+    // the state on screen looks like.
+    renderPage({ handover: handedBack({ canHandBack: false }) });
+    expect(handBackButton()).not.toBeInTheDocument();
+  });
+
+  it('does not offer it with no garment to write to', () => {
+    renderPage({ handover: handedBack({ listingId: null }) });
+    expect(handBackButton()).not.toBeInTheDocument();
+  });
+
+  it('can sit alongside a confirm button rather than replacing it', () => {
+    // Two different questions - what the rental does next, and whether the garment stays.
+    // Rendering one as the other's else-branch would have hidden whichever came second.
+    renderPage({ handover: handoverFor({ canHandBack: true, listingId: 'listing-1' }) });
+
+    expect(confirmButton()).toBeInTheDocument();
+    expect(handBackButton()).toBeInTheDocument();
+  });
+
+  it('explains a 409 as an active rental rather than as a generic failure', () => {
+    // The refusal an operator will actually hit, and the same sentence the ops screens use:
+    // one studio, two devices, must not get two explanations of the same answer.
+    renderPage({ handover: handedBack(), handBackError: { status: 409 } });
+
+    expect(screen.getByText('HandoverPage.handBack.activeRental')).toBeInTheDocument();
+    expect(screen.queryByText('HandoverPage.handBack.failed')).not.toBeInTheDocument();
+  });
+
+  it('reports anything else as a failure', () => {
+    renderPage({ handover: handedBack(), handBackError: { status: 500 } });
+
+    expect(screen.getByText('HandoverPage.handBack.failed')).toBeInTheDocument();
   });
 });

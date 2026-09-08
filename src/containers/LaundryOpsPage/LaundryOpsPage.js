@@ -133,6 +133,9 @@ export const LaundryOpsPageComponent = props => {
             showTabs={tab === 'orders'}
             onAdvanceStatus={onAdvanceStatus}
             advanceStatusTransactionId={advanceStatusTransactionId}
+            onHandBackToOwner={onHandBackToOwner}
+            handBackListingId={handBackListingId}
+            handBackError={handBackError}
           />
         );
     }

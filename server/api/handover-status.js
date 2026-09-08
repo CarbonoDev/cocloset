@@ -5,7 +5,10 @@ const {
   readAssignedLaundryId,
   resolveInitialCleaningDays,
 } = require('../api-util/laundryAssignment');
-const { stateFromLastTransition } = require('../api-util/coclosetBookingProcess');
+const {
+  isActiveLastTransition,
+  stateFromLastTransition,
+} = require('../api-util/coclosetBookingProcess');
 const { handoverStepFor } = require('../api-util/handoverSteps');
 const { createRateLimiter } = require('../api-util/rateLimit');
 const { maxCleaningDaysBeforeNextBooking } = require('../api-util/listingCustody');
@@ -260,6 +263,29 @@ module.exports = (req, res) => {
               // the assigned laundry ever gets `true`; the client renders a button off this
               // field alone, so the rule lives here rather than in the page.
               canConfirm: viewerRole === ROLE_LAUNDRY && !!step,
+              // THE GARMENT THIS IS ABOUT, and whether the studio may release it here.
+              //
+              //   > "el botón para devolver la prenda en el lado de laundry debe aparecer en
+              //   >  order, handover o inventory"
+              //   > "si la transacción aparece como cancelada tambien puedo devolver la prenda"
+              //   >   (Jonathan, 2026-09-07)
+              //
+              // Decided HERE for the same reason `canConfirm` is: the page renders a button
+              // off this field alone and does not re-derive the rule in a browser. Three
+              // conditions, all of them the custody endpoint's own
+              // (server/api/listing-custody-status.js): the caller is the assigned studio, the
+              // garment is on its shelf, and this rental is not still running.
+              //
+              // NOT THE WHOLE ANSWER, and it does not need to be. This sees one transaction;
+              // the write re-checks EVERY transaction on the listing and answers 409, which
+              // the page reports. False here would be the dangerous direction - a studio told
+              // it cannot release a garment nothing is renting - and that is what these three
+              // conditions are chosen to avoid.
+              listingId: listing?.id?.uuid || null,
+              canHandBack:
+                viewerRole === ROLE_LAUNDRY &&
+                listing?.attributes?.metadata?.onLaundry === true &&
+                !isActiveLastTransition(transaction?.attributes?.lastTransition),
               step: step
                 ? {
                     state: step.state,

@@ -1,7 +1,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 import { storableError } from '../../util/errors';
-import { fetchHandoverStatus, updateLaundryTransactionStatus } from '../../util/api';
+import {
+  fetchHandoverStatus,
+  updateLaundryTransactionStatus,
+  updateListingCustodyStatus,
+} from '../../util/api';
 
 // Redux state for the page a scanned handover QR opens.
 //
@@ -75,7 +79,31 @@ export const confirmHandoverThunk = createAsyncThunk(
       .catch(e => rejectWithValue(storableError(e)))
 );
 
+// Hand the garment back to its owner, from the counter phone.
+//
+//   > "el botón para devolver la prenda en el lado de laundry debe aparecer en order,
+//   >  handover o inventory" (Jonathan, 2026-09-07)
+//
+// The SAME endpoint the ops dashboard's inventory card fires, for the same reason the confirm
+// above shares one with the worklist: a second path to a privileged write is a second place
+// for the authorization to be wrong.
+//
+// Refetches on success, so `canHandBack` comes back false and the button leaves - the page
+// re-derives everything from the server rather than patching what it believes changed.
+export const handBackToOwnerThunk = createAsyncThunk(
+  'HandoverPage/handBackToOwner',
+  ({ transactionId, listingId }, { dispatch, rejectWithValue }) =>
+    updateListingCustodyStatus({ listingId, onLaundry: false })
+      .then(response => {
+        dispatch(fetchHandoverThunk({ transactionId }));
+        return response.data;
+      })
+      .catch(e => rejectWithValue(storableError(e)))
+);
+
 export const confirmHandover = params => dispatch => dispatch(confirmHandoverThunk(params));
+
+export const handBackToOwner = params => dispatch => dispatch(handBackToOwnerThunk(params));
 
 // ================ Slice ================ //
 
@@ -85,6 +113,8 @@ const initialState = {
   fetchError: null,
   confirmInProgress: false,
   confirmError: null,
+  handBackInProgress: false,
+  handBackError: null,
 };
 
 const handoverPageSlice = createSlice({
@@ -105,6 +135,7 @@ const handoverPageSlice = createSlice({
         // the server's, so a stale error next to it would describe a world that no longer
         // exists.
         state.confirmError = null;
+        state.handBackError = null;
       })
       .addCase(fetchHandoverThunk.rejected, (state, action) => {
         state.fetchInProgress = false;
@@ -123,6 +154,17 @@ const handoverPageSlice = createSlice({
       .addCase(confirmHandoverThunk.rejected, (state, action) => {
         state.confirmInProgress = false;
         state.confirmError = action.payload;
+      })
+      .addCase(handBackToOwnerThunk.pending, state => {
+        state.handBackInProgress = true;
+        state.handBackError = null;
+      })
+      .addCase(handBackToOwnerThunk.fulfilled, state => {
+        state.handBackInProgress = false;
+      })
+      .addCase(handBackToOwnerThunk.rejected, (state, action) => {
+        state.handBackInProgress = false;
+        state.handBackError = action.payload;
       });
   },
 });

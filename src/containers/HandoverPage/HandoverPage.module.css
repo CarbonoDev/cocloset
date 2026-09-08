@@ -63,6 +63,14 @@
   margin: 0;
 }
 
+/* Ruled off from the step above: releasing the garment is a different question from
+   confirming the rental's next move, and both can be on screen at once. */
+.handBack {
+  margin: 32px 0 0 0;
+  padding: 24px 0 0 0;
+  border-top: 1px solid var(--colorGrey100);
+}
+
 .status {
   composes: marketplaceDefaultFontStyles from global;
   color: var(--coclosetInkMuted);

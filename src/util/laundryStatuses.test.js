@@ -9,6 +9,7 @@
  * status badge, and deciding which action is legal from which state.
  */
 import {
+  canHandBackToOwner,
   LAUNDRY_STATES,
   CLEANING_PHASES,
   LAUNDRY_ACTION_STATUSES,
@@ -244,6 +245,46 @@ describe('laundryStatuses', () => {
     it('returns null when the row has no status at all', () => {
       expect(statusLabelKey({})).toBeNull();
       expect(statusLabelKey(null)).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  //   > "si la transacción aparece como cancelada tambien puedo devolver la prenda"
+  //   >   (Jonathan, 2026-09-07)
+  //
+  // The predicate used to be "has no status at all", so a garment was releasable only if it
+  // had never been booked. Every one of the first three cases below was a studio holding a
+  // garment with no way to give it back.
+  // ---------------------------------------------------------------------------
+  describe('canHandBackToOwner', () => {
+    it('lets a cancelled rental release the garment', () => {
+      expect(canHandBackToOwner(row({ onLaundry: true, state: 'canceled' }))).toBe(true);
+    });
+
+    it('lets a finished one release it too', () => {
+      expect(canHandBackToOwner(row({ onLaundry: true, state: 'delivered' }))).toBe(true);
+      expect(canHandBackToOwner(row({ onLaundry: true, state: 'reviewed' }))).toBe(true);
+      expect(canHandBackToOwner(row({ onLaundry: true, state: 'declined' }))).toBe(true);
+    });
+
+    it('still releases a garment that was never booked', () => {
+      expect(canHandBackToOwner(row({ onLaundry: true, state: null }))).toBe(true);
+    });
+
+    it('refuses while a rental is still holding it', () => {
+      // The server answers 409 for each of these; the button simply must not be there. The
+      // list is ACTIVE_STATES from the process module - see CUSTODY_ACTIVE_STATES.
+      ['accepted', 'ready-for-pickup', 'picked-up', 'overdue', 'returned', 'cleaning'].forEach(
+        state => {
+          expect(canHandBackToOwner(row({ onLaundry: true, state }))).toBe(false);
+        }
+      );
+    });
+
+    it('refuses for a garment the studio is not holding', () => {
+      expect(canHandBackToOwner(row({ onLaundry: false, state: 'canceled' }))).toBe(false);
+      expect(canHandBackToOwner(row({ state: 'canceled' }))).toBe(false);
+      expect(canHandBackToOwner(undefined)).toBe(false);
     });
   });
 
