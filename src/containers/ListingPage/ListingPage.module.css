@@ -1054,3 +1054,23 @@
   color: var(--coclosetInk);
   font-weight: var(--fontWeightSemiBold);
 }
+
+/* SAVE AND SHARE, under the gallery.
+   > "en la página de listing page, se puedan ver dos iconos" (Jonathan, 2026-09-08)
+
+   A row rather than a corner overlay on the photo: the gallery is swipeable on a phone, and a
+   control sitting on top of it competes with the swipe. */
+.listingActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 12px 0 0 0;
+}
+
+.listingAction {
+  /* The word is hidden on cards and shown here, where there is room for it and where the
+     reader has not met either icon before on this page. */
+  & span {
+    display: inline;
+  }
+}

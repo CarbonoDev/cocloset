@@ -25,12 +25,14 @@ export { default as IconEdit } from './IconEdit/IconEdit';
 export { default as IconEmailAttention } from './IconEmailAttention/IconEmailAttention';
 export { default as IconEmailSent } from './IconEmailSent/IconEmailSent';
 export { default as IconEmailSuccess } from './IconEmailSuccess/IconEmailSuccess';
+export { default as IconHeart } from './IconHeart/IconHeart';
 export { default as IconInquiry } from './IconInquiry/IconInquiry';
 export { default as IconKeys } from './IconKeys/IconKeys';
 export { default as IconKeysSuccess } from './IconKeysSuccess/IconKeysSuccess';
 export { default as IconReviewStar } from './IconReviewStar/IconReviewStar';
 export { default as IconReviewUser } from './IconReviewUser/IconReviewUser';
 export { default as IconSearch } from './IconSearch/IconSearch';
+export { default as IconShare } from './IconShare/IconShare';
 export { default as IconSynchronize } from './IconSynchronize/IconSynchronize';
 export { default as IconLocation } from './IconLocation/IconLocation';
 export { default as IconSocialMediaFacebook } from './IconSocialMediaFacebook/IconSocialMediaFacebook';
@@ -48,6 +50,7 @@ export { default as ExternalLink } from './ExternalLink/ExternalLink';
 export { default as ExpandingTextarea } from './ExpandingTextarea/ExpandingTextarea';
 export { default as FileName } from './FileName/FileName';
 export { default as HandBackToOwnerButton } from './HandBackToOwnerButton/HandBackToOwnerButton';
+export { default as ShareButton } from './ShareButton/ShareButton';
 export { default as HandoverQrCode } from './HandoverQrCode/HandoverQrCode';
 
 export { default as Form } from './Form/Form';
@@ -104,6 +107,7 @@ export { default as FieldRadioButton } from './FieldRadioButton/FieldRadioButton
 export { default as FieldReviewRating } from './FieldReviewRating/FieldReviewRating';
 export { default as FieldSelect } from './FieldSelect/FieldSelect';
 export { default as FieldSelectTree } from './FieldSelectTree/FieldSelectTree';
+export { default as FavoriteButton } from './FavoriteButton/FavoriteButton';
 export { default as FieldTextInput } from './FieldTextInput/FieldTextInput';
 
 // Fields that use other Fields

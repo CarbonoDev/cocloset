@@ -20,7 +20,9 @@ import {
   H4,
   Page,
   NamedLink,
+  FavoriteButton,
   OrderPanel,
+  ShareButton,
   LayoutSingleColumn,
   SectionText,
 } from '../../components';
@@ -271,6 +273,22 @@ export const ListingPageComponent = props => {
                   existed to repeat the sticky panel's title on a narrow screen. The design
                   gives the main column a heading of its own at every width, so repeating the
                   panel's is now a duplicate h1 rather than a fallback. */}
+            {/* SAVE IT, OR SEND IT TO SOMEBODY.
+                  > "en la página de listing page, se puedan ver dos iconos, el primero es para
+                  >  marcar como favorito (...) El segundo icono es de share"
+                  >   (Jonathan, 2026-09-08)
+
+                Directly under the gallery and above the heading: this is where a reader is
+                when they decide they like a garment, and both actions are about the garment
+                as a whole rather than about booking it. Putting them next to the order panel
+                would have made them look like part of the booking. */}
+            <div className={css.listingActions}>
+              <FavoriteButton listingId={currentListing?.id?.uuid} className={css.listingAction} />
+              <ShareButton
+                title={typeof title === 'string' ? title : undefined}
+                className={css.listingAction}
+              />
+            </div>
             <SectionListingHeader
               publicData={publicData}
               listingFieldConfigs={listingConfig.listingFields}

@@ -191,3 +191,29 @@
   margin: 4px 0 0 0;
   padding: 0;
 }
+
+/* THE SAVE HEART, over the card image.
+   > "puede estar en listingCard, pero tambien debe verse en listingPage" (Jonathan, 2026-09-08)
+
+   A wrapper exists only when a caller asks for the heart (see `showFavorite`), because the
+   card's own root is a link and a button cannot live inside one. */
+.cardWithFavorite {
+  position: relative;
+  min-width: 0;
+}
+
+.cardFavorite {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+
+  /* Legible over any photograph. A bare icon disappears against a pale garment on a pale
+     background, which is most of this marketplace. */
+  background-color: var(--colorWhite);
+  box-shadow: var(--boxShadowPopup, 0 2px 8px rgba(0, 0, 0, 0.15));
+
+  &:hover:enabled {
+    background-color: var(--colorWhite);
+  }
+}

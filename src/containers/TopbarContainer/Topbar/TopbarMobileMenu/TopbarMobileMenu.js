@@ -114,11 +114,12 @@ const TopbarMobileMenu = props => {
     </li>
   );
 
-  const createListingsLinkMaybe = showCreateListingsLink && !isLaundryUser(currentUser) ? (
-    <NamedLink className={css.createNewListingLink} name="NewListingPage">
-      <FormattedMessage id="TopbarMobileMenu.newListingLink" />
-    </NamedLink>
-  ) : null;
+  const createListingsLinkMaybe =
+    showCreateListingsLink && !isLaundryUser(currentUser) ? (
+      <NamedLink className={css.createNewListingLink} name="NewListingPage">
+        <FormattedMessage id="TopbarMobileMenu.newListingLink" />
+      </NamedLink>
+    ) : null;
 
   if (!isAuthenticated) {
     const signup = (
@@ -180,13 +181,14 @@ const TopbarMobileMenu = props => {
       : null;
   };
 
-  const manageListingsLinkMaybe = showCreateListingsLink && !isLaundryUser(currentUser) ? (
-    <li className={classNames(css.navigationLink, currentPageClass('ManageListingsPage'))}>
-      <NamedLink name="ManageListingsPage">
-        <FormattedMessage id="TopbarMobileMenu.yourListingsLink" />
-      </NamedLink>
-    </li>
-  ) : null;
+  const manageListingsLinkMaybe =
+    showCreateListingsLink && !isLaundryUser(currentUser) ? (
+      <li className={classNames(css.navigationLink, currentPageClass('ManageListingsPage'))}>
+        <NamedLink name="ManageListingsPage">
+          <FormattedMessage id="TopbarMobileMenu.yourListingsLink" />
+        </NamedLink>
+      </li>
+    ) : null;
 
   // Mobile twin of the desktop profile menu's studio entry - see TopbarDesktop's
   // ProfileMenu for why this link exists and why it points at LaundryProfilePage.
@@ -220,6 +222,12 @@ const TopbarMobileMenu = props => {
           {borrowLinkMaybe}
           {laundryProfileLinkMaybe}
           {manageListingsLinkMaybe}
+          {/* Saved garments - see the same entry in TopbarDesktop. */}
+          <li className={classNames(css.navigationLink, currentPageClass('FavoritesPage'))}>
+            <NamedLink name="FavoritesPage">
+              <FormattedMessage id="TopbarMobileMenu.favoritesLink" />
+            </NamedLink>
+          </li>
           <li className={classNames(css.navigationLink, currentPageClass('ProfileSettingsPage'))}>
             <NamedLink name="ProfileSettingsPage">
               <FormattedMessage id="TopbarMobileMenu.profileSettingsLink" />

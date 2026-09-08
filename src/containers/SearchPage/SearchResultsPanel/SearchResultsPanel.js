@@ -95,6 +95,7 @@ const SearchResultsPanel = props => {
               renderSizes={cardRenderSizes(isMapVariant)}
               setActiveListing={setActiveListing}
               variant="editorial"
+              showFavorite
             />
           </li>
         ))}
