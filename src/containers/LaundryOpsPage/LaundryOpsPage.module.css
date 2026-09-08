@@ -696,7 +696,8 @@
 }
 
 .cleaningDaysInput {
-  width: 100%;
+  /* width: 100%; */
+  width: 160px;
   padding: 10px 12px;
   border: 1px solid var(--coclosetBorder);
   border-radius: var(--coclosetRadiusSmall);
@@ -709,9 +710,9 @@
     box-shadow: none;
   }
 
-  @media (--viewportMedium) {
+  /* @media (--viewportMedium) {
     max-width: 160px;
-  }
+  } */
 }
 
 .cleaningDaysHint {
