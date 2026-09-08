@@ -16,6 +16,9 @@ import {
   ResponsiveImage,
   ListingCardThumbnail,
 } from '../../components';
+// Imported directly rather than through the barrel: components/index.js exports this file
+// too, so going through it would be a cycle.
+import FavoriteButton from '../FavoriteButton/FavoriteButton';
 
 import { getListingCardTranslations } from './ListingCard.helpers';
 
@@ -177,6 +180,12 @@ export const ListingCard = props => {
     // Cocloset: 'editorial' is the landing page's carousel card. Anything else - including
     // nothing, which is every existing call site - keeps the stock layout untouched.
     variant,
+    // Cocloset: the save-this-garment heart. OFF by default, and that is deliberate rather
+    // than cautious: the card's root element is a link, and a <button> inside an <a> is
+    // invalid markup that browsers disagree about. Turning the heart on therefore wraps the
+    // card in a positioning element, which is a change to the root of every card on every
+    // screen. Defaulting to false keeps the markup byte-identical wherever nobody asked.
+    showFavorite = false,
   } = props;
 
   const isEditorial = variant === 'editorial';
@@ -218,7 +227,7 @@ export const ListingCard = props => {
       }
     : null;
 
-  return (
+  const card = (
     <NamedLink
       className={classes}
       name="ListingPage"
@@ -278,6 +287,20 @@ export const ListingCard = props => {
         </div>
       )}
     </NamedLink>
+  );
+
+  if (!showFavorite || !id) {
+    return card;
+  }
+
+  // The heart is a SIBLING of the link, not a child: nested interactive elements are invalid
+  // and a screen reader reads the whole card as one control with a button hidden inside it.
+  // Absolutely positioned over the image so the card itself keeps its layout.
+  return (
+    <div className={css.cardWithFavorite}>
+      {card}
+      <FavoriteButton listingId={id} className={css.cardFavorite} />
+    </div>
   );
 };
 

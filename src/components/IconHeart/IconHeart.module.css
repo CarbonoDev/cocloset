@@ -1,0 +1,9 @@
+.root {
+  /* The colour is the button's, so one icon serves a dark card overlay and a light page. */
+  color: currentColor;
+  fill: none;
+}
+
+.filled {
+  color: var(--coclosetAccent, var(--marketplaceColor));
+}
