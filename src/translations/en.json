@@ -632,7 +632,7 @@
   "HandoverPage.status.pending-payment": "Waiting for payment",
   "HandoverPage.status.picked-up": "Out with renter",
   "HandoverPage.status.preauthorized": "Paid — waiting for the owner to accept",
-  "HandoverPage.status.ready-for-pickup": "Ready at the laundry — waiting to be collected",
+  "HandoverPage.status.ready-for-pickup": "Ready at the laundry for renter pickup",
   "HandoverPage.status.returned": "Returned to the laundry",
   "HandoverPage.status.reviewed": "Rental complete — reviewed",
   "HandoverPage.status.reviewed-by-customer": "Rental complete — reviewed by the renter",
