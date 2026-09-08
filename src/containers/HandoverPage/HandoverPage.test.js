@@ -19,7 +19,27 @@ const { screen, fireEvent } = testingLibrary;
 
 const TX_ID = '6a74b530-a104-42b6-a586-b35efb5dee79';
 
-const handoverFor = (overrides = {}) => ({
+// The studio's next action, which the SERVER now resolves (api-util/laundryActions.js) and
+// the page renders instead of re-deriving from the counter step. Defaulted from the step so
+// every existing case keeps meaning what it meant; the cleaning phases, which have no step at
+// all, pass one explicitly.
+const actionFor = step =>
+  step
+    ? {
+        status: step.status,
+        needsDamageReport: step.status === 'returned',
+        needsCleaningDays: step.status === 'cleaning-in-progress',
+        needsLaundryCode: ['garment-received', 'pending-cleaning'].includes(step.status),
+        firesPayout: step.status === 'pending-cleaning',
+      }
+    : null;
+
+const handoverFor = (overrides = {}) => {
+  const merged = { ...baseHandover, ...overrides };
+  return { action: actionFor(merged.step), ...merged };
+};
+
+const baseHandover = {
   transactionId: TX_ID,
   processState: 'ready-for-pickup',
   viewerRole: 'laundry',
@@ -35,8 +55,7 @@ const handoverFor = (overrides = {}) => ({
   bookingStart: null,
   bookingEnd: null,
   ticketCode: 'PIG-A3F91C',
-  ...overrides,
-});
+};
 
 const renderPage = (props = {}) =>
   render(
@@ -59,7 +78,11 @@ const renderPage = (props = {}) =>
   );
 
 const confirmButton = () =>
-  screen.queryByRole('button', { name: /HandoverPage\.step\..*\.confirm/ });
+  // The label is the step's at a counter event and the ops table's action label at the
+  // cleaning phases, which have no counter event - see api-util/laundryActions.js.
+  screen.queryByRole('button', {
+    name: /HandoverPage\.step\..*\.confirm|LaundryOpsPage\.action\./,
+  });
 
 describe('HandoverPage: who gets an action', () => {
   it('offers the laundry a confirm button', () => {
@@ -197,26 +220,41 @@ describe('HandoverPage: the full current status, for a party', () => {
   });
 });
 
-describe('HandoverPage: the cleaning-days box at a return', () => {
+describe('HandoverPage: the cleaning-days box where the wash starts', () => {
   //   > "al momento de recibir la prenda, laundry puede seleccionar cuantos dias necesita
   //   >  para lavar, pero en mobile no aparece esta opción, estos días deben tener un default
   //   >  de los días que indique la laundry, pero pueden modificarse al recibir"
+  //   > "el handover tiene que funcionar igual que en la pestaña orders de laundry"
+  //   >   (Jonathan, 2026-09-08)
   //
-  // This page IS the studio's phone screen - it is what a scan opens - so a return confirmed
-  // here used to fall back to the configured turnaround with nothing on screen to say so.
+  // This page IS the studio's phone screen - it is what a scan opens. It used to ask for the
+  // days at the RETURN, which is a step the endpoint does not read them at: typed, sent,
+  // dropped. They belong where the ops table asks for them, at the step that says the work has
+  // started - and that step has no counter event, which is why the page could not offer it
+  // until the button stopped being driven by the counter table.
 
   const returnStep = {
     state: 'picked-up',
-    status: 'returned',
+    status: 'cleaning-in-progress',
     counterparty: 'customer',
     direction: 'in',
     isLate: false,
   };
 
+  // The cleaning phases have NO counter step - nobody is handing anything over - which is
+  // exactly the situation the page could not render before. The action is what carries it.
   const returning = (overrides = {}) =>
     handoverFor({
-      processState: 'picked-up',
-      step: returnStep,
+      processState: 'cleaning',
+      step: null,
+      action: {
+        status: 'cleaning-in-progress',
+        needsDamageReport: false,
+        needsCleaningDays: true,
+        needsLaundryCode: false,
+        firesPayout: false,
+      },
+      canConfirm: true,
       defaultCleaningDays: 3,
       ...overrides,
     });
@@ -237,7 +275,7 @@ describe('HandoverPage: the cleaning-days box at a return', () => {
 
     expect(onConfirm).toHaveBeenCalledWith({
       transactionId: TX_ID,
-      status: 'returned',
+      status: 'cleaning-in-progress',
       cleaningDays: 5,
     });
   });
@@ -251,7 +289,10 @@ describe('HandoverPage: the cleaning-days box at a return', () => {
     fireEvent.change(daysInput(), { target: { value: '' } });
     confirmButton().click();
 
-    expect(onConfirm).toHaveBeenCalledWith({ transactionId: TX_ID, status: 'returned' });
+    expect(onConfirm).toHaveBeenCalledWith({
+      transactionId: TX_ID,
+      status: 'cleaning-in-progress',
+    });
   });
 
   it('sends a real zero when the operator types one', () => {
@@ -264,7 +305,7 @@ describe('HandoverPage: the cleaning-days box at a return', () => {
 
     expect(onConfirm).toHaveBeenCalledWith({
       transactionId: TX_ID,
-      status: 'returned',
+      status: 'cleaning-in-progress',
       cleaningDays: 0,
     });
   });
