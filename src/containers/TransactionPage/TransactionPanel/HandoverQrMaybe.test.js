@@ -119,12 +119,16 @@ describe('HandoverQrMaybe', () => {
   // sees the code, and from when" below. What matters here is that whoever DOES see a code
   // before the garment is ready is told it is not usable yet.
   it('carries the waiting copy while the garment is not at the counter yet', () => {
+    //   > "La key TransactionPanel.handoverQr.descriptionWaiting se muestra a un provider
+    //   >  aunque en ese momento no es necesario que se le muestre el QR"
+    //   >   (Jonathan, 2026-09-08)
+    //
+    // It is the RENTER's sentence - wait for the owner to drop it off and the studio to clean
+    // it - and it was being shown to the owner about their own garment, which they are the one
+    // holding. The owner has their own two sentences now, one per errand.
     const viewers = [
       // The renter, from the moment the booking is accepted.
       { processState: 'accepted', isCustomer: true },
-      // The owner, in the one pre-acceptance state they can still see it in.
-      { processState: 'preauthorized', isCustomer: false, isAtLaundry: true },
-      { processState: 'accepted', isCustomer: false },
     ];
 
     viewers.forEach(props => {
@@ -226,17 +230,66 @@ describe('HandoverQrMaybe', () => {
       expect(qr(view)).not.toBeInTheDocument();
     });
 
-    it('shows it to the owner before they answer IF the garment is already at a studio', () => {
-      // Nothing about the code is theirs to act on in that case - the handover it
-      // describes is between the studio and the renter either way - so their
-      // approval is not what gates it.
-      const view = renderPanel({
-        processState: 'preauthorized',
+    // ------------------------------------------------------------------------
+    //   > "puedes mostrar el QR al provider solo bajo estas condiciones? 1. Yo como provider
+    //   >  tengo la prenda en mi poder (onLaundry = false) y debo ir a entregarla a la
+    //   >  lavanderia. 2. La prenda ya regresó a la lavandería, ya terminó el proceso de
+    //   >  limpieza y puedo ir a recogerla. 3. Una transacción fue cancelada y puedo recoger
+    //   >  nuevamente la prenda" (Jonathan, 2026-09-08)
+    //
+    // Three cases, and they are TWO ERRANDS: take it in, or come and get it. Everything else
+    // is a stretch where the studio has the garment and the next person at the counter is the
+    // renter - which is what the owner was being shown a code for.
+    // ------------------------------------------------------------------------
+    it('shows it to the owner while the garment is theirs to deliver', () => {
+      const view = renderPanel({ processState: 'accepted', isCustomer: false });
+
+      expect(qr(view)).toBeInTheDocument();
+    });
+
+    it('hides it once the studio has the garment and the rental is live', () => {
+      // Nothing for the owner to do with a code here: the handovers left are the renter's.
+      const view = renderPanel({ processState: 'accepted', isCustomer: false, isAtLaundry: true });
+
+      expect(qr(view)).not.toBeInTheDocument();
+    });
+
+    it('shows it to the owner again once the wash is done and it can be collected', () => {
+      ['delivered', 'reviewed', 'reviewed-by-customer', 'reviewed-by-provider'].forEach(
+        processState => {
+          const view = renderPanel({ processState, isCustomer: false, isAtLaundry: true });
+          expect(qr(view)).toBeInTheDocument();
+          view.unmount();
+        }
+      );
+    });
+
+    it('shows it to the owner after a cancellation, so they can take the garment back', () => {
+      const view = renderPanel({ processState: 'canceled', isCustomer: false, isAtLaundry: true });
+
+      expect(qr(view)).toBeInTheDocument();
+    });
+
+    it('shows nothing to collect for a cancellation where the owner still has the garment', () => {
+      // There is no errand: the garment never left home.
+      const view = renderPanel({ processState: 'canceled', isCustomer: false });
+
+      expect(qr(view)).not.toBeInTheDocument();
+    });
+
+    it('tells the owner which walk they are making', () => {
+      const dropOff = renderPanel({ processState: 'accepted', isCustomer: false });
+      expect(dropOff.queryByText(/Take the garment to the laundry/i)).toBeInTheDocument();
+      dropOff.unmount();
+
+      const collect = renderPanel({
+        processState: 'delivered',
         isCustomer: false,
         isAtLaundry: true,
       });
-
-      expect(qr(view)).toBeInTheDocument();
+      expect(collect.queryByText(/ready to collect/i)).toBeInTheDocument();
+      // And never the renter's sentence, which is what the client was looking at.
+      expect(collect.queryByText(WAITING_COPY)).not.toBeInTheDocument();
     });
 
     it('gives it to the owner once they accept', () => {

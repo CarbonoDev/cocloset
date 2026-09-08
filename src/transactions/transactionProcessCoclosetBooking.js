@@ -502,14 +502,45 @@ export const HANDOVER_QR_CUSTOMER_VISIBLE_STATES = HANDOVER_QR_STATES_AFTER_ACCE
 // CEILING. Once the transaction reaches READY_FOR_PICKUP the remaining handovers are the
 // RENTER's - collect it, bring it back - and the owner is not at the counter for either. A
 // code on their screen then is an identifier for someone else's errand.
-export const HANDOVER_QR_PROVIDER_VISIBLE_STATES = [states.ACCEPTED];
+//
+// ── NARROWED AGAIN, AND RESHAPED (Jonathan, 2026-09-08) ─────────────────────
+//
+//   > "puedes mostrar el QR al provider solo bajo estas condiciones? 1. Yo como provider
+//   >  tengo la prenda en mi poder (onLaundry = false) y debo ir a entregarla a la lavanderia.
+//   >  2. La prenda ya regresó a la lavandería, ya terminó el proceso de limpieza y puedo ir a
+//   >  recogerla. 3. Una transacción fue cancelada y puedo recoger nuevamente la prenda"
+//
+// The owner's window is not one range with an exception any more. It is TWO ERRANDS, and
+// which one is next is a question about the garment, not about the process:
+//
+//   * DROP OFF - the owner is holding the garment and has to take it in. Only while the
+//     rental is live and only while the garment is genuinely with them.
+//   * COLLECT  - the garment is at the studio and the rental is over, so the owner may come
+//     and take it home. "Over" is the wash having finished (DELIVERED, and the review states
+//     that follow it) or the booking having been called off (CANCELED).
+//
+// Between those two the owner has no errand at all: the studio has the garment and the next
+// person at the counter is the renter. That is the stretch the client was looking at when
+// they reported being shown "wait for the studio" copy for a code they had nothing to do with.
+//
+// A state on NEITHER list is a state where the owner sees nothing - which is now the default
+// rather than something each state has to be excluded from.
+export const HANDOVER_QR_PROVIDER_DROP_OFF_STATES = [states.ACCEPTED];
 
-// The one state whose visibility depends on where the garment physically is, rather than on
-// what the process says.
-export const HANDOVER_QR_PROVIDER_AT_LAUNDRY_STATES = [
-  states.PREAUTHORIZED,
-  ...HANDOVER_QR_PROVIDER_VISIBLE_STATES,
+export const HANDOVER_QR_PROVIDER_COLLECT_STATES = [
+  states.DELIVERED,
+  // The wash is finished at DELIVERED and the garment does not move again on its own; the
+  // review states are bookkeeping between two humans that happen afterwards. An owner who
+  // has not been to collect yet still needs the code on the day they go.
+  states.REVIEWED,
+  states.REVIEWED_BY_CUSTOMER,
+  states.REVIEWED_BY_PROVIDER,
+  states.CANCELED,
 ];
+
+// Kept for readers that ask "which live state does the owner act in". Both lists are exported
+// because the answer is now genuinely two-sided.
+export const HANDOVER_QR_PROVIDER_VISIBLE_STATES = HANDOVER_QR_PROVIDER_DROP_OFF_STATES;
 
 // Kept as the union of everything either party can ever see, for callers that only ask "could
 // this state ever show a code" - not as a role's rule. It is no longer anyone's own list.
@@ -540,12 +571,17 @@ export const isHandoverQrVisibleState = (
   if (isCustomer) {
     return HANDOVER_QR_CUSTOMER_VISIBLE_STATES.includes(state);
   }
-  // `isAtLaundry` widens the owner's window by exactly one state, and defaults to false -
-  // so a caller that does not know where the garment is hides the code a beat early rather
-  // than showing it to an owner who has not answered the booking yet.
+  // WHICH ERRAND THE OWNER HAS, if any. `isAtLaundry` is not a widening flag any more: it
+  // selects between two disjoint lists, because "take it in" and "come and get it" are
+  // opposite errands and the garment can only be in one place.
+  //
+  // Defaults to false, so a caller that does not know where the garment is offers the
+  // drop-off code rather than a collection code for a garment that may not be there - the
+  // error that wastes a walk to the studio rather than one that sends somebody to a counter
+  // with nothing to hand over.
   return isAtLaundry
-    ? HANDOVER_QR_PROVIDER_AT_LAUNDRY_STATES.includes(state)
-    : HANDOVER_QR_PROVIDER_VISIBLE_STATES.includes(state);
+    ? HANDOVER_QR_PROVIDER_COLLECT_STATES.includes(state)
+    : HANDOVER_QR_PROVIDER_DROP_OFF_STATES.includes(state);
 };
 
 // The laundry states need the laundry's attention, not the garment owner's,

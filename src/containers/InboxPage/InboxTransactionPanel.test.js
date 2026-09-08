@@ -166,8 +166,13 @@ describe('InboxTransactionPanel: who gets the QR', () => {
             ...base.listing,
             attributes: {
               ...base.listing.attributes,
-              // `stored` is the studio holding it; anything else is not.
-              metadata: { readinessStatus: isAtLaundry ? 'stored' : 'incoming' },
+              // The CUSTODY flag, which is what the rule turns on - see the read in
+              // InboxTransactionPanel.js. `readinessStatus` rides along because other parts
+              // of the panel still use it.
+              metadata: {
+                onLaundry: isAtLaundry,
+                readinessStatus: isAtLaundry ? 'stored' : 'incoming',
+              },
             },
           },
         }}
@@ -185,15 +190,42 @@ describe('InboxTransactionPanel: who gets the QR', () => {
     expect(qrButton()).not.toBeInTheDocument();
   });
 
-  //   > "El QR no debe poder verse hasta que el provider apruebe la transacción,
-  //   >  esto aplica solo si la prenda no esta en una laundry" (Jonathan, 2026-09-03)
-  it('is hidden from the owner too, until they answer - unless the studio already has it', () => {
+  //   > "puedes mostrar el QR al provider solo bajo estas condiciones? 1. (...) tengo la
+  //   >  prenda en mi poder (onLaundry = false) y debo ir a entregarla (...) 2. (...) ya
+  //   >  terminó el proceso de limpieza y puedo ir a recogerla. 3. Una transacción fue
+  //   >  cancelada y puedo recoger nuevamente la prenda" (Jonathan, 2026-09-08)
+  //
+  // Two errands, and the garment can only be in one place - so the pre-acceptance state now
+  // shows nothing either way. This panel and the transaction page read the same rule, which
+  // is the point of it living in transactions/transactionProcessCoclosetBooking.js.
+  it('shows the owner nothing before they have answered the booking', () => {
     atTransition('transition/confirm-payment', TX_TRANSITION_ACTOR_PROVIDER).unmount();
     expect(qrButton()).not.toBeInTheDocument();
 
     atTransition('transition/confirm-payment', TX_TRANSITION_ACTOR_PROVIDER, {
       isAtLaundry: true,
     });
+    expect(qrButton()).not.toBeInTheDocument();
+  });
+
+  it('gives the owner the code while the garment is still theirs to drop off', () => {
+    atTransition('transition/accept', TX_TRANSITION_ACTOR_PROVIDER);
+
+    expect(qrButton()).toBeInTheDocument();
+  });
+
+  it('gives it back once the wash is done, or the booking was called off', () => {
+    const afterWash = atTransition(
+      'transition/laundry-mark-available',
+      TX_TRANSITION_ACTOR_PROVIDER,
+      {
+        isAtLaundry: true,
+      }
+    );
+    expect(qrButton()).toBeInTheDocument();
+    afterWash.unmount();
+
+    atTransition('transition/cancel', TX_TRANSITION_ACTOR_PROVIDER, { isAtLaundry: true });
     expect(qrButton()).toBeInTheDocument();
   });
 
