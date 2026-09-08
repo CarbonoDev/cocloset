@@ -25,6 +25,7 @@ const laundryTransactionStatus = require('./api/laundry-transaction-status');
 const listingReadinessStatus = require('./api/listing-readiness-status');
 const listingCustodyStatus = require('./api/listing-custody-status');
 const laundryReceiveGarment = require('./api/laundry-receive-garment');
+const listingAvailabilitySweep = require('./api/listing-availability-sweep');
 const listingLaundryAssignment = require('./api/listing-laundry-assignment');
 const listingInitialCleaning = require('./api/listing-initial-cleaning');
 const laundryAddress = require('./api/laundry-address');
@@ -90,6 +91,10 @@ router.post('/listing-readiness-status', listingReadinessStatus);
 // to be fused onto "ready for the renter", which announced a coat as collectable before it
 // had been washed. See server/api/laundry-receive-garment.js.
 router.post('/laundry-receive-garment', laundryReceiveGarment);
+// Give back the days a booking blocked once that booking is over. Fired by the listing page
+// on load, because a cancellation from Console runs no code of ours. See
+// server/api/listing-availability-sweep.js for what it will and will not delete.
+router.post('/listing-availability-sweep', listingAvailabilitySweep);
 // Garment custody (`listing.metadata.onLaundry`) - writable by the assigned
 // laundry OR the listing's owner, and only while the listing has no active
 // transaction. See server/api/listing-custody-status.js.

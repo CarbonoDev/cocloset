@@ -1,5 +1,7 @@
 jest.mock('../../util/api', () => ({
   fetchListingInitialCleaning: jest.fn(),
+  // The stale-block cleanup, fired and forgotten on every listing view - see loadData.
+  sweepListingAvailability: jest.fn(() => Promise.resolve({ data: {} })),
   transactionLineItems: jest.fn(),
 }));
 
@@ -9,7 +11,7 @@ jest.mock('../../util/log', () => ({
   error: jest.fn(),
 }));
 
-import { fetchListingInitialCleaning } from '../../util/api';
+import { fetchListingInitialCleaning, sweepListingAvailability } from '../../util/api';
 import * as log from '../../util/log';
 import { types as sdkTypes } from '../../util/sdkLoader';
 import { createFakeDispatch, getDefaultConfiguration } from '../../util/testHelpers';
@@ -88,6 +90,39 @@ const runLoadData = async listing => {
 describe('the live initial-cleaning lookup is asked for at page load', () => {
   beforeEach(() => {
     fetchListingInitialCleaning.mockResolvedValue({ data: { initialCleaningDays: 3 } });
+    sweepListingAvailability.mockResolvedValue({ data: {} });
+  });
+
+  // -------------------------------------------------------------------------
+  //   > "habia hecho una reservación (...) y la cancelé como operator, por lo tanto, los días
+  //   >  reservados deberían estar disponibles, sin embargo no lo estan" (Jonathan, 2026-09-07)
+  //
+  // Accepting a booking blocks its window and nothing ever unblocked it. A cancellation made
+  // from Console runs no code of ours, so the cleanup is triggered by this read - which makes
+  // the WIRING the whole feature. A sweep endpoint nobody calls is indistinguishable from the
+  // bug, and on this project that is exactly where things have died before.
+  // -------------------------------------------------------------------------
+  it('asks for the stale blocks to be swept', async () => {
+    await runLoadData(listingEntity());
+
+    expect(sweepListingAvailability).toHaveBeenCalledWith(LISTING_ID);
+  });
+
+  it('does not fail the page load when the sweep fails', async () => {
+    // It is a cleanup nobody is waiting on. A listing page that will not render is a much
+    // bigger wrong than a calendar that frees its days on the next load instead of this one.
+    sweepListingAvailability.mockRejectedValue(new Error('boom'));
+
+    await expect(runLoadData(listingEntity())).resolves.toBeDefined();
+  });
+
+  it('does not fail the page load when the sweep throws synchronously', async () => {
+    // A throw before any promise exists escapes into loadData unless it is wrapped.
+    sweepListingAvailability.mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    await expect(runLoadData(listingEntity())).resolves.toBeDefined();
   });
 
   it('asks for the listing being viewed', async () => {
