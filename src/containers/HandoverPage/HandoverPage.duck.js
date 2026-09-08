@@ -3,6 +3,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { storableError } from '../../util/errors';
 import {
   fetchHandoverStatus,
+  receiveGarmentAtLaundry,
   updateLaundryTransactionStatus,
   updateListingCustodyStatus,
 } from '../../util/api';
@@ -43,6 +44,33 @@ export const fetchHandoverThunk = createAsyncThunk(
 // Refetches on success rather than patching the slice from the response: the next step is a
 // function of the new process state, and re-deriving it from the server is what stops this
 // page ever showing a step the transaction has already left.
+// RECEPTION IS NOT A TRANSITION, so it is not the same POST.
+//
+//   > "cuando el provider va a entregar una prenda a la laundry, la laundry debe ingresar un
+//   >  ticket y luego iniciar el proceso de lavado" (Jonathan, 2026-09-08)
+//
+// Both screens advance the studio through one vocabulary of statuses, and this one step is
+// answered by a different endpoint: it records that the garment is now on the studio's rack
+// (a listing write) and fires nothing on the transaction, which stays `accepted` for the
+// length of the wash. Branching HERE rather than in the components keeps that a fact about
+// the endpoint rather than something every button has to know.
+const RECEPTION_STATUS = 'garment-received';
+
+const postStatus = ({ transactionId, status, damaged, damageNote, cleaningDays, laundryCode }) =>
+  status === RECEPTION_STATUS
+    ? receiveGarmentAtLaundry({
+        transactionId,
+        ...(laundryCode ? { laundryCode } : {}),
+      })
+    : updateLaundryTransactionStatus({
+        transactionId,
+        status,
+        ...(typeof damaged === 'boolean' ? { damaged } : {}),
+        ...(damageNote ? { damageNote } : {}),
+        ...(typeof cleaningDays === 'number' ? { cleaningDays } : {}),
+        ...(laundryCode ? { laundryCode } : {}),
+      });
+
 export const confirmHandoverThunk = createAsyncThunk(
   'HandoverPage/confirmHandover',
   (
@@ -64,14 +92,7 @@ export const confirmHandoverThunk = createAsyncThunk(
     // EVERY FIELD IS SPREAD IN BY NAME on purpose - it is what stops a caller posting
     // arbitrary keys at a privileged endpoint - so anything added to the form has to be added
     // here too, or it goes nowhere and says nothing.
-    updateLaundryTransactionStatus({
-      transactionId,
-      status,
-      ...(typeof cleaningDays === 'number' ? { cleaningDays } : {}),
-      ...(typeof damaged === 'boolean' ? { damaged } : {}),
-      ...(damageNote ? { damageNote } : {}),
-      ...(laundryCode ? { laundryCode } : {}),
-    })
+    postStatus({ transactionId, status, cleaningDays, damaged, damageNote, laundryCode })
       .then(response => {
         dispatch(fetchHandoverThunk({ transactionId }));
         return response.data;

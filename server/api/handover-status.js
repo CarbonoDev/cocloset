@@ -174,6 +174,10 @@ module.exports = (req, res) => {
       );
 
       const viewerRole = resolveViewerRole(currentUser, transaction, listing);
+      // `accepted` is two different counters - a drop-off to be washed, or a garment already
+      // on the rack that only needs marking ready. The state cannot tell them apart; the
+      // listing's custody flag can. See api-util/handoverSteps.js.
+      const onLaundry = listing?.attributes?.metadata?.onLaundry === true;
       if (!viewerRole) {
         // Same body for "not a party" as for "no such transaction" would be nicer still, but
         // the id is already known to whoever scanned the code - it IS the code - so there is
@@ -182,7 +186,7 @@ module.exports = (req, res) => {
       }
 
       const processState = stateFromLastTransition(transaction?.attributes?.lastTransition);
-      const step = handoverStepFor(processState);
+      const step = handoverStepFor(processState, { onLaundry });
 
       // How many days this studio needs to clean THIS garment, so the confirm screen can
       // pre-fill the box instead of asking the operator to remember their own configuration.

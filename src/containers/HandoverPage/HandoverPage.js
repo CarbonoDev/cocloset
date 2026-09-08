@@ -11,9 +11,16 @@ import {
 } from '../../util/handoverSteps';
 import { MAX_LAUNDRY_CODE_LENGTH } from '../../util/laundryStatuses';
 
-import { isScrollingDisabled } from '../../ducks/ui.duck';
+import { isScrollingDisabled, manageDisableScrolling } from '../../ducks/ui.duck';
 
-import { H3, Page, PrimaryButton, LayoutSingleColumn, NamedLink } from '../../components';
+import {
+  H3,
+  HandBackToOwnerButton,
+  Page,
+  PrimaryButton,
+  LayoutSingleColumn,
+  NamedLink,
+} from '../../components';
 
 import TopbarContainer from '../TopbarContainer/TopbarContainer';
 import FooterContainer from '../FooterContainer/FooterContainer';
@@ -103,6 +110,7 @@ export const HandoverPageComponent = props => {
     handBackInProgress,
     handBackError,
     onHandBack,
+    onManageDisableScrolling,
   } = props;
 
   // How long the studio will need to clean this garment, asked for at the moment it comes
@@ -508,15 +516,14 @@ export const HandoverPageComponent = props => {
                 />
               </p>
             ) : null}
-            <PrimaryButton
-              className={css.confirmButton}
-              type="button"
+            <HandBackToOwnerButton
+              id="HandoverPage.handBack"
+              className={css.handBackTrigger}
+              garmentTitle={listingTitle}
               inProgress={handBackInProgress}
-              disabled={handBackInProgress}
-              onClick={() => onHandBack({ transactionId: handover.transactionId, listingId })}
-            >
-              <FormattedMessage id="HandoverPage.handBack.confirm" />
-            </PrimaryButton>
+              onManageDisableScrolling={onManageDisableScrolling}
+              onConfirm={() => onHandBack({ transactionId: handover.transactionId, listingId })}
+            />
           </div>
         ) : null}
       </div>
@@ -566,6 +573,8 @@ const mapStateToProps = state => {
 const mapDispatchToProps = dispatch => ({
   onConfirm: params => dispatch(confirmHandover(params)),
   onHandBack: params => dispatch(handBackToOwner(params)),
+  onManageDisableScrolling: (componentId, disableScrolling) =>
+    dispatch(manageDisableScrolling(componentId, disableScrolling)),
 });
 
 const HandoverPage = compose(

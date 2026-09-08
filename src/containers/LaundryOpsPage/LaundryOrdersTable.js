@@ -24,6 +24,7 @@ import css from './LaundryOpsPage.module.css';
  * @param {Function} [props.onHandBackToOwner] - ({listingId}) => void
  * @param {string|null} [props.handBackListingId] - garment currently being handed back
  * @param {Object} [props.handBackError]
+ * @param {Function} [props.onManageDisableScrolling]
  * @returns {JSX.Element}
  */
 const LaundryOrdersTable = props => {
@@ -36,6 +37,7 @@ const LaundryOrdersTable = props => {
     onHandBackToOwner,
     handBackListingId,
     handBackError,
+    onManageDisableScrolling,
   } = props;
 
   const [tab, setTab] = useState('all');
@@ -127,6 +129,7 @@ const LaundryOrdersTable = props => {
                   }
                   onHandBackToOwner={onHandBackToOwner}
                   handBackInProgress={!!row.listingId && row.listingId === handBackListingId}
+                  onManageDisableScrolling={onManageDisableScrolling}
                 />
               ))}
             </tbody>

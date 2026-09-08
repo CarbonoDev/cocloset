@@ -412,6 +412,101 @@ describe('laundry-orders', () => {
     expect(meta).toEqual({ listingCount: 1, transactionCount: 2, truncated: false });
   });
 
+  // ---------------------------------------------------------------------------
+  //   > "de confirmarse el listing ya no debe aparecer en inventory" (Jonathan, 2026-09-08)
+  //
+  // Inventory is what the studio is holding plus what it is expecting. The pair below is the
+  // whole point: BOTH garments read `onLaundry !== true`, and only the stamp says which of
+  // them went home.
+  // ---------------------------------------------------------------------------
+  it('drops a garment the studio has handed back', async () => {
+    setupSdk({
+      listingPages: [
+        page(
+          [
+            listing('listing-gone', {
+              attributes: {
+                metadata: {
+                  assignedLaundryId: LAUNDRY_ID,
+                  readinessStatus: 'available',
+                  onLaundry: false,
+                  handedBackAt: '2026-09-08T04:00:00.000Z',
+                },
+              },
+            }),
+          ],
+          listingIncluded
+        ),
+      ],
+      transactionsByListing: {},
+    });
+
+    const res = mockRes();
+    await laundryOrders({}, res);
+    await new Promise(setImmediate);
+
+    expect(res.body.data.inventory).toHaveLength(0);
+    // The work it did is still the studio's history, so the orders union keeps it.
+    expect(res.body.data.orders).toHaveLength(1);
+  });
+
+  it('keeps a garment that has been assigned but has not arrived yet', async () => {
+    // `writeLaundryAssignment` writes no custody or readiness flag at all, so this garment is
+    // byte-identical to the one above apart from the stamp. It is exactly the garment the
+    // studio needs on the grid: it is being told to expect it.
+    setupSdk({
+      listingPages: [
+        page(
+          [
+            listing('listing-incoming', {
+              attributes: { metadata: { assignedLaundryId: LAUNDRY_ID } },
+            }),
+          ],
+          listingIncluded
+        ),
+      ],
+      transactionsByListing: {},
+    });
+
+    const res = mockRes();
+    await laundryOrders({}, res);
+    await new Promise(setImmediate);
+
+    expect(res.body.data.inventory).toHaveLength(1);
+    expect(res.body.data.inventory[0].listingId).toBe('listing-incoming');
+  });
+
+  it('keeps a garment the studio is holding, whatever it did before', async () => {
+    // A stale stamp from a previous visit must not hide a garment that came back. The custody
+    // write clears it, but the flag is what this reads.
+    setupSdk({
+      listingPages: [
+        page(
+          [
+            listing('listing-back', {
+              attributes: {
+                metadata: {
+                  assignedLaundryId: LAUNDRY_ID,
+                  readinessStatus: 'stored',
+                  onLaundry: true,
+                  handedBackAt: '2026-08-01T04:00:00.000Z',
+                },
+              },
+            }),
+          ],
+          listingIncluded
+        ),
+      ],
+      transactionsByListing: {},
+    });
+
+    const res = mockRes();
+    await laundryOrders({}, res);
+    await new Promise(setImmediate);
+
+    expect(res.body.data.inventory).toHaveLength(1);
+  });
+
   it('follows listing pagination and queries transactions per listing', async () => {
     const { listingsQuery, transactionsQuery } = setupSdk({
       listingPages: [

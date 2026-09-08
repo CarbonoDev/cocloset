@@ -3,6 +3,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { storableError } from '../../util/errors';
 import {
   fetchLaundryOrders,
+  receiveGarmentAtLaundry,
   updateLaundryTransactionStatus,
   updateListingCustodyStatus,
 } from '../../util/api';
@@ -43,20 +44,37 @@ export const fetchOrdersThunk = createAsyncThunk(
 // here means the row was stale. Refetching the whole payload on success keeps
 // every screen consistent and picks up any concurrent change by another
 // terminal in the studio.
+// RECEPTION IS NOT A TRANSITION, so it is not the same POST.
+//
+//   > "cuando el provider va a entregar una prenda a la laundry, la laundry debe ingresar un
+//   >  ticket y luego iniciar el proceso de lavado" (Jonathan, 2026-09-08)
+//
+// Both screens advance the studio through one vocabulary of statuses, and this one step is
+// answered by a different endpoint: it records that the garment is now on the studio's rack
+// (a listing write) and fires nothing on the transaction, which stays `accepted` for the
+// length of the wash. Branching HERE rather than in the components keeps that a fact about
+// the endpoint rather than something every button has to know.
+const RECEPTION_STATUS = 'garment-received';
+
+const postStatus = ({ transactionId, status, damaged, damageNote, cleaningDays, laundryCode }) =>
+  status === RECEPTION_STATUS
+    ? receiveGarmentAtLaundry({
+        transactionId,
+        ...(laundryCode ? { laundryCode } : {}),
+      })
+    : updateLaundryTransactionStatus({
+        transactionId,
+        status,
+        ...(typeof damaged === 'boolean' ? { damaged } : {}),
+        ...(damageNote ? { damageNote } : {}),
+        ...(typeof cleaningDays === 'number' ? { cleaningDays } : {}),
+        ...(laundryCode ? { laundryCode } : {}),
+      });
+
 export const advanceStatusThunk = createAsyncThunk(
   'LaundryOpsPage/advanceStatus',
-  (
-    { transactionId, status, damaged, damageNote, cleaningDays, laundryCode },
-    { dispatch, rejectWithValue }
-  ) =>
-    updateLaundryTransactionStatus({
-      transactionId,
-      status,
-      ...(typeof damaged === 'boolean' ? { damaged } : {}),
-      ...(damageNote ? { damageNote } : {}),
-      ...(typeof cleaningDays === 'number' ? { cleaningDays } : {}),
-      ...(laundryCode ? { laundryCode } : {}),
-    })
+  (params, { dispatch, rejectWithValue }) =>
+    postStatus(params)
       .then(response => {
         dispatch(fetchOrdersThunk());
         return response.data;

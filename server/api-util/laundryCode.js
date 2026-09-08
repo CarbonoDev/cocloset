@@ -36,6 +36,12 @@
 const LISTING_CODE_KEY = 'laundryCode';
 const TRANSACTION_CODE_KEY = 'laundryCode';
 
+// Every code this rental has been given, oldest first, as { code, at }. A SEPARATE key rather
+// than turning TRANSACTION_CODE_KEY into an array: every reader - the ops table, the handover
+// page, the emails - wants the one that is true now, and one place a garment is right now is
+// the honest shape for that. This is the audit trail beside it.
+const TRANSACTION_CODE_HISTORY_KEY = 'laundryCodes';
+
 // Long enough for "A-04 / RACK 12 / BIN 7", short enough that it is a label rather than a
 // note. Studios name their own shelving; this puts no format on it beyond a length and a
 // trim, because inventing one would be inventing somebody else's system.
@@ -134,11 +140,15 @@ const currentLaundryCodeFor = listing => {
 // MUST match LAUNDRY_CODE_STATUSES in src/util/laundryStatuses.js. This is the half that
 // decides whether the code is READ; a step the client asks at and this does not would take an
 // operator's input and drop it silently.
-const takesLaundryCode = status => ['ready-for-pickup', 'pending-cleaning'].includes(status);
+// 'garment-received' is the reception step - see server/api/laundry-receive-garment.js. It
+// replaced 'ready-for-pickup' here when the two were split: by the time a studio marks a
+// garment ready the wash is done and the code was written on the way in.
+const takesLaundryCode = status => ['garment-received', 'pending-cleaning'].includes(status);
 
 module.exports = {
   LISTING_CODE_KEY,
   TRANSACTION_CODE_KEY,
+  TRANSACTION_CODE_HISTORY_KEY,
   MAX_CODE_LENGTH,
   validateLaundryCode,
   buildListingCodeRecord,

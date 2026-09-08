@@ -56,7 +56,16 @@ const baseProps = {
   advanceStatusTransactionId: null,
   advanceStatusError: null,
   onAdvanceStatus: noop,
+  // Required by the confirm dialog's Modal, which calls it on mount whether or not it is open.
+  onManageDisableScrolling: noop,
   scrollingDisabled: false,
+};
+
+// The confirm dialog renders through a portal, so its root has to exist. Clicking the trigger
+// only ASKS - `onHandBackToOwner` fires from the dialog, which is the whole point of it.
+const handBack = async () => {
+  await userEvent.click(screen.getByText('HandBackToOwnerButton.trigger'));
+  await userEvent.click(screen.getByText('HandBackToOwnerButton.confirm'));
 };
 
 describe('LaundryOpsPage', () => {
@@ -147,7 +156,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
         />
       );
@@ -199,12 +208,13 @@ describe('LaundryOpsPage', () => {
       expect(input).toBeInTheDocument();
 
       await user.type(input, 'A-04 / BIN 7');
-      await user.click(screen.getByText('LaundryOpsPage.action.ready-for-pickup'));
+      await user.click(screen.getByText('LaundryOpsPage.action.garment-received'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           transactionId: 'tx-1',
-          status: 'ready-for-pickup',
+          // Reception, not "ready": the wash still has to happen. See laundryActionsFor.
+          status: 'garment-received',
           laundryCode: 'A-04 / BIN 7',
         })
       );
@@ -250,7 +260,7 @@ describe('LaundryOpsPage', () => {
     //   > "se debe preguntar a la laundry los días que necesita para el lavado y que ingrese
     //   >  nuevamente el ticket, por si debe cambiarlo, el valor por default debe ser el
     //   >  ticket anterior"
-    it('asks for both the days and the ticket when processing for cleaning', async () => {
+    it('asks for the ticket when processing for cleaning, and the days at the next step', async () => {
       const user = userEvent.setup();
       render(
         <LaundryOpsPageComponent
@@ -262,13 +272,31 @@ describe('LaundryOpsPage', () => {
 
       await user.click(screen.getByText('LaundryOpsPage.table.open'));
 
-      expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).toBeInTheDocument();
+      // The days moved one step later (Jonathan, 2026-09-08) - "Process for Cleaning" is the
+      // garment joining the queue, and the next button is the work starting.
+      expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).not.toBeInTheDocument();
       const codeBox = document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1');
       expect(codeBox).toBeInTheDocument();
       // Prefilled with the code the garment already carries: the common case is confirming
       // it, not retyping it.
       expect(codeBox).toHaveValue('A-04');
       expect(screen.getByText('LaundryOpsPage.action.pending-cleaning')).toBeInTheDocument();
+    });
+
+    it('asks for the days at the step that says the work has started', async () => {
+      const user = userEvent.setup();
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
+        />
+      );
+
+      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+
+      expect(screen.getByText('LaundryOpsPage.action.cleaning-in-progress')).toBeInTheDocument();
+      expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).toBeInTheDocument();
     });
 
     // A blank box is "not decided yet", never a delete: sending an empty string would ask the
@@ -287,7 +315,7 @@ describe('LaundryOpsPage', () => {
       );
 
       await user.click(screen.getByText('LaundryOpsPage.table.open'));
-      await user.click(screen.getByText('LaundryOpsPage.action.ready-for-pickup'));
+      await user.click(screen.getByText('LaundryOpsPage.action.garment-received'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
         expect.not.objectContaining({ laundryCode: expect.anything() })
@@ -313,7 +341,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
         />
       );
@@ -322,6 +350,39 @@ describe('LaundryOpsPage', () => {
       const input = document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1');
 
       expect(input).toHaveValue(3);
+    });
+
+    // -------------------------------------------------------------------------
+    //   > "debo poder ver el ticket que asigné a la prenda, no el ticket de la transaction en
+    //   >  la columna TICKET (...) el ticket interno de la transaction se debe mostrar solo
+    //   >  como fallback" (Jonathan, 2026-09-08)
+    //
+    // The column is what an operator reads to go and find a garment, and only one of the two
+    // codes answers that.
+    // -------------------------------------------------------------------------
+    it('shows the studio own code in the ticket column', () => {
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ laundryCode: 'A-04', ticketCode: 'PIG-2032' })]}
+        />
+      );
+
+      expect(screen.getByText('A-04')).toBeInTheDocument();
+      expect(screen.queryByText('PIG-2032')).not.toBeInTheDocument();
+    });
+
+    it('falls back to the rental ticket for a garment nobody has named yet', () => {
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ laundryCode: null, ticketCode: 'PIG-2032' })]}
+        />
+      );
+
+      expect(screen.getByText('PIG-2032')).toBeInTheDocument();
     });
 
     it('renders the filter tabs on the Orders screen only', () => {
@@ -455,7 +516,7 @@ describe('LaundryOpsPage', () => {
     });
 
     it('does not offer a damage report at a non-returned step', async () => {
-      const rows = [orderRow({ state: 'returned' })];
+      const rows = [orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
 
@@ -470,7 +531,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
           onAdvanceStatus={onAdvanceStatus}
         />
@@ -480,10 +541,10 @@ describe('LaundryOpsPage', () => {
       // turnaround, so typing into it would append rather than replace.
       await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.type(screen.getByRole('spinbutton'), '5');
-      await userEvent.click(screen.getByText('LaundryOpsPage.action.pending-cleaning'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.cleaning-in-progress'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'pending-cleaning', cleaningDays: 5 })
+        expect.objectContaining({ status: 'cleaning-in-progress', cleaningDays: 5 })
       );
     });
 
@@ -496,14 +557,14 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
           onAdvanceStatus={onAdvanceStatus}
         />
       );
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
       await userEvent.clear(screen.getByRole('spinbutton'));
-      await userEvent.click(screen.getByText('LaundryOpsPage.action.pending-cleaning'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.cleaning-in-progress'));
 
       expect(onAdvanceStatus.mock.calls[0][0]).not.toHaveProperty('cleaningDays');
     });
@@ -513,7 +574,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent
           {...baseProps}
-          orders={[orderRow({ state: 'returned' })]}
+          orders={[orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })]}
           tab="orders"
           onAdvanceStatus={onAdvanceStatus}
         />
@@ -521,7 +582,7 @@ describe('LaundryOpsPage', () => {
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
       await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.type(screen.getByRole('spinbutton'), '0');
-      await userEvent.click(screen.getByText('LaundryOpsPage.action.pending-cleaning'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.action.cleaning-in-progress'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(expect.objectContaining({ cleaningDays: 0 }));
     });
@@ -705,10 +766,11 @@ describe('LaundryOpsPage', () => {
           inventory={inventory}
           tab="inventory"
           onHandBackToOwner={onHandBackToOwner}
-        />
+        />,
+        { withPortals: true }
       );
 
-      await userEvent.click(screen.getByText('LaundryOpsPage.inventory.handBack'));
+      await handBack();
 
       expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
     });
@@ -723,7 +785,7 @@ describe('LaundryOpsPage', () => {
     // transaction at all, so a cancelled rental hid it - and it existed on one screen out of
     // the three where a studio does this work.
     // ---------------------------------------------------------------------------
-    it('offers it when the rental was cancelled', () => {
+    it('offers it when the rental was cancelled', async () => {
       const onHandBackToOwner = jest.fn();
       const inventory = [
         {
@@ -743,12 +805,13 @@ describe('LaundryOpsPage', () => {
           inventory={inventory}
           tab="inventory"
           onHandBackToOwner={onHandBackToOwner}
-        />
+        />,
+        { withPortals: true }
       );
 
-      return userEvent.click(screen.getByText('LaundryOpsPage.inventory.handBack')).then(() => {
-        expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
-      });
+      await handBack();
+
+      expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
     });
 
     it('offers it from the orders worklist too, on the row that was cancelled', async () => {
@@ -761,11 +824,12 @@ describe('LaundryOpsPage', () => {
           orders={[orderRow({ state: 'canceled', onLaundry: true })]}
           tab="orders"
           onHandBackToOwner={onHandBackToOwner}
-        />
+        />,
+        { withPortals: true }
       );
 
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
-      await userEvent.click(screen.getByText('LaundryOpsPage.inventory.handBack'));
+      await handBack();
 
       expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
     });
@@ -782,7 +846,7 @@ describe('LaundryOpsPage', () => {
 
       await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
 
-      expect(screen.queryByText('LaundryOpsPage.inventory.handBack')).not.toBeInTheDocument();
+      expect(screen.queryByText('HandBackToOwnerButton.trigger')).not.toBeInTheDocument();
     });
 
     it('does not offer it on a garment that is out on a rental', () => {
@@ -803,7 +867,7 @@ describe('LaundryOpsPage', () => {
       ];
       render(<LaundryOpsPageComponent {...baseProps} inventory={inventory} tab="inventory" />);
 
-      expect(screen.queryByText('LaundryOpsPage.inventory.handBack')).not.toBeInTheDocument();
+      expect(screen.queryByText('HandBackToOwnerButton.trigger')).not.toBeInTheDocument();
     });
 
     it('does not offer it on a garment the studio is not holding', () => {
@@ -821,7 +885,7 @@ describe('LaundryOpsPage', () => {
       ];
       render(<LaundryOpsPageComponent {...baseProps} inventory={inventory} tab="inventory" />);
 
-      expect(screen.queryByText('LaundryOpsPage.inventory.handBack')).not.toBeInTheDocument();
+      expect(screen.queryByText('HandBackToOwnerButton.trigger')).not.toBeInTheDocument();
     });
 
     it('explains a 409 as an active rental rather than as a generic failure', () => {

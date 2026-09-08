@@ -47,6 +47,7 @@ export { default as AspectRatioWrapper } from './AspectRatioWrapper/AspectRatioW
 export { default as ExternalLink } from './ExternalLink/ExternalLink';
 export { default as ExpandingTextarea } from './ExpandingTextarea/ExpandingTextarea';
 export { default as FileName } from './FileName/FileName';
+export { default as HandBackToOwnerButton } from './HandBackToOwnerButton/HandBackToOwnerButton';
 export { default as HandoverQrCode } from './HandoverQrCode/HandoverQrCode';
 
 export { default as Form } from './Form/Form';

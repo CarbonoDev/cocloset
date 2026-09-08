@@ -30,10 +30,16 @@ const ALL_STATES = Object.values(states);
 describe('the client and server handover step tables agree', () => {
   it('resolve the same step for every state in the process', () => {
     ALL_STATES.forEach(state => {
-      const client = handoverStepFor(state);
-      const server = serverHandoverStepFor(state);
+      // Both halves of the split `accepted` step, since that is now the one place the two
+      // tables could disagree in a way no other state can.
+      [{ onLaundry: false }, { onLaundry: true }].forEach(options => {
+        const client = handoverStepFor(state, options);
+        const server = serverHandoverStepFor(state, options);
 
-      expect(`${state} -> ${JSON.stringify(client)}`).toBe(`${state} -> ${JSON.stringify(server)}`);
+        expect(`${state} ${JSON.stringify(options)} -> ${JSON.stringify(client)}`).toBe(
+          `${state} ${JSON.stringify(options)} -> ${JSON.stringify(server)}`
+        );
+      });
     });
   });
 
@@ -50,7 +56,7 @@ describe('the step table names counter events only', () => {
     // Restated as a set so widening it (to a cleaning sub-phase, say) is a deliberate edit.
     // The cleaning phases are studio-internal: offering a "confirm" there would advance an
     // internal step with nobody handing anything over.
-    const withStep = ALL_STATES.filter(state => !!handoverStepFor(state));
+    const withStep = ALL_STATES.filter(state => !!handoverStepFor(state, { onLaundry: true }));
 
     expect(withStep.sort()).toEqual(
       ['accepted', 'overdue', 'picked-up', 'ready-for-pickup'].sort()
@@ -58,7 +64,9 @@ describe('the step table names counter events only', () => {
   });
 
   it('sends the garment IN from the owner, OUT to the renter, and IN again', () => {
-    expect(handoverStepFor(states.ACCEPTED).counterparty).toBe(HANDOVER_COUNTERPARTY_PROVIDER);
+    expect(handoverStepFor(states.ACCEPTED, { onLaundry: false }).counterparty).toBe(
+      HANDOVER_COUNTERPARTY_PROVIDER
+    );
     expect(handoverStepFor(states.READY_FOR_PICKUP).counterparty).toBe(
       HANDOVER_COUNTERPARTY_CUSTOMER
     );
@@ -76,15 +84,31 @@ describe('the step table names counter events only', () => {
 });
 
 describe('every step drives a status the confirm endpoint accepts', () => {
+  // `garment-received` is the one step that does NOT post there. It fires no transition at
+  // all - it records that the garment reached the studio's rack, and the transaction stays
+  // `accepted` for the length of the initial wash - so it has its own endpoint,
+  // /api/laundry-receive-garment. Named here rather than filtered silently, because the point
+  // of this file is that nothing reaches a counter with a status nobody accepts.
+  const RECEPTION_STATUS = 'garment-received';
+
   it('emits only known laundry statuses', () => {
     // The page posts `step.status` to POST /api/laundry-transaction-status. A status this
     // table invented would 400 at the counter, after the operator had already handed the
     // garment over.
-    ALL_STATES.map(handoverStepFor)
+    ALL_STATES.map(state => handoverStepFor(state, { onLaundry: true }))
       .filter(Boolean)
       .forEach(step => {
         expect(LAUNDRY_STATUSES).toContain(step.status);
       });
+  });
+
+  it('sends the reception step to the endpoint that has no transition to fire', () => {
+    const step = handoverStepFor('accepted', { onLaundry: false });
+
+    expect(step.status).toBe(RECEPTION_STATUS);
+    // Asserted the other way round on purpose: if this status ever DID become a transition,
+    // this test should fail and make somebody decide which endpoint owns it.
+    expect(LAUNDRY_STATUSES).not.toContain(RECEPTION_STATUS);
   });
 });
 

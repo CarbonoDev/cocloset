@@ -293,8 +293,11 @@ describe('writeCustodyMetadata', () => {
     const { sdk, update } = sdkWithListings();
     await writeCustodyMetadata({ integrationSdk: sdk, listingId: LISTING_ID, onLaundry: true });
 
+    // `handedBackAt: null` DELETES the key. Taking custody of a garment has to clear the
+    // departure stamp, or the ops dashboard keeps treating a garment that came back as one
+    // that went home - see isInStudioInventory in server/api/laundry-orders.js.
     expect(update).toHaveBeenCalledWith(
-      { id: LISTING_ID, metadata: { onLaundry: true } },
+      { id: LISTING_ID, metadata: { onLaundry: true, handedBackAt: null } },
       { expand: true }
     );
   });
@@ -302,8 +305,31 @@ describe('writeCustodyMetadata', () => {
   it('omits readyAt when it was not supplied', async () => {
     // A plain handover must not clear a readiness moment it knows nothing about.
     const { sdk, update } = sdkWithListings();
+    await writeCustodyMetadata({
+      integrationSdk: sdk,
+      listingId: LISTING_ID,
+      onLaundry: false,
+      handedBackAt: new Date('2026-09-08T04:00:00.000Z'),
+    });
+    expect(update.mock.calls[0][0].metadata).toEqual({
+      onLaundry: false,
+      handedBackAt: '2026-09-08T04:00:00.000Z',
+    });
+  });
+
+  it('stamps the moment the garment went home, so it can leave the inventory', async () => {
+    //   > "de confirmarse el listing ya no debe aparecer en inventory" (Jonathan, 2026-09-08)
+    //
+    // A handed-back garment and a freshly assigned one both read `onLaundry !== true` -
+    // `writeLaundryAssignment` sets neither flag - so without this stamp the dashboard cannot
+    // tell "it went home" from "it has not arrived yet", and would have to drop one of them
+    // wrongly.
+    const { sdk, update } = sdkWithListings();
     await writeCustodyMetadata({ integrationSdk: sdk, listingId: LISTING_ID, onLaundry: false });
-    expect(update.mock.calls[0][0].metadata).toEqual({ onLaundry: false });
+
+    const { handedBackAt } = update.mock.calls[0][0].metadata;
+    expect(typeof handedBackAt).toBe('string');
+    expect(Number.isNaN(Date.parse(handedBackAt))).toBe(false);
   });
 
   it('stores readyAt as an ISO string', async () => {
@@ -316,6 +342,7 @@ describe('writeCustodyMetadata', () => {
     });
     expect(update.mock.calls[0][0].metadata).toEqual({
       onLaundry: true,
+      handedBackAt: null,
       readyAt: '2026-08-11T14:37:00.000Z',
     });
   });

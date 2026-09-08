@@ -226,7 +226,6 @@ describe('handover-status: who may read it', () => {
 
 describe('handover-status: what it says is next', () => {
   it.each([
-    ['transition/accept', 'accepted', 'ready-for-pickup', 'provider'],
     ['transition/laundry-mark-ready', 'ready-for-pickup', 'picked-up', 'customer'],
     ['transition/laundry-confirm-pickup', 'picked-up', 'returned', 'customer'],
     ['transition/mark-overdue', 'overdue', 'returned', 'customer'],
@@ -237,6 +236,39 @@ describe('handover-status: what it says is next', () => {
       expect(res.body.data.processState).toBe(state);
       expect(res.body.data.step.status).toBe(status);
       expect(res.body.data.step.counterparty).toBe(party);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  //   > "cuando el provider va a entregar una prenda a la laundry, la laundry debe ingresar
+  //   >  un ticket y luego iniciar el proceso de lavado (...) esto solo sucede si onLaundry es
+  //   >  false. Si onLaundry es true, el siguiente paso es del renter" (Jonathan, 2026-09-08)
+  //
+  // `accepted` is the one state that is two different counters. The pair below is the whole
+  // fix: same state, same transition, different next step - and the thing that decides is
+  // where the garment physically is, which the state machine has never known.
+  // ---------------------------------------------------------------------------
+  it('sends a garment still with its owner to the drop-off step', () => {
+    setup({ lastTransition: 'transition/accept', onLaundry: false });
+
+    return run().then(res => {
+      expect(res.body.data.processState).toBe('accepted');
+      expect(res.body.data.step.status).toBe('garment-received');
+      expect(res.body.data.step.counterparty).toBe('provider');
+      // The code is asked for HERE now, on the way in, rather than at "mark ready".
+      expect(res.body.data.takesLaundryCode).toBe(true);
+    });
+  });
+
+  it('sends a garment already on the rack straight to marking it ready', () => {
+    setup({ lastTransition: 'transition/accept', onLaundry: true });
+
+    return run().then(res => {
+      expect(res.body.data.processState).toBe('accepted');
+      expect(res.body.data.step.status).toBe('ready-for-pickup');
+      // Nothing to receive, so nothing to name: this garment already carries this studio's
+      // code from the visit that put it on the shelf.
+      expect(res.body.data.takesLaundryCode).toBe(false);
     });
   });
 

@@ -98,7 +98,8 @@ describe('laundryStatuses', () => {
 
   describe('laundryActionsFor', () => {
     it.each([
-      ['accepted', null, 'ready-for-pickup'],
+      // `accepted` is not in this table any more: it is the one state whose next action
+      // depends on where the garment is, and it has its own tests below.
       ['ready-for-pickup', null, 'picked-up'],
       ['picked-up', null, 'returned'],
       ['overdue', null, 'returned'],
@@ -110,10 +111,42 @@ describe('laundryStatuses', () => {
       // now. It has to have a way out, or the garment never returns to the rack.
       ['cleaning', 'quality-inspection', 'available-for-booking'],
     ])('from state %s (phase %s) offers %s', (state, cleaningPhase, expected) => {
-      const actions = laundryActionsFor(row({ state, cleaningPhase }));
+      const actions = laundryActionsFor(row({ state, cleaningPhase, onLaundry: true }));
       expect(actions).toHaveLength(1);
       expect(actions[0].status).toBe(expected);
       expect(actions[0].labelKey).toBe(`LaundryOpsPage.action.${expected}`);
+    });
+
+    // -------------------------------------------------------------------------
+    //   > "cuando el provider va a entregar una prenda a la laundry, la laundry debe ingresar
+    //   >  un ticket y luego iniciar el proceso de lavado, actualmente su acción es ingresar el
+    //   >  ticket y luego se marca como ready para el renter (...) esto solo sucede si
+    //   >  onLaundry es false" (Jonathan, 2026-09-08)
+    //
+    // Reception and "ready" were one action, so typing a ticket told the renter the garment
+    // was collectable - before it had been washed.
+    // -------------------------------------------------------------------------
+    it('receives the garment first when it is still with its owner', () => {
+      const actions = laundryActionsFor(row({ state: 'accepted', onLaundry: false }));
+
+      expect(actions[0].status).toBe('garment-received');
+      // The code is asked for on the way IN, which is when the garment is on the counter
+      // about to go onto a shelf.
+      expect(actions[0].needsLaundryCode).toBe(true);
+    });
+
+    it('treats a missing flag as "not here", so the wash is never skipped', () => {
+      // The dangerous direction: guessing that a garment is already on the rack would mark it
+      // ready without anybody having washed it.
+      expect(laundryActionsFor(row({ state: 'accepted' }))[0].status).toBe('garment-received');
+    });
+
+    it('goes straight to marking a garment ready when the studio already has it', () => {
+      const actions = laundryActionsFor(row({ state: 'accepted', onLaundry: true }));
+
+      expect(actions[0].status).toBe('ready-for-pickup');
+      // Nothing to receive, so nothing to name - it already carries this studio's code.
+      expect(actions[0].needsLaundryCode).toBe(false);
     });
 
     it('offers the same step from picked-up and from overdue - the server picks the transition', () => {
@@ -180,11 +213,19 @@ describe('laundryStatuses', () => {
     //   > "1. Confirm return, donde solo se cambia de estado y una vez hecho esto, se debe
     //   >  preguntar a la laundry los días que necesita para el lavado" (Jonathan, 2026-09-03)
     it('asks for the cleaning days when the wash starts, not when the garment arrives', () => {
-      // Confirming the return is one thing now: the garment is back. The estimate belongs to
-      // the step where the studio actually starts working on it.
-      expect(laundryActionsFor(row({ state: 'returned' }))[0].needsCleaningDays).toBe(true);
+      //   > "luego de ahi viene otro paso con un unico button 'Mark cleaning in progress', en
+      //   >  ese paso es cuando se pregunta el número de días de lavado" (Jonathan, 2026-09-08)
+      //
+      // Confirming the return is one thing: the garment is back. "Process for Cleaning" is the
+      // second: it joins the queue. The estimate belongs to the third, which is the studio
+      // saying the work has started - a garment can sit in a queue for a day, and those are
+      // not days of work.
+      expect(
+        laundryActionsFor(row({ state: 'cleaning', cleaningPhase: 'pending-cleaning' }))[0]
+          .needsCleaningDays
+      ).toBe(true);
 
-      ['picked-up', 'overdue'].forEach(state => {
+      ['picked-up', 'overdue', 'returned'].forEach(state => {
         expect(laundryActionsFor(row({ state }))[0].needsCleaningDays).toBeFalsy();
       });
     });

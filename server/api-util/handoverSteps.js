@@ -18,6 +18,17 @@ const HANDOVER_COUNTERPARTY_CUSTOMER = 'customer';
 const HANDOVER_DIRECTION_IN = 'in';
 const HANDOVER_DIRECTION_OUT = 'out';
 
+// See the client copy for why this one step is not a function of the state alone.
+const HANDOVER_STEP_DROP_OFF = 'accepted-drop-off';
+
+const DROP_OFF_STEP = {
+  state: STATES.ACCEPTED,
+  stepKey: HANDOVER_STEP_DROP_OFF,
+  status: 'garment-received',
+  counterparty: HANDOVER_COUNTERPARTY_PROVIDER,
+  direction: HANDOVER_DIRECTION_IN,
+};
+
 const STEPS = {
   [STATES.ACCEPTED]: {
     state: STATES.ACCEPTED,
@@ -50,11 +61,19 @@ const STEPS = {
  * The next handover step for a transaction in this state.
  *
  * @param {string} [processState]
+ * @param {Object} [options]
+ * @param {boolean} [options.onLaundry] - is the garment already on the studio's rack?
  * @returns {Object|null} null when nothing is due at the counter
  */
-const handoverStepFor = processState => STEPS[processState] || null;
+const handoverStepFor = (processState, options = {}) => {
+  if (processState === STATES.ACCEPTED && options.onLaundry !== true) {
+    return DROP_OFF_STEP;
+  }
+  return STEPS[processState] || null;
+};
 
 module.exports = {
+  HANDOVER_STEP_DROP_OFF,
   HANDOVER_COUNTERPARTY_PROVIDER,
   HANDOVER_COUNTERPARTY_CUSTOMER,
   HANDOVER_DIRECTION_IN,

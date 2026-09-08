@@ -24,6 +24,7 @@ const createAvailabilityBuffer = require('./api/create-availability-buffer');
 const laundryTransactionStatus = require('./api/laundry-transaction-status');
 const listingReadinessStatus = require('./api/listing-readiness-status');
 const listingCustodyStatus = require('./api/listing-custody-status');
+const laundryReceiveGarment = require('./api/laundry-receive-garment');
 const listingLaundryAssignment = require('./api/listing-laundry-assignment');
 const listingInitialCleaning = require('./api/listing-initial-cleaning');
 const laundryAddress = require('./api/laundry-address');
@@ -85,6 +86,10 @@ router.get('/brands', brands);
 router.post('/create-availability-buffer', createAvailabilityBuffer);
 router.post('/laundry-transaction-status', laundryTransactionStatus);
 router.post('/listing-readiness-status', listingReadinessStatus);
+// The studio taking a garment IN from its owner at the start of a rental: the step that used
+// to be fused onto "ready for the renter", which announced a coat as collectable before it
+// had been washed. See server/api/laundry-receive-garment.js.
+router.post('/laundry-receive-garment', laundryReceiveGarment);
 // Garment custody (`listing.metadata.onLaundry`) - writable by the assigned
 // laundry OR the listing's owner, and only while the listing has no active
 // transaction. See server/api/listing-custody-status.js.

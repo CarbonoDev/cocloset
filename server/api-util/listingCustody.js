@@ -292,13 +292,35 @@ const assertNoActiveTransaction = ({ integrationSdk, listingId }) =>
  * @param {Object} params
  * @param {Object} params.integrationSdk
  * @param {Object|string} params.listingId
+ * `handedBackAt` is written from `onLaundry` rather than passed in, and it is what the ops
+ * dashboard uses to tell the two garments that both read `onLaundry !== true` apart: one has
+ * never arrived, the other has gone home. Without it a handed-back garment is
+ * indistinguishable from a freshly assigned one - `writeLaundryAssignment` sets neither flag -
+ * and the studio's inventory would either keep listing garments that left or lose the ones it
+ * is still waiting for. See `isInStudioInventory` in server/api/laundry-orders.js.
+ *
+ * Taking custody CLEARS it (null deletes the key), so a garment the owner brings back is an
+ * ordinary garment again rather than one carrying a stale departure date. That includes the
+ * implicit writer on `laundry-confirm-return`, which is exactly right: the garment is here.
+ *
+ * @param {Object} params
+ * @param {Object} params.integrationSdk
+ * @param {Object|string} params.listingId
  * @param {boolean} params.onLaundry
  * @param {Date} [params.readyAt]
- * @returns {Promise<{onLaundry: boolean, readyAt: string|undefined}>}
+ * @param {Date} [params.handedBackAt] - defaults to now on a hand-back; injectable for tests
+ * @returns {Promise<{onLaundry: boolean, readyAt: string|undefined, handedBackAt: string|null}>}
  */
-const writeCustodyMetadata = ({ integrationSdk, listingId, onLaundry, readyAt }) => {
+const writeCustodyMetadata = ({
+  integrationSdk,
+  listingId,
+  onLaundry,
+  readyAt,
+  handedBackAt = new Date(),
+}) => {
   const metadata = {
     onLaundry,
+    handedBackAt: onLaundry === false ? handedBackAt.toISOString() : null,
     ...(readyAt ? { readyAt: readyAt.toISOString() } : {}),
   };
 

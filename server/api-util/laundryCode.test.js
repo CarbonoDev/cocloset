@@ -105,9 +105,14 @@ describe('takesLaundryCode', () => {
   it('is the reception from the owner, and only that', () => {
     // The one moment the garment is on the counter about to go onto a shelf. Every step after
     // it only reads the code.
-    expect(takesLaundryCode('ready-for-pickup')).toBe(true);
-    ['picked-up', 'returned', 'cleaning', 'available', undefined].forEach(status => {
-      expect(takesLaundryCode(status)).toBe(false);
-    });
+    expect(takesLaundryCode('garment-received')).toBe(true);
+    // NOT 'ready-for-pickup' any more. Reception and "ready" were one step until the initial
+    // wash was split out of it (server/api/laundry-receive-garment.js); by the time a studio
+    // marks a garment ready the wash is done and the code was written on the way in.
+    ['ready-for-pickup', 'picked-up', 'returned', 'cleaning', 'available', undefined].forEach(
+      status => {
+        expect(takesLaundryCode(status)).toBe(false);
+      }
+    );
   });
 });

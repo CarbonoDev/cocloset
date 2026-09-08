@@ -238,7 +238,7 @@
                             <tr>
                               <td>
                                 <td>
-                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{t "BookingNewRequest.PriceForDaysQuantity" "{amount, number, ::.00} {currency} × {units, number} {units, plural, one {day} other {days}}" amount=unit-price.amount currency=unit-price.currency units=quantity}}</p>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{#if @root.transaction.protected-data.bookingWeeks}}{{t "BookingNewRequest.PriceForWeeksQuantity" "{amount, number, ::.00} {currency} × {weeks, number} {weeks, plural, one {week} other {weeks}}" amount=unit-price.amount currency=unit-price.currency weeks=@root.transaction.protected-data.bookingWeeks}}{{else}}{{#if ../protected-data.bookingWeeks}}{{t "BookingNewRequest.PriceForWeeksQuantity" "{amount, number, ::.00} {currency} × {weeks, number} {weeks, plural, one {week} other {weeks}}" amount=unit-price.amount currency=unit-price.currency weeks=../protected-data.bookingWeeks}}{{else}}{{t "BookingNewRequest.PriceForDaysQuantity" "{amount, number, ::.00} {currency} × {units, number} {units, plural, one {day} other {days}}" amount=unit-price.amount currency=unit-price.currency units=quantity}}{{/if}}{{/if}}</p>
                                 </td>
                                 <td style="text-align:right">
                                   <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{> format-money money=line-total}}</p>

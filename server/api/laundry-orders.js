@@ -234,6 +234,10 @@ const listingFields = (listing, included, laundryPrivateData) => {
     imageUrl: listingImageUrl(listing, included),
     ownerName: displayNameOf(author),
     readinessStatus: attrs.metadata?.readinessStatus || null,
+    // When the studio last handed this garment back to its owner, if it ever did. See
+    // isInStudioInventory - it is the only thing that distinguishes a garment that left from
+    // one that has not arrived yet.
+    handedBackAt: attrs.metadata?.handedBackAt || null,
     currentRack: attrs.privateData?.currentRack || null,
     // Physical custody and the readiness moment a real return produced. Emitted
     // on BOTH row kinds because both questions are about the garment, not about
@@ -258,6 +262,35 @@ const listingFields = (listing, included, laundryPrivateData) => {
     }),
   };
 };
+
+/**
+ * Is this garment part of the studio's inventory right now?
+ *
+ *   > "de confirmarse el listing ya no debe aparecer en inventory" (Jonathan, 2026-09-08)
+ *
+ * Inventory is what the studio is holding plus what it is expecting - not everything ever
+ * assigned to it, which is what it used to be. A garment handed back to its owner is neither,
+ * and leaving it on the grid makes the studio's stock list a list of garments that are not in
+ * the building.
+ *
+ * THE HARD PART IS NOT "is it here". It is telling apart the two garments that both read
+ * `onLaundry !== true`: one has been handed back, the other has just been assigned and is on
+ * its way. `writeLaundryAssignment` writes no custody or readiness flag at all, so those two
+ * are byte-identical until something records the departure - which is why
+ * `writeCustodyMetadata` stamps `handedBackAt`, and clears it again on the way back in.
+ *
+ * The alternative was to infer it from `readinessStatus` being `stored`/`available` on a
+ * garment nobody is holding. Rejected: that is a guess about data another endpoint writes for
+ * a different purpose, and it would silently hide every garment whose custody flag was never
+ * set - the incoming ones the studio most needs to see.
+ *
+ * Deliberately NOT applied to `orders`: that list is the §8 union of work, and a rental's
+ * history does not stop being the studio's because the garment went home.
+ *
+ * @param {Object} base - a record from listingFields
+ * @returns {boolean}
+ */
+const isInStudioInventory = base => base?.onLaundry === true || !base?.handedBackAt;
 
 const transactionRow = (transaction, txIncluded, listingBase) => {
   const attrs = transaction.attributes || {};
@@ -383,17 +416,19 @@ module.exports = (req, res) => {
         }
 
         // Inventory is per-garment, not per-booking: always exactly one row per
-        // assigned listing, annotated with its most recent transaction's state
-        // so the card grid can show a status badge (mockup 04.jpg).
+        // assigned listing that the studio is holding or expecting, annotated with its most
+        // recent transaction's state so the card grid can show a status badge (mockup 04.jpg).
         const latest = rows[0] || null;
-        inventory.push({
-          ...base,
-          id: `listing:${base.listingId}`,
-          ticketCode: latest?.ticketCode || null,
-          state: latest?.state || null,
-          cleaningPhase: latest?.cleaningPhase || null,
-          transactionId: latest?.transactionId || null,
-        });
+        if (isInStudioInventory(base)) {
+          inventory.push({
+            ...base,
+            id: `listing:${base.listingId}`,
+            ticketCode: latest?.ticketCode || null,
+            state: latest?.state || null,
+            cleaningPhase: latest?.cleaningPhase || null,
+            transactionId: latest?.transactionId || null,
+          });
+        }
       });
 
       res
