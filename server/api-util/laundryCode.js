@@ -134,7 +134,10 @@ const currentLaundryCodeFor = listing => {
 // MUST match LAUNDRY_CODE_STATUSES in src/util/laundryStatuses.js. This is the half that
 // decides whether the code is READ; a step the client asks at and this does not would take an
 // operator's input and drop it silently.
-const takesLaundryCode = status => ['ready-for-pickup', 'pending-cleaning'].includes(status);
+// 'garment-received' is the reception step - see server/api/laundry-receive-garment.js. It
+// replaced 'ready-for-pickup' here when the two were split: by the time a studio marks a
+// garment ready the wash is done and the code was written on the way in.
+const takesLaundryCode = status => ['garment-received', 'pending-cleaning'].includes(status);
 
 module.exports = {
   LISTING_CODE_KEY,

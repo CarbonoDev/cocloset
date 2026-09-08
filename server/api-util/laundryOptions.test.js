@@ -51,9 +51,7 @@ describe('buildLaundryOptions', () => {
   //   > "filtremos por laundry pero usando el nombre del vecindario que tenga en su
   //   >  dirección, solo es cambiar el label en las opciones de búsqueda"
   it('carries the neighbourhood when the studio has given one', () => {
-    const [option] = buildLaundryOptions([
-      laundryUser('l1', 'Maison du Marais', {}, 'Le Marais'),
-    ]);
+    const [option] = buildLaundryOptions([laundryUser('l1', 'Maison du Marais', {}, 'Le Marais')]);
     expect(option.neighborhood).toBe('Le Marais');
     // The name still goes too: it is the fallback label, and it is what every listing card
     // and every email prints.

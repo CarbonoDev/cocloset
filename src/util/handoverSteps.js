@@ -53,6 +53,34 @@ export const HANDOVER_DIRECTION_OUT = 'out'; // the garment leaves the studio
  * them yields null - the page then says "nothing to hand over right now" instead of offering
  * a button that would advance an internal phase by accident.
  */
+// THE ONE STEP THAT IS NOT A FUNCTION OF THE STATE ALONE.
+//
+//   > "cuando el provider va a entregar una prenda a la laundry, la laundry debe ingresar un
+//   >  ticket y luego iniciar el proceso de lavado (...) esto solo sucede si onLaundry es
+//   >  false. Si onLaundry es true, el siguiente paso es del renter quien va a laundry a
+//   >  recoger la prenda que ya esta lista previamente" (Jonathan, 2026-09-08)
+//
+// `accepted` covers two different counters. When the garment is at its owner's home the
+// studio is about to take it IN and wash it; when the garment is already on the studio's rack
+// there is nobody to receive and the only thing left is to say it is ready. The state cannot
+// tell them apart - which is the whole reason reception and "ready" were one button, and why
+// a customer was told a coat was collectable before it had been washed.
+//
+// The discriminator is `listing.metadata.onLaundry`, and that is not a second source of
+// truth for the handover (see the note above): it is not a record of a counter event at all,
+// it is where the garment physically is. The state machine has never known that.
+export const HANDOVER_STEP_DROP_OFF = 'accepted-drop-off';
+
+const DROP_OFF_STEP = {
+  state: states.ACCEPTED,
+  // Its own key, because it is its own instruction. "Take the garment in and start the wash"
+  // and "mark it ready to collect" share a state and share nothing else.
+  stepKey: HANDOVER_STEP_DROP_OFF,
+  status: 'garment-received',
+  counterparty: HANDOVER_COUNTERPARTY_PROVIDER,
+  direction: HANDOVER_DIRECTION_IN,
+};
+
 const STEPS = {
   [states.ACCEPTED]: {
     state: states.ACCEPTED,
@@ -89,9 +117,16 @@ const STEPS = {
  * The next handover step for a transaction in this state.
  *
  * @param {string} [processState] - a `cocloset-booking` state name
+ * @param {Object} [options]
+ * @param {boolean} [options.onLaundry] - is the garment already on the studio's rack?
  * @returns {Object|null} the step, or null when nothing is due at the counter
  */
-export const handoverStepFor = processState => STEPS[processState] || null;
+export const handoverStepFor = (processState, options = {}) => {
+  if (processState === states.ACCEPTED && options.onLaundry !== true) {
+    return DROP_OFF_STEP;
+  }
+  return STEPS[processState] || null;
+};
 
 /**
  * Translation key for the heading of a step.
@@ -104,7 +139,8 @@ export const handoverStepFor = processState => STEPS[processState] || null;
  * @param {string} suffix - e.g. 'title', 'instruction'
  * @returns {string}
  */
-export const handoverStepMessageId = (step, suffix) => `HandoverPage.step.${step.state}.${suffix}`;
+export const handoverStepMessageId = (step, suffix) =>
+  `HandoverPage.step.${step.stepKey || step.state}.${suffix}`;
 
 /**
  * Is this viewer the counterparty of this step?

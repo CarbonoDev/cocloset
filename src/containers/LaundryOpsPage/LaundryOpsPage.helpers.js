@@ -168,7 +168,10 @@ export const filterBySearch = (rows, query) => {
     return rows;
   }
   return rows.filter(r =>
-    [r.ticketCode, r.customerName, r.ownerName, r.title, r.brand, r.currentRack]
+    // `laundryCode` is now what the TICKET column shows, so it has to be searchable - an
+    // operator typing what is on screen and getting nothing back reads as a broken box.
+    // `ticketCode` stays searchable too: it is still the fallback the column falls back TO.
+    [r.laundryCode, r.ticketCode, r.customerName, r.ownerName, r.title, r.brand, r.currentRack]
       .filter(Boolean)
       .some(field => field.toLowerCase().includes(q))
   );

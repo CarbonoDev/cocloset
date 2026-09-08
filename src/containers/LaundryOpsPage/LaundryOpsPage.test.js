@@ -208,12 +208,13 @@ describe('LaundryOpsPage', () => {
       expect(input).toBeInTheDocument();
 
       await user.type(input, 'A-04 / BIN 7');
-      await user.click(screen.getByText('LaundryOpsPage.action.ready-for-pickup'));
+      await user.click(screen.getByText('LaundryOpsPage.action.garment-received'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           transactionId: 'tx-1',
-          status: 'ready-for-pickup',
+          // Reception, not "ready": the wash still has to happen. See laundryActionsFor.
+          status: 'garment-received',
           laundryCode: 'A-04 / BIN 7',
         })
       );
@@ -296,7 +297,7 @@ describe('LaundryOpsPage', () => {
       );
 
       await user.click(screen.getByText('LaundryOpsPage.table.open'));
-      await user.click(screen.getByText('LaundryOpsPage.action.ready-for-pickup'));
+      await user.click(screen.getByText('LaundryOpsPage.action.garment-received'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
         expect.not.objectContaining({ laundryCode: expect.anything() })
@@ -331,6 +332,39 @@ describe('LaundryOpsPage', () => {
       const input = document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1');
 
       expect(input).toHaveValue(3);
+    });
+
+    // -------------------------------------------------------------------------
+    //   > "debo poder ver el ticket que asigné a la prenda, no el ticket de la transaction en
+    //   >  la columna TICKET (...) el ticket interno de la transaction se debe mostrar solo
+    //   >  como fallback" (Jonathan, 2026-09-08)
+    //
+    // The column is what an operator reads to go and find a garment, and only one of the two
+    // codes answers that.
+    // -------------------------------------------------------------------------
+    it('shows the studio own code in the ticket column', () => {
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ laundryCode: 'A-04', ticketCode: 'PIG-2032' })]}
+        />
+      );
+
+      expect(screen.getByText('A-04')).toBeInTheDocument();
+      expect(screen.queryByText('PIG-2032')).not.toBeInTheDocument();
+    });
+
+    it('falls back to the rental ticket for a garment nobody has named yet', () => {
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          tab="orders"
+          orders={[orderRow({ laundryCode: null, ticketCode: 'PIG-2032' })]}
+        />
+      );
+
+      expect(screen.getByText('PIG-2032')).toBeInTheDocument();
     });
 
     it('renders the filter tabs on the Orders screen only', () => {

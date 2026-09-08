@@ -107,6 +107,7 @@
   "BookingNewRequest.PriceForHoursQuantityWithSeats": "{amount, number, ::.00} {currency} × {units, number} {units, plural, one {hour} other {hours}} x {seats, number} {seats, plural, one {seat} other {seats}}",
   "BookingNewRequest.PriceForNightsQuantity": "{amount, number, ::.00} {currency} × {units, number} {units, plural, one {night} other {nights}}",
   "BookingNewRequest.PriceForNightsQuantityWithSeats": "{amount, number, ::.00} {currency} × {units, number} {units, plural, one {night} other {nights}} x {seats, number} {seats, plural, one {seat} other {seats}}",
+  "BookingNewRequest.PriceForWeeksQuantity": "{amount, number, ::.00} {currency} × {weeks, number} {weeks, plural, one {week} other {weeks}}",
   "BookingNewRequest.StartLabel": "Start",
   "BookingNewRequest.Subject": "{customerDisplayName} requested to book {listingTitle}",
   "BookingNewRequest.Title": "You have a new booking request for {listingTitle}",

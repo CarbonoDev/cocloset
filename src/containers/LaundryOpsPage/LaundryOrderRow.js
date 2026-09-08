@@ -180,7 +180,18 @@ const LaundryOrderRow = props => {
           replacement for one - and `.row`'s existing hover already says it is live. */}
       <tr className={css.row} onClick={toggleOpen}>
         <td className={css.cellNoWrap}>
-          <span className={css.primaryText}>{row.ticketCode || '—'}</span>
+          {/* THE STUDIO'S OWN CODE FIRST.
+                > "en la tabla de orders como laundry, debo poder ver el ticket que asigné a
+                >  la prenda, no el ticket de la transaction en la columna TICKET (...) el
+                >  ticket interno de la transaction se debe mostrar solo como fallback"
+                >   (Jonathan, 2026-09-08)
+
+              This column is what an operator reads to go and find a garment, and only one of
+              the two codes answers that: `laundryCode` is what this studio wrote on it and
+              where it sits on their shelving. `ticketCode` identifies the rental - useful
+              when nothing has been named yet, useless for finding a coat. Same order the
+              inventory grid already uses. */}
+          <span className={css.primaryText}>{row.laundryCode || row.ticketCode || '—'}</span>
           <span className={css.secondaryText}>{row.currentRack || '—'}</span>
         </td>
         <td className={css.cell}>

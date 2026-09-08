@@ -325,6 +325,14 @@ export const updateListingReadinessStatus = body => {
 // endpoint from listing-readiness-status rather than a branch inside it.
 //
 // Body: { listingId, onLaundry }
+// The studio taking a garment IN from its owner at the start of a rental: ticket, then the
+// wash. Its own endpoint rather than a status on /api/laundry-transaction-status, because it
+// fires no transition at all - the transaction stays `accepted` until the garment is ready.
+// See server/api/laundry-receive-garment.js.
+export const receiveGarmentAtLaundry = body => {
+  return post('/api/laundry-receive-garment', body);
+};
+
 export const updateListingCustodyStatus = body => {
   return post('/api/listing-custody-status', body);
 };

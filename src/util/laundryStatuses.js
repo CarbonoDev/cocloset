@@ -92,6 +92,11 @@ export const isGarmentAtLaundry = readinessStatus =>
  * server/api-util/coclosetBookingProcess.js.
  */
 export const LAUNDRY_ACTION_STATUSES = [
+  // NOT a transition, and the only one here that is not. Reception is a custody write on the
+  // listing, posted to /api/laundry-receive-garment - see that file for why the transaction
+  // stays in `accepted` while the garment is being washed. It is in this list because it is
+  // one of the steps a studio advances through, and the screens speak one vocabulary.
+  'garment-received',
   'ready-for-pickup',
   'picked-up',
   'returned',
@@ -140,7 +145,7 @@ export const CLEANING_DAYS_STATUS = 'pending-cleaning';
 // ignores would take an operator's input and drop it silently. That is exactly what the ops
 // table did once already: the handover page asked, this one did not, so the same reception
 // done from a desk lost the code with nothing on screen to say so.
-export const LAUNDRY_CODE_STATUSES = ['ready-for-pickup', 'pending-cleaning'];
+export const LAUNDRY_CODE_STATUSES = ['garment-received', 'pending-cleaning'];
 
 export const takesLaundryCode = status => LAUNDRY_CODE_STATUSES.includes(status);
 
@@ -250,8 +255,18 @@ export const laundryActionsFor = row => {
 
   const nextStatus = (() => {
     switch (row.state) {
+      // TWO COUNTERS, ONE STATE.
+      //
+      //   > "cuando el provider va a entregar una prenda a la laundry, la laundry debe
+      //   >  ingresar un ticket y luego iniciar el proceso de lavado (...) esto solo sucede si
+      //   >  onLaundry es false. Si onLaundry es true, el siguiente paso es del renter"
+      //   >   (Jonathan, 2026-09-08)
+      //
+      // A garment that is still with its owner has to be taken in and washed before anyone
+      // can be told it is ready; a garment already on the rack is ready now. Fusing the two
+      // is what announced a coat as collectable the moment its ticket was typed.
       case 'accepted':
-        return 'ready-for-pickup';
+        return row.onLaundry === true ? 'ready-for-pickup' : 'garment-received';
       case 'ready-for-pickup':
         return 'picked-up';
       // Both of these mean "the garment is out with the customer"; the server
