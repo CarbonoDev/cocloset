@@ -2,7 +2,7 @@ import React from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../util/reactIntl';
-import { opsStatus, statusLabelKey } from '../../util/laundryStatuses';
+import { canHandBackToOwner, statusLabelKey } from '../../util/laundryStatuses';
 
 import { statusTone } from './LaundryOpsPage.helpers';
 import css from './LaundryOpsPage.module.css';
@@ -23,9 +23,8 @@ import css from './LaundryOpsPage.module.css';
 // renting it. The server is the authority - it answers 409 while the listing has an active
 // transaction, which is what enforces "una vez que finalice la limpieza" - but offering a
 // button that is going to be refused is its own kind of wrong, so the card asks the same
-// question from what it already knows.
-const canHandBack = item => item.onLaundry === true && !opsStatus(item);
-
+// question from what it already knows. Shared with the orders table and the handover page,
+// because the same garment has to answer the same way on all three (util/laundryStatuses.js).
 const LaundryInventory = props => {
   const { inventory, onHandBackToOwner, handBackListingId, handBackError } = props;
 
@@ -99,7 +98,7 @@ const LaundryInventory = props => {
                 owner collects. Until this button existed the flag could only ever be set to
                 true, so a garment that went home stayed in the studio's inventory forever -
                 and its laundry could never be reassigned. */}
-              {canHandBack(item) ? (
+              {canHandBackToOwner(item) ? (
                 <button
                   type="button"
                   className={css.handBackButton}

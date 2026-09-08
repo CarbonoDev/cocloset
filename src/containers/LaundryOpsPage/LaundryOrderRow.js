@@ -4,6 +4,7 @@ import classNames from 'classnames';
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import {
   MAX_LAUNDRY_CODE_LENGTH,
+  canHandBackToOwner,
   laundryActionsFor,
   statusLabelKey,
 } from '../../util/laundryStatuses';
@@ -45,11 +46,13 @@ const lastBookedDayIso = isoString => {
  * @param {Object} props.row - a row from the /api/laundry-orders response
  * @param {Function} props.onAdvanceStatus - ({transactionId, status, damaged, damageNote}) => void
  * @param {boolean} props.advanceInProgress - true while this row's update is in flight
+ * @param {Function} [props.onHandBackToOwner] - ({listingId}) => void
+ * @param {boolean} [props.handBackInProgress] - true while this garment's hand-back is in flight
  * @returns {JSX.Element}
  */
 const LaundryOrderRow = props => {
   const intl = useIntl();
-  const { row, onAdvanceStatus, advanceInProgress } = props;
+  const { row, onAdvanceStatus, advanceInProgress, onHandBackToOwner, handBackInProgress } = props;
 
   const [isOpen, setIsOpen] = useState(false);
   const [damaged, setDamaged] = useState(false);
@@ -98,6 +101,11 @@ const LaundryOrderRow = props => {
   // rows (§8's listings with no booking) move via the readiness endpoint on
   // the Inventory screen instead.
   const action = laundryActionsFor(row)[0] || null;
+
+  // A row with no `listingId` cannot be handed back whatever its state says - there is
+  // nothing to write to. `onHandBackToOwner` is optional so this row stays renderable in
+  // contexts that do not wire the custody write.
+  const showHandBack = !!onHandBackToOwner && !!row.listingId && canHandBackToOwner(row);
 
   // NO QR ON THE LAUNDRY'S SCREENS.
   //
@@ -378,11 +386,35 @@ const LaundryOrderRow = props => {
                       <FormattedMessage id={action.labelKey} />
                     </PrimaryButton>
                   </div>
-                ) : (
+                ) : showHandBack ? null : (
                   <p className={css.detailLine}>
                     <FormattedMessage id="LaundryOpsPage.detail.noAdvance" />
                   </p>
                 )}
+
+                {/* HANDING IT BACK, FROM THE WORKLIST TOO.
+                      > "el botón para devolver la prenda en el lado de laundry debe aparecer
+                      >  en order, handover o inventory" (Jonathan, 2026-09-07)
+
+                    The same button as the inventory card and the counter phone, with the same
+                    label and the same write. A studio that has the rental open in front of it
+                    - which is where a cancellation is read about - should not have to go and
+                    find the garment on another screen to release it. */}
+                {showHandBack ? (
+                  <div className={css.advance}>
+                    <p className={css.detailLine}>
+                      <FormattedMessage id="LaundryOpsPage.detail.handBackHint" />
+                    </p>
+                    <button
+                      type="button"
+                      className={css.handBackButton}
+                      disabled={handBackInProgress}
+                      onClick={() => onHandBackToOwner({ listingId: row.listingId })}
+                    >
+                      <FormattedMessage id="LaundryOpsPage.inventory.handBack" />
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           </td>

@@ -713,6 +713,78 @@ describe('LaundryOpsPage', () => {
       expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
     });
 
+    // ---------------------------------------------------------------------------
+    //   > "el botón para devolver la prenda en el lado de laundry debe aparecer en order,
+    //   >  handover o inventory"
+    //   > "si la transacción aparece como cancelada tambien puedo devolver la prenda"
+    //   >   (Jonathan, 2026-09-07)
+    //
+    // Both halves of what the client reported. The button was gated on the garment having NO
+    // transaction at all, so a cancelled rental hid it - and it existed on one screen out of
+    // the three where a studio does this work.
+    // ---------------------------------------------------------------------------
+    it('offers it when the rental was cancelled', () => {
+      const onHandBackToOwner = jest.fn();
+      const inventory = [
+        {
+          id: 'listing:1',
+          listingId: 'listing-1',
+          title: 'Camel hair wrap coat',
+          onLaundry: true,
+          readinessStatus: 'available',
+          state: 'canceled',
+          cleaningPhase: null,
+          imageUrl: null,
+        },
+      ];
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          inventory={inventory}
+          tab="inventory"
+          onHandBackToOwner={onHandBackToOwner}
+        />
+      );
+
+      return userEvent.click(screen.getByText('LaundryOpsPage.inventory.handBack')).then(() => {
+        expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
+      });
+    });
+
+    it('offers it from the orders worklist too, on the row that was cancelled', async () => {
+      // The screen a studio is looking at when it reads that a rental was cancelled. Sending
+      // it to another tab to release the garment is the trip this removes.
+      const onHandBackToOwner = jest.fn();
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          orders={[orderRow({ state: 'canceled', onLaundry: true })]}
+          tab="orders"
+          onHandBackToOwner={onHandBackToOwner}
+        />
+      );
+
+      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByText('LaundryOpsPage.inventory.handBack'));
+
+      expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
+    });
+
+    it('does not offer it on a worklist row whose rental is still running', async () => {
+      render(
+        <LaundryOpsPageComponent
+          {...baseProps}
+          orders={[orderRow({ state: 'cleaning', onLaundry: true })]}
+          tab="orders"
+          onHandBackToOwner={jest.fn()}
+        />
+      );
+
+      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+
+      expect(screen.queryByText('LaundryOpsPage.inventory.handBack')).not.toBeInTheDocument();
+    });
+
     it('does not offer it on a garment that is out on a rental', () => {
       // The server refuses with 409 anyway - `cleaning` counts as an active transaction and
       // `delivered` does not, which is what enforces "una vez que finalice la limpieza" -

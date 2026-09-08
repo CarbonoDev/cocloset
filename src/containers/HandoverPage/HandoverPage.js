@@ -18,7 +18,7 @@ import { H3, Page, PrimaryButton, LayoutSingleColumn, NamedLink } from '../../co
 import TopbarContainer from '../TopbarContainer/TopbarContainer';
 import FooterContainer from '../FooterContainer/FooterContainer';
 
-import { confirmHandover } from './HandoverPage.duck';
+import { confirmHandover, handBackToOwner } from './HandoverPage.duck';
 import css from './HandoverPage.module.css';
 
 /**
@@ -100,6 +100,9 @@ export const HandoverPageComponent = props => {
     confirmInProgress,
     confirmError,
     onConfirm,
+    handBackInProgress,
+    handBackError,
+    onHandBack,
   } = props;
 
   // How long the studio will need to clean this garment, asked for at the moment it comes
@@ -217,6 +220,8 @@ export const HandoverPageComponent = props => {
       step,
       viewerRole,
       canConfirm,
+      canHandBack,
+      listingId,
       processState,
       listingTitle,
       ticketCode,
@@ -474,6 +479,46 @@ export const HandoverPageComponent = props => {
             <FormattedMessage id={instructionMessageId(step, viewerRole)} />
           </p>
         )}
+
+        {/* HANDING THE GARMENT BACK TO ITS OWNER.
+              > "el botón para devolver la prenda en el lado de laundry debe aparecer en
+              >  order, handover o inventory" (Jonathan, 2026-09-07)
+
+            A SIBLING of the confirm block, not a branch of it, because the two answer
+            different questions and both can be true. `canConfirm` is about the rental; this
+            is about the garment, and the case that put it here is a rental that ended -
+            cancelled, or finished - with the garment still on the shelf. That is exactly when
+            there is no step to confirm and the page would otherwise be a dead end.
+
+            `canHandBack` is the SERVER's answer, on the same terms as `canConfirm`: this
+            component does not re-derive who may write custody. */}
+        {canHandBack && listingId ? (
+          <div className={css.handBack}>
+            <p className={css.instruction}>
+              <FormattedMessage id="HandoverPage.handBack.hint" />
+            </p>
+            {handBackError ? (
+              <p className={css.error}>
+                <FormattedMessage
+                  id={
+                    handBackError?.status === 409
+                      ? 'HandoverPage.handBack.activeRental'
+                      : 'HandoverPage.handBack.failed'
+                  }
+                />
+              </p>
+            ) : null}
+            <PrimaryButton
+              className={css.confirmButton}
+              type="button"
+              inProgress={handBackInProgress}
+              disabled={handBackInProgress}
+              onClick={() => onHandBack({ transactionId: handover.transactionId, listingId })}
+            >
+              <FormattedMessage id="HandoverPage.handBack.confirm" />
+            </PrimaryButton>
+          </div>
+        ) : null}
       </div>
     );
   })();
@@ -502,6 +547,8 @@ const mapStateToProps = state => {
     fetchError,
     confirmInProgress,
     confirmError,
+    handBackInProgress,
+    handBackError,
   } = state.HandoverPage;
 
   return {
@@ -511,11 +558,14 @@ const mapStateToProps = state => {
     fetchError,
     confirmInProgress,
     confirmError,
+    handBackInProgress,
+    handBackError,
   };
 };
 
 const mapDispatchToProps = dispatch => ({
   onConfirm: params => dispatch(confirmHandover(params)),
+  onHandBack: params => dispatch(handBackToOwner(params)),
 });
 
 const HandoverPage = compose(

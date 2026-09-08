@@ -21,11 +21,22 @@ import css from './LaundryOpsPage.module.css';
  * @param {boolean} [props.showTabs] - render the Orders filter tabs
  * @param {Function} props.onAdvanceStatus
  * @param {string|null} props.advanceStatusTransactionId - row currently updating
+ * @param {Function} [props.onHandBackToOwner] - ({listingId}) => void
+ * @param {string|null} [props.handBackListingId] - garment currently being handed back
+ * @param {Object} [props.handBackError]
  * @returns {JSX.Element}
  */
 const LaundryOrdersTable = props => {
   const intl = useIntl();
-  const { rows, showTabs = false, onAdvanceStatus, advanceStatusTransactionId } = props;
+  const {
+    rows,
+    showTabs = false,
+    onAdvanceStatus,
+    advanceStatusTransactionId,
+    onHandBackToOwner,
+    handBackListingId,
+    handBackError,
+  } = props;
 
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
@@ -59,6 +70,18 @@ const LaundryOrdersTable = props => {
           aria-label={intl.formatMessage({ id: 'LaundryOpsPage.table.searchPlaceholder' })}
         />
       </div>
+
+      {handBackError ? (
+        <p className={css.error}>
+          <FormattedMessage
+            id={
+              handBackError?.status === 409
+                ? 'LaundryOpsPage.inventory.handBackActiveRental'
+                : 'LaundryOpsPage.inventory.handBackFailed'
+            }
+          />
+        </p>
+      ) : null}
 
       {visible.length === 0 ? (
         <p className={css.emptyState}>
@@ -102,6 +125,8 @@ const LaundryOrdersTable = props => {
                   advanceInProgress={
                     !!row.transactionId && row.transactionId === advanceStatusTransactionId
                   }
+                  onHandBackToOwner={onHandBackToOwner}
+                  handBackInProgress={!!row.listingId && row.listingId === handBackListingId}
                 />
               ))}
             </tbody>

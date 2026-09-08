@@ -175,6 +175,53 @@ export const opsStatus = row => {
 };
 
 /**
+ * States in which a garment is committed to a live booking, so nobody hands it back.
+ *
+ * The CLIENT half of `ACTIVE_STATES` in server/api-util/coclosetBookingProcess.js, and it has
+ * to say the same thing that list says: `accepted` through `cleaning`, and nothing else. Its
+ * complement is what makes the button appear, so what is deliberately ABSENT matters more
+ * than what is present:
+ *
+ *   - `canceled` / `declined` / `expired` - the booking is over or never happened, and the
+ *     garment is sitting in the studio with nothing holding it.
+ *   - `delivered` / `reviewed*` - the rental finished. This is the ordinary case.
+ *
+ * @see canHandBackToOwner
+ */
+export const CUSTODY_ACTIVE_STATES = [
+  'accepted',
+  'ready-for-pickup',
+  'picked-up',
+  'overdue',
+  'returned',
+  'cleaning',
+];
+
+/**
+ * May this studio hand this garment back to its owner?
+ *
+ *   > "si la transacción aparece como cancelada tambien puedo devolver la prenda"
+ *   >   (Jonathan, 2026-09-07)
+ *
+ * This used to read "has no status at all", which meant the button appeared ONLY for a
+ * garment that had never been booked - a cancelled rental, a finished one, or a reviewed one
+ * all hid it, and the studio was left holding a garment it had no way to release. The
+ * question is not whether a transaction exists; it is whether one is still holding the
+ * garment.
+ *
+ * THE SERVER IS THE AUTHORITY, not this. `assertNoActiveTransaction` looks at every
+ * transaction on the listing and answers 409; a row here only knows about its own, or - in
+ * inventory - the most recent one. So this can say yes where the server says no, and the
+ * screens report that 409 in words. What it must never do is say no where the server would
+ * have said yes, which is the failure it had.
+ *
+ * @param {Object} row - a row from /api/laundry-orders (orders or inventory)
+ * @returns {boolean}
+ */
+export const canHandBackToOwner = row =>
+  row?.onLaundry === true && !CUSTODY_ACTIVE_STATES.includes(row?.state);
+
+/**
  * Actions the laundry may take on a row, given the state the process is
  * actually in.
  *

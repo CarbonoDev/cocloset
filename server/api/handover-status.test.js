@@ -82,13 +82,16 @@ const transactionEntity = lastTransition => ({
   },
 });
 
-const listingEntity = (assignedLaundryId = LAUNDRY_ID) => ({
+const listingEntity = (assignedLaundryId = LAUNDRY_ID, onLaundry = false) => ({
   id: { uuid: LISTING_ID },
   type: 'listing',
   attributes: {
     title: 'A silk frock',
     publicData: { categoryLevel1: 'dresses' },
-    metadata: assignedLaundryId ? { assignedLaundryId } : {},
+    metadata: {
+      ...(assignedLaundryId ? { assignedLaundryId } : {}),
+      ...(onLaundry ? { onLaundry: true } : {}),
+    },
   },
 });
 
@@ -99,6 +102,7 @@ const setup = ({
   assignedLaundryId = LAUNDRY_ID,
   currentUserFails = false,
   laundryPrivateData = { turnaroundDays: 4 },
+  onLaundry = false,
 } = {}) => {
   const show = jest.fn(() =>
     currentUserFails
@@ -113,7 +117,7 @@ const setup = ({
     Promise.resolve({
       data: {
         data: transactionEntity(lastTransition),
-        included: [listingEntity(assignedLaundryId)],
+        included: [listingEntity(assignedLaundryId, onLaundry)],
       },
     })
   );
@@ -361,6 +365,11 @@ describe('handover-status: what it discloses', () => {
           // about the money, which is what this assertion is really guarding.
           'laundryCode',
           'takesLaundryCode',
+          // Which garment this is about, and whether the studio may release it. The id was
+          // already knowable from the listing title and the ticket; what is new is the
+          // permission, and it is a permission to move a garment rather than money.
+          'listingId',
+          'canHandBack',
         ].sort()
       );
     });
@@ -380,6 +389,69 @@ describe('handover-status: what it discloses', () => {
 
     return run({}).then(res => {
       expect(res.statusCode).toBe(400);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "el botón para devolver la prenda en el lado de laundry debe aparecer en order,
+//   >  handover o inventory"
+//   > "si la transacción aparece como cancelada tambien puedo devolver la prenda"
+//   >   (Jonathan, 2026-09-07)
+//
+// `canHandBack` is decided here for the same reason `canConfirm` is: the page renders a
+// button off it and does not re-derive the rule in a browser. So the same discipline applies -
+// assert the denying direction as hard as the allowing one.
+// ---------------------------------------------------------------------------
+describe('handover-status: may the studio release the garment', () => {
+  it('says yes to the assigned studio when the rental was cancelled', () => {
+    setup({ lastTransition: 'transition/cancel', onLaundry: true });
+
+    return run().then(res => {
+      expect(res.body.data.canHandBack).toBe(true);
+      expect(res.body.data.listingId).toBe(LISTING_ID);
+    });
+  });
+
+  it('says yes once the rental has finished', () => {
+    setup({ lastTransition: 'transition/laundry-mark-available', onLaundry: true });
+
+    return run().then(res => {
+      expect(res.body.data.canHandBack).toBe(true);
+    });
+  });
+
+  it('says no while the rental is still running', () => {
+    // The custody endpoint answers 409 for exactly these, which is what enforces "una vez que
+    // finalice la limpieza". Offering a button that is going to be refused is its own kind of
+    // wrong.
+    setup({ lastTransition: 'transition/laundry-start-cleaning', onLaundry: true });
+
+    return run().then(res => {
+      expect(res.body.data.canHandBack).toBe(false);
+    });
+  });
+
+  it('says no when the garment is not on the studio shelf', () => {
+    setup({ lastTransition: 'transition/cancel', onLaundry: false });
+
+    return run().then(res => {
+      expect(res.body.data.canHandBack).toBe(false);
+    });
+  });
+
+  it('never says yes to the customer or the owner', () => {
+    // Custody is the studio's to record - the owner was deliberately taken off this write.
+    // See server/api/listing-custody-status.js.
+    setup({
+      callerId: CUSTOMER_ID,
+      isLaundry: false,
+      lastTransition: 'transition/cancel',
+      onLaundry: true,
+    });
+
+    return run().then(res => {
+      expect(res.body.data.canHandBack).toBe(false);
     });
   });
 });
