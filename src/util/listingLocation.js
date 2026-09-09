@@ -35,13 +35,13 @@
  *   there is nothing to show
  */
 export const getPickupLocation = publicData => {
-  const { pickupAddress, assignedLaundryName, pickupNeighborhood, location } = publicData || {};
+  const { pickupAddress, assignedLaundryName, assignedLaundryNeighborhood, location } = publicData || {};
 
   if (pickupAddress) {
     return {
       address: pickupAddress,
       ...(assignedLaundryName ? { building: assignedLaundryName } : {}),
-      ...(pickupNeighborhood ? { neighborhood: pickupNeighborhood } : {}),
+      ...(assignedLaundryNeighborhood ? { neighborhood: assignedLaundryNeighborhood } : {}),
     };
   }
 
