@@ -170,6 +170,10 @@ export class SearchPageComponent extends Component {
       location,
       urlQueryParams: validUrlQueryParamsFromProps(this.props),
       setState: this.setState.bind(this),
+      // The pickup, neighbourhood and brand filters are built from these, so a reset that
+      // does not know about them leaves them in the URL. See onResetAll.
+      laundryOptions: this.props.laundryOptions,
+      brandOptions: this.props.brandOptions,
     });
   }
 

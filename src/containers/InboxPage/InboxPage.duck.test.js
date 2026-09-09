@@ -66,4 +66,20 @@ describe('InboxPage loadData query', () => {
       ])
     );
   });
+
+  //   > "el QR tiene inconsistencias, en la ventana de inbox y en transaction page, a veces no
+  //   >  aparece en inbox, luego al ingresar a tx page y luego regreso, aparece"
+  //   >   (Jonathan, 2026-09-09)
+  //
+  // The clearest case of this file's whole premise. The owner's QR rule turns on
+  // `metadata.onLaundry`; the field was not in this allowlist, so it arrived undefined and the
+  // inbox always answered as though the garment were with its owner. Opening the transaction
+  // page loaded the listing in full into the same entity store, so coming BACK the inbox had
+  // the flag and gave a different answer - a bug that only appeared after navigating, which is
+  // exactly the kind a component test cannot see.
+  it('asks where the garment is, which decides who may see the QR', async () => {
+    const params = await runLoadData();
+
+    expect(params['fields.listing']).toEqual(expect.arrayContaining(['metadata.onLaundry']));
+  });
 });
