@@ -131,6 +131,19 @@ const loadDataPayloadCreator = ({ params, search }, { dispatch, rejectWithValue,
       'publicData.brand',
       'publicData.assignedLaundryName',
       'publicData.pickupAddress',
+      // WHERE THE GARMENT PHYSICALLY IS, which decides whether the OWNER is shown the QR
+      // (see InboxTransactionPanel and transactions/transactionProcessCoclosetBooking.js).
+      //
+      //   > "el QR tiene inconsistencias, en la ventana de inbox y en transaction page, a
+      //   >  veces no aparece en inbox, luego al ingresar a tx page y luego regreso, aparece"
+      //   >   (Jonathan, 2026-09-09)
+      //
+      // That is this allowlist. Without the field, `metadata` is absent here and the rule
+      // read `onLaundry` as false for every rental - so the inbox always answered with the
+      // DROP-OFF rule. Opening the transaction page loads the listing in full into the same
+      // entity store, so coming back the inbox suddenly had the flag and changed its mind.
+      // Two screens, one rule, two answers, depending on where you had been.
+      'metadata.onLaundry',
     ],
     'fields.user': ['profile.displayName', 'profile.abbreviatedName', 'deleted', 'banned'],
     'fields.image': [

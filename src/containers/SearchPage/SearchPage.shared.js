@@ -692,7 +692,7 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
  *
  * BUILT FROM THE STUDIOS, FILTERED ON THE LISTINGS. The options are the distinct
  * neighbourhoods of the studios that exist, deduplicated here; the query runs against
- * `publicData.assignedLaundryNeighborhood`, which the assignment stamps onto each listing and
+ * `publicData.pickupNeighborhood`, which the assignment stamps onto each listing and
  * the propagation keeps current (server/api-util/laundryAssignment.js).
  *
  * IT NEEDS A SEARCH SCHEMA, and that is not something this file can check. An extended-data
@@ -701,7 +701,7 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
  * than like an error, which is why it is called out here and in the handover notes rather
  * than left to be discovered:
  *
- *   flex-cli search set --key assignedLaundryNeighborhood --type enum --scope public
+ *   flex-cli search set --key pickupNeighborhood --type enum --scope public
  *
  * @param {Array<Object>} listingFields - from config.listing
  * @param {Array<{id: string, name: string, neighborhood: string}>} laundryOptions
@@ -726,7 +726,7 @@ export const withNeighborhoodFilter = (listingFields = [], laundryOptions = [], 
   return [
     ...listingFields,
     {
-      key: 'assignedLaundryNeighborhood',
+      key: 'pickupNeighborhood',
       scope: 'public',
       schemaType: 'enum',
       // The value IS the label. A neighbourhood has no id of its own - it is a string a studio
@@ -1029,11 +1029,35 @@ export const onResetAll = ({
   location,
   urlQueryParams,
   setState,
+  laundryOptions,
+  brandOptions,
 }) => {
   const { listingFields: listingFieldsConfig } = config?.listing || {};
   const { defaultFilters: defaultFiltersConfig } = config?.search || {};
 
-  const filterQueryParamNames = getQueryParamNames(listingFieldsConfig, defaultFiltersConfig);
+  // THE SYNTHESISED FILTERS COUNT TOO.
+  //
+  //   > "si doy click en Reset All no se limpia, se limpia hasta que doy click manualmente a
+  //   >  ese filtro" (Jonathan, 2026-09-09)
+  //
+  // Three of the filters on this page do not come from Console - pickup, neighbourhood and
+  // brand are built from the studios and the brands that exist (see withLaundryPickupFilter
+  // and the two below it). "Reset all" strips the params it knows about, and it was reading
+  // only `config.listing.listingFields` - so it stripped every Console filter and left ours
+  // in the URL, which is a Reset that visibly resets some things.
+  //
+  // Built by calling the SAME synthesis functions the page renders from, rather than by
+  // listing the three keys here: a fourth synthesised filter would otherwise be a fourth
+  // thing that survives a reset, and nothing would fail until somebody noticed.
+  const allListingFields = withBrandFilter(
+    withNeighborhoodFilter(
+      withLaundryPickupFilter(listingFieldsConfig, laundryOptions),
+      laundryOptions
+    ),
+    brandOptions
+  );
+
+  const filterQueryParamNames = getQueryParamNames(allListingFields, defaultFiltersConfig);
 
   setState({ currentQueryParams: {} });
 

@@ -302,6 +302,9 @@ const getSearchParams = config => {
       'publicData.brand',
       'publicData.size',
       'publicData.assignedLaundryName',
+      // Read by the card and by getPickupLocation (util/listingLocation.js); written by the
+      // laundry assignment, which is what this branch added.
+      'publicData.pickupNeighborhood',
     ],
     'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
     'fields.image': [
