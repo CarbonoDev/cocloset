@@ -208,6 +208,17 @@ describe('InboxTransactionPanel: who gets the QR', () => {
     expect(qrButton()).not.toBeInTheDocument();
   });
 
+  it('keeps the code out of the page entirely, not just out of sight', () => {
+    //   > "el provider no debe ver el QR nunca" (Jonathan, 2026-09-09)
+    //
+    // Modal keeps its children mounted and hides them with CSS, so the payload used to be in
+    // the DOM for every reader even though the button that opens it was correctly hidden.
+    // "Not visible" and "not there" are different claims, and the rule is the second one.
+    atTransition('transition/laundry-mark-ready', TX_TRANSITION_ACTOR_PROVIDER);
+
+    expect(screen.queryByText('InboxPage.panel.qrModalTitle')).not.toBeInTheDocument();
+  });
+
   it('gives the owner the code while the garment is still theirs to drop off', () => {
     atTransition('transition/accept', TX_TRANSITION_ACTOR_PROVIDER);
 

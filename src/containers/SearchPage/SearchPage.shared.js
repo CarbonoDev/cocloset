@@ -461,6 +461,36 @@ export const pickListingFieldFilters = params => {
  * @param {Array<String>} activeListingTypes select configs that are marked only for these active listing types
  * @returns Array of grouped arrays. First subarray contains primary configs and the second contains secondary configs.
  */
+// The listing field the brand filter is built from. Named rather than inlined because the
+// string is the contract with Console: rename the field there and this stops matching, which
+// is a filter quietly sliding back down the row rather than an error.
+const BRAND_FILTER_KEY = 'brand';
+
+/**
+ * Put the brand filter first.
+ *
+ *   > "El filtro de brand puedes colocarlo en el primer lugar de los filtros en search?"
+ *   >   (Jonathan, 2026-09-08)
+ *
+ * Custom filters otherwise appear in the order Console lists the listing fields in, and they
+ * appear AFTER the built-ins - so no amount of reordering in Console could have put brand
+ * first. It is hoisted here instead, which also means it cannot be pushed back down by
+ * accident the next time somebody adds a listing field.
+ *
+ * A no-op when brand is not an active filter (not indexed, or limited to a listing type this
+ * search does not cover), because it reorders the list that was already built rather than
+ * adding to it.
+ *
+ * @param {Array<Object>} filters
+ * @returns {Array<Object>}
+ */
+const hoistBrandFirst = filters => {
+  const brand = filters.filter(f => f.key === BRAND_FILTER_KEY);
+  return brand.length > 0
+    ? [...brand, ...filters.filter(f => f.key !== BRAND_FILTER_KEY)]
+    : filters;
+};
+
 export const groupListingFieldConfigs = (configs, activeListingTypes) =>
   configs.reduce(
     (grouped, config) => {
@@ -648,6 +678,77 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
 };
 
 /**
+ * The neighbourhood filter.
+ *
+ *   > "el vecindario tambien debe guardarse en el listing y debemos poder filtrar por
+ *   >  vecindario, el cual me dará el mismo resultado que filtrar por laundry, pero es algo
+ *   >  que solicita mi cliente" (Jonathan, 2026-09-09)
+ *
+ * SAME RESULTS AS THE PICKUP FILTER, AND STILL WORTH HAVING. Every garment has exactly one
+ * studio and every studio is in exactly one part of town, so the two filters partition the
+ * same listings. What differs is what the reader is asked. The pickup filter offers one row
+ * PER STUDIO - two studios in Sant Antoni are two identical-looking rows - while this one
+ * offers each part of town once. That is the question a renter actually has.
+ *
+ * BUILT FROM THE STUDIOS, FILTERED ON THE LISTINGS. The options are the distinct
+ * neighbourhoods of the studios that exist, deduplicated here; the query runs against
+ * `publicData.assignedLaundryNeighborhood`, which the assignment stamps onto each listing and
+ * the propagation keeps current (server/api-util/laundryAssignment.js).
+ *
+ * IT NEEDS A SEARCH SCHEMA, and that is not something this file can check. An extended-data
+ * parameter with no schema is not rejected by Sharetribe - it is IGNORED, and the search
+ * returns the whole marketplace. That failure looks like a filter that does nothing rather
+ * than like an error, which is why it is called out here and in the handover notes rather
+ * than left to be discovered:
+ *
+ *   flex-cli search set --key assignedLaundryNeighborhood --type enum --scope public
+ *
+ * @param {Array<Object>} listingFields - from config.listing
+ * @param {Array<{id: string, name: string, neighborhood: string}>} laundryOptions
+ * @param {Object} intl
+ * @returns {Array<Object>}
+ */
+export const withNeighborhoodFilter = (listingFields = [], laundryOptions = [], intl) => {
+  const neighborhoods = [
+    ...new Set(
+      (Array.isArray(laundryOptions) ? laundryOptions : [])
+        .map(option => option?.neighborhood)
+        .filter(name => typeof name === 'string' && name.trim() !== '')
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+
+  // No dropdown rather than an empty one, for the same reason as the pickup filter: a filter
+  // offering nothing reads as "this marketplace has no neighbourhoods".
+  if (neighborhoods.length === 0) {
+    return listingFields;
+  }
+
+  return [
+    ...listingFields,
+    {
+      key: 'assignedLaundryNeighborhood',
+      scope: 'public',
+      schemaType: 'enum',
+      // The value IS the label. A neighbourhood has no id of its own - it is a string a studio
+      // typed or Mapbox returned - so inventing one would mean a second mapping to keep in
+      // step with the studios, for nothing.
+      enumOptions: neighborhoods.map(name => ({ option: name, label: name })),
+      filterConfig: {
+        indexForSearch: true,
+        showFilter: true,
+        group: 'primary',
+        // One part of town at a time, matching the pickup filter it sits beside. A garment has
+        // exactly one, so a multi-select would only ever express "or".
+        filterType: 'SelectSingleFilter',
+        label: intl
+          ? intl.formatMessage({ id: 'SearchPage.neighborhoodFilterLabel' })
+          : 'Neighbourhood',
+      },
+    },
+  ];
+};
+
+/**
  * The brand filter, built from the brands that exist rather than from Console.
  *
  *   > "En search page, puedes agregar brand como primary filter? Es un texto a ingresar,
@@ -738,7 +839,11 @@ export const getDerivedRenderData = ({
   const listingCategories = categoryConfiguration.categories;
   const listingFieldsConfig = pickListingFieldFilters({
     listingFields: withBrandFilter(
-      withLaundryPickupFilter(listingFields, laundryOptions, intl),
+      withNeighborhoodFilter(
+        withLaundryPickupFilter(listingFields, laundryOptions, intl),
+        laundryOptions,
+        intl
+      ),
       brandOptions,
       intl
     ),
@@ -810,15 +915,17 @@ export const getDerivedRenderData = ({
   const builtInSecondaryFilters = builtInFilters.filter(isSecondaryBuiltInFilter);
   const builtInPrimaryTailFilters = builtInFilters.filter(f => !isSecondaryBuiltInFilter(f));
 
-  const availablePrimaryFilters = [
+  const availablePrimaryFilters = hoistBrandFirst([
     ...builtInPrimaryFilters,
     ...customPrimaryFilters,
     ...builtInPrimaryTailFilters,
-  ];
+  ]);
   const availableFilters = [
-    ...builtInPrimaryFilters,
-    ...customPrimaryFilters,
-    ...builtInPrimaryTailFilters,
+    ...hoistBrandFirst([
+      ...builtInPrimaryFilters,
+      ...customPrimaryFilters,
+      ...builtInPrimaryTailFilters,
+    ]),
     ...builtInSecondaryFilters,
     ...customSecondaryFilters,
   ];

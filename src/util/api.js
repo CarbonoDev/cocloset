@@ -382,6 +382,13 @@ export const assignListingLaundry = body => {
 // Ask the server to give back the days a finished booking is still blocking. Fired on listing
 // page load and deliberately not awaited: it is a cleanup, and a page that renders is worth
 // more than a calendar that is right on this particular load rather than the next one.
+// Ask the server to re-stamp this studio's name and address onto its garments. No arguments:
+// the session is the studio, and the server writes what the profile already says. See
+// server/api/laundry-listings-refresh.js.
+export const refreshLaundryListings = () => {
+  return post('/api/laundry-listings-refresh', {});
+};
+
 export const sweepListingAvailability = listingId => {
   return post('/api/listing-availability-sweep', { listingId });
 };

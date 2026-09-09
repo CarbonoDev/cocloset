@@ -371,7 +371,12 @@ const propagateAddressToAssignedListings = ({ integrationSdk, laundryId, laundry
           // Same precedence as `laundryDerivedListingFields` in api-util/laundryAssignment.js,
           // which is what writes this field. The two must agree or a listing either re-stamps
           // on every pass or never converges.
-          publicData.assignedLaundryName === (laundry.studioName || laundry.displayName || null);
+          publicData.assignedLaundryName === (laundry.studioName || laundry.displayName || null) &&
+          // Same reason as the name above: this is a copy, so it is something that can be
+          // stale, so it is something this comparison has to know about. Omitting it would
+          // leave a studio that moved neighbourhoods printing the old one forever, because
+          // every listing would look "already correct" on the other three fields.
+          publicData.assignedLaundryNeighborhood === (laundry.neighborhood || null);
 
         if (alreadyCorrect) {
           skipped.push({ id: listing.id.uuid, description: describeListing(listing) });

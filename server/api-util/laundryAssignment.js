@@ -317,7 +317,17 @@ const laundryDerivedListingFields = laundry => ({
   // every listing would either re-stamp forever or never.
   assignedLaundryName: laundry.studioName || laundry.displayName || null,
   pickupAddress: laundry.address,
-  pickupNeighborhood: laundry.neighborhood || null,
+  // THE PART OF TOWN, COPIED ONTO THE GARMENT.
+  //
+  // It was previously read live off the studio for the search filter's LABELS, which is why
+  // it could never go stale. A filter that queries listings needs it on the listing, so it is
+  // now a copy like the other two - and therefore something the propagation has to keep
+  // current (api-util/laundryAddress.js).
+  //
+  // Null rather than absent when the studio has not got one: the field has to be written on
+  // every pass or a studio that clears its neighbourhood would leave the old value stranded
+  // on its garments.
+  assignedLaundryNeighborhood: laundry.neighborhood || null,
   geolocation: { lat: laundry.origin.lat, lng: laundry.origin.lng },
 });
 
@@ -332,11 +342,15 @@ const laundryDerivedListingFields = laundry => ({
  * @returns {{geolocation: Object, publicData: {assignedLaundryName: string|null, pickupAddress: string}}}
  */
 const laundryDerivedListingParams = laundry => {
-  const { assignedLaundryName, pickupAddress, pickupNeighborhood } = laundryDerivedListingFields(laundry);
+  const {
+    assignedLaundryName,
+    pickupAddress,
+    assignedLaundryNeighborhood,
+  } = laundryDerivedListingFields(laundry);
 
   return {
     geolocation: new sdkTypes.LatLng(laundry.origin.lat, laundry.origin.lng),
-    publicData: { assignedLaundryName, pickupAddress, pickupNeighborhood },
+    publicData: { assignedLaundryName, pickupAddress, assignedLaundryNeighborhood },
   };
 };
 

@@ -402,7 +402,14 @@ describe('propagateAddressToAssignedListings()', () => {
       [
         listingEntity({
           id: 'already-correct',
-          publicData: { pickupAddress: NEW_ADDRESS, assignedLaundryName: 'Maison du Marais' },
+          publicData: {
+            pickupAddress: NEW_ADDRESS,
+            assignedLaundryName: 'Maison du Marais',
+            // Part of the comparison now: it is a copy, so it can be stale, so "already
+            // correct" has to include it. Without this the listing looks correct on the
+            // other three and a studio that moved neighbourhoods never converges.
+            assignedLaundryNeighborhood: null,
+          },
           geolocation: NEW_ORIGIN,
         }),
         listingEntity({ id: 'stale' }),
@@ -465,5 +472,65 @@ describe('propagateAddressToAssignedListings()', () => {
     // Never the bare error object - an axios error carries the bearer token in
     // `config.headers`.
     expect(result.failed[0].error).toEqual({ errors: [{ code: 'nope' }] });
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "el vecindario tambien debe guardarse en el listing" (Jonathan, 2026-09-09)
+//
+// A copy is a thing that can go stale, so the moment the neighbourhood became a copy it also
+// became something this propagation has to notice. The assertion that matters: a listing
+// correct on the other three fields is NOT correct if this one has moved.
+// ---------------------------------------------------------------------------
+describe('propagateAddressToAssignedListings(): the neighbourhood', () => {
+  it('re-stamps a listing whose only stale field is the neighbourhood', async () => {
+    const { integrationSdk, update } = setupListings([
+      [
+        listingEntity({
+          id: 'moved',
+          geolocation: laundryRecord.origin,
+          publicData: {
+            pickupAddress: laundryRecord.address,
+            assignedLaundryName: laundryRecord.studioName,
+            assignedLaundryNeighborhood: 'Le Marais',
+          },
+        }),
+      ],
+    ]);
+
+    const result = await propagateAddressToAssignedListings({
+      integrationSdk,
+      laundryId: LAUNDRY_ID,
+      laundry: { ...laundryRecord, neighborhood: 'Le Sentier' },
+    });
+
+    expect(result.updated.map(entry => entry.id)).toEqual(['moved']);
+    expect(result.skipped).toHaveLength(0);
+    expect(update.mock.calls[0][0].publicData.assignedLaundryNeighborhood).toBe('Le Sentier');
+  });
+
+  it('leaves a listing alone once its neighbourhood already matches', async () => {
+    const { integrationSdk, update } = setupListings([
+      [
+        listingEntity({
+          id: 'current',
+          geolocation: laundryRecord.origin,
+          publicData: {
+            pickupAddress: laundryRecord.address,
+            assignedLaundryName: laundryRecord.studioName,
+            assignedLaundryNeighborhood: 'Le Sentier',
+          },
+        }),
+      ],
+    ]);
+
+    const result = await propagateAddressToAssignedListings({
+      integrationSdk,
+      laundryId: LAUNDRY_ID,
+      laundry: { ...laundryRecord, neighborhood: 'Le Sentier' },
+    });
+
+    expect(result.skipped.map(entry => entry.id)).toEqual(['current']);
+    expect(update).not.toHaveBeenCalled();
   });
 });
