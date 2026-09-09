@@ -319,9 +319,6 @@ const laundryDerivedListingFields = laundry => ({
   pickupAddress: laundry.address,
   // THE PART OF TOWN, COPIED ONTO THE GARMENT.
   //
-  //   > "el vecindario tambien debe guardarse en el listing y debemos poder filtrar por
-  //   >  vecindario" (Jonathan, 2026-09-09)
-  //
   // It was previously read live off the studio for the search filter's LABELS, which is why
   // it could never go stale. A filter that queries listings needs it on the listing, so it is
   // now a copy like the other two - and therefore something the propagation has to keep
