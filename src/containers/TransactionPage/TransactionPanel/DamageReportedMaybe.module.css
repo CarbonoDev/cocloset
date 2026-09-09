@@ -7,9 +7,9 @@
   flex-direction: column;
   margin: 24px 0 0 0;
   padding: 18px;
-  border: 1px solid var(--coclosetToneCriticalDot);
+  border: 1px solid #E3C68E;
   border-radius: var(--coclosetRadiusSmall);
-  background-color: var(--coclosetToneCriticalBg);
+  background-color: #FEF9F3;
 
   @media (--viewportMedium) {
     margin: 32px 0 0 0;
@@ -20,7 +20,7 @@
 .heading {
   margin: 0 0 6px 0;
   padding: 0;
-  color: var(--coclosetToneCriticalFg);
+  color: #644935;
 
   @media (--viewportMedium) {
     margin: 0 0 8px 0;
@@ -41,7 +41,7 @@
    than blended into a paragraph. */
 .note {
   padding: 12px 14px;
-  border-left: 4px solid var(--coclosetToneCriticalDot);
+  border-left: 4px solid #E3C68E;
   border-radius: var(--coclosetRadiusSmall);
   background-color: var(--coclosetSurface);
 
@@ -52,7 +52,7 @@
 
 .noteLabel {
   margin: 0 0 4px 0;
-  color: var(--coclosetToneCriticalFg);
+  color: #644935;
   font-weight: var(--fontWeightBold);
   letter-spacing: 0.4px;
   text-transform: uppercase;
