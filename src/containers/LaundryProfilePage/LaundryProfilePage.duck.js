@@ -1,6 +1,9 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { storableError } from '../../util/errors';
-import { updateLaundryAddress as updateLaundryAddressApi } from '../../util/api';
+import {
+  refreshLaundryListings,
+  updateLaundryAddress as updateLaundryAddressApi,
+} from '../../util/api';
 import { fetchCurrentUser, setCurrentUser } from '../../ducks/user.duck';
 import { denormalisedResponseEntities } from '../../util/data';
 
@@ -109,9 +112,32 @@ export const updateProfile = (actionPayload, addressChange) => dispatch =>
   dispatch(updateProfileThunk(actionPayload)).then(action => {
     const profileSaved = updateProfileThunk.fulfilled.match(action);
 
-    return addressChange && profileSaved
-      ? dispatch(updateLaundryAddressThunk(addressChange))
-      : action;
+    if (addressChange && profileSaved) {
+      // The address endpoint propagates to the listings itself, so there is nothing more to
+      // do here - and asking twice would write the same fields twice.
+      return dispatch(updateLaundryAddressThunk(addressChange));
+    }
+
+    if (profileSaved) {
+      // RE-STAMP THE GARMENTS.
+      //
+      //   > "si laundry cambia su nombre, la dirección o el vecindario los listings no se
+      //   >  actualizan" (Jonathan, 2026-09-09)
+      //
+      // Assigning a laundry copies its name and address onto the listing, because cards,
+      // search results and emails print them and none of those can fetch a user. A studio
+      // that renamed itself therefore kept its old name on every garment it holds - the
+      // address path has propagated since it was built, an ordinary profile save never did.
+      //
+      // Not awaited and failures are swallowed: the profile HAS saved by this point, and
+      // reporting a propagation failure as a save failure would tell the studio its rename
+      // did not stick when it did. The endpoint is idempotent, so the next save converges.
+      Promise.resolve()
+        .then(() => refreshLaundryListings())
+        .catch(() => null);
+    }
+
+    return action;
   });
 
 // ================ Slice ================ //

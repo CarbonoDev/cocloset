@@ -26,6 +26,7 @@ const listingReadinessStatus = require('./api/listing-readiness-status');
 const listingCustodyStatus = require('./api/listing-custody-status');
 const laundryReceiveGarment = require('./api/laundry-receive-garment');
 const listingAvailabilitySweep = require('./api/listing-availability-sweep');
+const laundryListingsRefresh = require('./api/laundry-listings-refresh');
 const listingLaundryAssignment = require('./api/listing-laundry-assignment');
 const listingInitialCleaning = require('./api/listing-initial-cleaning');
 const laundryAddress = require('./api/laundry-address');
@@ -95,6 +96,9 @@ router.post('/laundry-receive-garment', laundryReceiveGarment);
 // on load, because a cancellation from Console runs no code of ours. See
 // server/api/listing-availability-sweep.js for what it will and will not delete.
 router.post('/listing-availability-sweep', listingAvailabilitySweep);
+// Re-stamp a studio's name and address onto its garments. Fired after the studio saves its
+// profile: the address path has always propagated, an ordinary profile save never did.
+router.post('/laundry-listings-refresh', laundryListingsRefresh);
 // Garment custody (`listing.metadata.onLaundry`) - writable by the assigned
 // laundry OR the listing's owner, and only while the listing has no active
 // transaction. See server/api/listing-custody-status.js.

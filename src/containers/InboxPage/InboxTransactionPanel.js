@@ -271,25 +271,36 @@ const InboxTransactionPanel = props => {
         <FormattedMessage id="InboxPage.panel.openFull" />
       </NamedLink>
 
-      <Modal
-        id="InboxTransactionPanel.qr"
-        isOpen={isQrModalOpen}
-        onClose={() => setQrModalOpen(false)}
-        onManageDisableScrolling={props.onManageDisableScrolling}
-        usePortal
-      >
-        <div className={css.qrModalContent}>
-          <h2 className={css.qrModalTitle}>
-            <FormattedMessage id="InboxPage.panel.qrModalTitle" />
-          </h2>
-          <p className={css.qrModalBody}>
-            <FormattedMessage id="InboxPage.panel.qrModalBody" />
-          </p>
-          {/* `showPayload` is the manual fallback: a studio whose scanner is down needs the
+      {/* GATED TOO, NOT JUST THE BUTTON.
+            > "puedes revisar si todo esta finalizado en cuestión de que el provider no debe
+            >  ver el QR nunca" (Jonathan, 2026-09-09)
+
+          Modal keeps its children mounted and hides them with CSS, so a Modal rendered
+          unconditionally put the QR payload in the page for every reader - including the
+          owner who is not at either of their two errands. Nobody could SEE it without the
+          button, which was correctly hidden, but "not visible" and "not there" are different
+          claims and the rule is the second one. */}
+      {showQr ? (
+        <Modal
+          id="InboxTransactionPanel.qr"
+          isOpen={isQrModalOpen}
+          onClose={() => setQrModalOpen(false)}
+          onManageDisableScrolling={props.onManageDisableScrolling}
+          usePortal
+        >
+          <div className={css.qrModalContent}>
+            <h2 className={css.qrModalTitle}>
+              <FormattedMessage id="InboxPage.panel.qrModalTitle" />
+            </h2>
+            <p className={css.qrModalBody}>
+              <FormattedMessage id="InboxPage.panel.qrModalBody" />
+            </p>
+            {/* `showPayload` is the manual fallback: a studio whose scanner is down needs the
               id it can type into its own search box, and that is what this prints. */}
-          <HandoverQrCode payload={transaction.id?.uuid} size="large" showPayload />
-        </div>
-      </Modal>
+            <HandoverQrCode payload={transaction.id?.uuid} size="large" showPayload />
+          </div>
+        </Modal>
+      ) : null}
     </section>
   );
 };

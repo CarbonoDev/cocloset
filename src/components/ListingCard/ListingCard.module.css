@@ -200,6 +200,17 @@
 .cardWithFavorite {
   position: relative;
   min-width: 0;
+
+  /* A STACKING CONTEXT OF ITS OWN.
+     > "El z index del icono del corazón se ve encima del algunos modales o del menú en mobile"
+     >   (Jonathan, 2026-09-08)
+
+     The heart needs a z-index to sit above the card image. Without this line that z-index is
+     measured against the whole page, so it also sat above the mobile menu and any overlay
+     that did not declare a higher one. `isolation` confines it: inside this card the heart is
+     still on top, and outside it the card has no z-index at all. Raising every modal instead
+     would have been the same bug waiting for the next overlay somebody adds. */
+  isolation: isolate;
 }
 
 .cardFavorite {

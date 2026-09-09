@@ -461,6 +461,36 @@ export const pickListingFieldFilters = params => {
  * @param {Array<String>} activeListingTypes select configs that are marked only for these active listing types
  * @returns Array of grouped arrays. First subarray contains primary configs and the second contains secondary configs.
  */
+// The listing field the brand filter is built from. Named rather than inlined because the
+// string is the contract with Console: rename the field there and this stops matching, which
+// is a filter quietly sliding back down the row rather than an error.
+const BRAND_FILTER_KEY = 'brand';
+
+/**
+ * Put the brand filter first.
+ *
+ *   > "El filtro de brand puedes colocarlo en el primer lugar de los filtros en search?"
+ *   >   (Jonathan, 2026-09-08)
+ *
+ * Custom filters otherwise appear in the order Console lists the listing fields in, and they
+ * appear AFTER the built-ins - so no amount of reordering in Console could have put brand
+ * first. It is hoisted here instead, which also means it cannot be pushed back down by
+ * accident the next time somebody adds a listing field.
+ *
+ * A no-op when brand is not an active filter (not indexed, or limited to a listing type this
+ * search does not cover), because it reorders the list that was already built rather than
+ * adding to it.
+ *
+ * @param {Array<Object>} filters
+ * @returns {Array<Object>}
+ */
+const hoistBrandFirst = filters => {
+  const brand = filters.filter(f => f.key === BRAND_FILTER_KEY);
+  return brand.length > 0
+    ? [...brand, ...filters.filter(f => f.key !== BRAND_FILTER_KEY)]
+    : filters;
+};
+
 export const groupListingFieldConfigs = (configs, activeListingTypes) =>
   configs.reduce(
     (grouped, config) => {
@@ -810,15 +840,17 @@ export const getDerivedRenderData = ({
   const builtInSecondaryFilters = builtInFilters.filter(isSecondaryBuiltInFilter);
   const builtInPrimaryTailFilters = builtInFilters.filter(f => !isSecondaryBuiltInFilter(f));
 
-  const availablePrimaryFilters = [
+  const availablePrimaryFilters = hoistBrandFirst([
     ...builtInPrimaryFilters,
     ...customPrimaryFilters,
     ...builtInPrimaryTailFilters,
-  ];
+  ]);
   const availableFilters = [
-    ...builtInPrimaryFilters,
-    ...customPrimaryFilters,
-    ...builtInPrimaryTailFilters,
+    ...hoistBrandFirst([
+      ...builtInPrimaryFilters,
+      ...customPrimaryFilters,
+      ...builtInPrimaryTailFilters,
+    ]),
     ...builtInSecondaryFilters,
     ...customSecondaryFilters,
   ];
