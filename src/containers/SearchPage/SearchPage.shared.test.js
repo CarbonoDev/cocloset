@@ -1,4 +1,5 @@
 import {
+  withNeighborhoodFilter,
   omitLimitedListingFieldParams,
   validURLParamForExtendedData,
   validFilterParams,
@@ -828,5 +829,65 @@ describe('withLaundryPickupFilter labels', () => {
   it('adds no filter at all when there are no studios', () => {
     // An empty dropdown reads as "this marketplace has no stores", which is worse than none.
     expect(withLaundryPickupFilter([], [], { formatMessage: () => 'Pickup' })).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "el vecindario tambien debe guardarse en el listing y debemos poder filtrar por
+//   >  vecindario, el cual me dará el mismo resultado que filtrar por laundry"
+//   >   (Jonathan, 2026-09-09)
+//
+// It returns the same listings as the pickup filter - one studio per garment, one part of
+// town per studio - and asks a different question: each neighbourhood once, rather than one
+// row per studio. What is worth pinning is the deduplication, since that IS the difference.
+// ---------------------------------------------------------------------------
+describe('withNeighborhoodFilter', () => {
+  const fieldFrom = laundryOptions => {
+    const fields = withNeighborhoodFilter([], laundryOptions, null);
+    return fields.find(f => f.key === 'assignedLaundryNeighborhood') || null;
+  };
+
+  it('offers each part of town once, however many studios are in it', () => {
+    const field = fieldFrom([
+      { id: 'l1', name: 'Maison du Marais', neighborhood: 'Le Marais' },
+      { id: 'l2', name: 'Pressing Bastille', neighborhood: 'Le Marais' },
+      { id: 'l3', name: 'Studio Pigalle', neighborhood: 'Pigalle' },
+    ]);
+
+    expect(field.enumOptions).toEqual([
+      { option: 'Le Marais', label: 'Le Marais' },
+      { option: 'Pigalle', label: 'Pigalle' },
+    ]);
+  });
+
+  it('queries the listing, not the studio', () => {
+    // The value has to be on the garment for a listing search to filter on it - which is why
+    // the assignment now stamps it and the propagation keeps it current.
+    const field = fieldFrom([{ id: 'l1', name: 'A', neighborhood: 'Le Marais' }]);
+
+    expect(field.key).toBe('assignedLaundryNeighborhood');
+    expect(field.scope).toBe('public');
+  });
+
+  it('skips studios with no neighbourhood rather than offering a blank row', () => {
+    const field = fieldFrom([
+      { id: 'l1', name: 'A', neighborhood: null },
+      { id: 'l2', name: 'B', neighborhood: '   ' },
+      { id: 'l3', name: 'C', neighborhood: 'Sant Antoni' },
+    ]);
+
+    expect(field.enumOptions).toEqual([{ option: 'Sant Antoni', label: 'Sant Antoni' }]);
+  });
+
+  it('renders no filter at all when nothing has a neighbourhood', () => {
+    // A dropdown offering nothing reads as "this marketplace has no neighbourhoods", which is
+    // worse than no dropdown.
+    expect(fieldFrom([{ id: 'l1', name: 'A', neighborhood: null }])).toBeNull();
+    expect(fieldFrom([])).toBeNull();
+  });
+
+  it('leaves the fields it was given alone', () => {
+    const existing = [{ key: 'brand' }];
+    expect(withNeighborhoodFilter(existing, [], null)).toBe(existing);
   });
 });

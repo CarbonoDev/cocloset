@@ -93,6 +93,9 @@ describe('toLaundryDirectoryEntry()', () => {
       displayName: 'Pigalle Pressing',
       studioName: 'Studio Pigalle',
       address: '12 Rue Pigalle, Paris',
+      // Carried so the ASSIGNMENT can stamp it onto the listing - the search filter queries
+      // the garment now, not the studio (Jonathan, 2026-09-09).
+      neighborhood: null,
       origin: { lat: 48.8821, lng: 2.3372 },
       businessHours: 'Mon-Fri 9-18',
       acceptedCategories: ['dresses', 'coats'],
@@ -119,6 +122,8 @@ describe('toLaundryDirectoryEntry()', () => {
       'businessHours',
       'displayName',
       'id',
+      // The part of town. Public, and already visible through the search filter it feeds.
+      'neighborhood',
       'origin',
       'studioName',
       'turnaroundDays',

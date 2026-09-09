@@ -108,6 +108,11 @@ const toLaundryDirectoryEntry = (user, listingCategoryValues = []) => {
     displayName: profile.displayName || null,
     studioName: laundryProfile.studioName || null,
     address: laundryProfile.address || null,
+    // The part of town, resolved from the studio's own address when it was saved (see
+    // GeocoderMapbox.placeNeighborhood) or typed as a fallback. Carried here because the
+    // ASSIGNMENT stamps it onto the listing - a card and a search filter both print it, and
+    // neither can fetch a user.
+    neighborhood: laundryProfile.neighborhood || null,
     origin: parseOrigin(laundryProfile.origin),
     businessHours: laundryProfile.businessHours || null,
     acceptedCategories: Array.isArray(acceptedCategories) ? acceptedCategories : [],

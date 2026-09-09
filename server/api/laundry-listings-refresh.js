@@ -2,6 +2,7 @@ const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { requireLaundryCaller } = require('../api-util/laundryAuth');
 const { propagateAddressToAssignedListings } = require('../api-util/laundryAddress');
+const { toLaundryDirectoryEntry } = require('../api-util/laundryDirectory');
 const log = require('../log');
 
 // Bring a studio's garments back in line with the studio's own profile.
@@ -44,13 +45,18 @@ const log = require('../log');
 // writes nothing at all and reports why.
 //
 // ---------------------------------------------------------------------------
-// THE NEIGHBOURHOOD IS NOT IN HERE, AND DOES NOT NEED TO BE
+// THE NEIGHBOURHOOD IS IN HERE TOO, NOW
 // ---------------------------------------------------------------------------
-// The client's message lists it alongside the name and the address, but it is not copied onto
-// listings at all: the search filter reads it from the studio itself
-// (api-util/laundryDirectory.js `buildLaundryOptions`), which is a live read on every search.
-// It therefore cannot go stale, and adding a copy to propagate would create the very problem
-// this endpoint exists to fix.
+// It used to be read live off the studio - the search filter only needed it for its LABELS -
+// so it could not go stale and there was nothing to propagate.
+//
+//   > "el vecindario tambien debe guardarse en el listing y debemos poder filtrar por
+//   >  vecindario" (Jonathan, 2026-09-09)
+//
+// A filter that queries listings needs the value ON the listing, so it is now a copy like the
+// name and the address - which means it is now something that can go stale, and therefore
+// something this endpoint has to keep current. It rides along for free: the record below is
+// built by the same function the assignment resolves a laundry with.
 //
 // Success response (200): { data: { listings: { updated, failed, skipped, scanned, truncated } } }
 // Failure responses:
@@ -88,12 +94,11 @@ module.exports = (req, res) => {
       return propagateAddressToAssignedListings({
         integrationSdk,
         laundryId: currentUser.id.uuid,
-        laundry: {
-          displayName: profile.displayName,
-          studioName: laundryProfile.studioName,
-          address: laundryProfile.address,
-          origin: { lat: origin.lat, lng: origin.lng },
-        },
+        // Built by the SAME function the assignment endpoint resolves a laundry with, rather
+        // than spelled out here. That is what guarantees this writes byte for byte what an
+        // assignment would have written - and it is why adding the neighbourhood to the
+        // derived fields did not need a second edit in this file.
+        laundry: toLaundryDirectoryEntry(currentUser),
       });
     })
     .then(listings => {

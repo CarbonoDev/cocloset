@@ -1504,6 +1504,7 @@
   "SearchPage.detailYes": "Yes",
   "SearchPage.invalidDatesFilter": "Invalid date range filter values in URL. The filter was ignored.",
   "SearchPage.laundryPickupFilterLabel": "Pickup laundry",
+  "SearchPage.neighborhoodFilterLabel": "Neighbourhood",
   "SearchPage.noResults": "Couldn't find any listings that match your search criteria.",
   "SearchPage.resetAllFilters": "Reset filters",
   "SearchPage.schemaDescription": "Showing search results",
