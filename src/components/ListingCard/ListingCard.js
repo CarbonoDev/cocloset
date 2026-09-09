@@ -105,15 +105,20 @@ const ListingCardImage = props => {
  */
 const EditorialInfo = props => {
   const { listing, titleFormatted, showPrice, priceMessage, priceTooltip, darkMode } = props;
-  const { brand, size, assignedLaundryName } = listing?.attributes?.publicData || {};
+  const { brand, size, assignedLaundryName, pickupNeighborhood } = listing?.attributes?.publicData || {};
 
   const meta = [
     size ? <FormattedMessage key="size" id="ListingCard.editorialSize" values={{ size }} /> : null,
     assignedLaundryName ? (
       <FormattedMessage
         key="pickup"
-        id="ListingCard.editorialPickup"
-        values={{ name: assignedLaundryName }}
+        id={
+          pickupNeighborhood
+            ? 'ListingCard.editorialPickupWithNeighborhood'
+            : 'ListingCard.editorialPickup'
+        }
+
+        values={{ name: assignedLaundryName, neighborhood: pickupNeighborhood }}
       />
     ) : null,
   ].filter(Boolean);

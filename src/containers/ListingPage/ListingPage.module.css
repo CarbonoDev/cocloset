@@ -1074,3 +1074,9 @@
     display: inline;
   }
 }
+
+/* The neighborhood, same visual weight as the turnaround line below it — both are
+   secondary detail about the pickup, not part of the address itself. */
+.pickupLocationNeighborhood {
+  composes: pickupLocationMeta;
+}

@@ -529,6 +529,7 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
         'publicData.brand',
         'publicData.size',
         'publicData.assignedLaundryName',
+        'publicData.pickupNeighborhood',
       ],
       'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
       'fields.image': [

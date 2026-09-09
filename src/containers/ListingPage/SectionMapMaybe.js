@@ -97,6 +97,9 @@ class SectionMapMaybe extends Component {
                 place the garment is handed over, which is exactly what the
                 element means. */}
             <address className={css.pickupLocationAddress}>{laundryLocation.address}</address>
+            {laundryLocation.neighborhood ? (
+              <p className={css.pickupLocationNeighborhood}>{laundryLocation.neighborhood}</p>
+            ) : null}
             {/* How long this studio takes between rentals. Resolved live by the same page-load
                 call that produces the calendar's blocked days, so the number here and the days
                 the calendar refuses cannot disagree. Omitted entirely when it is not known -

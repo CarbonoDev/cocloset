@@ -115,6 +115,7 @@ const toLaundryDirectoryEntry = (user, listingCategoryValues = []) => {
     neighborhood: laundryProfile.neighborhood || null,
     origin: parseOrigin(laundryProfile.origin),
     businessHours: laundryProfile.businessHours || null,
+    neighborhood: laundryProfile.neighborhood || null,
     acceptedCategories: Array.isArray(acceptedCategories) ? acceptedCategories : [],
     turnaroundDays,
     // True only when the number above came from an entry for this garment's own

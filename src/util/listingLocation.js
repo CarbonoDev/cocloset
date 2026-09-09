@@ -31,16 +31,18 @@
  * Once that migration has run, the fallback branch can be deleted.
  *
  * @param {Object} [publicData] - a listing's `attributes.publicData`
- * @returns {{ address?: string, building?: string }} never null; `{}` when
+ * @returns {{ address?: string, building?: string, neighborhood?: string }} never null; `{}` when
  *   there is nothing to show
  */
 export const getPickupLocation = publicData => {
-  const { pickupAddress, assignedLaundryName, location } = publicData || {};
+  const { pickupAddress, assignedLaundryName, pickupNeighborhood, location } = publicData || {};
 
   if (pickupAddress) {
-    return assignedLaundryName
-      ? { address: pickupAddress, building: assignedLaundryName }
-      : { address: pickupAddress };
+    return {
+      address: pickupAddress,
+      ...(assignedLaundryName ? { building: assignedLaundryName } : {}),
+      ...(pickupNeighborhood ? { neighborhood: pickupNeighborhood } : {}),
+    };
   }
 
   return location || {};
