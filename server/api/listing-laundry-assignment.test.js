@@ -713,7 +713,7 @@ describe('listing-laundry-assignment', () => {
         // garment rather than on the studio (Jonathan, 2026-09-09). Null here because this
         // fixture's studio has not set one - written either way, so a studio that clears its
         // neighbourhood does not leave the old value stranded.
-        assignedLaundryNeighborhood: null,
+        pickupNeighborhood: null,
       });
       expect(params.geolocation).toMatchObject({ lat: 48.857, lng: 2.359 });
     });

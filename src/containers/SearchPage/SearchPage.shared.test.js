@@ -845,7 +845,7 @@ describe('withLaundryPickupFilter labels', () => {
 describe('withNeighborhoodFilter', () => {
   const fieldFrom = laundryOptions => {
     const fields = withNeighborhoodFilter([], laundryOptions, null);
-    return fields.find(f => f.key === 'assignedLaundryNeighborhood') || null;
+    return fields.find(f => f.key === 'pickupNeighborhood') || null;
   };
 
   it('offers each part of town once, however many studios are in it', () => {
@@ -866,7 +866,7 @@ describe('withNeighborhoodFilter', () => {
     // the assignment now stamps it and the propagation keeps it current.
     const field = fieldFrom([{ id: 'l1', name: 'A', neighborhood: 'Le Marais' }]);
 
-    expect(field.key).toBe('assignedLaundryNeighborhood');
+    expect(field.key).toBe('pickupNeighborhood');
     expect(field.scope).toBe('public');
   });
 
@@ -939,14 +939,14 @@ describe('onResetAll', () => {
       pub_size: 'M',
       price: '0,100',
       meta_assignedLaundryId: 'l1',
-      pub_assignedLaundryNeighborhood: 'Le Marais',
+      pub_pickupNeighborhood: 'Le Marais',
       pub_brand: 'Reformation',
     });
 
     expect(url).not.toContain('pub_size');
     expect(url).not.toContain('price');
     expect(url).not.toContain('meta_assignedLaundryId');
-    expect(url).not.toContain('pub_assignedLaundryNeighborhood');
+    expect(url).not.toContain('pub_pickupNeighborhood');
     expect(url).not.toContain('pub_brand');
   });
 

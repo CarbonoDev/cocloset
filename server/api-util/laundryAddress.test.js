@@ -408,7 +408,7 @@ describe('propagateAddressToAssignedListings()', () => {
             // Part of the comparison now: it is a copy, so it can be stale, so "already
             // correct" has to include it. Without this the listing looks correct on the
             // other three and a studio that moved neighbourhoods never converges.
-            assignedLaundryNeighborhood: null,
+            pickupNeighborhood: null,
           },
           geolocation: NEW_ORIGIN,
         }),
@@ -492,7 +492,7 @@ describe('propagateAddressToAssignedListings(): the neighbourhood', () => {
           publicData: {
             pickupAddress: laundryRecord.address,
             assignedLaundryName: laundryRecord.studioName,
-            assignedLaundryNeighborhood: 'Le Marais',
+            pickupNeighborhood: 'Le Marais',
           },
         }),
       ],
@@ -506,7 +506,7 @@ describe('propagateAddressToAssignedListings(): the neighbourhood', () => {
 
     expect(result.updated.map(entry => entry.id)).toEqual(['moved']);
     expect(result.skipped).toHaveLength(0);
-    expect(update.mock.calls[0][0].publicData.assignedLaundryNeighborhood).toBe('Le Sentier');
+    expect(update.mock.calls[0][0].publicData.pickupNeighborhood).toBe('Le Sentier');
   });
 
   it('leaves a listing alone once its neighbourhood already matches', async () => {
@@ -518,7 +518,7 @@ describe('propagateAddressToAssignedListings(): the neighbourhood', () => {
           publicData: {
             pickupAddress: laundryRecord.address,
             assignedLaundryName: laundryRecord.studioName,
-            assignedLaundryNeighborhood: 'Le Sentier',
+            pickupNeighborhood: 'Le Sentier',
           },
         }),
       ],

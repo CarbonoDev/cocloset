@@ -692,7 +692,7 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
  *
  * BUILT FROM THE STUDIOS, FILTERED ON THE LISTINGS. The options are the distinct
  * neighbourhoods of the studios that exist, deduplicated here; the query runs against
- * `publicData.assignedLaundryNeighborhood`, which the assignment stamps onto each listing and
+ * `publicData.pickupNeighborhood`, which the assignment stamps onto each listing and
  * the propagation keeps current (server/api-util/laundryAssignment.js).
  *
  * IT NEEDS A SEARCH SCHEMA, and that is not something this file can check. An extended-data
@@ -701,7 +701,7 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
  * than like an error, which is why it is called out here and in the handover notes rather
  * than left to be discovered:
  *
- *   flex-cli search set --key assignedLaundryNeighborhood --type enum --scope public
+ *   flex-cli search set --key pickupNeighborhood --type enum --scope public
  *
  * @param {Array<Object>} listingFields - from config.listing
  * @param {Array<{id: string, name: string, neighborhood: string}>} laundryOptions
@@ -726,7 +726,7 @@ export const withNeighborhoodFilter = (listingFields = [], laundryOptions = [], 
   return [
     ...listingFields,
     {
-      key: 'assignedLaundryNeighborhood',
+      key: 'pickupNeighborhood',
       scope: 'public',
       schemaType: 'enum',
       // The value IS the label. A neighbourhood has no id of its own - it is a string a studio

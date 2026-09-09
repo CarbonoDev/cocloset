@@ -376,7 +376,7 @@ const propagateAddressToAssignedListings = ({ integrationSdk, laundryId, laundry
           // stale, so it is something this comparison has to know about. Omitting it would
           // leave a studio that moved neighbourhoods printing the old one forever, because
           // every listing would look "already correct" on the other three fields.
-          publicData.assignedLaundryNeighborhood === (laundry.neighborhood || null);
+          publicData.pickupNeighborhood === (laundry.neighborhood || null);
 
         if (alreadyCorrect) {
           skipped.push({ id: listing.id.uuid, description: describeListing(listing) });
