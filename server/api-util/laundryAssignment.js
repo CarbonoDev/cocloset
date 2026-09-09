@@ -327,7 +327,7 @@ const laundryDerivedListingFields = laundry => ({
   // Null rather than absent when the studio has not got one: the field has to be written on
   // every pass or a studio that clears its neighbourhood would leave the old value stranded
   // on its garments.
-  assignedLaundryNeighborhood: laundry.neighborhood || null,
+  pickupNeighborhood: laundry.neighborhood || null,
   geolocation: { lat: laundry.origin.lat, lng: laundry.origin.lng },
 });
 
@@ -342,15 +342,13 @@ const laundryDerivedListingFields = laundry => ({
  * @returns {{geolocation: Object, publicData: {assignedLaundryName: string|null, pickupAddress: string}}}
  */
 const laundryDerivedListingParams = laundry => {
-  const {
-    assignedLaundryName,
-    pickupAddress,
-    assignedLaundryNeighborhood,
-  } = laundryDerivedListingFields(laundry);
+  const { assignedLaundryName, pickupAddress, pickupNeighborhood } = laundryDerivedListingFields(
+    laundry
+  );
 
   return {
     geolocation: new sdkTypes.LatLng(laundry.origin.lat, laundry.origin.lng),
-    publicData: { assignedLaundryName, pickupAddress, assignedLaundryNeighborhood },
+    publicData: { assignedLaundryName, pickupAddress, pickupNeighborhood },
   };
 };
 

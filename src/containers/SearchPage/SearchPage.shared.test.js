@@ -12,6 +12,7 @@ import {
   getDerivedRenderData,
   withBrandFilter,
   withLaundryPickupFilter,
+  onResetAll,
 } from './SearchPage.shared.js';
 
 const urlParams = {
@@ -844,7 +845,7 @@ describe('withLaundryPickupFilter labels', () => {
 describe('withNeighborhoodFilter', () => {
   const fieldFrom = laundryOptions => {
     const fields = withNeighborhoodFilter([], laundryOptions, null);
-    return fields.find(f => f.key === 'assignedLaundryNeighborhood') || null;
+    return fields.find(f => f.key === 'pickupNeighborhood') || null;
   };
 
   it('offers each part of town once, however many studios are in it', () => {
@@ -865,7 +866,7 @@ describe('withNeighborhoodFilter', () => {
     // the assignment now stamps it and the propagation keeps it current.
     const field = fieldFrom([{ id: 'l1', name: 'A', neighborhood: 'Le Marais' }]);
 
-    expect(field.key).toBe('assignedLaundryNeighborhood');
+    expect(field.key).toBe('pickupNeighborhood');
     expect(field.scope).toBe('public');
   });
 
@@ -889,5 +890,98 @@ describe('withNeighborhoodFilter', () => {
   it('leaves the fields it was given alone', () => {
     const existing = [{ key: 'brand' }];
     expect(withNeighborhoodFilter(existing, [], null)).toBe(existing);
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "si doy click en Reset All no se limpia, se limpia hasta que doy click manualmente a
+//   >  ese filtro" (Jonathan, 2026-09-09)
+//
+// Three of the filters on this page are not in Console - pickup, neighbourhood and brand are
+// synthesised from the studios and brands that exist. "Reset all" strips the params it knows
+// about, and it only knew about the Console ones, so it cleared some filters and left others.
+// A reset that resets most things is worse than one that resets nothing: it reads as done.
+// ---------------------------------------------------------------------------
+describe('onResetAll', () => {
+  const LAUNDRY_OPTIONS = [{ id: 'l1', name: 'Maison du Marais', neighborhood: 'Le Marais' }];
+  const BRAND_OPTIONS = ['Reformation'];
+
+  const resetFrom = urlQueryParams => {
+    const history = { push: jest.fn() };
+    onResetAll({
+      history,
+      routeConfiguration: [{ name: 'SearchPage', path: '/s', auth: false }],
+      config: {
+        listing: {
+          listingFields: [
+            {
+              key: 'size',
+              scope: 'public',
+              schemaType: 'enum',
+              filterConfig: { indexForSearch: true, showFilter: true },
+            },
+          ],
+        },
+        search: { defaultFilters: [{ key: 'price', schemaType: 'price' }] },
+      },
+      location: { pathname: '/s', search: '' },
+      urlQueryParams,
+      setState: () => null,
+      laundryOptions: LAUNDRY_OPTIONS,
+      brandOptions: BRAND_OPTIONS,
+    });
+    const pushedTo = history.push.mock.calls[0]?.[0] || '';
+    return pushedTo;
+  };
+
+  it('clears the pickup, neighbourhood and brand filters as well as the Console ones', () => {
+    const url = resetFrom({
+      pub_size: 'M',
+      price: '0,100',
+      meta_assignedLaundryId: 'l1',
+      pub_pickupNeighborhood: 'Le Marais',
+      pub_brand: 'Reformation',
+    });
+
+    expect(url).not.toContain('pub_size');
+    expect(url).not.toContain('price');
+    expect(url).not.toContain('meta_assignedLaundryId');
+    expect(url).not.toContain('pub_pickupNeighborhood');
+    expect(url).not.toContain('pub_brand');
+  });
+
+  it('leaves params that are not filters alone', () => {
+    // Sorting and paging are not filters, and a reset that dropped them would move the reader
+    // somewhere they did not ask to go.
+    const url = resetFrom({ pub_size: 'M', sort: '-createdAt' });
+
+    expect(url).toContain('sort=-createdAt');
+    expect(url).not.toContain('pub_size');
+  });
+
+  it('still clears the Console filters when there are no studios or brands', () => {
+    const history = { push: jest.fn() };
+    onResetAll({
+      history,
+      routeConfiguration: [{ name: 'SearchPage', path: '/s', auth: false }],
+      config: {
+        listing: {
+          listingFields: [
+            {
+              key: 'size',
+              scope: 'public',
+              schemaType: 'enum',
+              filterConfig: { indexForSearch: true, showFilter: true },
+            },
+          ],
+        },
+        search: { defaultFilters: [] },
+      },
+      location: { pathname: '/s', search: '' },
+      urlQueryParams: { pub_size: 'M' },
+      setState: () => null,
+    });
+
+    expect(history.push.mock.calls[0][0]).not.toContain('pub_size');
   });
 });
