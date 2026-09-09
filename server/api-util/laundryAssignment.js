@@ -317,6 +317,7 @@ const laundryDerivedListingFields = laundry => ({
   // every listing would either re-stamp forever or never.
   assignedLaundryName: laundry.studioName || laundry.displayName || null,
   pickupAddress: laundry.address,
+  pickupNeighborhood: laundry.neighborhood || null,
   geolocation: { lat: laundry.origin.lat, lng: laundry.origin.lng },
 });
 
@@ -331,11 +332,11 @@ const laundryDerivedListingFields = laundry => ({
  * @returns {{geolocation: Object, publicData: {assignedLaundryName: string|null, pickupAddress: string}}}
  */
 const laundryDerivedListingParams = laundry => {
-  const { assignedLaundryName, pickupAddress } = laundryDerivedListingFields(laundry);
+  const { assignedLaundryName, pickupAddress, pickupNeighborhood } = laundryDerivedListingFields(laundry);
 
   return {
     geolocation: new sdkTypes.LatLng(laundry.origin.lat, laundry.origin.lng),
-    publicData: { assignedLaundryName, pickupAddress },
+    publicData: { assignedLaundryName, pickupAddress, pickupNeighborhood },
   };
 };
 
