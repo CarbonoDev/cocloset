@@ -139,6 +139,56 @@ describe('processCheckoutWithPayment - auto-accept timing', () => {
     );
   });
 
+  //   > "Al hacer booking de una prenda que ya está en laundry se hace la autoaceptación, pero
+  //   >  el customer tiene que hacer refresh para ver el nuevo status; esto ya se habia
+  //   >  corregido" (Jonathan, 2026-09-10)
+  //
+  // It had been corrected on the wrong screen. What the customer sees next is /order/:id,
+  // which re-reads the transaction from the API - and this promise resolving is what triggers
+  // that navigation. Fire-and-continue therefore meant a race between the acceptance and the
+  // page that reads its result, and the fix is that there is no longer a race to win.
+  it('does not finish the checkout until the acceptance has landed', async () => {
+    let acceptanceSettled = false;
+    let resolveAcceptance;
+    autoAcceptBooking.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveAcceptance = () => {
+            acceptanceSettled = true;
+            resolve({ data: { transaction: txAfter('transition/accept') } });
+          };
+        })
+    );
+
+    const calls = [];
+    let checkoutFinished = false;
+    const checkout = processCheckoutWithPayment(...buildParams({ calls })).then(result => {
+      checkoutFinished = true;
+      return result;
+    });
+
+    // Let every other step settle. The acceptance is still outstanding, so the checkout - and
+    // therefore the redirect it triggers - must be too.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(autoAcceptBooking).toHaveBeenCalled();
+    expect(checkoutFinished).toBe(false);
+
+    resolveAcceptance();
+    await checkout;
+
+    expect(acceptanceSettled).toBe(true);
+    expect(checkoutFinished).toBe(true);
+  });
+
+  it('still finishes when the acceptance fails, rather than hanging on it', async () => {
+    // The await must not become a way for a broken endpoint to strand a customer who has paid.
+    autoAcceptBooking.mockImplementation(() => Promise.reject(new Error('500')));
+
+    await expect(processCheckoutWithPayment(...buildParams({ calls: [] }))).resolves.toEqual(
+      expect.objectContaining({ orderId: ORDER_ID })
+    );
+  });
+
   // NOT COVERED HERE, DELIBERATELY, AND SAID OUT LOUD.
   //
   // The re-persist of the accepted transaction (see the .then beside the autoAcceptBooking
