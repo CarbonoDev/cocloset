@@ -305,6 +305,12 @@ const getSearchParams = config => {
       // Read by the card and by getPickupLocation (util/listingLocation.js); written by the
       // laundry assignment, which is what this branch added.
       'publicData.pickupNeighborhood',
+      // The cleaning floor the date filter cannot ask Sharetribe about - see
+      // util/searchCleaningFloor.js. Without these three the filter has nothing to apply and
+      // a garment that cannot be collected for a fortnight comes back as available today.
+      'metadata.initialCleaningDays',
+      'metadata.onLaundry',
+      'metadata.readyAt',
     ],
     'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
     'fields.image': [
