@@ -1,7 +1,4 @@
-import {
-  earliestBookableStart,
-  resolveInitialCleaningDays,
-} from '../components/OrderPanel/BookingDatesForm/BookingDatesForm';
+import { earliestBookableStart, resolveInitialCleaningDays } from './cleaningFloor';
 
 /**
  * Drop the garments a date search would offer but a booking would refuse.
