@@ -19,6 +19,7 @@ import { fetchBrands, fetchLaundryOptions } from '../../util/api';
 import * as log from '../../util/log';
 
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
+import { withoutUnbookableListings } from '../../util/searchCleaningFloor';
 
 // Pagination page size might need to be dynamic on responsive page layouts
 // Current design has max 3 columns 12 is divisible by 2 and 3
@@ -282,6 +283,15 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
   // We could consider moving them to the prepareAPIParams function too.
   const priceMaybe = priceSearchParams(price);
   const datesMaybe = datesSearchParams(dates);
+
+  // The FIRST day the reader asked about, kept out of the query params on purpose - it is not
+  // something the API is asked, it is what the cleaning floor is compared against once the API
+  // has answered. Parsed the same way `datesSearchParams` parses it, and null unless the
+  // dates filter produced a usable range, so a search with no dates filters nothing.
+  const requestedStart =
+    datesMaybe.start && typeof dates === 'string' && dates.split(',').length === 2
+      ? parseDateFromISO8601(dates.split(',')[0], 'Etc/UTC')
+      : null;
   const stockMaybe = stockFilters(datesMaybe);
   const seatsMaybe = seatsSearchParams(seats, datesMaybe);
   const sortMaybe = sortSearchParams(sort, searchParams?.keywords !== undefined);
@@ -333,8 +343,12 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
       const listingFields = config?.listing?.listingFields;
       const sanitizeConfig = { listingFields };
 
-      dispatch(addMarketplaceEntities(response, sanitizeConfig));
-      return response;
+      // Dropped BEFORE the entities are stored, so nothing downstream has to remember to
+      // exclude them again: the results, the map and the count all read what is kept.
+      const filtered = withoutUnbookableListings(response, requestedStart);
+
+      dispatch(addMarketplaceEntities(filtered, sanitizeConfig));
+      return filtered;
     })
     .catch(e => {
       const error = storableError(e);
@@ -530,6 +544,19 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
         'publicData.size',
         'publicData.assignedLaundryName',
         'publicData.pickupNeighborhood',
+        // WHAT THE DATE FILTER CANNOT ASK SHARETRIBE.
+        //
+        //   > "tengo un listing que estará disponible hasta el día 22 de septiembre; sin
+        //   >  embargo, cuando hago filtros por fecha (...) aparece el listing como resultado"
+        //   >   (Jonathan, 2026-09-10)
+        //
+        // The initial cleaning lead time is not on the calendar - it is relative to a drop-off
+        // that has not happened yet - so `listings.query` has no reason to exclude a garment
+        // that cannot be collected for another fortnight. These three are what the same rule
+        // the picker applies needs to run here. See util/searchCleaningFloor.js.
+        'metadata.initialCleaningDays',
+        'metadata.onLaundry',
+        'metadata.readyAt',
       ],
       'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
       'fields.image': [
