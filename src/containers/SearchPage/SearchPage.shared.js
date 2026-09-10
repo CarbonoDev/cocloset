@@ -464,7 +464,10 @@ export const pickListingFieldFilters = params => {
 // The listing field the brand filter is built from. Named rather than inlined because the
 // string is the contract with Console: rename the field there and this stops matching, which
 // is a filter quietly sliding back down the row rather than an error.
-const BRAND_FILTER_KEY = 'brand';
+// Matched case-insensitively, and `brands` as well as `brand`: this is a Console-authored key
+// on the fields we did not synthesise, and a filter silently sliding back down the row because
+// somebody named it "Brands" is not a failure anybody would attribute to this.
+const BRAND_FILTER_KEYS = ['brand', 'brands'];
 
 /**
  * Put the brand filter first.
@@ -484,11 +487,11 @@ const BRAND_FILTER_KEY = 'brand';
  * @param {Array<Object>} filters
  * @returns {Array<Object>}
  */
+const isBrandFilter = filter => BRAND_FILTER_KEYS.includes(String(filter?.key || '').toLowerCase());
+
 const hoistBrandFirst = filters => {
-  const brand = filters.filter(f => f.key === BRAND_FILTER_KEY);
-  return brand.length > 0
-    ? [...brand, ...filters.filter(f => f.key !== BRAND_FILTER_KEY)]
-    : filters;
+  const brand = filters.filter(isBrandFilter);
+  return brand.length > 0 ? [...brand, ...filters.filter(f => !isBrandFilter(f))] : filters;
 };
 
 export const groupListingFieldConfigs = (configs, activeListingTypes) =>
