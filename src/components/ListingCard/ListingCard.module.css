@@ -217,7 +217,20 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  z-index: 1;
+
+  /* NO Z-INDEX. It does not need one and it must not have one.
+     > "El z index del icono del corazón se ve encima del algunos modales o del menú en mobile"
+     >   (Jonathan, 2026-09-08, still visible 2026-09-10)
+
+     An absolutely positioned element already paints above the in-flow content of its own
+     stacking context, so the heart sits over the card image for free. The `z-index: 1` it had
+     bought nothing and cost everything: a positive z-index enters the page's stacking
+     competition, and this card is nested several contexts deep - the sticky filter bar, the
+     search wrapper - so what it competes against is not the modal but whatever ancestor the
+     modal happens to live under. `isolation` alone did not settle that, because it confines a
+     z-index rather than removing it.
+
+     The rule to keep: a card is content. Content does not declare a z-index. */
 
   /* Legible over any photograph. A bare icon disappears against a pale garment on a pale
      background, which is most of this marketplace. */

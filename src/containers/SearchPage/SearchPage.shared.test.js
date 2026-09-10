@@ -985,3 +985,119 @@ describe('onResetAll', () => {
     expect(history.push.mock.calls[0][0]).not.toContain('pub_size');
   });
 });
+
+// ---------------------------------------------------------------------------
+//   > "El filtro de brand no está en la primer posición, esto debe funcionar tanto en mobile
+//   >  como en desktop"
+//   > "No se muestra el filtro de vecindario" (Jonathan, 2026-09-10)
+//
+// The two synthesised filters were asserted in isolation, which proved the builders were
+// right and nothing about the list the page actually renders. Both screens map over
+// `availableFilters`, so that is what these drive - through getDerivedRenderData, with the
+// options the page really passes.
+// ---------------------------------------------------------------------------
+describe('the filter row the page renders', () => {
+  const keysOf = filters => filters.map(f => f.key);
+
+  const deriveWith = ({
+    laundryOptions = [],
+    brandOptions = [],
+    listingFields = [],
+    categories = [],
+  } = {}) =>
+    getDerivedRenderData({
+      intl: { formatMessage: ({ id }) => id, formatNumber: n => `${n}` },
+      location: { search: '' },
+      routeConfiguration: [],
+      config: {
+        currency: 'USD',
+        listing: { listingTypes: [{ listingType: 'rent-garment' }], listingFields },
+        categoryConfiguration: { key: 'categoryLevel', categories },
+        search: {
+          mainSearch: { searchType: 'location' },
+          sortConfig: {
+            active: false,
+            queryParamName: 'sort',
+            options: [],
+            conflictingFilters: [],
+          },
+          defaultFilters: [
+            { key: 'listingType', schemaType: 'listingType' },
+            { key: 'categoryLevel', schemaType: 'category' },
+            { key: 'price', schemaType: 'price', min: 0, max: 1000 },
+            { key: 'keywords', schemaType: 'keywords' },
+          ],
+        },
+        maps: {},
+        user: { userTypes: [] },
+      },
+      searchParams: {},
+      listings: [],
+      searchInProgress: false,
+      laundryOptions,
+      brandOptions,
+    });
+
+  const consoleField = key => ({
+    key,
+    scope: 'public',
+    schemaType: 'enum',
+    enumOptions: [{ option: 'a', label: 'A' }],
+    filterConfig: { indexForSearch: true, showFilter: true, group: 'primary', label: key },
+  });
+
+  it('puts brand first, ahead of the built-ins and of the Console fields', () => {
+    const { availableFilters, availablePrimaryFilters } = deriveWith({
+      brandOptions: ['Reformation'],
+      listingFields: [consoleField('size')],
+      // A REAL category tree. With none, the category filter drops out of the list entirely
+      // and the ordering question never arises - which is exactly how a green test can sit
+      // beside a filter row that reads Category, Size, ... on the actual page.
+      categories: [{ id: 'dresses', name: 'Dresses' }],
+    });
+
+    // Both lists: the desktop row reads the primary one, the mobile panel reads the other.
+    expect(keysOf(availableFilters)[0]).toBe('brand');
+    expect(keysOf(availablePrimaryFilters)[0]).toBe('brand');
+  });
+
+  it('puts a CONSOLE brand field first too, not just the synthesised one', () => {
+    // The synthesised brand filter only exists when the marketplace has brands to offer. If
+    // Console also defines a `brand` listing field, that is what a reader sees - and it has to
+    // land in the same place, or "brand is first" would depend on how many brands exist.
+    const { availableFilters } = deriveWith({
+      listingFields: [consoleField('size'), consoleField('brand')],
+    });
+
+    expect(keysOf(availableFilters)[0]).toBe('brand');
+  });
+
+  it('hoists a brand field whatever Console called it', () => {
+    // The last way the hoist could miss: the key on a Console-authored field is Console's to
+    // choose, and a filter sliding back down the row because somebody typed "Brands" is not a
+    // failure anybody would attribute to this code.
+    const { availableFilters } = deriveWith({
+      listingFields: [consoleField('size'), consoleField('Brands')],
+    });
+
+    expect(keysOf(availableFilters)[0]).toBe('Brands');
+  });
+
+  it('offers the neighbourhood filter once a studio has one', () => {
+    const { availableFilters } = deriveWith({
+      laundryOptions: [{ id: 'l1', name: 'Maison du Marais', neighborhood: 'Le Marais' }],
+    });
+
+    expect(keysOf(availableFilters)).toContain('pickupNeighborhood');
+  });
+
+  it('offers no neighbourhood filter while no studio has set one', () => {
+    // The honest empty case: this is what a marketplace looks like before any studio has
+    // saved a neighbourhood, and it is why the filter can be "missing" without being broken.
+    const { availableFilters } = deriveWith({
+      laundryOptions: [{ id: 'l1', name: 'Maison du Marais', neighborhood: null }],
+    });
+
+    expect(keysOf(availableFilters)).not.toContain('pickupNeighborhood');
+  });
+});
