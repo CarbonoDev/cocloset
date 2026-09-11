@@ -1,4 +1,5 @@
 import React from 'react';
+import { Route } from 'react-router-dom';
 import '@testing-library/jest-dom';
 
 import { createCurrentUser } from '../../util/testData';
@@ -274,7 +275,9 @@ describe('LaundryOpsPage', () => {
 
       // The days moved one step later (Jonathan, 2026-09-08) - "Process for Cleaning" is the
       // garment joining the queue, and the next button is the work starting.
-      expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).not.toBeInTheDocument();
+      expect(
+        document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')
+      ).not.toBeInTheDocument();
       const codeBox = document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1');
       expect(codeBox).toBeInTheDocument();
       // Prefilled with the code the garment already carries: the common case is confirming
@@ -649,9 +652,25 @@ describe('LaundryOpsPage', () => {
       ];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="dashboard" />);
 
-      const rented = screen.getByText('LaundryOpsPage.tile.currentlyRented').closest('div');
+      const rented = screen.getByText('LaundryOpsPage.tile.outWithRenters').closest('a');
       expect(within(rented).getByText('2')).toBeInTheDocument();
-      expect(screen.getByText('LaundryOpsPage.tile.damaged')).toBeInTheDocument();
+      expect(screen.getByText('LaundryOpsPage.tile.flaggedForReview')).toBeInTheDocument();
+    });
+
+    it('makes each stat tile a link into its section', () => {
+      render(<LaundryOpsPageComponent {...baseProps} tab="dashboard" />);
+
+      expect(
+        screen.getByText('LaundryOpsPage.tile.pendingPickups48h').closest('a')
+      ).toHaveAttribute('href', '/laundry/pickups');
+      expect(screen.getByText('LaundryOpsPage.tile.rentalOrders').closest('a')).toHaveAttribute(
+        'href',
+        '/laundry/orders'
+      );
+      expect(screen.getByText('LaundryOpsPage.tile.rentalInventory').closest('a')).toHaveAttribute(
+        'href',
+        '/laundry/inventory'
+      );
     });
 
     it('lists damaged garments in the attention panel', () => {
@@ -665,6 +684,32 @@ describe('LaundryOpsPage', () => {
     it('shows an empty state when nothing needs attention', () => {
       render(<LaundryOpsPageComponent {...baseProps} tab="dashboard" />);
       expect(screen.getByText('LaundryOpsPage.panel.attentionEmpty')).toBeInTheDocument();
+    });
+
+    it('looking up a ticket navigates to the Orders screen with it as the search term', async () => {
+      const user = userEvent.setup();
+      render(
+        <>
+          <LaundryOpsPageComponent {...baseProps} tab="dashboard" />
+          {/* Location probe: LaundryOpsPageComponent doesn't derive `tab` from the
+              URL itself (routeConfiguration.js does that in the real app), so this
+              is how the test observes where the ticket lookup form navigated to. */}
+          <Route
+            path="*"
+            render={({ location }) => (
+              <div data-testid="location">{`${location.pathname}${location.search}`}</div>
+            )}
+          />
+        </>
+      );
+
+      await user.type(
+        screen.getByPlaceholderText('LaundryOpsPage.ticketLookup.placeholder'),
+        'PIG-2032'
+      );
+      await user.click(screen.getByText('LaundryOpsPage.ticketLookup.submit'));
+
+      expect(screen.getByTestId('location')).toHaveTextContent('/laundry/orders?search=PIG-2032');
     });
   });
 

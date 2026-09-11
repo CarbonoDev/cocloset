@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useHistory } from 'react-router-dom';
 import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { statusLabelKey } from '../../util/laundryStatuses';
+import { useRouteConfiguration } from '../../context/routeConfigurationContext';
+import { pathByRouteName } from '../../util/routes';
+import { stringify } from '../../util/urlHelpers';
 import { H4, NamedLink } from '../../components';
 
 import {
   DASHBOARD_TILES,
+  TILE_ROUTES,
   TILE_TONES,
   dashboardCounts,
   incomingNext48h,
@@ -45,17 +50,59 @@ const PanelRow = props => {
 };
 
 /**
- * "Today at the studio" dashboard (mockup 09.jpg): eight stat tiles plus the
- * "Incoming next 48h" and "Needs your attention" panels.
+ * "Lookup ticket #" - replaces the old "Open orders" button (2026-09-11):
+ * typing an internal ticket code and submitting jumps straight to the Orders
+ * screen pre-filtered to it, via the same `?search=` param LaundryOrdersTable
+ * already reads for its own search box.
+ */
+const TicketLookup = () => {
+  const intl = useIntl();
+  const history = useHistory();
+  const routeConfiguration = useRouteConfiguration();
+  const [value, setValue] = useState('');
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    const query = value.trim();
+    if (!query) {
+      return;
+    }
+    history.push({
+      pathname: pathByRouteName('LaundryOpsOrdersPage', routeConfiguration),
+      search: stringify({ search: query }),
+    });
+  };
+
+  return (
+    <form className={css.ticketLookup} onSubmit={handleSubmit}>
+      <input
+        type="search"
+        className={css.search}
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder={intl.formatMessage({ id: 'LaundryOpsPage.ticketLookup.placeholder' })}
+        aria-label={intl.formatMessage({ id: 'LaundryOpsPage.ticketLookup.placeholder' })}
+      />
+      <button type="submit" className={css.dashboardLink}>
+        <FormattedMessage id="LaundryOpsPage.ticketLookup.submit" />
+      </button>
+    </form>
+  );
+};
+
+/**
+ * "Today at the studio" dashboard: stat tiles plus the "Incoming next 48h" and
+ * "Needs your attention" panels.
  *
  * @param {Object} props
  * @param {Array} props.rows - all rows from the /api/laundry-orders response
+ * @param {Array} [props.inventory] - per-garment rows from the same response
  * @returns {JSX.Element}
  */
 const LaundryDashboard = props => {
-  const { rows } = props;
+  const { rows, inventory = [] } = props;
 
-  const counts = dashboardCounts(rows);
+  const counts = dashboardCounts(rows, inventory);
   const incoming = incomingNext48h(rows);
   const attention = needsAttention(rows);
 
@@ -63,7 +110,7 @@ const LaundryDashboard = props => {
     <div className={css.dashboard}>
       <div className={css.tiles}>
         {DASHBOARD_TILES.map(tile => (
-          <div key={tile} className={css.tile}>
+          <NamedLink key={tile} name={TILE_ROUTES[tile]} className={css.tile}>
             <span className={css.tileLabel}>
               <FormattedMessage id={`LaundryOpsPage.tile.${tile}`} />
             </span>
@@ -74,7 +121,7 @@ const LaundryDashboard = props => {
             >
               {counts[tile]}
             </span>
-          </div>
+          </NamedLink>
         ))}
       </div>
 
@@ -119,9 +166,7 @@ const LaundryDashboard = props => {
         </section>
       </div>
 
-      <NamedLink name="LaundryOpsOrdersPage" className={css.dashboardLink}>
-        <FormattedMessage id="LaundryOpsPage.openOrders" />
-      </NamedLink>
+      <TicketLookup />
     </div>
   );
 };

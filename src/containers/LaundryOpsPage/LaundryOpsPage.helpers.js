@@ -179,54 +179,75 @@ export const filterBySearch = (rows, query) => {
 
 // ================ Dashboard ================ //
 
-// Stat tiles on the Dashboard (mockup 09.jpg), in the order shown there.
+// Stat tiles on the Dashboard, left to right (per Jonathan, 2026-09-11 - given
+// to us right to left, so this is that list reversed).
 export const DASHBOARD_TILES = [
-  'readyForPickup',
-  'pickupsToday',
-  'dropOffsToday',
-  'currentlyRented',
-  'pendingCleaning',
-  'lateReturns',
-  'damaged',
+  'flaggedForReview',
+  'rentalInventory',
+  'pendingDropOffs48h',
+  'inCleaning',
+  'outWithRenters',
+  'rentalOrders',
+  'pendingPickups48h',
 ];
+
+// Which named route each tile drills into when clicked (2026-09-11: "cada
+// card del dashboard sea clickeable para poder entrar a cada sección").
+export const TILE_ROUTES = {
+  pendingPickups48h: 'LaundryOpsPickupsPage',
+  rentalOrders: 'LaundryOpsOrdersPage',
+  outWithRenters: 'LaundryOpsReturnsPage',
+  inCleaning: 'LaundryOpsCleaningPage',
+  pendingDropOffs48h: 'LaundryOpsReturnsPage',
+  rentalInventory: 'LaundryOpsInventoryPage',
+  flaggedForReview: 'LaundryOpsOrdersPage',
+};
 
 /**
  * Counts for the dashboard stat tiles.
  *
- * NOTE on the two date-driven tiles (`pickupsToday`, `dropOffsToday`): they read
- * `bookingStart`/`bookingEnd`, which only exist once a transaction has a real
- * Sharetribe booking. Inquiry-stage rows have none and are counted as zero
- * rather than guessed at.
+ * NOTE on the two date-driven tiles (`pendingPickups48h`, `pendingDropOffs48h`):
+ * they read `bookingStart`/`bookingEnd`, which only exist once a transaction
+ * has a real Sharetribe booking. Inquiry-stage rows have none and are counted
+ * as zero rather than guessed at.
  *
- * @param {Array} rows
+ * @param {Array} rows - all rows from the /api/laundry-orders response
+ * @param {Array} inventory - per-garment rows from /api/laundry-orders
  * @param {Date} now
  */
-export const dashboardCounts = (rows, now = new Date()) => ({
-  readyForPickup: rows.filter(r => opsStatus(r) === 'ready-for-pickup').length,
-  pickupsToday: rows.filter(r => isSameDayAs(r.bookingStart, now)).length,
+export const dashboardCounts = (rows, inventory = [], now = new Date()) => ({
+  // "Ready for renter pickup" is instantly within the next 48h, so it counts
+  // alongside bookings whose start date falls in that window.
+  pendingPickups48h:
+    rows.filter(r => opsStatus(r) === 'ready-for-pickup').length +
+    rows.filter(
+      r => opsStatus(r) !== 'ready-for-pickup' && isWithinNextHours(r.bookingStart, now, 48)
+    ).length,
+  rentalOrders: rows.length,
+  // "Out with renters" is the garment being out with the customer, which stays
+  // true after it goes overdue.
+  outWithRenters: rows.filter(r => ['picked-up', 'overdue'].includes(opsStatus(r))).length,
+  inCleaning: rows.filter(r => opsStatus(r) === 'pending-cleaning').length,
   // BOTH KINDS OF DROP-OFF, NOT JUST THE RENTER'S.
   //
   //   > "el que era returns expected today, puedes integrar Lender or Renter
   //   >  drop offs?" (Jonathan, 2026-09-03)
   //
   // Two different people walk in with a garment: a RENTER returning one whose
-  // booking ends today, and a LENDER bringing one in for the first time. The
-  // tile counted only the first, so the counter staff's own question - how many
-  // garments am I taking in - had no answer on the dashboard.
+  // booking ends within the window, and a LENDER bringing one in for the first
+  // time. The tile counted only the first, so the counter staff's own
+  // question - how many garments am I taking in - had no answer on the
+  // dashboard.
   //
-  // A lender drop-off has no booking date to be "today": the garment is
+  // A lender drop-off has no booking date to fall "within 48h": the garment is
   // `incoming` until the studio receives it, and it stays that way for as long
   // as it takes the owner to turn up. So it is counted as outstanding rather
-  // than as due today, which is what the label says.
-  dropOffsToday:
-    rows.filter(r => isSameDayAs(r.bookingEnd, now)).length +
+  // than as due soon, which is what the label says.
+  pendingDropOffs48h:
+    rows.filter(r => isWithinNextHours(r.bookingEnd, now, 48)).length +
     rows.filter(r => r?.readinessStatus === 'incoming' && !opsStatus(r)).length,
-  // "Currently rented" is the garment being out with the customer, which stays
-  // true after it goes overdue.
-  currentlyRented: rows.filter(r => ['picked-up', 'overdue'].includes(opsStatus(r))).length,
-  pendingCleaning: rows.filter(r => opsStatus(r) === 'pending-cleaning').length,
-  lateReturns: rows.filter(isLate).length,
-  damaged: rows.filter(isDamaged).length,
+  rentalInventory: inventory.length,
+  flaggedForReview: rows.filter(isDamaged).length,
 });
 
 /**
@@ -313,7 +334,6 @@ export const statusTone = row =>
  * Tiles without an entry render in the default colour.
  */
 export const TILE_TONES = {
-  pendingCleaning: 'Blue',
-  lateReturns: 'Critical',
-  damaged: 'Critical',
+  inCleaning: 'Blue',
+  flaggedForReview: 'Critical',
 };

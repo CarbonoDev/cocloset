@@ -204,22 +204,26 @@ describe('LaundryOpsPage.helpers', () => {
     ];
 
     it('produces a count for every declared tile', () => {
-      const counts = dashboardCounts(rows, NOW);
+      const counts = dashboardCounts(rows, [], NOW);
       DASHBOARD_TILES.forEach(tile => {
         expect(typeof counts[tile]).toBe('number');
       });
     });
 
     it('counts each tile correctly', () => {
-      expect(dashboardCounts(rows, NOW)).toEqual({
-        readyForPickup: 1,
-        pickupsToday: 1,
-        dropOffsToday: 1,
-        currentlyRented: 2,
-        pendingCleaning: 2,
-        lateReturns: 1,
-        damaged: 1,
+      expect(dashboardCounts(rows, [{ id: 'inv-1' }, { id: 'inv-2' }], NOW)).toEqual({
+        pendingPickups48h: 1,
+        rentalOrders: 8,
+        outWithRenters: 2,
+        inCleaning: 2,
+        pendingDropOffs48h: 1,
+        rentalInventory: 2,
+        flaggedForReview: 1,
       });
+    });
+
+    it('counts a garment already ready for pickup even without a booking in the next 48h', () => {
+      expect(dashboardCounts(rows, [], NOW).pendingPickups48h).toBe(1);
     });
 
     it('counts a lender bringing a garment in as a drop-off too', () => {
@@ -234,7 +238,7 @@ describe('LaundryOpsPage.helpers', () => {
         { id: 'incoming-2', readinessStatus: 'incoming' },
       ];
 
-      expect(dashboardCounts(withIncoming, NOW).dropOffsToday).toBe(3);
+      expect(dashboardCounts(withIncoming, [], NOW).pendingDropOffs48h).toBe(3);
     });
 
     it('does not count a garment the studio already has as an incoming drop-off', () => {
@@ -242,14 +246,14 @@ describe('LaundryOpsPage.helpers', () => {
       // `incoming` is someone still to walk through the door.
       const stored = [{ id: 's', readinessStatus: 'stored' }];
 
-      expect(dashboardCounts(stored, NOW).dropOffsToday).toBe(0);
+      expect(dashboardCounts(stored, [], NOW).pendingDropOffs48h).toBe(0);
     });
 
     it('counts date-driven tiles as zero when no row has a booking', () => {
       const undated = [row({ id: 'x', state: 'picked-up' })];
-      const counts = dashboardCounts(undated, NOW);
-      expect(counts.pickupsToday).toBe(0);
-      expect(counts.dropOffsToday).toBe(0);
+      const counts = dashboardCounts(undated, [], NOW);
+      expect(counts.pendingPickups48h).toBe(0);
+      expect(counts.pendingDropOffs48h).toBe(0);
     });
   });
 
