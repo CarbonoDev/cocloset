@@ -6,6 +6,8 @@ const {
   getCustomerCommissionMaybe,
   getCleaningFeeLineItemMaybe,
   resolveCleaningFeeInSubunits,
+  getSpecialHandlingFeeLineItemMaybe,
+  resolveSpecialHandlingFeeInSubunits,
 } = require('./lineItemHelpers');
 const {
   usesFixedRentalPeriods,
@@ -172,6 +174,9 @@ const getRentalPeriodQuantityAndLineItems = () => {
  * @param {number} [cleaningFeeInSubunits] - Cleaning fee (customer-paid) in the listing's
  * currency subunits, already resolved by the caller (see lineItemHelpers.resolveCleaningFeeInSubunits) -
  * this function stays synchronous, so the Integration API lookup happens before it's called.
+ * @param {number} [specialHandlingFeeInSubunits] - Special-handling fee (customer-paid) in the
+ * listing's currency subunits, already resolved by the caller (see
+ * lineItemHelpers.resolveSpecialHandlingFeeInSubunits) - same reasoning as the cleaning fee above.
  * @returns {Array} lineItems
  */
 exports.transactionLineItems = (
@@ -179,7 +184,8 @@ exports.transactionLineItems = (
   orderData,
   providerCommission,
   customerCommission,
-  cleaningFeeInSubunits
+  cleaningFeeInSubunits,
+  specialHandlingFeeInSubunits
 ) => {
   const publicData = listing.attributes.publicData;
   // Note: the unitType needs to be one of the following:
@@ -321,6 +327,7 @@ exports.transactionLineItems = (
     order,
     ...extraLineItems,
     ...getCleaningFeeLineItemMaybe(cleaningFeeInSubunits, currency),
+    ...getSpecialHandlingFeeLineItemMaybe(specialHandlingFeeInSubunits, currency),
     ...getProviderCommissionMaybe(providerCommission, order, currency),
     ...getCustomerCommissionMaybe(customerCommission, order, currency),
   ];
@@ -341,18 +348,20 @@ exports.transactionLineItems = (
  * copies of "resolve the fee, then call transactionLineItems" is exactly how
  * that happened, so there is now one copy and the endpoints call it.
  *
- * Still returns a Promise even though resolving the fee is now a synchronous env
- * read (it used to be an Integration API lookup of the assigned laundry — see
- * lineItemHelpers.resolveCleaningFeeInSubunits). Keeping the async contract means
- * the three endpoints above did not have to change when the fee moved into the
- * environment, and leaves room for a future input that does need I/O.
+ * Still returns a Promise even though resolving the cleaning fee is now a synchronous
+ * env read (it used to be an Integration API lookup of the assigned laundry — see
+ * lineItemHelpers.resolveCleaningFeeInSubunits): that async contract turned out to
+ * matter, because resolveSpecialHandlingFeeInSubunits is exactly the "future input that
+ * does need I/O" this used to just leave room for — it reads the listing's own
+ * `privateData` via the Integration API, which none of the three endpoints' own SDK
+ * calls can see (see that function's docstring for why).
  *
  * @param {Object} params
  * @param {Object} params.listing
  * @param {Object} params.orderData
  * @param {Object} params.providerCommission
  * @param {Object} params.customerCommission
- * @param {string} params.currency - currency the fee should be expressed in
+ * @param {string} params.currency - currency the fees should be expressed in
  * @returns {Promise<Array>} lineItems
  */
 exports.buildLineItemsForListing = ({
@@ -362,12 +371,16 @@ exports.buildLineItemsForListing = ({
   customerCommission,
   currency,
 }) =>
-  Promise.resolve(resolveCleaningFeeInSubunits(listing, currency)).then(cleaningFeeInSubunits =>
+  Promise.all([
+    resolveCleaningFeeInSubunits(listing, currency),
+    resolveSpecialHandlingFeeInSubunits(listing, currency),
+  ]).then(([cleaningFeeInSubunits, specialHandlingFeeInSubunits]) =>
     exports.transactionLineItems(
       listing,
       orderData,
       providerCommission,
       customerCommission,
-      cleaningFeeInSubunits
+      cleaningFeeInSubunits,
+      specialHandlingFeeInSubunits
     )
   );
