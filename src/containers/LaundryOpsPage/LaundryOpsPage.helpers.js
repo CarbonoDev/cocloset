@@ -179,16 +179,17 @@ export const filterBySearch = (rows, query) => {
 
 // ================ Dashboard ================ //
 
-// Stat tiles on the Dashboard, left to right (per Jonathan, 2026-09-11 - given
-// to us right to left, so this is that list reversed).
+// Stat tiles on the Dashboard, left to right (per Jonathan, 2026-09-11). An
+// 8th card, the ticket lookup box, follows these in the same row/grid - see
+// LaundryDashboard.js.
 export const DASHBOARD_TILES = [
-  'flaggedForReview',
-  'rentalInventory',
-  'pendingDropOffs48h',
-  'inCleaning',
-  'outWithRenters',
-  'rentalOrders',
   'pendingPickups48h',
+  'rentalOrders',
+  'outWithRenters',
+  'inCleaning',
+  'pendingDropOffs48h',
+  'rentalInventory',
+  'flaggedForReview',
 ];
 
 // Which named route each tile drills into when clicked (2026-09-11: "cada
@@ -249,26 +250,6 @@ export const dashboardCounts = (rows, inventory = [], now = new Date()) => ({
   rentalInventory: inventory.length,
   flaggedForReview: rows.filter(isDamaged).length,
 });
-
-/**
- * "Incoming next 48h" panel: garments arriving at or leaving the studio soon.
- * Includes rows whose booking starts within 48h, plus garments the owner has
- * shipped in but that haven't been received yet (readiness `incoming`), which
- * have no booking date to sort by at all.
- */
-export const incomingNext48h = (rows, now = new Date()) =>
-  rows
-    .filter(r => isWithinNextHours(r.bookingStart, now, 48) || r.readinessStatus === 'incoming')
-    .sort((a, b) => {
-      // Rows with a date first, soonest first; undated rows after them.
-      if (!a.bookingStart && !b.bookingStart) return 0;
-      if (!a.bookingStart) return 1;
-      if (!b.bookingStart) return -1;
-      return new Date(a.bookingStart) - new Date(b.bookingStart);
-    });
-
-/** "Needs your attention" panel: damage reports (design doc §10). */
-export const needsAttention = rows => rows.filter(isDamaged);
 
 // ================ Sorting ================ //
 
