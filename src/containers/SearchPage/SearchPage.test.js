@@ -747,6 +747,62 @@ describe('Duck', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  //   > listing `6aa26840-16da-44df-8a74-ff4ece1da4eb` still showing for a search dated
+  //   >  2026-09-10, tested in the evening (Jonathan, 2026-09-10)
+  //
+  // Widening the "is this date valid" cutoff above (36h) let a visitor behind UTC pick their
+  // own local "today" late in the day - but that picked day, read as UTC midnight, can then be
+  // genuinely behind the marketplace's actual UTC "today". The cleaning-floor post-filter
+  // (util/searchCleaningFloor.js) is deliberately anchored on UTC as the day-boundary
+  // authority, so comparing a stale `requestedStart` against it made every listing look
+  // unbookable - including ones with nothing wrong (already on laundry, cleaning long done).
+  // -------------------------------------------------------------------------
+  it('does not let a stale picked day hide an already-bookable listing behind the cleaning floor', () => {
+    const getState = () => ({
+      ...initialState,
+      user: { currentUser },
+      auth: { isAuthenticated: true },
+    });
+
+    // The picked day itself: yesterday, by real UTC clock - the exact shape of a visitor behind
+    // UTC picking their own local "today" late enough that it reads as UTC's prior day.
+    const pickedDay = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const iso = d => d.toISOString().slice(0, 10);
+    const dates = `${iso(pickedDay)},${iso(pickedDay)}`;
+
+    // Already on its laundry, cleaning finished long ago - nothing should block this listing
+    // from a search for "today or later".
+    const bookableListing = createListing('bookable', {
+      metadata: { onLaundry: true, initialCleaningDays: 2, readyAt: '2020-01-01T00:00:00.000Z' },
+    });
+
+    const query = sdkFn(fakeResponse([bookableListing]));
+    const sdk = {
+      currentUser: { show: sdkFn(fakeResponse(currentUser)) },
+      listings: { query },
+      authInfo: sdkFn({}),
+    };
+    const dispatch = createFakeDispatch(getState, sdk);
+
+    const withDatesFilter = {
+      ...config,
+      search: {
+        ...config.search,
+        defaultFilters: [
+          ...(config.search?.defaultFilters || []).filter(f => f.key !== 'dates'),
+          { key: 'dates', schemaType: 'dates', availability: 'time-full', dateRangeMode: 'day' },
+        ],
+      },
+    };
+
+    return dispatch(
+      searchListings({ searchParams: { dates, perPage: 24 }, config: withDatesFilter })
+    ).then(result => {
+      expect(result.payload.data.data.map(l => l.id.uuid)).toEqual(['bookable']);
+    });
+  });
+
   it('loadData() for full viewing rights user loads listings', () => {
     const getState = () => ({
       ...initialState,

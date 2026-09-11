@@ -342,9 +342,23 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
   // something the API is asked, it is what the cleaning floor is compared against once the API
   // has answered. Parsed the same way `datesSearchParams` parses it, and null unless the
   // dates filter produced a usable range, so a search with no dates filters nothing.
+  //
+  // CLAMPED FORWARD TO UTC'S OWN "TODAY" - the cleaning floor (util/cleaningFloor.js) is
+  // deliberately anchored on the marketplace's day-boundary authority (UTC), not on whichever
+  // browser is shopping, precisely so the floor cannot depend on a customer's clock. A visitor
+  // behind UTC (e.g. Mexico City) can still pick their own local "today" late in the day - see
+  // the 36h grace window above - and that picked day, read as UTC midnight, is then genuinely
+  // BEHIND the marketplace's current UTC day. Comparing that stale value against a floor that
+  // is correctly anchored on real UTC "today" made every listing look unbookable, including
+  // ones with nothing wrong at all (onLaundry already true, cleaning long finished) - the 36h
+  // widening fixed the query but broke this comparison by construction. Clamping to "no earlier
+  // than UTC's actual today" keeps both halves asking about the same day.
+  const today = getStartOf(new Date(), 'day', 'Etc/UTC');
   const requestedStart =
     datesMaybe.start && typeof dates === 'string' && dates.split(',').length === 2
-      ? parseDateFromISO8601(dates.split(',')[0], 'Etc/UTC')
+      ? [parseDateFromISO8601(dates.split(',')[0], 'Etc/UTC'), today].reduce((a, b) =>
+          a.getTime() > b.getTime() ? a : b
+        )
       : null;
   const stockMaybe = stockFilters(datesMaybe);
   const seatsMaybe = seatsSearchParams(seats, datesMaybe);
