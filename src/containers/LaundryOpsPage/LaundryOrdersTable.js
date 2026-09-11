@@ -19,6 +19,8 @@ import css from './LaundryOpsPage.module.css';
  * @param {Object} props
  * @param {Array} props.rows - already view-filtered rows
  * @param {boolean} [props.showTabs] - render the Orders filter tabs
+ * @param {string} [props.initialSearch] - pre-fill the search box (e.g. from
+ *   the dashboard's "Lookup ticket #" box)
  * @param {Function} props.onAdvanceStatus
  * @param {string|null} props.advanceStatusTransactionId - row currently updating
  * @param {Function} [props.onHandBackToOwner] - ({listingId}) => void
@@ -32,6 +34,7 @@ const LaundryOrdersTable = props => {
   const {
     rows,
     showTabs = false,
+    initialSearch = '',
     onAdvanceStatus,
     advanceStatusTransactionId,
     onHandBackToOwner,
@@ -41,7 +44,7 @@ const LaundryOrdersTable = props => {
   } = props;
 
   const [tab, setTab] = useState('all');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
 
   const tabbed = showTabs ? filterByTab(rows, tab) : rows;
   const visible = sortRows(filterBySearch(tabbed, search));

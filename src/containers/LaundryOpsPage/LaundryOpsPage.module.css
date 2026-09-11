@@ -750,6 +750,18 @@
   border: 1px solid var(--coclosetBorder);
   border-radius: var(--coclosetRadius);
   background-color: var(--coclosetSurface);
+  text-decoration: none;
+  transition: var(--transitionStyleButton);
+
+  &:hover {
+    border-color: var(--coclosetBrand);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coclosetBrand);
+    outline-offset: 2px;
+  }
 
   @media (--viewportMedium) {
     padding: 20px;
@@ -861,10 +873,25 @@
   white-space: normal;
 }
 
+.ticketLookup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+
+  @media (--viewportMedium) {
+    margin-top: 24px;
+  }
+
+  & .search {
+    flex: 1 1 240px;
+  }
+}
+
 .dashboardLink {
   display: inline-flex;
   align-items: center;
-  margin-top: 18px;
+  border: none;
   padding: 10px 20px;
   border-radius: var(--coclosetRadiusPill);
   background-color: var(--coclosetInk);
@@ -873,6 +900,7 @@
   font-weight: var(--fontWeightSemiBold);
   line-height: 20px;
   text-decoration: none;
+  cursor: pointer;
   transition: var(--transitionStyleButton);
 
   &:hover {
@@ -884,10 +912,6 @@
   &:focus-visible {
     outline: 2px solid var(--coclosetBrand);
     outline-offset: 2px;
-  }
-
-  @media (--viewportMedium) {
-    margin-top: 24px;
   }
 }
 
