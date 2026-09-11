@@ -53,6 +53,28 @@ import { COCLOSET_BOOKING_PROCESS_NAME, DAY } from '../transactions/transaction'
 export const RENTAL_PERIOD_DAYS = [7, 14];
 
 /**
+ * The window the SEARCH date filter asks Sharetribe to find free, in days.
+ *
+ *   > "el filtro de dates (...) muestra un listing que no es propio de las fechas
+ *   >  seleccionadas" (Jonathan, 2026-09-10)
+ *
+ * Picking a date in search means "I want to start on this day", and nothing here is rented by
+ * the day - so the filter has to ask for a whole rental period, not for the days somebody
+ * happened to touch.
+ *
+ * THE SHORTEST PERIOD, DELIBERATELY. A listing offers whichever periods its owner priced, and
+ * one query cannot use a different length per listing. The shortest is the permissive choice:
+ * it can leave in a garment that only rents for two weeks and has ten free days, but it can
+ * never hide one that is genuinely bookable. Between showing a garment the picker will narrow
+ * and hiding one it would have offered, the first is recoverable and the second is invisible.
+ *
+ * It does NOT include the studio's turnaround, which the picker adds on top of the period
+ * (BookingRentalPeriodForm `windowDays`). That number is per-studio, so it cannot be in a
+ * single query either - and leaving it out errs in the same permissive direction.
+ */
+export const RENTAL_WINDOW_DAYS = Math.min(...RENTAL_PERIOD_DAYS);
+
+/**
  * Upper bound on a stored period, in days.
  *
  * `publicData` is owner-writable, so `bookingLengthInDays` is a number its own owner can

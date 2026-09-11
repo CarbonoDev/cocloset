@@ -7,6 +7,7 @@ import {
   DAY_AVAILABLE,
   DAY_BOOKED,
   DAY_CLEANING,
+  DAY_NO_ROOM,
   DAY_PAST,
   DAY_SELECTED,
   buildCalendarDays,
@@ -39,6 +40,8 @@ import css from './AvailabilityCalendar.module.css';
  * @param {string} [props.timeZone]
  * @param {number} [props.firstDayOfWeek]
  * @param {Date} [props.today] - injectable for tests
+ * @param {number} [props.windowDays] - period + turnaround, so a day the picker will refuse
+ *   stops calling itself available. See DAY_NO_ROOM.
  * @returns {JSX.Element}
  */
 const AvailabilityCalendar = props => {
@@ -51,6 +54,10 @@ const AvailabilityCalendar = props => {
     timeZone,
     firstDayOfWeek,
     today = new Date(),
+    // The whole stretch a rental from a given day would occupy - the period the reader chose
+    // plus the studio's turnaround. Supplied by the form, which is where both numbers are
+    // already known. Absent until a period is picked, and then no day claims there is no room.
+    windowDays,
   } = props;
   const intl = useIntl();
 
@@ -63,6 +70,7 @@ const AvailabilityCalendar = props => {
     timeZone,
     firstDayOfWeek,
     weeks: CALENDAR_WEEKS,
+    windowDays,
   });
 
   const statusClass = {
@@ -70,6 +78,7 @@ const AvailabilityCalendar = props => {
     [DAY_SELECTED]: css.selected,
     [DAY_BOOKED]: css.booked,
     [DAY_CLEANING]: css.cleaning,
+    [DAY_NO_ROOM]: css.noRoom,
     // Deliberately the same neutral fill as `available`, dimmed by `.past`: a day that has
     // gone by is not a state of the garment, and giving it a colour of its own would put a
     // fifth thing in a legend that explains four.
@@ -81,7 +90,15 @@ const AvailabilityCalendar = props => {
   // and this grid's whole job is to communicate a distinction.
   const statusLabel = status => intl.formatMessage({ id: `AvailabilityCalendar.status.${status}` });
 
-  const legend = [DAY_AVAILABLE, DAY_SELECTED, DAY_BOOKED, DAY_CLEANING];
+  // NO_ROOM is in the legend only when it can occur - i.e. once a period is chosen. A key for
+  // a colour nothing on screen uses is a reader wondering what they missed.
+  const legend = [
+    DAY_AVAILABLE,
+    DAY_SELECTED,
+    DAY_BOOKED,
+    DAY_CLEANING,
+    ...(windowDays > 0 ? [DAY_NO_ROOM] : []),
+  ];
 
   return (
     <section className={classNames(css.root, className)}>

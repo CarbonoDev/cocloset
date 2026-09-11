@@ -1,4 +1,4 @@
-import { getStartOf, getStartOfWeek, isInRange } from './dates';
+import { getStartOf, getStartOfWeek, isDateSameOrAfter, isInRange } from './dates';
 import { isDayInCleaningGap } from './cleaningGaps';
 
 /**
@@ -40,6 +40,23 @@ export const DAY_AVAILABLE = 'available';
 export const DAY_SELECTED = 'selected';
 export const DAY_BOOKED = 'booked';
 export const DAY_CLEANING = 'cleaning';
+
+/**
+ * Free, but no rental fits from here.
+ *
+ *   > "nota que no aparecen ocupados ni el 10 que es hoy, ni 11 ni 12; pero el calendario a
+ *   >  buscar no estan habilitados" (Jonathan, 2026-09-10)
+ *
+ * Both views were telling the truth and contradicting each other. This strip answers "is this
+ * day booked", and the 10th genuinely was not; the picker above it answers "can a rental START
+ * here", and a seven-day rental from the 10th ran into a booking on the 13th. Two right
+ * answers, stacked, reading as one wrong one.
+ *
+ * So a day the picker will refuse stops calling itself "Available". It is not `booked` either
+ * - nobody has it - and saying so would be a different lie. It is its own thing: the garment
+ * is free, the rental does not fit.
+ */
+export const DAY_NO_ROOM = 'noRoom';
 
 /**
  * A day that has gone by. NOT one of the four the legend explains.
@@ -112,9 +129,19 @@ export const selectedRange = (startDate, periodDays, timeZone) => {
  * @param {Array<{start: Date, end: Date}>} [params.cleaningGaps]
  * @param {{start: Date, end: Date}} [params.selection]
  * @param {string} [params.timeZone]
+ * @param {number} [params.windowDays] - the rental window a start here would need. Omitted
+ *   when no period is chosen yet, and then no day is classified DAY_NO_ROOM - "nothing fits"
+ *   is not something that can be said before there is something to fit.
  * @returns {string} one of the DAY_* constants
  */
-export const classifyDay = ({ day, allTimeSlots, cleaningGaps, selection, timeZone }) => {
+export const classifyDay = ({
+  day,
+  allTimeSlots,
+  cleaningGaps,
+  selection,
+  timeZone,
+  windowDays,
+}) => {
   const time = day.getTime();
 
   if (selection && time >= selection.start.getTime() && time < selection.end.getTime()) {
@@ -123,7 +150,76 @@ export const classifyDay = ({ day, allTimeSlots, cleaningGaps, selection, timeZo
   if (isDayInCleaningGap(day, cleaningGaps, timeZone)) {
     return DAY_CLEANING;
   }
-  return isDayFree(day, allTimeSlots, timeZone) ? DAY_AVAILABLE : DAY_BOOKED;
+  if (!isDayFree(day, allTimeSlots, timeZone)) {
+    return DAY_BOOKED;
+  }
+
+  // Free, and then asked the picker's question: does a whole rental fit from here. Checked
+  // LAST, so a booked day still reads as booked - "no room" is only interesting about a day
+  // that is otherwise yours.
+  const fits =
+    windowDays > 0 ? isWindowFree(day, windowDays, allTimeSlots, cleaningGaps, timeZone) : true;
+  return fits ? DAY_AVAILABLE : DAY_NO_ROOM;
+};
+
+/**
+ * Is the whole rental window free, starting on this day?
+ *
+ * The strip's copy of the rule the picker enforces (isWindowAvailableFn in
+ * BookingRentalPeriodForm). Deliberately a copy of the QUESTION rather than a shared function:
+ * the picker works from monthly time slots it fetches per month and a set of cleaning gaps,
+ * and this works from the merged slots the strip already holds. Sharing would mean handing one
+ * of them the other's data structure for no gain.
+ *
+ * Erring: an unfetched day has no containing slot, so it reads as not free and the day shows
+ * as no-room rather than as available. That is the safe direction - it never promises a start
+ * the picker will refuse.
+ *
+ * @param {Date} day
+ * @param {number} windowDays
+ * @param {Array<Object>} [allTimeSlots]
+ * @param {Array<{start: Date, end: Date}>} [cleaningGaps]
+ * @param {string} [timeZone]
+ * @returns {boolean}
+ */
+export const isWindowFree = (day, windowDays, allTimeSlots, cleaningGaps, timeZone) => {
+  const slots = Array.isArray(allTimeSlots) ? allTimeSlots : [];
+  const windowEnd = getStartOf(day, 'day', timeZone, windowDays, 'days');
+
+  // ONE containing slot, not a walk over every day in the window. Walking was the obvious
+  // implementation and it is measurably the wrong one: this runs for all 35 cells on every
+  // render of the strip, so a fortnight-long window turned one classification into hundreds
+  // of time-zone conversions and slowed the panel enough to fail a test that waits on it.
+  //
+  // Availability arrives as contiguous free blocks, so "is the whole window free" is the same
+  // question as "does one block contain it" - which is also exactly how the picker asks it
+  // (isWindowAvailableFn in BookingRentalPeriodForm).
+  const containing = slots.find(slot => {
+    const slotStart = slot?.attributes?.start;
+    const slotEnd = slot?.attributes?.end;
+    if (!slotStart || !slotEnd) {
+      return false;
+    }
+    // Floored to its day for the same reason isDayFree floors it: availability is fetched
+    // from NOW, so today's slot starts at whatever o'clock the page was loaded.
+    return isInRange(day, getStartOf(slotStart, 'day', timeZone), slotEnd, 'day', timeZone);
+  });
+
+  if (!containing || !isDateSameOrAfter(containing.attributes.end, windowEnd)) {
+    return false;
+  }
+
+  // Cleaning gaps are separate from availability - the day a rental ends is owed to that
+  // rental's wash, and no time slot says so. There are only ever a handful, so this one stays
+  // a walk.
+  for (let offset = 0; offset < windowDays; offset += 1) {
+    if (
+      isDayInCleaningGap(getStartOf(day, 'day', timeZone, offset, 'days'), cleaningGaps, timeZone)
+    ) {
+      return false;
+    }
+  }
+  return true;
 };
 
 /**
@@ -155,6 +251,7 @@ export const buildCalendarDays = ({
   timeZone,
   firstDayOfWeek,
   weeks = CALENDAR_WEEKS,
+  windowDays,
 }) => {
   const startOfToday = getStartOf(today, 'day', timeZone);
   const firstDay = getStartOfWeek(startOfToday, timeZone, firstDayOfWeek);
@@ -162,7 +259,14 @@ export const buildCalendarDays = ({
 
   return Array.from({ length: weeks * 7 }, (_, index) => {
     const date = getStartOf(firstDay, 'day', timeZone, index, 'days');
-    const status = classifyDay({ day: date, allTimeSlots, cleaningGaps, selection, timeZone });
+    const status = classifyDay({
+      day: date,
+      allTimeSlots,
+      cleaningGaps,
+      selection,
+      timeZone,
+      windowDays,
+    });
 
     // Gone by, or gone by for booking purposes. Today counts when availability no longer
     // offers it - which for a day-unit rental is from the moment today begins. See DAY_PAST.

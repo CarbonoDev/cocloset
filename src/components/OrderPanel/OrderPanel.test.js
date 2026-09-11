@@ -783,9 +783,17 @@ describe('OrderPanel', () => {
       routeConfiguration,
     });
 
-    await waitFor(() => {
-      expect(getByText('BookingRentalPeriodForm.periodLabel')).toBeInTheDocument();
-    });
+    // An explicit timeout, because this one waits on the whole OrderPanel mounting - lazy
+    // chunks, the form, and the five-week strip - and the default second is not much when the
+    // suite is running several workers at once. It passes alone and has failed under load both
+    // before and after the strip learned to check rental windows; what it is measuring is the
+    // markup, not how fast the machine is.
+    await waitFor(
+      () => {
+        expect(getByText('BookingRentalPeriodForm.periodLabel')).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
     // One start date, not a range: the stock form's two labels must be gone.
     expect(getByText('BookingRentalPeriodForm.startDateLabel')).toBeInTheDocument();
     expect(queryByText('BookingDatesForm.bookingStartTitle')).not.toBeInTheDocument();

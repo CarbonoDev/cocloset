@@ -35,6 +35,7 @@
   "AvailabilityCalendar.status.available": "Available",
   "AvailabilityCalendar.status.booked": "Booked",
   "AvailabilityCalendar.status.cleaning": "Cleaning",
+  "AvailabilityCalendar.status.noRoom": "Too short a gap",
   "AvailabilityCalendar.status.past": "No longer available",
   "AvailabilityCalendar.status.selected": "Your selection",
   "Avatar.bannedUserDisplayName": "Banned user",

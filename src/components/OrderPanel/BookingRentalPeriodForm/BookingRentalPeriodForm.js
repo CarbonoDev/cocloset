@@ -670,6 +670,11 @@ export const BookingRentalPeriodForm = props => {
               selectedStartDate={startDate}
               selectedPeriodDays={periodDays}
               timeZone={timeZone}
+              // The SAME window the picker above blocks on - period plus the studio's
+              // turnaround. Passing it is what stops the strip calling a day "Available" that
+              // the field directly above it refuses: two right answers to two different
+              // questions, stacked, read as one wrong one.
+              windowDays={windowDays}
             />
           </Form>
         );
