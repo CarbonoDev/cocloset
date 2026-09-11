@@ -12,7 +12,7 @@ import {
   dispatchedActions,
 } from '../../util/testHelpers';
 
-import { loadData } from './SearchPage.duck';
+import { loadData, searchListings } from './SearchPage.duck';
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 import SearchPageWithGrid from './SearchPageWithGrid';
 import SearchPageWithMap from './SearchPageWithMap';
@@ -685,6 +685,67 @@ describe('Duck', () => {
   const fakeResponse = resource => ({ data: { data: resource, include: [] } });
   const sdkFn = response => jest.fn(() => Promise.resolve(response));
   const currentUser = createCurrentUser('userId');
+
+  // -------------------------------------------------------------------------
+  //   > "el filtro de dates (...) muestra un listing que no es propio de las fechas
+  //   >  seleccionadas" (Jonathan, 2026-09-10)
+  //
+  // Nothing here is rented by the day, so "is it free on the 10th?" is not a question anybody
+  // can act on. The listing that prompted the report answered it honestly - the 10th WAS free
+  // - and a 7-day rental starting then still collided with a booking three days later. The
+  // filter has to ask what the picker asks: is a whole period free from this day.
+  // -------------------------------------------------------------------------
+  it('asks for a whole rental period from the chosen day, not for the days picked', () => {
+    const getState = () => ({
+      ...initialState,
+      user: { currentUser },
+      auth: { isAuthenticated: true },
+    });
+    const query = sdkFn(fakeResponse([]));
+    const sdk = {
+      currentUser: { show: sdkFn(fakeResponse(currentUser)) },
+      listings: { query },
+      authInfo: sdkFn({}),
+    };
+    const dispatch = createFakeDispatch(getState, sdk);
+
+    // The dates filter has to be configured for the params to be built at all - the shared
+    // `config` above is the map variant's.
+    const withDatesFilter = {
+      ...config,
+      search: {
+        ...config.search,
+        defaultFilters: [
+          ...(config.search?.defaultFilters || []).filter(f => f.key !== 'dates'),
+          { key: 'dates', schemaType: 'dates', availability: 'time-full', dateRangeMode: 'day' },
+        ],
+      },
+    };
+
+    // Dispatched directly rather than through loadData: what is under test is how a picked
+    // date becomes an availability query, not how the page reads its URL.
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const iso = d => d.toISOString().slice(0, 10);
+    const dates = `${iso(tomorrow)},${iso(new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000))}`;
+
+    return dispatch(
+      searchListings({ searchParams: { dates, perPage: 24 }, config: withDatesFilter })
+    ).then(() => {
+      const params = query.mock.calls[0][0];
+
+      // Seven days from the chosen day, not the two the reader happened to touch. The bounds
+      // are prolonged either side to cover other time zones - the stock template's doing, and
+      // why this asserts a span rather than exact instants.
+      const spanMs = params.end.getTime() - params.start.getTime();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      expect(spanMs).toBeGreaterThan(sevenDaysMs);
+      expect(spanMs).toBeLessThan(sevenDaysMs + 36 * 60 * 60 * 1000);
+
+      // And the whole of it has to be free. An hour of availability inside a prolonged window
+      // is what let a garment free on the 12th answer a search for the 10th.
+      expect(params.minDuration).toBe(7 * 1440 - 60);
+    });
+  });
 
   it('loadData() for full viewing rights user loads listings', () => {
     const getState = () => ({

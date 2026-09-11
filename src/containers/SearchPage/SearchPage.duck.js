@@ -19,6 +19,7 @@ import { fetchBrands, fetchLaundryOptions } from '../../util/api';
 import * as log from '../../util/log';
 
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
+import { RENTAL_WINDOW_DAYS } from '../../util/rentalPeriods';
 import { withoutUnbookableListings } from '../../util/searchCleaningFloor';
 
 // Pagination page size might need to be dynamic on responsive page layouts
@@ -205,21 +206,39 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
       startDate.getTime() >= possibleStartDate.getTime() &&
       startDate.getTime() <= endDate.getTime();
 
-    const dayCount = isEntireRangeAvailable ? daysBetween(startDate, endDate) : 1;
+    // THE DATE IS A START DATE, NOT A RANGE OF DAYS SOMEBODY WANTS FREE.
+    //
+    //   > "el filtro de dates (...) muestra un listing que no es propio de las fechas
+    //   >  seleccionadas" (Jonathan, 2026-09-10)
+    //
+    // Nothing in this marketplace is rented by the day: a garment goes out for a whole period,
+    // 7 days or 14. So "is this free on the 10th?" - the question this filter used to ask - is
+    // not a question anybody can act on, and the listing that prompted the report answered it
+    // honestly: the 10th WAS free. What was not possible was a 7-day rental starting then,
+    // because a booking sat across the 13th to the 21st.
+    //
+    // The picker has always asked the right question (isWindowAvailableFn in
+    // BookingRentalPeriodForm), so the filter now asks it too: is a whole rental period free,
+    // starting on the day you picked. Anything else puts garments in front of a reader that
+    // the next screen refuses.
+    //
+    // The END OF THE PICKED RANGE IS IGNORED on purpose. Selecting "10 to 11" cannot mean a
+    // two-day rental because no such rental exists; it can only mean "I want it around the
+    // 10th". The first day is the only part of that with a meaning the marketplace can honour.
     const day = 1440;
     const hour = 60;
-    // When entire range is required to be available, we count minutes of included date range,
-    // but there's a need to subtract one hour due to possibility of daylight saving time.
-    // If partial range is needed, then we just make sure that the shortest time unit supported
-    // is available within the range.
-    // You might want to customize this to match with your time units (e.g. day: 1440 - 60)
-    const minDuration = isEntireRangeAvailable ? dayCount * day - hour : hour;
+    const windowEnd = getStartOf(startDate, 'day', searchTZ, RENTAL_WINDOW_DAYS, 'days');
+    // The whole window, not one hour of it. `time-partial` with the prolonged window below is
+    // what let a garment free on the 12th answer a search for the 10th.
+    const minDuration = RENTAL_WINDOW_DAYS * day - hour;
+
     return hasValidDates
       ? {
           start: getProlongedStart(startDate),
-          end: getProlongedEnd(endDate),
-          // Availability can be time-full or time-partial.
-          // However, due to prolonged time window, we need to use time-partial.
+          end: getProlongedEnd(windowEnd),
+          // Still time-partial, because the window above is prolonged by a day's worth of
+          // hours to cover other time zones - `time-full` would then demand availability
+          // outside the rental itself. `minDuration` is what enforces the whole period.
           availability: 'time-partial',
           // minDuration uses minutes
           minDuration,

@@ -106,3 +106,16 @@
   width: 1px;
   white-space: nowrap;
 }
+
+/* FREE, BUT THE RENTAL DOES NOT FIT FROM HERE.
+   > "no aparecen ocupados ni el 10 (...) pero el calendario a buscar no estan habilitados"
+   >   (Jonathan, 2026-09-10)
+
+   Deliberately closer to `available` than to `booked`: nobody has this day, and colouring it
+   like a booking would be a different untruth. It reads as a day that is there but not usable,
+   which is exactly what it is. */
+.noRoom {
+  background-color: var(--colorGrey50);
+  color: var(--colorGrey300);
+  border: 1px dashed var(--colorGrey100);
+}
