@@ -199,8 +199,27 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
         ? getExclusiveEndDate(endRaw, searchTZ)
         : null;
 
-    const today = getStartOf(new Date(), 'day', searchTZ);
-    const possibleStartDate = subtractTime(today, 14, 'hours', searchTZ);
+    // THE CUTOFF HAS TO BE ANCHORED ON THE ACTUAL MOMENT, NOT ON UTC'S CALENDAR PAGE.
+    //
+    //   > listing `6aa26840-16da-44df-8a74-ff4ece1da4eb` still showing for a search dated
+    //   >  2026-09-10, tested in the evening (Jonathan, 2026-09-10)
+    //
+    // `startDate` is the picked day read as UTC midnight (see parseDateFromISO8601 above), but
+    // the picker itself runs in the visitor's own local calendar. For any timezone behind UTC,
+    // "today" locally can already read as UTC's NEXT day by evening - e.g. at 9pm in Mexico
+    // City (UTC-6) it is already past 3am UTC tomorrow. The old cutoff compared against
+    // `getStartOf(now, 'day', 'Etc/UTC')` minus a 14-hour grace window, which is generous
+    // against UTC's *own* clock but not against a visitor whose local day runs behind it: the
+    // gap between a UTC-midnight-anchored "today" and the real instant can reach ~30 hours for
+    // UTC-6 and worse further west. Once it did, `hasValidDates` went false and the whole date
+    // filter silently dropped out (`{}`), returning every listing unfiltered - the picker
+    // wasn't wrong, it just stopped running at all.
+    //
+    // So the cutoff is measured against the real "now", not a UTC day boundary, with a buffer
+    // wide enough to cover any visitor's local "today" (up to UTC-12, the most negative real
+    // offset). Being generous here costs nothing: this is a past/nonsense guard against a URL
+    // param, not the search window itself.
+    const possibleStartDate = subtractTime(new Date(), 36, 'hours', searchTZ);
     const hasValidDates =
       hasValues &&
       startDate.getTime() >= possibleStartDate.getTime() &&
@@ -232,9 +251,25 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
     // what let a garment free on the 12th answer a search for the 10th.
     const minDuration = RENTAL_WINDOW_DAYS * day - hour;
 
+    // THE API REJECTS A `start` MORE THAN A DAY OLD, EVEN WHEN THE CUTOFF ABOVE ALLOWS IT.
+    //
+    // The 36-hour grace period on `hasValidDates` exists so a visitor behind UTC can still pick
+    // "today" late in their day (see above). But `getProlongedStart` then subtracts another 14
+    // hours from that already-stale `startDate`, and Sharetribe's own search endpoint hard-
+    // rejects a `start` more than 24 hours in the past with a 400 - which would have surfaced
+    // as a broken search page, not a wrong result. So the prolonged start is clamped to the
+    // API's own limit rather than trusted as-is; the query is still permissive (it just can't
+    // reach as far back as `getProlongedStart` would like when `startDate` itself is stale).
+    const earliestAllowedStart = subtractTime(new Date(), 24, 'hours', searchTZ);
+    const prolongedStart = getProlongedStart(startDate);
+    const start =
+      prolongedStart.getTime() < earliestAllowedStart.getTime()
+        ? earliestAllowedStart
+        : prolongedStart;
+
     return hasValidDates
       ? {
-          start: getProlongedStart(startDate),
+          start,
           end: getProlongedEnd(windowEnd),
           // Still time-partial, because the window above is prolonged by a day's worth of
           // hours to cover other time zones - `time-full` would then demand availability
