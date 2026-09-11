@@ -11,8 +11,6 @@ import {
   filterByView,
   filterBySearch,
   dashboardCounts,
-  incomingNext48h,
-  needsAttention,
   sortRows,
 } from './LaundryOpsPage.helpers';
 
@@ -254,25 +252,6 @@ describe('LaundryOpsPage.helpers', () => {
       const counts = dashboardCounts(undated, [], NOW);
       expect(counts.pendingPickups48h).toBe(0);
       expect(counts.pendingDropOffs48h).toBe(0);
-    });
-  });
-
-  describe('dashboard panels', () => {
-    it('incomingNext48h includes soon-to-start bookings and undated incoming garments', () => {
-      const rows = [
-        row({ id: 'soon', bookingStart: '2026-08-01T09:00:00.000Z' }),
-        row({ id: 'later', bookingStart: '2026-08-20T09:00:00.000Z' }),
-        row({ id: 'incoming', rowType: 'listing', readinessStatus: 'incoming' }),
-      ];
-      expect(incomingNext48h(rows, NOW).map(r => r.id)).toEqual(['soon', 'incoming']);
-    });
-
-    it('needsAttention surfaces damage reports', () => {
-      const rows = [
-        row({ id: 'ok' }),
-        row({ id: 'bad', damageReported: { flag: true, note: 'Small pull at left cuff.' } }),
-      ];
-      expect(needsAttention(rows).map(r => r.id)).toEqual(['bad']);
     });
   });
 

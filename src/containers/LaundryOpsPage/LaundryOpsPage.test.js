@@ -6,6 +6,7 @@ import { createCurrentUser } from '../../util/testData';
 import { renderWithProviders as render, testingLibrary } from '../../util/testHelpers';
 
 import { LaundryOpsPageComponent } from './LaundryOpsPage';
+import css from './LaundryOpsPage.module.css';
 
 const { screen, within, userEvent } = testingLibrary;
 
@@ -673,17 +674,10 @@ describe('LaundryOpsPage', () => {
       );
     });
 
-    it('lists damaged garments in the attention panel', () => {
-      const rows = [orderRow({ damageReported: { flag: true, note: 'Small pull at left cuff.' } })];
-      render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="dashboard" />);
-
-      expect(screen.getByText('LaundryOpsPage.panel.attention')).toBeInTheDocument();
-      expect(screen.getByText('Small pull at left cuff.')).toBeInTheDocument();
-    });
-
-    it('shows an empty state when nothing needs attention', () => {
+    it('shows exactly 8 cards - the 7 stat tiles plus the ticket lookup', () => {
       render(<LaundryOpsPageComponent {...baseProps} tab="dashboard" />);
-      expect(screen.getByText('LaundryOpsPage.panel.attentionEmpty')).toBeInTheDocument();
+
+      expect(document.querySelectorAll(`.${css.tile}`)).toHaveLength(8);
     });
 
     it('looking up a ticket navigates to the Orders screen with it as the search term', async () => {
