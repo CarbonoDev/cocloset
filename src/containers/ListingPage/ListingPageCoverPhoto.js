@@ -7,6 +7,7 @@ import classNames from 'classnames';
 import { FormattedMessage } from '../../util/reactIntl';
 import { LISTING_STATE_CLOSED, propTypes } from '../../util/types';
 import { OFFER, REQUEST } from '../../transactions/transaction';
+import { isPickupTodayListing } from '../../util/searchCleaningFloor';
 
 // Global ducks (for Redux actions and thunks)
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -301,6 +302,7 @@ export const ListingPageComponent = props => {
               completedRentals={completedRentals}
               reviews={reviews}
               authorDisplayName={authorDisplayName}
+              showPickupToday={isPickupTodayListing(currentListing)}
             />
             {showDescription && <SectionText text={description} showAsIngress />}
 

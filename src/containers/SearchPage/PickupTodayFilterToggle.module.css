@@ -1,0 +1,13 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 14px;
+  color: var(--colorGrey700, #4a4a4a);
+}
+
+.input {
+  cursor: pointer;
+}

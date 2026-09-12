@@ -23,6 +23,7 @@ import {
 import FilterComponent from './FilterComponent';
 import MainPanelHeader from './MainPanelHeader/MainPanelHeader';
 import SearchFiltersMobile from './SearchFiltersMobile/SearchFiltersMobile';
+import PickupTodayFilterToggle from './PickupTodayFilterToggle';
 import SortBy from './SortBy/SortBy';
 import SearchResultsPanel from './SearchResultsPanel/SearchResultsPanel';
 import NoSearchResultsMaybe from './NoSearchResultsMaybe/NoSearchResultsMaybe';
@@ -251,6 +252,10 @@ export class SearchPageComponent extends Component {
                   />
                 );
               })}
+              <PickupTodayFilterToggle
+                history={this.props.history}
+                location={this.props.location}
+              />
               <button className={css.resetAllButton} onClick={e => this.handleResetAll(e)}>
                 <FormattedMessage id={'SearchFiltersMobile.resetAll'} />
               </button>

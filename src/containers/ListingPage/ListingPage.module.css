@@ -961,6 +961,14 @@
   }
 }
 
+/* Above the brand eyebrow: the "Pickup Today" tag is a fact about the garment right now,
+   ahead of everything else in the header. No absolute positioning here, unlike the card's
+   corner overlay - the header has no image behind it to sit over, just normal flow. */
+.listingPickupTodayBadge {
+  display: inline-flex;
+  margin: 0 0 12px 0;
+}
+
 .brandEyebrow {
   composes: marketplaceTinyFontStyles from global;
   text-transform: uppercase;
