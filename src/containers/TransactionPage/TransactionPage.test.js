@@ -33,6 +33,12 @@ import {
 
 import { getStateData } from './TransactionPage.stateData';
 import { TransactionPageComponent } from './TransactionPage';
+import { autoAcceptBooking } from '../../util/api';
+
+jest.mock('../../util/api', () => ({
+  ...jest.requireActual('../../util/api'),
+  autoAcceptBooking: jest.fn(),
+}));
 
 const { Money, UUID } = sdkTypes;
 const { screen, waitFor, within } = testingLibrary;
@@ -40,6 +46,7 @@ const noop = () => null;
 
 const bookingTransitions = getProcess('default-booking')?.transitions;
 const purchaseTransitions = getProcess('default-purchase')?.transitions;
+const coclosetBookingTransitions = getProcess('cocloset-booking')?.transitions;
 
 describe('TransactionPage', () => {
   const lineItemUnitTypeItem = {
@@ -1588,6 +1595,143 @@ describe('TransactionPage', () => {
         // Don't show order purchase CTA
         expect(screen.queryByText('OrderPanel.ctaButtonMessagePurchase')).toBeNull();
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  //   > "esto ya funciona, pero la transacción no se hace update, el usuario tiene que hacer
+  //   >  refresh (...) necesitamos asegurar que si ocurre el auto-accept se muestre al
+  //   >  cliente el status correcto" (Jonathan, 2026-09-11)
+  //
+  // Checkout already awaits auto-accept before redirecting here, but that call is fired from
+  // the browser and can fail to run at all (tab closed) or fail silently (swallowed on
+  // purpose so a broken accept never looks like a failed payment). This page gives auto-accept
+  // a second, idempotent chance whenever a customer or provider is looking at a preauthorized
+  // cocloset-booking transaction.
+  // -------------------------------------------------------------------------
+  describe('cocloset-booking: defensive auto-accept re-check on page view', () => {
+    const processName = 'cocloset-booking';
+    const process = getProcess(processName);
+
+    const makeTx = () =>
+      createTransaction({
+        id: 'id-cocloset-preauthorized',
+        customer,
+        provider,
+        listing: createListing('listing-item', {
+          publicData: {
+            listingType: 'rent-clothes',
+            transactionProcessAlias: 'cocloset-booking/release-1',
+            unitType: 'day',
+          },
+        }),
+        booking: createBooking('booking-id', {
+          start: new Date(Date.UTC(2022, 5, 14)),
+          end: new Date(Date.UTC(2022, 5, 21)),
+        }),
+        processName,
+        lastTransition: coclosetBookingTransitions.CONFIRM_PAYMENT,
+        lastTransitionedAt: new Date(Date.UTC(2022, 0, 15)),
+        lineItems: [lineItemProviderCommission],
+      });
+
+    beforeEach(() => {
+      autoAcceptBooking.mockClear();
+    });
+
+    test('re-checks auto-accept for a preauthorized transaction, and refetches when it lands', async () => {
+      const tx = makeTx();
+      autoAcceptBooking.mockImplementation(() =>
+        Promise.resolve({ data: { accepted: true, transaction: tx } })
+      );
+      const onRefetchTransaction = jest.fn();
+      const transactionRole = TX_TRANSITION_ACTOR_CUSTOMER;
+
+      const props = {
+        ...panelBaseProps,
+        currentUser: createCurrentUser(customerId),
+        transaction: tx,
+        transactionRole,
+        onRefetchTransaction,
+        params: { id: tx.id?.uuid },
+      };
+
+      await act(async () => {
+        render(<TransactionPageComponent {...props} />);
+      });
+
+      await waitFor(() => {
+        expect(autoAcceptBooking).toHaveBeenCalledTimes(1);
+        expect(autoAcceptBooking).toHaveBeenCalledWith({ transactionId: tx.id });
+        expect(onRefetchTransaction).toHaveBeenCalledTimes(1);
+        expect(onRefetchTransaction).toHaveBeenCalledWith(tx.id, transactionRole, expect.anything());
+      });
+    });
+
+    test('does not refetch when the endpoint has nothing to do', async () => {
+      const tx = makeTx();
+      autoAcceptBooking.mockImplementation(() =>
+        Promise.resolve({ data: null, reason: 'garment-not-at-laundry' })
+      );
+      const onRefetchTransaction = jest.fn();
+      const transactionRole = TX_TRANSITION_ACTOR_CUSTOMER;
+
+      const props = {
+        ...panelBaseProps,
+        currentUser: createCurrentUser(customerId),
+        transaction: tx,
+        transactionRole,
+        onRefetchTransaction,
+        params: { id: tx.id?.uuid },
+      };
+
+      await act(async () => {
+        render(<TransactionPageComponent {...props} />);
+      });
+
+      await waitFor(() => {
+        expect(autoAcceptBooking).toHaveBeenCalledTimes(1);
+      });
+      expect(onRefetchTransaction).not.toHaveBeenCalled();
+    });
+
+    test('does not re-check once the transaction is already accepted', async () => {
+      const tx = createTransaction({
+        id: 'id-cocloset-accepted',
+        customer,
+        provider,
+        listing: createListing('listing-item', {
+          publicData: {
+            listingType: 'rent-clothes',
+            transactionProcessAlias: 'cocloset-booking/release-1',
+            unitType: 'day',
+          },
+        }),
+        booking: createBooking('booking-id', {
+          start: new Date(Date.UTC(2022, 5, 14)),
+          end: new Date(Date.UTC(2022, 5, 21)),
+        }),
+        processName,
+        lastTransition: process.transitions.OPERATOR_ACCEPT,
+        lastTransitionedAt: new Date(Date.UTC(2022, 0, 15)),
+        lineItems: [lineItemProviderCommission],
+      });
+      const transactionRole = TX_TRANSITION_ACTOR_CUSTOMER;
+
+      const props = {
+        ...panelBaseProps,
+        currentUser: createCurrentUser(customerId),
+        transaction: tx,
+        transactionRole,
+        onRefetchTransaction: jest.fn(),
+        params: { id: tx.id?.uuid },
+      };
+
+      await act(async () => {
+        render(<TransactionPageComponent {...props} />);
+      });
+
+      expect(autoAcceptBooking).not.toHaveBeenCalled();
     });
   });
 });
