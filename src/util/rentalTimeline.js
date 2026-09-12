@@ -142,6 +142,32 @@ const lastIndexForState = steps =>
     {}
   );
 
+// THE ONE STATE THAT ISN'T ONE MOMENT.
+//
+//   > "he aceptado la solicitud del pedido, pero aún no lo he llevado a la laundry. Esto
+//   >  debería mostrar el segundo punto con un contorno oscuro pero sin relleno (...) el punto
+//   >  actual debe ser 'Drop off at cleaner'" (Jonathan, 2026-09-11)
+//
+// `bookingConfirmed`, `dropOffAtCleaners` and `laundryPreparing` all share `state: ACCEPTED`
+// on purpose (see the comment on `dropOffAtCleaners` above) - `lastIndexForState` resolves
+// that tie to the LAST of the three, so a transaction that has only just been accepted, with
+// nobody having carried the garment anywhere yet, was marked "laundryPreparing" as CURRENT and
+// "dropOffAtCleaners" as already DONE. Both were wrong: the garment has not left its owner.
+//
+// The disambiguating fact already exists elsewhere in this codebase - `metadata.onLaundry`,
+// the same flag `create-availability-buffer` and the initial-cleaning floor read - it just was
+// not threaded into this function. `onLaundry !== true` means the accepted booking is still
+// waiting on the owner, so the current step is `dropOffAtCleaners`; `onLaundry === true` means
+// the studio already has it, so `laundryPreparing` resumes being current and
+// `dropOffAtCleaners` reads DONE, same as before this fix for that case.
+const currentIndexForAccepted = (steps, onLaundry) => {
+  if (onLaundry === true) {
+    return lastIndexForState(steps)[coclosetStates.ACCEPTED];
+  }
+  const dropOffIndex = steps.findIndex(step => step.key === 'dropOffAtCleaners');
+  return dropOffIndex >= 0 ? dropOffIndex : lastIndexForState(steps)[coclosetStates.ACCEPTED];
+};
+
 // States that come BEFORE the first step. A booking still awaiting payment or acceptance has
 // not started the story, so nothing is marked - the alternative is a timeline that claims
 // "booking confirmed" for a booking nobody has confirmed.
@@ -192,10 +218,12 @@ const REVIEWABLE_STATES = [
  * @param {string} [processState] - from `resolveLatestProcessName`-aware state derivation
  * @param {Object} [options]
  * @param {string} [options.audience] - whose list to mark; defaults to the customer's
+ * @param {boolean} [options.onLaundry] - the listing's `metadata.onLaundry`; disambiguates the
+ *   ACCEPTED state's three shared steps (see `currentIndexForAccepted`)
  * @returns {Array<{key: string, status: string}>} that reader's steps, in order
  */
 export const timelineStatusFor = (processState, options = {}) => {
-  const { audience = TIMELINE_AUDIENCE_CUSTOMER } = options;
+  const { audience = TIMELINE_AUDIENCE_CUSTOMER, onLaundry } = options;
   const steps = rentalTimelineSteps(audience);
 
   const normalised =
@@ -211,7 +239,12 @@ export const timelineStatusFor = (processState, options = {}) => {
 
   const isBefore = PRE_TIMELINE_STATES.includes(normalised);
   const isOff = OFF_TIMELINE_STATES.includes(normalised);
-  const currentIndex = isBefore || isOff ? -1 : lastIndexForState(steps)[normalised];
+  const currentIndex =
+    isBefore || isOff
+      ? -1
+      : normalised === coclosetStates.ACCEPTED
+      ? currentIndexForAccepted(steps, onLaundry)
+      : lastIndexForState(steps)[normalised];
 
   const canReview = REVIEWABLE_STATES.includes(processState);
   const reviewStatus = hasReviewed(processState, audience)

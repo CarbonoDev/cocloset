@@ -82,10 +82,6 @@ const InboxTransactionPanel = props => {
   // `getState` is the process's own reading of `lastTransition`. Asking the process rather
   // than mapping transitions here is what keeps this panel correct when the EDN changes.
   const processState = process?.getState ? process.getState(transaction) : null;
-  // WHOSE STORY THIS IS. The renter does not see the laundry's work after the garment goes
-  // back, and both parties see a review step - see util/rentalTimeline.js. The panel already
-  // knows the role for its status strings, so this costs nothing but passing it along.
-  const steps = timelineStatusFor(processState, { audience: transactionRole });
 
   // WHETHER THIS VIEWER GETS THE CODE AT ALL.
   //
@@ -100,6 +96,15 @@ const InboxTransactionPanel = props => {
   // doors cannot drift apart. It also means this panel now shows no code before the payment
   // is confirmed, which was never intended here and simply had no gate.
   const isAtLaundry = listing?.attributes?.metadata?.onLaundry === true;
+
+  // WHOSE STORY THIS IS. The renter does not see the laundry's work after the garment goes
+  // back, and both parties see a review step - see util/rentalTimeline.js. The panel already
+  // knows the role for its status strings, so this costs nothing but passing it along.
+  //
+  // `onLaundry: isAtLaundry` disambiguates the ACCEPTED state's shared steps - see the comment
+  // on `currentIndexForAccepted` in rentalTimeline.js - so "accepted, still with the owner"
+  // marks `dropOffAtCleaners` as current rather than already done.
+  const steps = timelineStatusFor(processState, { audience: transactionRole, onLaundry: isAtLaundry });
 
   const showQr =
     processName === COCLOSET_BOOKING_PROCESS &&
