@@ -46,7 +46,7 @@ const FIELD_SPECS = {
   phone: { required: true, maxLength: 40, minLength: 5, pattern: PHONE_PATTERN },
   address: { required: true, maxLength: 300 },
   businessHours: { required: true, maxLength: 200 },
-  acceptedCategories: { required: true, maxLength: 300 },
+  // acceptedCategories: { required: true, maxLength: 300 },
   notes: { required: false, maxLength: 2000 },
 };
 
@@ -109,40 +109,40 @@ const validateApplication = body => {
     application[name] = value;
   }
 
-  const turnaroundDays = Number(source.turnaroundDays);
-  if (
-    source.turnaroundDays == null ||
-    source.turnaroundDays === '' ||
-    !Number.isInteger(turnaroundDays) ||
-    turnaroundDays < 1 ||
-    turnaroundDays > MAX_TURNAROUND_DAYS
-  ) {
-    return invalid(
-      `Missing or invalid "turnaroundDays" in request body. Must be a whole number of days between 1 and ${MAX_TURNAROUND_DAYS}.`
-    );
-  }
-  application.turnaroundDays = turnaroundDays;
+  // const turnaroundDays = Number(source.turnaroundDays);
+  // if (
+  //   source.turnaroundDays == null ||
+  //   source.turnaroundDays === '' ||
+  //   !Number.isInteger(turnaroundDays) ||
+  //   turnaroundDays < 1 ||
+  //   turnaroundDays > MAX_TURNAROUND_DAYS
+  // ) {
+  //   return invalid(
+  //     `Missing or invalid "turnaroundDays" in request body. Must be a whole number of days between 1 and ${MAX_TURNAROUND_DAYS}.`
+  //   );
+  // }
+  // application.turnaroundDays = turnaroundDays;
 
   // Same comma-separated-string -> array convention as LaundryProfilePage.
-  const categories = application.acceptedCategories
-    .split(',')
-    .map(category => category.trim())
-    .filter(category => category !== '');
+  // const categories = application.acceptedCategories
+  //   .split(',')
+  //   .map(category => category.trim())
+  //   .filter(category => category !== '');
 
-  if (categories.length === 0) {
-    return invalid('Missing required "acceptedCategories" in request body.');
-  }
-  if (categories.length > MAX_CATEGORIES) {
-    return invalid(
-      `Invalid "acceptedCategories" in request body: max ${MAX_CATEGORIES} categories.`
-    );
-  }
-  if (categories.some(category => category.length > MAX_CATEGORY_LENGTH)) {
-    return invalid(
-      `Invalid "acceptedCategories" in request body: each category is limited to ${MAX_CATEGORY_LENGTH} characters.`
-    );
-  }
-  application.acceptedCategories = categories;
+  // if (categories.length === 0) {
+  //   return invalid('Missing required "acceptedCategories" in request body.');
+  // }
+  // if (categories.length > MAX_CATEGORIES) {
+  //   return invalid(
+  //     `Invalid "acceptedCategories" in request body: max ${MAX_CATEGORIES} categories.`
+  //   );
+  // }
+  // if (categories.some(category => category.length > MAX_CATEGORY_LENGTH)) {
+  //   return invalid(
+  //     `Invalid "acceptedCategories" in request body: each category is limited to ${MAX_CATEGORY_LENGTH} characters.`
+  //   );
+  // }
+  // application.acceptedCategories = categories;
 
   return { valid: true, application };
 };
@@ -156,8 +156,8 @@ const EMAIL_FIELD_LABELS = [
   ['phone', 'Phone'],
   ['address', 'Address'],
   ['businessHours', 'Business hours'],
-  ['acceptedCategories', 'Garments accepted'],
-  ['turnaroundDays', 'Turnaround (days)'],
+  // ['acceptedCategories', 'Garments accepted'],
+  // ['turnaroundDays', 'Turnaround (days)'],
   ['notes', 'Notes'],
 ];
 

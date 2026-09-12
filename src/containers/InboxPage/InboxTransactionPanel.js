@@ -3,6 +3,7 @@ import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { subtractTime } from '../../util/dates';
+import { userDisplayNameAsString } from '../../util/data';
 import { getProcess, resolveLatestProcessName } from '../../transactions/transaction';
 import { isHandoverQrVisibleState } from '../../transactions/transactionProcessCoclosetBooking';
 import {
@@ -18,6 +19,7 @@ import { HandoverQrCode, Modal, NamedLink, ResponsiveImage } from '../../compone
 import css from './InboxPage.module.css';
 
 const DATE_FORMAT = { year: 'numeric', month: 'short', day: 'numeric' };
+const DATE_FORMAT_NO_YEAR = { month: 'short', day: 'numeric' };
 
 /**
  * ONE RENTAL, IN FULL, BESIDE THE LIST IT WAS PICKED FROM.
@@ -97,6 +99,8 @@ const InboxTransactionPanel = props => {
   // The rule itself lives in transactions/transactionProcessCoclosetBooking.js so the two
   // doors cannot drift apart. It also means this panel now shows no code before the payment
   // is confirmed, which was never intended here and simply had no gate.
+  const isAtLaundry = listing?.attributes?.metadata?.onLaundry === true;
+
   const showQr =
     processName === COCLOSET_BOOKING_PROCESS &&
     isHandoverQrVisibleState(processState, {
@@ -109,6 +113,9 @@ const InboxTransactionPanel = props => {
 
   const laundryName = publicData.assignedLaundryName;
   const pickupAddress = publicData.pickupAddress;
+
+  const deletedBorrowerName = intl.formatMessage({ id: 'InboxPage.panel.deletedBorrower' });
+  const borrowerName = userDisplayNameAsString(transaction.customer, deletedBorrowerName);
 
   // Written by the studio at the return step (server/api/laundry-transaction-status.js).
   // `=== true` rather than truthiness, matching every other reader of this flag: the shape is
@@ -128,8 +135,16 @@ const InboxTransactionPanel = props => {
   // convention as the listing page and the price breakdown, so the three agree.
   const inclusiveEnd = bookingEnd ? subtractTime(bookingEnd, 1, 'days', timeZone) : null;
 
+  // The lender's deadline to drop the garment off: 48h (2 days) before the rental starts,
+  // so the studio has time to clean it. Same helper and timezone as inclusiveEnd, so all
+  // three dates in this panel agree with each other.
+  const recommendedDropTime = bookingStart ? subtractTime(bookingStart, 2, 'days', timeZone) : null;
+
   const formatDate = date =>
     date ? intl.formatDate(new Date(date), { ...DATE_FORMAT, timeZone }) : null;
+
+  const formatDateNoYear = date =>
+    date ? intl.formatDate(new Date(date), { ...DATE_FORMAT_NO_YEAR, timeZone }) : null;
 
   // The identifiers a counter goes by. Assembled from what exists rather than from a fixed
   // template, so a rental that has not reached the studio yet reads as one line rather than
@@ -208,26 +223,61 @@ const InboxTransactionPanel = props => {
       <div className={css.panelCards}>
         <div className={css.panelCard}>
           <h3 className={css.panelCardTitle}>
-            <FormattedMessage id="InboxPage.panel.pickupTitle" />
+            {transactionRole === 'customer' ? (
+              <FormattedMessage id="InboxPage.panel.pickupTitle" />
+            ) : (
+              <FormattedMessage id="InboxPage.panel.pickupTitleLender" />
+            )}
           </h3>
+          {transactionRole !== 'customer' && !isAtLaundry ? (
+            <p className={css.panelCardBody}>
+              <FormattedMessage
+                id="InboxPage.panel.pickupTitle.recommendedDropTimeLender"
+                values={{
+                  laundryName,
+                  recommendedDropTime: formatDateNoYear(recommendedDropTime),
+                  startDate: formatDateNoYear(bookingStart),
+                }}
+              />
+            </p>
+          ) : null}
           {laundryName ? <p className={css.panelCardStrong}>{laundryName}</p> : null}
           {pickupAddress ? (
             <address className={css.panelCardAddress}>{pickupAddress}</address>
           ) : null}
           {bookingStart ? <p className={css.panelCardValue}>{formatDate(bookingStart)}</p> : null}
           <p className={css.panelCardBody}>
-            <FormattedMessage id="InboxPage.panel.pickupBody" />
+            {transactionRole === 'customer' ? (
+              <FormattedMessage id="InboxPage.panel.pickupBody" />
+            ) : (
+              <FormattedMessage id="InboxPage.panel.pickupBodyLender" />
+            )}
           </p>
         </div>
 
         <div className={css.panelCard}>
           <h3 className={css.panelCardTitle}>
-            <FormattedMessage id="InboxPage.panel.returnTitle" />
+            {transactionRole === 'customer' ? (
+              <FormattedMessage id="InboxPage.panel.returnTitle" />
+            ) : (
+              <FormattedMessage id="InboxPage.panel.returnTitleLender" />
+            )}
           </h3>
           {laundryName ? <p className={css.panelCardStrong}>{laundryName}</p> : null}
           {inclusiveEnd ? <p className={css.panelCardValue}>{formatDate(inclusiveEnd)}</p> : null}
           <p className={css.panelCardBody}>
-            <FormattedMessage id="InboxPage.panel.returnBody" />
+            {transactionRole === 'customer' ? (
+              <FormattedMessage id="InboxPage.panel.returnBody" />
+            ) : (
+              <FormattedMessage
+                id="InboxPage.panel.returnBodyLender"
+                values={{
+                  borrowerName,
+                  startDate: formatDateNoYear(bookingStart),
+                  endDate: formatDateNoYear(inclusiveEnd),
+                }}
+              />
+            )}
           </p>
         </div>
       </div>

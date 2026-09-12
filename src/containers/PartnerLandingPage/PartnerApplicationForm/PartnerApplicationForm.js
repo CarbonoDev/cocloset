@@ -227,7 +227,7 @@ const PartnerApplicationForm = props => (
           <H3 className={css.fieldsetLegend}>
             <FormattedMessage id="PartnerApplicationForm.capabilitiesTitle" />
           </H3>
-
+{/* 
           <FieldTextInput
             className={css.field}
             type="text"
@@ -273,7 +273,7 @@ const PartnerApplicationForm = props => (
                 1
               )
             )}
-          />
+          /> */}
 
           <FieldTextInput
             className={css.field}
