@@ -315,6 +315,33 @@ describe('ProfilePage for a laundry', () => {
     expect(screen.getByText('A neighborhood dry cleaner since 1998.')).toBeInTheDocument();
   });
 
+  // "los horarios... Se muestren mejor en una lista, es más cómodo leer asi"
+  // (Jonathan, 2026-09-11) - once `businessHoursByDay` is stored, the list wins
+  // over the old comma-joined sentence.
+  it('shows business hours as a per-day list once businessHoursByDay is stored', async () => {
+    const stateWithGrid = getLaundryInitialState();
+    const users = stateWithGrid.marketplaceData.entities.user;
+    Object.values(users).forEach(u => {
+      u.attributes.profile.publicData.laundryProfile.businessHoursByDay = {
+        mon: { open: '09:00', close: '18:00' },
+        tue: { open: '09:00', close: '14:00' },
+      };
+    });
+
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: stateWithGrid, config });
+    });
+
+    expect(screen.getByText('ProfilePage.day.mon')).toBeInTheDocument();
+    expect(screen.getByText('09:00–18:00')).toBeInTheDocument();
+    expect(screen.getByText('ProfilePage.day.tue')).toBeInTheDocument();
+    expect(screen.getByText('09:00–14:00')).toBeInTheDocument();
+    // The list replaces the old sentence entirely - not shown alongside it.
+    expect(screen.queryByText('Mon-Sat 11:00-21:00')).not.toBeInTheDocument();
+    // Only open days appear - Wed was never ticked in this fixture.
+    expect(screen.queryByText('ProfilePage.day.wed')).not.toBeInTheDocument();
+  });
+
   it('renders no reviews section at all', async () => {
     await act(async () => {
       render(<ProfilePage {...props} />, { initialState: getLaundryInitialState(), config });

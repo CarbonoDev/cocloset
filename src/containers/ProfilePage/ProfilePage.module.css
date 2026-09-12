@@ -105,6 +105,29 @@
   }
 }
 
+/* A laundry's business hours (2026-09-11), one line per open day - see MainContent's
+   `businessHoursEntries`. Same quiet treatment as .neighborhood above it. */
+.businessHoursList {
+  list-style: none;
+  margin: 0 0 8px 0;
+  padding: 0;
+  color: var(--coclosetInkMuted);
+
+  @media (--viewportMedium) {
+    margin: 0 0 12px 0;
+  }
+}
+
+.businessHoursRow {
+  display: flex;
+  gap: 8px;
+}
+
+.businessHoursDay {
+  flex: 0 0 96px;
+  font-weight: var(--fontWeightSemiBold);
+}
+
 .bio {
   /* Preserve newlines, but collapse other whitespace */
   white-space: pre-line;
