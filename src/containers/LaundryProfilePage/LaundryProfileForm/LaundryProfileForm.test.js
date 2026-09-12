@@ -11,7 +11,7 @@ import {
 
 import LaundryProfileForm from './LaundryProfileForm';
 
-const { screen, userEvent } = testingLibrary;
+const { screen, userEvent, fireEvent } = testingLibrary;
 const { LatLng } = sdkTypes;
 
 const noop = () => null;
@@ -77,6 +77,13 @@ describe('LaundryProfileForm', () => {
     expect(
       screen.getByRole('textbox', { name: 'LaundryProfileForm.neighborhoodLabel' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'LaundryProfileForm.descriptionLabel' })
+    ).toBeInTheDocument();
+    // The Logo field: same upload mechanism as ProfileSettingsForm's avatar, just
+    // relabelled for a studio (2026-09-11).
+    expect(screen.getByText('LaundryProfileForm.logoLabel')).toBeInTheDocument();
+    expect(screen.getByText('LaundryProfileForm.addYourLogo')).toBeInTheDocument();
 
     // Opening hours is a row per day now, not one free-text line - see
     // util/businessHours.js. Seven checkboxes, and two time inputs on each row.
@@ -619,5 +626,68 @@ describe('LaundryProfileForm address alert and lock', () => {
     await renderAddressForm();
 
     expect(addressInput()).toBeEnabled();
+  });
+});
+
+describe('LaundryProfileForm Logo', () => {
+  it('picking a file calls onImageUpload with a fresh id and the chosen file', async () => {
+    const onImageUpload = jest.fn();
+
+    await act(async () => {
+      render(
+        <LaundryProfileForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onSubmit={noop}
+          updateInProgress={false}
+          onImageUpload={onImageUpload}
+        />
+      );
+    });
+
+    const file = new File(['logo'], 'logo.png', { type: 'image/png' });
+    const input = document.getElementById('LaundryProfileForm.logo');
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(onImageUpload).toHaveBeenCalledTimes(1);
+    const [{ id, file: uploadedFile }] = onImageUpload.mock.calls[0];
+    expect(typeof id).toBe('string');
+    expect(uploadedFile).toBe(file);
+  });
+
+  it("shows the 'Change logo' state once a logo is uploaded, not the placeholder", async () => {
+    await act(async () => {
+      render(
+        <LaundryProfileForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onSubmit={noop}
+          updateInProgress={false}
+          currentUser={{ id: { uuid: 'laundry-1' } }}
+          profileImage={{ imageId: { uuid: 'img-1' } }}
+        />
+      );
+    });
+
+    expect(screen.getByText('LaundryProfileForm.changeLogo')).toBeInTheDocument();
+    expect(screen.queryByText('LaundryProfileForm.addYourLogo')).not.toBeInTheDocument();
+  });
+
+  it('shows the upload-failed message when uploadImageError is set', async () => {
+    await act(async () => {
+      render(
+        <LaundryProfileForm
+          intl={fakeIntl}
+          dispatch={noop}
+          onSubmit={noop}
+          updateInProgress={false}
+          uploadInProgress={false}
+          uploadImageError={{ type: 'error', status: 500 }}
+        />
+      );
+    });
+
+    expect(screen.getByText('LaundryProfileForm.imageUploadFailed')).toBeInTheDocument();
   });
 });

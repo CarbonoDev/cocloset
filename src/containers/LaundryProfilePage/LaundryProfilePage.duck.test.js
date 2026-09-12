@@ -13,7 +13,12 @@ jest.mock('../../ducks/user.duck', () => ({
 import { updateLaundryAddress as updateLaundryAddressApi } from '../../util/api';
 import { fetchCurrentUser } from '../../ducks/user.duck';
 
-import reducer, { updateProfile, updateLaundryAddressThunk } from './LaundryProfilePage.duck';
+import reducer, {
+  updateProfile,
+  updateProfileThunk,
+  updateLaundryAddressThunk,
+  uploadImageThunk,
+} from './LaundryProfilePage.duck';
 
 const ADDRESS = '5 Rue des Rosiers, 75004 Paris';
 const ORIGIN = { lat: 48.857, lng: 2.359 };
@@ -166,5 +171,44 @@ describe('reducer', () => {
     // The profile call's own error is untouched: the two fail for different reasons
     // and the form shows a different message for each.
     expect(rejected.updateProfileError).toBeNull();
+  });
+
+  // Mirrors ProfileSettingsPage.duck.js's uploadImageThunk reducer behaviour - the
+  // Logo (2026-09-11) reuses the same upload mechanism.
+  it('tracks an in-flight Logo upload, then clears it once the profile is saved', () => {
+    const pending = reducer(initial, uploadImageThunk.pending('req', { id: 'tmp-1', file: {} }));
+    expect(pending.uploadInProgress).toBe(true);
+    expect(pending.image).toEqual({ id: 'tmp-1', file: {} });
+
+    const fulfilled = reducer(pending, {
+      type: uploadImageThunk.fulfilled.type,
+      payload: { id: 'tmp-1', uploadedImage: { id: { uuid: 'img-1' } } },
+    });
+    expect(fulfilled.uploadInProgress).toBe(false);
+    expect(fulfilled.image).toEqual({
+      id: 'tmp-1',
+      imageId: { uuid: 'img-1' },
+      file: {},
+      uploadedImage: { id: { uuid: 'img-1' } },
+    });
+
+    // The in-flight image is cleared once the profile write that actually attaches
+    // it has succeeded - otherwise a second, unrelated save would silently re-attach
+    // a stale upload.
+    const saved = reducer(fulfilled, { type: updateProfileThunk.fulfilled.type });
+    expect(saved.image).toBeNull();
+  });
+
+  it('clears the image and records the error when the upload fails', () => {
+    const pending = reducer(initial, uploadImageThunk.pending('req', { id: 'tmp-1', file: {} }));
+
+    const rejected = reducer(pending, {
+      type: uploadImageThunk.rejected.type,
+      payload: { id: 'tmp-1', error: { type: 'error', status: 500 } },
+    });
+
+    expect(rejected.image).toBeNull();
+    expect(rejected.uploadInProgress).toBe(false);
+    expect(rejected.uploadImageError).toEqual({ type: 'error', status: 500 });
   });
 });

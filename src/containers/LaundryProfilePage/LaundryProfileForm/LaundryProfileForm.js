@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Field, Form as FinalForm } from 'react-final-form';
 import { FieldArray } from 'react-final-form-arrays';
 import arrayMutators from 'final-form-arrays';
@@ -6,6 +6,7 @@ import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { propTypes } from '../../../util/types';
+import { isUploadImageOverLimitError } from '../../../util/errors';
 import {
   CATEGORY_PRICING_FIELDS,
   categoryPricingFieldName,
@@ -32,17 +33,171 @@ import {
 
 import {
   Form,
+  Avatar,
   Button,
   FieldCheckbox,
   FieldTextInput,
   FieldLocationAutocompleteInput,
   IconAlert,
+  IconSpinner,
+  ImageFromFile,
   InlineTextButton,
 } from '../../../components';
 
 import css from './LaundryProfileForm.module.css';
 
 const identity = v => v;
+const ACCEPT_IMAGES = 'image/*';
+const UPLOAD_CHANGE_DELAY = 2000; // Show spinner so that browser has time to load img srcset
+
+/**
+ * The Logo field. Reuses the exact upload mechanism ProfileSettingsForm's avatar does
+ * (same `profileImage` user attribute, same sdk.images.upload flow) - "Logo" is a
+ * label change for laundries, not a new stored field. Kept as its own component
+ * because it needs the upload-delay smoothing timer (`uploadDelay`), which the rest of
+ * this form has no use for.
+ */
+const LogoField = props => {
+  const {
+    formId,
+    form,
+    currentUser,
+    profileImage = {},
+    onImageUpload,
+    uploadInProgress = false,
+    uploadImageError,
+  } = props;
+  const intl = useIntl();
+  const [uploadDelay, setUploadDelay] = useState(false);
+  const wasUploading = React.useRef(uploadInProgress);
+
+  useEffect(() => {
+    // Upload delay is an additional time window where the Avatar is added to the DOM,
+    // but not yet visible (time to load the image URL from srcset).
+    if (wasUploading.current && !uploadInProgress) {
+      setUploadDelay(true);
+      const timeoutId = window.setTimeout(() => setUploadDelay(false), UPLOAD_CHANGE_DELAY);
+      wasUploading.current = uploadInProgress;
+      return () => window.clearTimeout(timeoutId);
+    }
+    wasUploading.current = uploadInProgress;
+  }, [uploadInProgress]);
+
+  const uploadingOverlay =
+    uploadInProgress || uploadDelay ? (
+      <div className={css.uploadingImageOverlay}>
+        <IconSpinner />
+      </div>
+    ) : null;
+
+  const hasUploadError = !!uploadImageError && !uploadInProgress;
+  const errorClasses = classNames({ [css.avatarUploadError]: hasUploadError });
+  const transientUserProfileImage = profileImage.uploadedImage || currentUser?.profileImage;
+  const transientUser = { ...currentUser, profileImage: transientUserProfileImage };
+
+  const fileExists = !!profileImage.file;
+  const fileUploadInProgress = uploadInProgress && fileExists;
+  const delayAfterUpload = profileImage.imageId && uploadDelay;
+  const imageFromFile =
+    fileExists && (fileUploadInProgress || delayAfterUpload) ? (
+      <ImageFromFile
+        id={profileImage.id}
+        className={errorClasses}
+        rootClassName={css.uploadingImage}
+        aspectWidth={1}
+        aspectHeight={1}
+        file={profileImage.file}
+      >
+        {uploadingOverlay}
+      </ImageFromFile>
+    ) : null;
+
+  const avatarClasses = classNames(errorClasses, css.avatar, {
+    [css.avatarInvisible]: uploadDelay,
+  });
+  const avatarComponent =
+    !fileUploadInProgress && profileImage.imageId ? (
+      <Avatar
+        className={avatarClasses}
+        renderSizes="(max-width: 767px) 96px, 240px"
+        user={transientUser}
+        disableProfileLink
+      />
+    ) : null;
+
+  const chooseLogoLabel =
+    profileImage.imageId || fileUploadInProgress ? (
+      <div className={css.avatarContainer}>
+        {imageFromFile}
+        {avatarComponent}
+        <div className={css.changeAvatar}>
+          <FormattedMessage id="LaundryProfileForm.changeLogo" />
+        </div>
+      </div>
+    ) : (
+      <div className={css.avatarPlaceholder}>
+        <div className={css.avatarPlaceholderText}>
+          <FormattedMessage id="LaundryProfileForm.addYourLogo" />
+        </div>
+      </div>
+    );
+
+  let uploadError = null;
+  if (isUploadImageOverLimitError(uploadImageError)) {
+    uploadError = (
+      <div className={css.error}>
+        <FormattedMessage id="LaundryProfileForm.imageUploadFailedFileTooLarge" />
+      </div>
+    );
+  } else if (uploadImageError) {
+    uploadError = (
+      <div className={css.error}>
+        <FormattedMessage id="LaundryProfileForm.imageUploadFailed" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={css.field}>
+      <span className={css.fieldLabel}>
+        <FormattedMessage id="LaundryProfileForm.logoLabel" />
+      </span>
+      <Field accept={ACCEPT_IMAGES} id={`${formId}.logo`} name="logo" type="file" form={null}>
+        {fieldProps => {
+          const { accept, id, input } = fieldProps;
+          const { name, type } = input;
+          const onChange = e => {
+            const file = e.target.files[0];
+            form.change('logo', file);
+            form.blur('logo');
+            if (file != null) {
+              const tempId = `${file.name}_${Date.now()}`;
+              onImageUpload({ id: tempId, file });
+            }
+          };
+
+          return (
+            <div className={css.uploadAvatarWrapper}>
+              <label className={css.label} htmlFor={id}>
+                {chooseLogoLabel}
+              </label>
+              <input
+                accept={accept}
+                id={id}
+                name={name}
+                className={css.uploadAvatarInput}
+                disabled={uploadInProgress}
+                onChange={onChange}
+                type={type}
+              />
+            </div>
+          );
+        }}
+      </Field>
+      {uploadError}
+    </div>
+  );
+};
 
 // Indent class per nesting level, so "Dresses > Maxi Dress > ..." reads as a tree rather
 // than a flat wall of checkboxes. Console allows three levels; anything deeper (it
@@ -200,6 +355,13 @@ const FallbackHint = props => {
  * @param {boolean} [props.addressEditable] - May the studio change the address right
  *   now? Drives the lock. Defaults to true so a caller that passes neither prop gets
  *   the pre-existing editable form rather than a silently frozen one.
+ * @param {propTypes.currentUser} [props.currentUser] - The current user, for the Logo's
+ *   Avatar preview
+ * @param {Object} [props.profileImage] - In-flight/uploaded Logo image, see
+ *   ProfileSettingsForm for the identical shape
+ * @param {Function} [props.onImageUpload] - `({ id, file }) => void`
+ * @param {boolean} [props.uploadInProgress] - Whether the Logo upload is in progress
+ * @param {propTypes.error} [props.uploadImageError] - The Logo upload error
  * @returns {JSX.Element}
  */
 const LaundryProfileForm = props => (
@@ -210,17 +372,22 @@ const LaundryProfileForm = props => (
       const {
         addressEditable = true,
         className,
+        currentUser,
         form,
         formId = 'LaundryProfileForm',
         handleSubmit,
         hasUsableAddress = false,
         initialValues,
         invalid,
+        onImageUpload,
         pristine,
+        profileImage = {},
         rootClassName,
         updateAddressError,
         updateInProgress,
         updateProfileError,
+        uploadImageError,
+        uploadInProgress = false,
         values,
       } = fieldRenderProps;
 
@@ -362,6 +529,16 @@ const LaundryProfileForm = props => (
           {submitError}
           {addressError}
 
+          <LogoField
+            formId={formId}
+            form={form}
+            currentUser={currentUser}
+            profileImage={profileImage}
+            onImageUpload={onImageUpload}
+            uploadInProgress={uploadInProgress}
+            uploadImageError={uploadImageError}
+          />
+
           <FieldTextInput
             className={css.field}
             type="text"
@@ -437,6 +614,20 @@ const LaundryProfileForm = props => (
           <p className={css.fieldHint}>
             <FormattedMessage id="LaundryProfileForm.neighborhoodHelp" />
           </p>
+
+          {/* THE STUDIO'S "ABOUT" LINE, shown read-only on its public ProfilePage
+              alongside address/neighborhood/business hours (2026-09-11). Optional,
+              same as neighborhood - a studio that doesn't want to say anything leaves
+              it blank. */}
+          <FieldTextInput
+            className={css.field}
+            type="textarea"
+            id={`${formId}.description`}
+            name="description"
+            labelClassName={css.fieldLabel}
+            label={intl.formatMessage({ id: 'LaundryProfileForm.descriptionLabel' })}
+            placeholder={intl.formatMessage({ id: 'LaundryProfileForm.descriptionPlaceholder' })}
+          />
 
           {/* ONE ROW PER DAY, ALL TICKED TO START WITH.
                 > "un listado con checkboxes por cada día, cada día debe tener un input

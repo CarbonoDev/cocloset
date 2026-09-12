@@ -25,7 +25,7 @@ import LaundryOpsNav from '../LaundryOpsPage/LaundryOpsNav';
 
 import LaundryProfileForm from './LaundryProfileForm/LaundryProfileForm';
 
-import { updateProfile } from './LaundryProfilePage.duck';
+import { updateProfile, uploadImage } from './LaundryProfilePage.duck';
 import css from './LaundryProfilePage.module.css';
 import {
   businessHoursSummary,
@@ -62,7 +62,14 @@ const toLatLng = origin => {
 const getInitialValues = currentUser => {
   const { publicData = {}, privateData = {} } = currentUser?.attributes?.profile || {};
   const { laundryProfile = {}, acceptedCategories = [] } = publicData;
-  const { studioName, address, businessHours, businessHoursByDay, neighborhood } = laundryProfile;
+  const {
+    studioName,
+    address,
+    businessHours,
+    businessHoursByDay,
+    neighborhood,
+    description,
+  } = laundryProfile;
   const origin = toLatLng(laundryProfile.origin);
   // No cleaningFee is read: fees are marketplace-level server env configuration now
   // (CLEANING_FEE_<CATEGORY_ID>, see server/api-util/cleaningFeeEnv.js), the form has no
@@ -71,6 +78,10 @@ const getInitialValues = currentUser => {
 
   return {
     studioName,
+    // Optional, free text - the laundry's own "about the studio" line, shown read-only
+    // on its public ProfilePage. Null in storage (see the submit handler) becomes ''
+    // here, same convention as neighborhood.
+    description: description || '',
     // Typed only when the geocoder could not answer - see the submit handler.
     neighborhood: neighborhood || '',
     // The old free-text line is still read for display elsewhere; the FORM is the grid now.
@@ -130,6 +141,10 @@ const LaundryProfileFormSection = props => {
     updateProfileError,
     updateAddressInProgress,
     updateAddressError,
+    image,
+    onImageUpload,
+    uploadInProgress,
+    uploadImageError,
   } = props;
 
   const [state, setState] = useState({ initialValues: getInitialValues(currentUser) });
@@ -143,6 +158,10 @@ const LaundryProfileFormSection = props => {
 
   const handleSubmit = values => {
     const { studioName, turnaroundDays, acceptedCategories, location } = values;
+    // Optional, trimmed to null when blank - same convention as neighborhood: an empty
+    // string would leave the profile rendering a blank line forever, since Sharetribe
+    // only drops an extended-data key when it is explicitly null.
+    const description = typeof values.description === 'string' ? values.description.trim() : '';
     // The grid is the source of truth; `businessHours` is the one-line summary written from
     // it, because that string is what the listing wizard's laundry card, the public directory
     // and this page's own header print. See util/businessHours.js.
@@ -238,6 +257,7 @@ const LaundryProfileFormSection = props => {
           businessHours,
           businessHoursByDay,
           neighborhood: resolvedNeighborhood,
+          description: description || null,
           // Absent keys are omitted rather than written as undefined: a studio
           // setting its FIRST address has nothing stored to preserve, and the
           // address call right after this one is what puts it there.
@@ -284,6 +304,7 @@ const LaundryProfileFormSection = props => {
     setState({
       initialValues: {
         studioName,
+        description,
         neighborhood: resolvedNeighborhood || '',
         ...businessHoursToFormValues(businessHoursByDay),
         turnaroundDays: nextTurnaroundDays,
@@ -302,8 +323,19 @@ const LaundryProfileFormSection = props => {
       },
     });
 
-    onUpdateProfile(profile, addressChange);
+    // Update profileImageId only if a new image was actually picked and finished
+    // uploading - same guard as ProfileSettingsPage.js, which this mirrors.
+    const uploadedImage = image;
+    const profileToSend =
+      uploadedImage && uploadedImage.imageId && uploadedImage.file
+        ? { ...profile, profileImageId: uploadedImage.imageId }
+        : profile;
+
+    onUpdateProfile(profileToSend, addressChange);
   };
+
+  const profileImageId = currentUser?.profileImage ? currentUser.profileImage.id : null;
+  const profileImage = image || { imageId: profileImageId };
 
   return (
     <LaundryProfileForm
@@ -315,6 +347,11 @@ const LaundryProfileFormSection = props => {
       updateInProgress={updateProfileInProgress || updateAddressInProgress}
       hasUsableAddress={hasUsableAddress}
       addressEditable={addressEditable}
+      currentUser={currentUser}
+      profileImage={profileImage}
+      onImageUpload={onImageUpload}
+      uploadInProgress={uploadInProgress}
+      uploadImageError={uploadImageError}
     />
   );
 };
@@ -322,12 +359,15 @@ const LaundryProfileFormSection = props => {
 /**
  * LaundryProfilePage
  *
- * Laundry-only settings page for the studio profile: studio name, address,
- * business hours, studio-wide turnaround in days, and one table of accepted garment
- * categories carrying a turnaround per top-level category. Writes to
- * publicData.laundryProfile, publicData.acceptedCategories and privateData
- * (turnaroundDays, categoryPricing) on the laundry's own user profile via the ordinary
- * Marketplace API (sdk.currentUser.updateProfile).
+ * Laundry-only settings page for the studio profile: Logo, business (studio) name,
+ * address, neighborhood, business hours, description, studio-wide turnaround in days,
+ * and one table of accepted garment categories carrying a turnaround per top-level
+ * category. Writes to publicData.laundryProfile, publicData.acceptedCategories and
+ * privateData (turnaroundDays, categoryPricing) on the laundry's own user profile via
+ * the ordinary Marketplace API (sdk.currentUser.updateProfile). The Logo is the base
+ * `profileImage` attribute every user type has - "Logo" is a label, not a separate
+ * stored field - uploaded through the same sdk.images.upload flow as
+ * ProfileSettingsPage's avatar (see LaundryProfilePage.duck.js's uploadImageThunk).
  *
  * THE ADDRESS IS THE ONE EXCEPTION. It is saved by a second call, to our own server
  * (/api/laundry-address -> Integration API), because two things about it need a
@@ -354,6 +394,11 @@ const LaundryProfileFormSection = props => {
  * @param {propTypes.error} [props.updateProfileError] - The update profile error
  * @param {boolean} [props.updateAddressInProgress] - Whether the address call is in progress
  * @param {Object} [props.updateAddressError] - The address call error, carrying `code`
+ * @param {Object} [props.image] - In-flight/uploaded Logo image, see ProfileSettingsPage
+ *   for the identical shape (`{ id, file, imageId, uploadedImage }`)
+ * @param {Function} [props.onImageUpload] - `({ id, file }) => void`
+ * @param {boolean} [props.uploadInProgress] - Whether the Logo upload is in progress
+ * @param {propTypes.error} [props.uploadImageError] - The Logo upload error
  * @returns {JSX.Element}
  */
 export const LaundryProfilePageComponent = props => {
@@ -366,6 +411,10 @@ export const LaundryProfilePageComponent = props => {
     updateProfileError,
     updateAddressInProgress = false,
     updateAddressError,
+    image,
+    onImageUpload,
+    uploadInProgress = false,
+    uploadImageError,
     staticContext,
   } = props;
 
@@ -426,6 +475,10 @@ export const LaundryProfilePageComponent = props => {
             updateProfileError={updateProfileError}
             updateAddressInProgress={updateAddressInProgress}
             updateAddressError={updateAddressError}
+            image={image}
+            onImageUpload={onImageUpload}
+            uploadInProgress={uploadInProgress}
+            uploadImageError={uploadImageError}
           />
         </div>
       </LayoutSideNavigation>
@@ -436,6 +489,9 @@ export const LaundryProfilePageComponent = props => {
 const mapStateToProps = state => {
   const { currentUser } = state.user;
   const {
+    image,
+    uploadImageError,
+    uploadInProgress,
     updateProfileInProgress,
     updateProfileError,
     updateAddressInProgress,
@@ -444,6 +500,9 @@ const mapStateToProps = state => {
   return {
     currentUser,
     scrollingDisabled: isScrollingDisabled(state),
+    image,
+    uploadImageError,
+    uploadInProgress,
     updateProfileInProgress,
     updateProfileError,
     updateAddressInProgress,
@@ -452,6 +511,7 @@ const mapStateToProps = state => {
 };
 
 const mapDispatchToProps = dispatch => ({
+  onImageUpload: data => dispatch(uploadImage(data)),
   // Two arguments: the ordinary profile write, and (only when the studio submitted a
   // different address and may currently change it) the gated address change. The duck
   // sequences them - see LaundryProfilePage.duck.js `updateProfile` for why the order

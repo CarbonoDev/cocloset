@@ -9,6 +9,39 @@ import { denormalisedResponseEntities } from '../../util/data';
 
 // ================ Async Thunks ================ //
 
+//////////////////
+// Upload Image //
+//////////////////
+
+// The Logo field (2026-09-11) reuses the exact same upload mechanism as the ordinary
+// ProfileSettingsPage avatar - `profileImage` is a base Sharetribe user attribute
+// shared by every user type, not a laundry-specific one, so "Logo" is a label change
+// only. See ProfileSettingsPage.duck.js's uploadImageThunk, which this mirrors.
+export const uploadImageThunk = createAsyncThunk(
+  'LaundryProfilePage/uploadImage',
+  ({ id, file }, { rejectWithValue, extra: sdk }) => {
+    const bodyParams = {
+      image: file,
+    };
+    const queryParams = {
+      expand: true,
+      'fields.image': ['variants.square-small', 'variants.square-small2x'],
+    };
+
+    return sdk.images
+      .upload(bodyParams, queryParams)
+      .then(resp => {
+        const uploadedImage = resp.data.data;
+        return { id, uploadedImage };
+      })
+      .catch(e => {
+        return rejectWithValue({ id, error: storableError(e) });
+      });
+  }
+);
+
+export const uploadImage = actionPayload => dispatch => dispatch(uploadImageThunk(actionPayload));
+
 ////////////////////
 // Update Profile //
 ////////////////////
@@ -18,6 +51,8 @@ export const updateProfileThunk = createAsyncThunk(
   (actionPayload, { dispatch, rejectWithValue, extra: sdk }) => {
     const queryParams = {
       expand: true,
+      include: ['profileImage'],
+      'fields.image': ['variants.square-small', 'variants.square-small2x'],
     };
 
     return sdk.currentUser
@@ -145,6 +180,9 @@ export const updateProfile = (actionPayload, addressChange) => dispatch =>
 const laundryProfilePageSlice = createSlice({
   name: 'LaundryProfilePage',
   initialState: {
+    image: null,
+    uploadImageError: null,
+    uploadInProgress: false,
     updateProfileInProgress: false,
     updateProfileError: null,
     updateAddressInProgress: false,
@@ -153,6 +191,23 @@ const laundryProfilePageSlice = createSlice({
   reducers: {},
   extraReducers: builder => {
     builder
+      .addCase(uploadImageThunk.pending, (state, action) => {
+        const { id, file } = action.meta.arg;
+        state.image = { id, file };
+        state.uploadInProgress = true;
+        state.uploadImageError = null;
+      })
+      .addCase(uploadImageThunk.fulfilled, (state, action) => {
+        const { id, uploadedImage } = action.payload;
+        const { file } = state.image || {};
+        state.image = { id, imageId: uploadedImage.id, file, uploadedImage };
+        state.uploadInProgress = false;
+      })
+      .addCase(uploadImageThunk.rejected, (state, action) => {
+        state.image = null;
+        state.uploadInProgress = false;
+        state.uploadImageError = action.payload.error;
+      })
       .addCase(updateProfileThunk.pending, state => {
         state.updateProfileInProgress = true;
         state.updateProfileError = null;
@@ -161,6 +216,7 @@ const laundryProfilePageSlice = createSlice({
         state.updateAddressError = null;
       })
       .addCase(updateProfileThunk.fulfilled, state => {
+        state.image = null;
         state.updateProfileInProgress = false;
       })
       .addCase(updateProfileThunk.rejected, (state, action) => {

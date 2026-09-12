@@ -198,6 +198,41 @@ describe('ProfileSettingsForm', () => {
     expect(screen.getByText('ProfileSettingsForm.bioLabel')).toBeInTheDocument();
   });
 
+  // NOT FOR STUDIOS (2026-09-11): a laundry's identity/about-text fields are
+  // Business Name / Description on LaundryProfileForm, not Display Name / Bio here -
+  // two boxes for one answer is how they end up disagreeing.
+  it('hides Display Name and Bio for a laundry user', () => {
+    const laundry = createCurrentUser('laundry-userId', {
+      profile: { firstName: 'a', lastName: 'b', metadata: { isLaundry: true } },
+    });
+    render(
+      <ProfileSettingsForm
+        intl={fakeIntl}
+        onSubmit={noop}
+        uploadInProgress={false}
+        updateInProgress={false}
+        currentUser={laundry}
+        profileImage={{}}
+        userFields={userFieldConfig}
+        userTypeConfig={userTypeConfig}
+        initialValues={{}}
+      />
+    );
+
+    expect(
+      screen.queryByRole('heading', { name: 'ProfileSettingsForm.displayNameHeading' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('ProfileSettingsForm.displayNameLabel')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'ProfileSettingsForm.bioHeading' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('ProfileSettingsForm.bioLabel')).not.toBeInTheDocument();
+    // Name and neighborhood-adjacent sections are untouched by this gate.
+    expect(
+      screen.getByRole('heading', { name: 'ProfileSettingsForm.yourName' })
+    ).toBeInTheDocument();
+  });
+
   it('shows inputs and initial values for bio', () => {
     const u1 = createCurrentUser('userId', attributes);
     const { bio } = u1.attributes.profile;

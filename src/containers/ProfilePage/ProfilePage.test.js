@@ -220,6 +220,133 @@ describe('ProfilePage', () => {
   });
 });
 
+// ── A LAUNDRY'S PUBLIC PROFILE (2026-09-11) ────────────────────────────────────────
+//
+//   > "Solo el Business Name reemplazando a 'Hello my name is [user name]'... Hay
+//   >  que quitar la sección de reviews... Hay que mostrar: store address,
+//   >  neighborhood, business hours, y description" (Jonathan)
+describe('ProfilePage for a laundry', () => {
+  const config = getHostedConfiguration();
+  const props = {
+    scrollingDisabled: false,
+    intl: fakeIntl,
+    viewport: fakeViewport,
+    params: {},
+  };
+
+  const laundryAttributes = {
+    profile: {
+      metadata: { isLaundry: true },
+      publicData: {
+        userType: 'a',
+        laundryProfile: {
+          studioName: 'Studio Pigalle',
+          address: '21 Rue Frochot, Paris',
+          neighborhood: 'Pigalle',
+          businessHours: 'Mon-Sat 11:00-21:00',
+          description: 'A neighborhood dry cleaner since 1998.',
+        },
+      },
+    },
+  };
+
+  const createLaundryUser = (userFn, id) => {
+    const user = userFn(id);
+    return {
+      ...user,
+      attributes: {
+        ...user.attributes,
+        profile: {
+          ...user.attributes.profile,
+          metadata: laundryAttributes.profile.metadata,
+          publicData: laundryAttributes.profile.publicData,
+        },
+      },
+    };
+  };
+
+  const getLaundryInitialState = () => {
+    const currentUser = createLaundryUser(createCurrentUser, userId);
+    const user = createLaundryUser(createUser, userId);
+    const listing = createListing('l1');
+    return {
+      ProfilePage: {
+        userId: user.id,
+        userListingRefs: [{ id: listing.id, type: 'listing' }],
+        userShowError: null,
+        queryListingsError: null,
+        reviews: [],
+        queryReviewsError: null,
+      },
+      user: {
+        currentUser,
+        currentUserHasListings: false,
+        sendVerificationEmailInProgress: false,
+      },
+      marketplaceData: {
+        entities: {
+          user: { userId: user },
+          listing: { l1: { ...listing, relationships: { author: user } } },
+        },
+      },
+    };
+  };
+
+  it('shows only the Business Name as the heading, with no "Hello, I\'m" framing', async () => {
+    // fakeIntl (test harness) renders every message as its own id, ignoring `values`
+    // - the interpolated name string is not what's asserted here, the CHOICE of
+    // message id is: the laundry heading must not be the "Hello, I'm {name}" one.
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: getLaundryInitialState(), config });
+    });
+
+    expect(screen.getByText('ProfilePage.laundryDesktopHeading')).toBeInTheDocument();
+    expect(screen.queryByText('ProfilePage.desktopHeading')).not.toBeInTheDocument();
+  });
+
+  it('shows store address, neighborhood, business hours and description', async () => {
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: getLaundryInitialState(), config });
+    });
+
+    expect(screen.getByText('21 Rue Frochot, Paris')).toBeInTheDocument();
+    expect(screen.getByText('Pigalle')).toBeInTheDocument();
+    expect(screen.getByText('Mon-Sat 11:00-21:00')).toBeInTheDocument();
+    expect(screen.getByText('A neighborhood dry cleaner since 1998.')).toBeInTheDocument();
+  });
+
+  it('renders no reviews section at all', async () => {
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: getLaundryInitialState(), config });
+    });
+
+    expect(
+      screen.queryByRole('heading', { name: 'ProfilePage.reviewsFromMyCustomersTitle' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'ProfilePage.reviewsAsACustomerTitle' })
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not fall back to the plain member's neighborhood field for a laundry", async () => {
+    // The two keys are distinct (`laundryProfile.neighborhood` vs top-level
+    // `publicData.neighborhood`) - a laundry should never have the latter, but the
+    // page must read the RIGHT one regardless, not fall through to it.
+    const stateWithBoth = getLaundryInitialState();
+    const users = stateWithBoth.marketplaceData.entities.user;
+    Object.values(users).forEach(u => {
+      u.attributes.profile.publicData.neighborhood = 'Should not appear';
+    });
+
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: stateWithBoth, config });
+    });
+
+    expect(screen.getByText('Pigalle')).toBeInTheDocument();
+    expect(screen.queryByText('Should not appear')).not.toBeInTheDocument();
+  });
+});
+
 describe('Duck', () => {
   const config = {
     ...getHostedConfiguration(),
