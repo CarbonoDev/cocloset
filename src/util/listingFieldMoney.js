@@ -15,12 +15,17 @@
  * behaviour the day an operator renames a field or a garment costs 8. So the keys are listed,
  * in one place, and a key not on the list is left exactly as it is.
  *
- * MUST MATCH THE KEYS IN CONSOLE. `retailValue` is the one that exists today, verified against
- * the Dev marketplace's own listings. This mirrors util/listingFieldSearch.js, which keeps the
- * same kind of listing-page-only, key-driven decision out of the shared field helpers - it is
- * ProfilePage that renders custom fields through the same components and has no prices.
+ * MUST MATCH THE KEYS IN CONSOLE. This is why the $ went missing again after already being
+ * fixed once (2026-08-25, `retailValue`): the field's stored key is `retail_value` on real
+ * listings now (confirmed live - `publicData.retail_value: 80` on a published listing), not
+ * `retailValue`. Nothing in the client code changed between the two reports; the Console
+ * field's key drifted underneath a hardcoded list that has no way to notice. Both spellings
+ * are kept rather than swapped outright, since which one is live can move again the same way
+ * and keeping the old one costs nothing. This mirrors util/listingFieldSearch.js, which keeps
+ * the same kind of listing-page-only, key-driven decision out of the shared field helpers - it
+ * is ProfilePage that renders custom fields through the same components and has no prices.
  */
-const MONEY_FIELD_KEYS = ['retailValue'];
+const MONEY_FIELD_KEYS = ['retailValue', 'retail_value'];
 
 /**
  * @param {string} key - a listing field key

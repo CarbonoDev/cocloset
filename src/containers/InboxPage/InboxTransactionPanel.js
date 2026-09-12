@@ -82,10 +82,6 @@ const InboxTransactionPanel = props => {
   // `getState` is the process's own reading of `lastTransition`. Asking the process rather
   // than mapping transitions here is what keeps this panel correct when the EDN changes.
   const processState = process?.getState ? process.getState(transaction) : null;
-  // WHOSE STORY THIS IS. The renter does not see the laundry's work after the garment goes
-  // back, and both parties see a review step - see util/rentalTimeline.js. The panel already
-  // knows the role for its status strings, so this costs nothing but passing it along.
-  const steps = timelineStatusFor(processState, { audience: transactionRole });
 
   // WHETHER THIS VIEWER GETS THE CODE AT ALL.
   //
@@ -100,6 +96,15 @@ const InboxTransactionPanel = props => {
   // doors cannot drift apart. It also means this panel now shows no code before the payment
   // is confirmed, which was never intended here and simply had no gate.
   const isAtLaundry = listing?.attributes?.metadata?.onLaundry === true;
+
+  // WHOSE STORY THIS IS. The renter does not see the laundry's work after the garment goes
+  // back, and both parties see a review step - see util/rentalTimeline.js. The panel already
+  // knows the role for its status strings, so this costs nothing but passing it along.
+  //
+  // `onLaundry: isAtLaundry` disambiguates the ACCEPTED state's shared steps - see the comment
+  // on `currentIndexForAccepted` in rentalTimeline.js - so "accepted, still with the owner"
+  // marks `dropOffAtCleaners` as current rather than already done.
+  const steps = timelineStatusFor(processState, { audience: transactionRole, onLaundry: isAtLaundry });
 
   const showQr =
     processName === COCLOSET_BOOKING_PROCESS &&
@@ -135,16 +140,35 @@ const InboxTransactionPanel = props => {
   // convention as the listing page and the price breakdown, so the three agree.
   const inclusiveEnd = bookingEnd ? subtractTime(bookingEnd, 1, 'days', timeZone) : null;
 
-  // The lender's deadline to drop the garment off: 48h (2 days) before the rental starts,
-  // so the studio has time to clean it. Same helper and timezone as inclusiveEnd, so all
+  // The lender's deadline to drop the garment off: 2 hours before the rental starts.
+  //
+  //   > "si debo ir a entregar una prenda, la fecha que se debe mostrar (...) es dos horas
+  //   >  antes de la fecha de inicio del booking" (Jonathan, 2026-09-11)
+  //
+  // Previously 48h before, for the studio's cleaning turnaround - replaced outright per this
+  // instruction, not layered on top of it. Same helper and timezone as inclusiveEnd, so all
   // three dates in this panel agree with each other.
-  const recommendedDropTime = bookingStart ? subtractTime(bookingStart, 2, 'days', timeZone) : null;
+  const recommendedDropTime = bookingStart ? subtractTime(bookingStart, 2, 'hours', timeZone) : null;
 
   const formatDate = date =>
     date ? intl.formatDate(new Date(date), { ...DATE_FORMAT, timeZone }) : null;
 
   const formatDateNoYear = date =>
     date ? intl.formatDate(new Date(date), { ...DATE_FORMAT_NO_YEAR, timeZone }) : null;
+
+  // A 2-hour deadline usually falls on the SAME calendar day as the rental start, so the
+  // date-only format above would print the drop-off deadline and the start date as identical
+  // text ("by Sep 15" ... "starting Sep 15"). This one carries the time of day too, since that
+  // is the only part of it that now differs.
+  const formatDateTimeNoYear = date =>
+    date
+      ? intl.formatDate(new Date(date), {
+          ...DATE_FORMAT_NO_YEAR,
+          hour: 'numeric',
+          minute: 'numeric',
+          timeZone,
+        })
+      : null;
 
   // The identifiers a counter goes by. Assembled from what exists rather than from a fixed
   // template, so a rental that has not reached the studio yet reads as one line rather than
@@ -235,7 +259,7 @@ const InboxTransactionPanel = props => {
                 id="InboxPage.panel.pickupTitle.recommendedDropTimeLender"
                 values={{
                   laundryName,
-                  recommendedDropTime: formatDateNoYear(recommendedDropTime),
+                  recommendedDropTime: formatDateTimeNoYear(recommendedDropTime),
                   startDate: formatDateNoYear(bookingStart),
                 }}
               />

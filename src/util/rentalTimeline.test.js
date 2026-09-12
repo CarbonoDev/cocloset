@@ -62,12 +62,49 @@ describe('timelineStatusFor', () => {
   });
 
   it('lands on the LATER of two steps that share one process state', () => {
-    // The design splits "booking confirmed" from "laundry preparing", and "picked up" from
-    // "rental active"; each pair is one process state. Marking the earlier twin would leave a
-    // rental that is out with the customer showing "picked up" as still happening.
-    // Three steps share `accepted` now, and the rule is unchanged: the last one wins.
-    expect(keyAt('accepted')).toBe('laundryPreparing');
+    // "picked up" / "rental active" is still a plain last-one-wins tie: nothing disambiguates
+    // it, and nothing needs to - a rental out with the customer has no further sub-state.
     expect(keyAt('picked-up')).toBe('rentalActive');
+  });
+
+  // -------------------------------------------------------------------------
+  //   > "he aceptado la solicitud del pedido, pero aún no lo he llevado a la laundry (...)
+  //   >  el punto actual debe ser 'Drop off at cleaner'" (Jonathan, 2026-09-11)
+  //
+  // `bookingConfirmed`, `dropOffAtCleaners` and `laundryPreparing` all share `accepted` on
+  // purpose. Three sharing one state needs more than "the last one wins" once two readers
+  // need to be told apart, not just two - `onLaundry` is that extra bit.
+  // -------------------------------------------------------------------------
+  describe('accepted, before vs. after the garment reaches its laundry', () => {
+    it('marks the drop-off as current when the garment has not left its owner', () => {
+      // Unknown/false read the same way: absent metadata must not skip straight past a step
+      // nobody has actually done.
+      expect(timelineStatusFor('accepted').find(s => s.status === STEP_CURRENT).key).toBe(
+        'dropOffAtCleaners'
+      );
+      expect(
+        timelineStatusFor('accepted', { onLaundry: false }).find(s => s.status === STEP_CURRENT)
+          .key
+      ).toBe('dropOffAtCleaners');
+    });
+
+    it('marks laundry preparing as current once the studio has it, and drop-off as done', () => {
+      const steps = timelineStatusFor('accepted', { onLaundry: true });
+      expect(steps.find(s => s.status === STEP_CURRENT).key).toBe('laundryPreparing');
+      expect(steps.find(s => s.key === 'dropOffAtCleaners').status).toBe(STEP_DONE);
+    });
+
+    it('still marks bookingConfirmed done either way', () => {
+      expect(
+        timelineStatusFor('accepted', { onLaundry: false }).find(
+          s => s.key === 'bookingConfirmed'
+        ).status
+      ).toBe(STEP_DONE);
+      expect(
+        timelineStatusFor('accepted', { onLaundry: true }).find(s => s.key === 'bookingConfirmed')
+          .status
+      ).toBe(STEP_DONE);
+    });
   });
 
   it('treats an overdue rental as one in progress, not as its own step', () => {

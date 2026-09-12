@@ -20,7 +20,7 @@ import * as log from '../../util/log';
 
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 import { RENTAL_WINDOW_DAYS } from '../../util/rentalPeriods';
-import { withoutUnbookableListings } from '../../util/searchCleaningFloor';
+import { withoutUnbookableListings, withOnlyPickupTodayListings } from '../../util/searchCleaningFloor';
 
 // Pagination page size might need to be dynamic on responsive page layouts
 // Current design has max 3 columns 12 is divisible by 2 and 3
@@ -326,6 +326,7 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
     perPage,
     price,
     dates,
+    pickupToday,
     seats,
     sort,
     mapSearch,
@@ -336,7 +337,6 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
   // The params related to default filters are prepared one-by-one
   // We could consider moving them to the prepareAPIParams function too.
   const priceMaybe = priceSearchParams(price);
-  const datesMaybe = datesSearchParams(dates);
 
   // The FIRST day the reader asked about, kept out of the query params on purpose - it is not
   // something the API is asked, it is what the cleaning floor is compared against once the API
@@ -354,9 +354,27 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
   // widening fixed the query but broke this comparison by construction. Clamping to "no earlier
   // than UTC's actual today" keeps both halves asking about the same day.
   const today = getStartOf(new Date(), 'day', 'Etc/UTC');
+
+  // "PICKUP TODAY" IS NOT A NEW QUESTION, JUST TODAY'S ANSWER TO THE OLD ONE.
+  //
+  //   > "hay que agregar un filtro en el search que nos permita filtrar por listings que
+  //   >  esten disponibles para hoy" (Jonathan, 2026-09-11)
+  //
+  // Rather than a second copy of the date filter's own timezone handling (the 36h cutoff
+  // above, the UTC-anchored clamp just below, the API's own "not more than a day in the past"
+  // limit further down), this is internally just `dates=<today>,<today>`, fed through the SAME
+  // datesSearchParams - it inherits every fix already made to that function instead of risking
+  // a fourth, independent bug in the same family. An explicit `dates` filter still wins if the
+  // reader set one; "today" and a chosen range cannot both be the question being asked.
+  const todayIso = today.toISOString().slice(0, 10);
+  const effectiveDates = dates || (pickupToday === 'true' ? `${todayIso},${todayIso}` : dates);
+  const datesMaybe = datesSearchParams(effectiveDates);
+
   const requestedStart =
-    datesMaybe.start && typeof dates === 'string' && dates.split(',').length === 2
-      ? [parseDateFromISO8601(dates.split(',')[0], 'Etc/UTC'), today].reduce((a, b) =>
+    datesMaybe.start &&
+    typeof effectiveDates === 'string' &&
+    effectiveDates.split(',').length === 2
+      ? [parseDateFromISO8601(effectiveDates.split(',')[0], 'Etc/UTC'), today].reduce((a, b) =>
           a.getTime() > b.getTime() ? a : b
         )
       : null;
@@ -413,7 +431,14 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
 
       // Dropped BEFORE the entities are stored, so nothing downstream has to remember to
       // exclude them again: the results, the map and the count all read what is kept.
-      const filtered = withoutUnbookableListings(response, requestedStart);
+      //
+      // pickupToday's post-fetch pass is the STRICTER one - the same rule the card badge
+      // uses, additionally requiring onLaundry - so it runs instead of (not on top of)
+      // withoutUnbookableListings' plain cleaning-floor check.
+      const filtered =
+        pickupToday === 'true'
+          ? withOnlyPickupTodayListings(response)
+          : withoutUnbookableListings(response, requestedStart);
 
       dispatch(addMarketplaceEntities(filtered, sanitizeConfig));
       return filtered;

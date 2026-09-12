@@ -1,4 +1,9 @@
-import { isBookableFrom, withoutUnbookableListings } from './searchCleaningFloor';
+import {
+  isBookableFrom,
+  isPickupTodayListing,
+  withOnlyPickupTodayListings,
+  withoutUnbookableListings,
+} from './searchCleaningFloor';
 
 /**
  * WHY THIS FILE EXISTS
@@ -61,6 +66,73 @@ describe('a garment the calendar offers and a booking would refuse', () => {
     const garment = listing({ initialCleaningDays: 12, onLaundry: false });
 
     expect(isBookableFrom(garment, null)).toBe(true);
+  });
+});
+
+// -------------------------------------------------------------------------
+//   > "la tag debe ser mostrada para los listings que esten en laundry y que esten
+//   >  disponibles para hoy" (Jonathan, 2026-09-11)
+// -------------------------------------------------------------------------
+describe('isPickupTodayListing', () => {
+  it('is false when the garment has never reached its laundry', () => {
+    // Free today per the cleaning floor, but onLaundry is the first condition, not an
+    // afterthought - a garment still with its owner is not collectable from a studio.
+    expect(isPickupTodayListing(listing({ onLaundry: false }), today())).toBe(false);
+    expect(isPickupTodayListing(listing({}), today())).toBe(false);
+  });
+
+  it('is true when at the studio and nothing blocks today', () => {
+    expect(isPickupTodayListing(listing({ onLaundry: true }), today())).toBe(true);
+  });
+
+  // `initialCleaningDays` stops mattering once `onLaundry` is true - resolveInitialCleaningDays
+  // treats that flag as proof the first-time lead time has already been spent, first and
+  // regardless of the stored number. A stale value left over from before the handoff must not
+  // resurrect a rule that no longer applies.
+  it('ignores a stale initialCleaningDays once the garment has actually reached the studio', () => {
+    const garment = listing({ onLaundry: true, initialCleaningDays: 12 });
+
+    expect(isPickupTodayListing(garment, today())).toBe(true);
+  });
+
+  it('is false when a post-rental readyAt has not passed yet', () => {
+    const garment = listing({ onLaundry: true, readyAt: daysFromToday(2).toISOString() });
+
+    expect(isPickupTodayListing(garment, today())).toBe(false);
+  });
+
+  it('is true once a past readyAt has cleared', () => {
+    const garment = listing({ onLaundry: true, readyAt: daysFromToday(-2).toISOString() });
+
+    expect(isPickupTodayListing(garment, today())).toBe(true);
+  });
+});
+
+describe('withOnlyPickupTodayListings', () => {
+  const responseWith = (listings, totalItems) => ({
+    data: { data: listings, meta: { totalItems, totalPages: 3, page: 1, perPage: 24 } },
+  });
+
+  it('keeps only listings on laundry and free today, and corrects the count', () => {
+    const response = responseWith(
+      [
+        listing({ id: 'pickup-today', onLaundry: true }),
+        listing({ id: 'not-on-laundry', onLaundry: false }),
+        listing({ id: 'still-cleaning', onLaundry: true, readyAt: daysFromToday(2).toISOString() }),
+      ],
+      17
+    );
+
+    const filtered = withOnlyPickupTodayListings(response);
+
+    expect(filtered.data.data.map(l => l.id.uuid)).toEqual(['pickup-today']);
+    expect(filtered.data.meta.totalItems).toBe(15);
+  });
+
+  it('returns the response untouched when everything qualifies', () => {
+    const response = responseWith([listing({ onLaundry: true })], 17);
+
+    expect(withOnlyPickupTodayListings(response)).toBe(response);
   });
 });
 

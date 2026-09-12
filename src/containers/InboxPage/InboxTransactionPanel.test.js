@@ -334,3 +334,52 @@ describe('InboxTransactionPanel: the status pill', () => {
     expect(pill.className).not.toContain('panelStatusFinal');
   });
 });
+
+// -------------------------------------------------------------------------
+//   > "si debo ir a entregar una prenda, la fecha que se debe mostrar (...) es dos horas
+//   >  antes de la fecha de inicio del booking" (Jonathan, 2026-09-11)
+//
+// Previously 48h (2 days) before. Booking start is set to midnight UTC so a 2-hour offset
+// crosses into the PREVIOUS calendar day (22:00 the day before) while a 2-DAY offset would
+// not - this tells the two apart without depending on exact hour/minute formatting.
+// -------------------------------------------------------------------------
+describe('InboxTransactionPanel: the lender drop-off deadline', () => {
+  it('is 2 hours before the booking start, not 2 days', () => {
+    const transaction = {
+      ...transactionWith({}),
+      attributes: { ...transactionWith({}).attributes, lastTransition: 'transition/accept' },
+      booking: {
+        id: { uuid: 'booking-1' },
+        type: 'booking',
+        attributes: {
+          start: new Date('2026-09-20T00:00:00.000Z'),
+          end: new Date('2026-09-27T00:00:00.000Z'),
+        },
+      },
+    };
+
+    render(
+      <InboxTransactionPanel
+        transaction={transaction}
+        transactionRole={TX_TRANSITION_ACTOR_PROVIDER}
+        onManageDisableScrolling={() => null}
+      />,
+      {
+        // The default test harness maps every message id to itself, so the real English copy
+        // - and the interpolated dates this test is actually about - would never render.
+        // Overriding just this one key with its real en.json string is what lets the
+        // assertion below see actual dates rather than a literal id.
+        messages: {
+          'InboxPage.panel.pickupTitle.recommendedDropTimeLender':
+            'As the lender, you must drop this item off at {laundryName} by {recommendedDropTime} so that it can be cleaned in time for the rental starting on {startDate}.',
+        },
+      }
+    );
+
+    const message = screen.getByText(/must drop this item off/);
+    // Deadline reads Sep 19 (crossed the day boundary going back 2 hours from Sep 20 00:00);
+    // the rental start still reads Sep 20. A 2-day offset would have printed Sep 18 instead.
+    expect(message.textContent).toMatch(/Sep 19/);
+    expect(message.textContent).toMatch(/Sep 20/);
+  });
+});

@@ -68,6 +68,8 @@ const COCLOSET_BOOKING_PROCESS = 'cocloset-booking';
  * @param {boolean} [props.isCustomer] - is the viewer the customer rather than the owner?
  * @param {boolean} [props.isAtLaundry] - is the garment already in a studio's custody? Only
  *   affects the owner, and only before they have accepted - see isHandoverQrVisibleState.
+ * @param {string} [props.dropOffBy] - pre-formatted deadline (2h before the booking start) for
+ *   the owner's drop-off, or null when there is no booking to compute one from. Owner-only.
  * @returns {JSX.Element|null}
  */
 const HandoverQrMaybe = props => {
@@ -80,6 +82,7 @@ const HandoverQrMaybe = props => {
     metadata,
     isCustomer = false,
     isAtLaundry = false,
+    dropOffBy = null,
   } = props;
 
   // Every other process in this template (booking, purchase, inquiry,
@@ -117,6 +120,9 @@ const HandoverQrMaybe = props => {
     : isAtLaundry
     ? 'TransactionPanel.handoverQr.descriptionOwnerCollect'
     : 'TransactionPanel.handoverQr.descriptionOwnerDropOff';
+  // Only descriptionOwnerDropOff's default string has a {dropOffBy} placeholder - passing it
+  // to the others as an unused value is harmless, react-intl just ignores it.
+  const descriptionValues = dropOffBy ? { dropOffBy } : undefined;
 
   return (
     <section className={classes}>
@@ -138,7 +144,7 @@ const HandoverQrMaybe = props => {
           the moment it matters most - just after paying, which is exactly when the client
           says the customer needs to be told. */}
       <p className={css.description}>
-        <FormattedMessage id={descriptionId} />
+        <FormattedMessage id={descriptionId} values={descriptionValues} />
       </p>
       <div className={css.body}>
         <HandoverQrCode

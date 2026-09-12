@@ -19,7 +19,9 @@ import {
 // Imported directly rather than through the barrel: components/index.js exports this file
 // too, so going through it would be a cycle.
 import FavoriteButton from '../FavoriteButton/FavoriteButton';
+import PickupTodayBadge from '../PickupTodayBadge/PickupTodayBadge';
 
+import { isPickupTodayListing } from '../../util/searchCleaningFloor';
 import { getListingCardTranslations } from './ListingCard.helpers';
 
 import css from './ListingCard.module.css';
@@ -212,6 +214,15 @@ export const ListingCard = props => {
   const { title = '', publicData } = listing?.attributes || {};
   const slug = createSlug(title);
 
+  // "Pickup Today" (mockup: green pill, top-right of the card image).
+  //
+  //   > "la tag debe ser mostrada para los listings que esten en laundry y que esten
+  //   >  disponibles para hoy" (Jonathan, 2026-09-11)
+  //
+  // See util/searchCleaningFloor.js's isPickupTodayListing for what this does and does not
+  // guarantee - it reads only what a search-response listing already carries.
+  const showPickupToday = isPickupTodayListing(listing);
+
   const { listingType, cardStyle } = publicData || {};
   const validListingTypes = config.listing.listingTypes || [];
   const foundListingTypeConfig = validListingTypes.find(conf => conf.listingType === listingType);
@@ -294,17 +305,29 @@ export const ListingCard = props => {
     </NamedLink>
   );
 
-  if (!showFavorite || !id) {
+  const showFavoriteButton = showFavorite && !!id;
+  if (!showFavoriteButton && !showPickupToday) {
     return card;
   }
 
   // The heart is a SIBLING of the link, not a child: nested interactive elements are invalid
   // and a screen reader reads the whole card as one control with a button hidden inside it.
-  // Absolutely positioned over the image so the card itself keeps its layout.
+  // Absolutely positioned over the image so the card itself keeps its layout. The badge is a
+  // plain span, so it has no such constraint, but shares the wrapper for the same reason.
   return (
     <div className={css.cardWithFavorite}>
       {card}
-      <FavoriteButton listingId={id} className={css.cardFavorite} />
+      {showPickupToday ? <PickupTodayBadge className={css.cardPickupToday} /> : null}
+      {showFavoriteButton ? (
+        <FavoriteButton
+          listingId={id}
+          // Both corners are the same corner (top-right) by design (mockup), so the heart
+          // makes room for the badge rather than sitting under it - see .cardFavoriteShifted.
+          className={classNames(css.cardFavorite, {
+            [css.cardFavoriteShifted]: showPickupToday,
+          })}
+        />
+      ) : null}
     </div>
   );
 };

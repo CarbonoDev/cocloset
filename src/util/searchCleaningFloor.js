@@ -1,4 +1,5 @@
 import { earliestBookableStart, resolveInitialCleaningDays } from './cleaningFloor';
+import { getStartOf } from './dates';
 
 /**
  * Drop the garments a date search would offer but a booking would refuse.
@@ -69,7 +70,43 @@ export const isBookableFrom = (listing, requestedStart) => {
 };
 
 /**
- * Filter a search response, and correct what it claims to have found.
+ * The "Pickup Today" badge condition, for a card or a listing page.
+ *
+ *   > "la tag debe ser mostrada para los listings que esten en laundry y que esten
+ *   >  disponibles para hoy" (Jonathan, 2026-09-11)
+ *
+ * Two conditions, both from data already on a search-response listing entity: the garment is
+ * physically at its studio right now (`metadata.onLaundry === true` - the same flag every
+ * other reader of custody uses), and nothing known blocks a collection today (the same
+ * cleaning-floor check the date filter already relies on).
+ *
+ * NOT A GUARANTEE, and said so rather than hidden: this reads only the initial-cleaning and
+ * post-rental-readiness floors, which is everything a search-response listing carries. It does
+ * NOT re-check Sharetribe's own availability exceptions (an active or upcoming booking sitting
+ * across today), because that would mean a real availability query per card rather than a read
+ * of data already in hand. This is the same trade-off `withoutUnbookableListings` already
+ * makes for the dates filter's post-fetch pass, and the same direction it errs in: showing the
+ * badge on a garment a booking would then refuse, rather than hiding it from one that is
+ * genuinely free. A search actually filtered by today's date (the "Available today" filter)
+ * goes through the real query instead and does not share this gap.
+ *
+ * @param {Object} listing - a listing entity from the search response
+ * @param {Date} [today] - for tests; defaults to the real current instant
+ * @returns {boolean}
+ */
+export const isPickupTodayListing = (listing, today = new Date()) => {
+  const onLaundry = listing?.attributes?.metadata?.onLaundry === true;
+  if (!onLaundry) {
+    return false;
+  }
+  const timeZone = listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC';
+  const startOfToday = getStartOf(today, 'day', timeZone);
+  return isBookableFrom(listing, startOfToday);
+};
+
+/**
+ * Filter a search response by a per-listing predicate, and correct what it claims to have
+ * found.
  *
  *   > "trata de corregir el conteo" (Jonathan, 2026-09-10)
  *
@@ -82,16 +119,16 @@ export const isBookableFrom = (listing, requestedStart) => {
  * on the strength of one page would remove pages that still hold results.
  *
  * @param {Object} response - the raw `listings.query` response
- * @param {Date|null} requestedStart
- * @returns {Object} the same response shape, with unbookable listings removed
+ * @param {(listing: Object) => boolean} keepIf - true for a listing that should survive
+ * @returns {Object} the same response shape, with the dropped listings removed
  */
-export const withoutUnbookableListings = (response, requestedStart) => {
+const filterSearchResponse = (response, keepIf) => {
   const data = response?.data?.data;
-  if (!requestedStart || !Array.isArray(data)) {
+  if (!Array.isArray(data)) {
     return response;
   }
 
-  const kept = data.filter(listing => isBookableFrom(listing, requestedStart));
+  const kept = data.filter(keepIf);
   const dropped = data.length - kept.length;
   if (dropped === 0) {
     return response;
@@ -111,3 +148,33 @@ export const withoutUnbookableListings = (response, requestedStart) => {
     },
   };
 };
+
+/**
+ * @param {Object} response - the raw `listings.query` response
+ * @param {Date|null} requestedStart
+ * @returns {Object} the same response shape, with unbookable listings removed
+ */
+export const withoutUnbookableListings = (response, requestedStart) => {
+  if (!requestedStart) {
+    return response;
+  }
+  return filterSearchResponse(response, listing => isBookableFrom(listing, requestedStart));
+};
+
+/**
+ * The post-fetch half of the "Pickup Today" search filter.
+ *
+ *   > "hay que agregar un filtro en el search que nos permita filtrar por listings que esten
+ *   >  disponibles para hoy" (Jonathan, 2026-09-11)
+ *
+ * Reuses `isPickupTodayListing` - the exact same rule the card badge uses - so a listing the
+ * filter offers and the badge does not agree about would be a new bug wearing an old one's
+ * clothes. Unlike the badge, this runs on top of a REAL availability query for today (see
+ * SearchPage.duck.js, which reuses `datesSearchParams` internally rather than a second copy of
+ * that logic), so it does not carry the badge's "does not see active bookings" caveat.
+ *
+ * @param {Object} response - the raw `listings.query` response, already date-filtered for today
+ * @returns {Object} the same response shape, with everything not pickup-today removed
+ */
+export const withOnlyPickupTodayListings = response =>
+  filterSearchResponse(response, listing => isPickupTodayListing(listing));
