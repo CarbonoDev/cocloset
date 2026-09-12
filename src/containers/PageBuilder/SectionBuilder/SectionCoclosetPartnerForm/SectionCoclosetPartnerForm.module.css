@@ -1,0 +1,76 @@
+@import '../../../../styles/customMediaQueries.css';
+
+/* Hardcoded, not dependent on Console's `appearance` (currently the plain default) - same
+   approach SectionCoclosetHero/Laundry use for their own fixed backgrounds. */
+.root {
+  background-color: var(--coclosetPartnerTealDark);
+}
+
+.layout {
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: center;
+
+  @media (--viewportLarge) {
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+    padding: 0 36px;
+  }
+}
+
+.info {
+  color: var(--colorWhite);
+}
+
+.headline {
+  font-family: var(--fontFamilyDisplay);
+  color: var(--colorWhite);
+  font-size: 32px;
+  line-height: 1.1;
+  margin: 0 0 16px 0;
+
+  @media (--viewportMedium) {
+    font-size: 42px;
+  }
+}
+
+.body {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--colorWhite);
+  margin: 0;
+}
+
+.body > p {
+  margin: 0;
+}
+
+.card {
+  background-color: var(--coclosetSurface);
+  border-radius: var(--coclosetRadius);
+  box-shadow: var(--boxShadowPopup);
+  padding: 28px 24px;
+
+  @media (--viewportMedium) {
+    padding: 36px;
+  }
+}
+
+.submitted {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.submittedTitle {
+  color: var(--coclosetInk);
+  margin: 0 0 12px 0;
+}
+
+.submittedMessage {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+}
