@@ -750,6 +750,18 @@
   border: 1px solid var(--coclosetBorder);
   border-radius: var(--coclosetRadius);
   background-color: var(--coclosetSurface);
+  text-decoration: none;
+  transition: var(--transitionStyleButton);
+
+  &:hover {
+    border-color: var(--coclosetBrand);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coclosetBrand);
+    outline-offset: 2px;
+  }
 
   @media (--viewportMedium) {
     padding: 20px;
@@ -794,77 +806,31 @@
   color: var(--coclosetToneCriticalFg);
 }
 
-.panels {
-  display: grid;
-  gap: 12px;
-  margin-top: 18px;
+/* The 8th dashboard card (LaundryDashboard's TicketLookupTile): a form
+   dressed as a `.tile` so it sits in the same grid as the 7 stat cards. */
+.ticketLookupTile {
+  cursor: default;
 
-  @media (--viewportMedium) {
-    gap: 16px;
-    grid-template-columns: repeat(2, 1fr);
-    margin-top: 24px;
+  &:hover {
+    border-color: var(--coclosetBorder);
   }
 }
 
-.panel {
-  padding: 16px;
-  border: 1px solid var(--coclosetBorder);
-  border-radius: var(--coclosetRadius);
-  background-color: var(--coclosetSurface);
-
-  @media (--viewportMedium) {
-    padding: 20px 20px 8px 20px;
-  }
-}
-
-.panelTitle {
-  margin: 0 0 4px 0;
-  color: var(--coclosetInkMuted);
-  font-size: 11px;
-  font-weight: var(--fontWeightSemiBold);
-  letter-spacing: 0.8px;
-  line-height: 15px;
-  text-transform: uppercase;
-}
-
-.panelList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.panelRow {
+.ticketLookup {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--coclosetBorder);
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
 
-  &:last-child {
-    border-bottom: none;
+  & .search {
+    flex: 1 1 140px;
   }
-}
-
-.panelRowMain {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-/* Same reasoning as the inventory card: a dashboard panel has a fixed width,
-   so a long status label wraps rather than pushing the panel wider. */
-.panelRow .statusBadge {
-  max-width: 50%;
-  white-space: normal;
 }
 
 .dashboardLink {
   display: inline-flex;
   align-items: center;
-  margin-top: 18px;
+  border: none;
   padding: 10px 20px;
   border-radius: var(--coclosetRadiusPill);
   background-color: var(--coclosetInk);
@@ -873,6 +839,7 @@
   font-weight: var(--fontWeightSemiBold);
   line-height: 20px;
   text-decoration: none;
+  cursor: pointer;
   transition: var(--transitionStyleButton);
 
   &:hover {
@@ -884,10 +851,6 @@
   &:focus-visible {
     outline: 2px solid var(--coclosetBrand);
     outline-offset: 2px;
-  }
-
-  @media (--viewportMedium) {
-    margin-top: 24px;
   }
 }
 

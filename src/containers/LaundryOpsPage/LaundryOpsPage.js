@@ -1,9 +1,11 @@
 import React from 'react';
 import { compose } from 'redux';
 import { connect } from 'react-redux';
+import { useLocation } from 'react-router-dom';
 
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { isLaundryUser } from '../../util/userHelpers';
+import { parse } from '../../util/urlHelpers';
 import { isScrollingDisabled, manageDisableScrolling } from '../../ducks/ui.duck';
 
 import { H3, IconSpinner, Page, UserNav, LayoutSideNavigation } from '../../components';
@@ -65,6 +67,7 @@ const ROUTE_NAME_BY_TAB = {
  */
 export const LaundryOpsPageComponent = props => {
   const intl = useIntl();
+  const location = useLocation();
   const {
     tab = 'dashboard',
     currentUser,
@@ -100,6 +103,12 @@ export const LaundryOpsPageComponent = props => {
 
   const title = intl.formatMessage({ id: `LaundryOpsPage.title.${tab}` });
 
+  // Populated only for the Orders screen, from the dashboard's "Lookup
+  // ticket #" box (LaundryDashboard's TicketLookup navigates here with
+  // `?search=`) - the other screens keep their own filter, so a stray
+  // `search` param left in the URL shouldn't silently filter them too.
+  const initialSearch = tab === 'orders' ? parse(location.search).search : undefined;
+
   const renderContent = () => {
     if (fetchOrdersInProgress && orders.length === 0 && inventory.length === 0) {
       return <IconSpinner />;
@@ -114,7 +123,7 @@ export const LaundryOpsPageComponent = props => {
 
     switch (tab) {
       case 'dashboard':
-        return <LaundryDashboard rows={orders} />;
+        return <LaundryDashboard rows={orders} inventory={inventory} />;
       case 'inventory':
         return (
           <LaundryInventory
@@ -134,6 +143,7 @@ export const LaundryOpsPageComponent = props => {
           <LaundryOrdersTable
             rows={filterByView(orders, tab === 'orders' ? 'all' : tab)}
             showTabs={tab === 'orders'}
+            initialSearch={initialSearch}
             onAdvanceStatus={onAdvanceStatus}
             advanceStatusTransactionId={advanceStatusTransactionId}
             onHandBackToOwner={onHandBackToOwner}

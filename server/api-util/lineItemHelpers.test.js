@@ -12,11 +12,20 @@ jest.mock('../log', () => ({ error: jest.fn() }));
 // The Integration SDK is still mocked here so the tests below can assert that NOTHING
 // looks a laundry up on the pricing path: a stored fee that could still reach an invoice
 // is the exact bug that change removed.
+//
+// resolveSpecialHandlingFeeInSubunits(), unlike the cleaning fee, DOES call the
+// Integration SDK — to re-fetch the LISTING itself (not a laundry) and read its own
+// `privateData.specialCare`, which the caller's own session SDK cannot see. Hence
+// `listings.show` is mocked here too.
 const mockUsersShow = jest.fn();
+const mockListingsShow = jest.fn();
 jest.mock('./integrationSdk', () => ({
   getIntegrationSdk: jest.fn(() => ({
     users: {
       show: mockUsersShow,
+    },
+    listings: {
+      show: mockListingsShow,
     },
   })),
 }));
@@ -41,9 +50,14 @@ const {
   getCustomerCommissionMaybe,
   getCleaningFeeLineItemMaybe,
   resolveCleaningFeeInSubunits,
+  getSpecialHandlingFeeLineItemMaybe,
+  resolveSpecialHandlingFeeInSubunits,
 } = require('./lineItemHelpers');
 
 const { resetReportedMalformedEnvVars } = require('./cleaningFeeEnv');
+const {
+  resetReportedMalformed: resetReportedSpecialHandlingMalformed,
+} = require('./specialHandlingFeeEnv');
 
 describe('calculateTotalPriceFromQuantity()', () => {
   it('should calculate price based on quantity', () => {
@@ -990,5 +1004,139 @@ describe('resolveCleaningFeeInSubunits()', () => {
 
     expect(await resolveCleaningFeeInSubunits(assigned, 'EUR')).toBe(1100);
     expect(await resolveCleaningFeeInSubunits(unassigned, 'EUR')).toBe(1100);
+  });
+});
+
+describe('getSpecialHandlingFeeLineItemMaybe()', () => {
+  it('should return a special-handling-fee line item for a positive amount', () => {
+    expect(getSpecialHandlingFeeLineItemMaybe(1500, 'USD')).toEqual([
+      {
+        code: 'line-item/special-handling-fee',
+        unitPrice: new Money(1500, 'USD'),
+        quantity: 1,
+        includeFor: ['customer'],
+      },
+    ]);
+  });
+
+  it('should return an empty array for a zero amount (fee disabled via env)', () => {
+    expect(getSpecialHandlingFeeLineItemMaybe(0, 'USD')).toEqual([]);
+  });
+
+  it('should return an empty array when the amount is not a valid number', () => {
+    expect(getSpecialHandlingFeeLineItemMaybe(undefined, 'USD')).toEqual([]);
+    expect(getSpecialHandlingFeeLineItemMaybe(null, 'USD')).toEqual([]);
+    expect(getSpecialHandlingFeeLineItemMaybe(NaN, 'USD')).toEqual([]);
+    expect(getSpecialHandlingFeeLineItemMaybe(-500, 'USD')).toEqual([]);
+  });
+
+  it('should return an empty array when currency is missing', () => {
+    expect(getSpecialHandlingFeeLineItemMaybe(1500, null)).toEqual([]);
+  });
+});
+
+describe('resolveSpecialHandlingFeeInSubunits()', () => {
+  const originalEnv = process.env.SPECIAL_HANDLING_FEE;
+
+  beforeEach(() => {
+    delete process.env.SPECIAL_HANDLING_FEE;
+    // jest config has resetMocks: true, so the jest.mock() factory's implementation is
+    // wiped before every test.
+    getIntegrationSdk.mockReturnValue({ listings: { show: mockListingsShow } });
+    resetReportedSpecialHandlingMalformed();
+  });
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.SPECIAL_HANDLING_FEE;
+    } else {
+      process.env.SPECIAL_HANDLING_FEE = originalEnv;
+    }
+  });
+
+  const listingWithSpecialCare = flags => ({
+    id: { uuid: 'listing-1' },
+    attributes: { privateData: { specialCare: { flags } } },
+  });
+
+  const mockFreshListing = privateData =>
+    mockListingsShow.mockResolvedValue({
+      data: { data: { attributes: { privateData } } },
+    });
+
+  it('charges the $15 default when the listing has any Special Care flag set', async () => {
+    mockFreshListing({ specialCare: { flags: ['highValue'] } });
+
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare(['highValue']), 'USD')
+    ).toBe(1500);
+  });
+
+  it('charges nothing when the listing has no Special Care flags', async () => {
+    mockFreshListing({});
+
+    expect(await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare([]), 'USD')).toBe(0);
+  });
+
+  it('charges nothing when the listing has no privateData at all', async () => {
+    mockFreshListing(undefined);
+
+    expect(await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare([]), 'USD')).toBe(0);
+  });
+
+  it('does not matter WHICH flag is set — it is a flat, not per-flag, fee', async () => {
+    mockFreshListing({ specialCare: { flags: ['embellishments', 'leatherSuedeTrim'] } });
+
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(
+        listingWithSpecialCare(['embellishments', 'leatherSuedeTrim']),
+        'USD'
+      )
+    ).toBe(1500);
+  });
+
+  it('uses the env override, including a $0 override that disables the fee outright', async () => {
+    process.env.SPECIAL_HANDLING_FEE = '25';
+    mockFreshListing({ specialCare: { flags: ['highValue'] } });
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare(['highValue']), 'USD')
+    ).toBe(2500);
+
+    process.env.SPECIAL_HANDLING_FEE = '0';
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare(['highValue']), 'USD')
+    ).toBe(0);
+  });
+
+  // ── PREVIEW AND CHARGE AGREE BY CONSTRUCTION ───────────────────────────────
+  // The whole point of re-fetching rather than trusting the passed-in listing: a
+  // customer's own session SDK never carries privateData for someone else's listing, so
+  // if this read the object it was handed instead of a fresh Integration API fetch, the
+  // fee would silently be 0 on every real checkout while still working in a test that
+  // hands it privateData directly.
+
+  it('re-fetches the listing rather than trusting privateData already on the object it was given', async () => {
+    mockFreshListing({ specialCare: { flags: ['highValue'] } });
+
+    // The listing passed in claims no privateData at all — exactly what a customer's own
+    // session SDK would hand this function on a real checkout.
+    const listingFromCustomerSession = { id: { uuid: 'listing-1' }, attributes: {} };
+
+    expect(await resolveSpecialHandlingFeeInSubunits(listingFromCustomerSession, 'USD')).toBe(1500);
+    expect(mockListingsShow).toHaveBeenCalledWith({ id: { uuid: 'listing-1' } });
+  });
+
+  it('never throws, whatever the listing looks like', async () => {
+    expect(await resolveSpecialHandlingFeeInSubunits(undefined, 'USD')).toBe(0);
+    expect(await resolveSpecialHandlingFeeInSubunits({}, 'USD')).toBe(0);
+    expect(mockListingsShow).not.toHaveBeenCalled();
+  });
+
+  it('returns 0 when no currency is given, even with special care set', async () => {
+    mockFreshListing({ specialCare: { flags: ['highValue'] } });
+
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare(['highValue']), null)
+    ).toBe(0);
   });
 });

@@ -831,6 +831,147 @@ describe('transactionLineItems', () => {
     });
   });
 
+  describe('Special Handling Fee (Cocloset laundry feature)', () => {
+    // transactionLineItems() itself stays synchronous - the caller resolves
+    // specialHandlingFeeInSubunits beforehand via
+    // lineItemHelpers.resolveSpecialHandlingFeeInSubunits (Integration API lookup of the
+    // listing's own privateData.specialCare, with a $15 env-var-overridable default). See
+    // lineItemHelpers.test.js for coverage of that resolution logic.
+    it('should add a special-handling-fee line item, paid by the customer only, when a positive amount is resolved', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        0, // no cleaning fee resolved for this fixture
+        1500 // $15.00 resolved to subunits
+      );
+
+      expect(result).toHaveLength(4); // order + special handling fee + provider commission + customer commission
+      expect(result.some(item => item.code === 'line-item/special-handling-fee')).toBe(true);
+      expect(result.find(item => item.code === 'line-item/special-handling-fee')).toEqual({
+        code: 'line-item/special-handling-fee',
+        unitPrice: new Money(1500, 'EUR'),
+        quantity: 1,
+        includeFor: ['customer'],
+      });
+    });
+
+    it('sits alongside the cleaning fee, both customer-paid, when both are positive', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        1250,
+        1500
+      );
+
+      // order + cleaning fee + special handling fee + provider commission + customer commission
+      expect(result).toHaveLength(5);
+      expect(result.map(item => item.code)).toEqual([
+        `line-item/${listing.attributes.publicData.unitType}`,
+        'line-item/cleaning-fee',
+        'line-item/special-handling-fee',
+        'line-item/provider-commission',
+        'line-item/customer-commission',
+      ]);
+    });
+
+    it('should not add a special-handling-fee line item when specialHandlingFeeInSubunits is 0 (env override, or no Special Care)', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        0,
+        0
+      );
+
+      expect(result).toHaveLength(3); // order + provider commission + customer commission
+      expect(result.some(item => item.code === 'line-item/special-handling-fee')).toBe(false);
+    });
+
+    it('should not crash and should not add a special-handling-fee line item when it is not provided', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      // No 6th argument at all - mirrors a caller that forgot to resolve the
+      // special-handling fee, or the (impossible today) case where it's undefined.
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        0
+      );
+
+      expect(result).toHaveLength(3);
+      expect(result.some(item => item.code === 'line-item/special-handling-fee')).toBe(false);
+    });
+  });
+
   describe('Currency Handling', () => {
     it('should use currency from orderData when listing price has no currency', () => {
       const listing = {
