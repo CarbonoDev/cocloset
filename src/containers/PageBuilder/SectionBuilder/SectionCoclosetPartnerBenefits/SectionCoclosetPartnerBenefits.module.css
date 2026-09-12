@@ -66,24 +66,25 @@
   text-align: center;
 }
 
+/* The Console icon images ARE the finished badge - a filled teal circle with a white glyph
+   baked in, not a transparent line icon - so this wrapper only clips them to a circle. An
+   earlier version of this component also painted its own teal circle behind the image and
+   forced it white with a CSS filter, assuming a transparent line icon; against an opaque
+   image that filter crushes the icon's internal white-on-teal contrast into a blank white
+   disc (found by comparing the rendered page against the reference screenshots). */
 .badge {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background-color: var(--coclosetPartnerTeal);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
   margin-bottom: 20px;
   flex-shrink: 0;
 }
 
 .badgeImage {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
-  /* The Console icons are dark line art; the design wants them white on the teal badge. */
-  filter: brightness(0) invert(1);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .cardTitle {

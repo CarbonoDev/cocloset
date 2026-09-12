@@ -59,16 +59,18 @@
  * come down to bundle order. Replacing means the layout properties the stock root supplied
  * (the flex centring the spinner needs while `inProgress`) have to be restated here - they are.
  *
- * Sized off its text and aligned left, like every other action on the site.
+ * Full-width, per the become-a-partner reference screenshot's card - this form now renders
+ * only inside that one card, so there is no other context asking for a left-aligned,
+ * text-sized button.
  */
 .submitButton {
   composes: marketplaceDefaultFontStyles from global;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  align-self: flex-start;
+  align-self: stretch;
   min-height: 48px;
-  width: auto;
+  width: 100%;
   margin-top: 28px;
   padding: 0 28px;
   border: 1px solid var(--coclosetInk);
