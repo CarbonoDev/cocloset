@@ -158,6 +158,17 @@ describe('LaundryProfilePage', () => {
     expect(screen.getByDisplayValue('3')).toBeInTheDocument();
   });
 
+  // "el perfil de laundry, el cual ya tiene las correcciones que pedí" (Jonathan,
+  // 2026-09-11) - what a visitor sees is the public ProfilePage, not this form.
+  it("links to the laundry's own public ProfilePage", async () => {
+    await act(async () => {
+      renderPage(laundryUser);
+    });
+
+    const link = screen.getByRole('link', { name: 'LaundryProfilePage.viewProfileLink' });
+    expect(link).toHaveAttribute('href', '/u/laundry-user-id');
+  });
+
   it('submits the saved turnaroundDays unchanged when only another field is edited', async () => {
     const onUpdateProfile = jest.fn();
     let rendered;

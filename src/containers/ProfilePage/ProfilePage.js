@@ -29,6 +29,7 @@ import {
   isUserAuthorized,
 } from '../../util/userHelpers';
 import { richText } from '../../util/richText';
+import { BUSINESS_DAYS } from '../../util/businessHours';
 
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -281,6 +282,26 @@ export const MainContent = props => {
   // Written by the member on their settings page; absent on a profile that has not said.
   const neighborhood = isLaundry ? laundryProfile.neighborhood : publicData?.neighborhood;
 
+  // BUSINESS HOURS, AS A LIST - NOT THE GROUPED SENTENCE.
+  //
+  //   > "los horarios... actualmente salen asi: Mon 09:00-18:00, Tue 09:00-14:00...
+  //   >  Se muestren mejor en una lista, es más cómodo leer asi" (Jonathan, 2026-09-11)
+  //
+  // `businessHours` (the one-line summary LaundryProfileForm derives and stores
+  // alongside the grid) is what that comma-joined sentence IS - so this reads the
+  // structured `businessHoursByDay` instead and renders one line per day. Only days
+  // the studio is actually open appear at all: `businessHoursByDay` never carries a
+  // closed day (see util/businessHours.js's `toBusinessHoursByDay`).
+  const businessHoursByDay = laundryProfile.businessHoursByDay;
+  const businessHoursEntries = BUSINESS_DAYS.filter(day => businessHoursByDay?.[day]).map(day => ({
+    day,
+    ...businessHoursByDay[day],
+  }));
+  // A studio that saved its profile before the per-day grid existed has only the old
+  // summary sentence stored - shown verbatim rather than left blank, since some
+  // information beats none until the studio saves again and gets the list.
+  const hasBusinessHoursList = businessHoursEntries.length > 0;
+
   // A laundry's "about" text is its Description (LaundryProfileForm's `description`),
   // not the base `bio` attribute - see ProfileSettingsForm, which hides Bio entirely
   // for a laundry so there is only ever one answer to "about this account".
@@ -338,7 +359,21 @@ export const MainContent = props => {
           the same treatment the bio below gets, and for the same reason: there is no
           UI text here to translate, only what they typed. */}
       {neighborhood ? <p className={css.neighborhood}>{neighborhood}</p> : null}
-      {isLaundry && laundryProfile.businessHours ? (
+      {isLaundry && hasBusinessHoursList ? (
+        <ul className={css.businessHoursList}>
+          {businessHoursEntries.map(({ day, open, close }) => (
+            <li key={day} className={css.businessHoursRow}>
+              <span className={css.businessHoursDay}>
+                <FormattedMessage id={`ProfilePage.day.${day}`} />
+              </span>
+              <span>
+                {open}–{close}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : isLaundry && laundryProfile.businessHours ? (
+        // Saved before the per-day grid existed - the old sentence, verbatim.
         <p className={css.neighborhood}>{laundryProfile.businessHours}</p>
       ) : null}
       {hasBio ? <p className={css.bio}>{bioWithLinks}</p> : null}

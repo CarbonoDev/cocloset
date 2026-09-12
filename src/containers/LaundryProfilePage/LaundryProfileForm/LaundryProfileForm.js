@@ -529,6 +529,10 @@ const LaundryProfileForm = props => (
           {submitError}
           {addressError}
 
+          <h4 className={classNames(css.sectionDivider, css.sectionDividerFirst)}>
+            <FormattedMessage id="LaundryProfileForm.section.identity" />
+          </h4>
+
           <LogoField
             formId={formId}
             form={form}
@@ -549,6 +553,24 @@ const LaundryProfileForm = props => (
             placeholder={intl.formatMessage({ id: 'LaundryProfileForm.studioNamePlaceholder' })}
             validate={required(intl.formatMessage({ id: 'LaundryProfileForm.studioNameRequired' }))}
           />
+
+          {/* THE STUDIO'S "ABOUT" LINE, shown read-only on its public ProfilePage
+              alongside address/neighborhood/business hours (2026-09-11). Optional,
+              same as neighborhood - a studio that doesn't want to say anything leaves
+              it blank. */}
+          <FieldTextInput
+            className={css.field}
+            type="textarea"
+            id={`${formId}.description`}
+            name="description"
+            labelClassName={css.fieldLabel}
+            label={intl.formatMessage({ id: 'LaundryProfileForm.descriptionLabel' })}
+            placeholder={intl.formatMessage({ id: 'LaundryProfileForm.descriptionPlaceholder' })}
+          />
+
+          <h4 className={css.sectionDivider}>
+            <FormattedMessage id="LaundryProfileForm.section.location" />
+          </h4>
 
           <FieldLocationAutocompleteInput
             className={css.field}
@@ -615,20 +637,6 @@ const LaundryProfileForm = props => (
             <FormattedMessage id="LaundryProfileForm.neighborhoodHelp" />
           </p>
 
-          {/* THE STUDIO'S "ABOUT" LINE, shown read-only on its public ProfilePage
-              alongside address/neighborhood/business hours (2026-09-11). Optional,
-              same as neighborhood - a studio that doesn't want to say anything leaves
-              it blank. */}
-          <FieldTextInput
-            className={css.field}
-            type="textarea"
-            id={`${formId}.description`}
-            name="description"
-            labelClassName={css.fieldLabel}
-            label={intl.formatMessage({ id: 'LaundryProfileForm.descriptionLabel' })}
-            placeholder={intl.formatMessage({ id: 'LaundryProfileForm.descriptionPlaceholder' })}
-          />
-
           {/* ONE ROW PER DAY, ALL TICKED TO START WITH.
                 > "un listado con checkboxes por cada día, cada día debe tener un input
                 >  para hora de abrir y un input para hora de cerrar, por default todos
@@ -680,6 +688,10 @@ const LaundryProfileForm = props => (
               );
             })}
           </fieldset>
+
+          <h4 className={css.sectionDivider}>
+            <FormattedMessage id="LaundryProfileForm.section.operations" />
+          </h4>
 
           <FieldTextInput
             className={css.field}

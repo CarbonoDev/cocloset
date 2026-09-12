@@ -16,7 +16,7 @@ import {
 } from '../../util/userHelpers';
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 
-import { H3, Page, UserNav, NamedLink, LayoutSingleColumn } from '../../components';
+import { H3, Page, UserNav, NamedLink, NamedRedirect, LayoutSingleColumn } from '../../components';
 
 import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer';
 import FooterContainer from '../../containers/FooterContainer/FooterContainer';
@@ -132,6 +132,19 @@ export const ProfileSettingsPageComponent = props => {
 
     onUpdateProfile(updatedValues);
   };
+
+  // A LAUNDRY'S REAL SETTINGS PAGE IS /laundry-profile.
+  //
+  //   > "en laundry /profile-settings nos debe llevar a /laundry-profile, solo si
+  //   >  el usuario es laundry" (Jonathan, 2026-09-11)
+  //
+  // ProfileSettingsForm already hides Display Name and Bio for a laundry (its
+  // Business Name / Description live on LaundryProfileForm instead), so this page
+  // has nothing left for a laundry to configure - sending it here at all would be a
+  // dead end that only looks like a settings page.
+  if (currentUser?.id && isLaundryUser(currentUser)) {
+    return <NamedRedirect name="LaundryProfilePage" />;
+  }
 
   const user = ensureCurrentUser(currentUser);
   const { firstName, lastName, displayName, bio, publicData } = user?.attributes.profile;

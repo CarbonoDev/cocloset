@@ -15,7 +15,7 @@ import { types as sdkTypes } from '../../util/sdkLoader';
 import { useConfiguration } from '../../context/configurationContext';
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 
-import { H3, Page, UserNav, LayoutSideNavigation } from '../../components';
+import { H3, NamedLink, Page, UserNav, LayoutSideNavigation } from '../../components';
 
 import TopbarContainer from '../TopbarContainer/TopbarContainer';
 import FooterContainer from '../FooterContainer/FooterContainer';
@@ -462,9 +462,21 @@ export const LaundryProfilePageComponent = props => {
         intl={intl}
       >
         <div className={css.content}>
-          <H3 as="h1" className={css.pageTitle}>
-            <FormattedMessage id="LaundryProfilePage.heading" />
-          </H3>
+          <div className={css.headingRow}>
+            <H3 as="h1" className={css.pageTitle}>
+              <FormattedMessage id="LaundryProfilePage.heading" />
+            </H3>
+            {/* "el perfil de laundry, el cual ya tiene las correcciones que pedí"
+                (Jonathan, 2026-09-11) - what a visitor sees is the PUBLIC
+                ProfilePage, not this settings form. */}
+            <NamedLink
+              className={css.viewProfileLink}
+              name="ProfilePage"
+              params={{ id: currentUser.id.uuid }}
+            >
+              <FormattedMessage id="LaundryProfilePage.viewProfileLink" />
+            </NamedLink>
+          </div>
           {/* key: remount (and re-snapshot initialValues) if the user
               identity ever changes. currentUser is guaranteed loaded here. */}
           <LaundryProfileFormSection

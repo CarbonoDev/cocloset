@@ -13,6 +13,7 @@ import {
   isSignupEmailTakenError,
   isTooManyEmailVerificationRequestsError,
 } from '../../util/errors';
+import { isLaundryUser } from '../../util/userHelpers';
 
 import { login, authenticationInProgress, signup, signupWithIdp } from '../../ducks/auth.duck';
 import { isScrollingDisabled, manageDisableScrolling } from '../../ducks/ui.duck';
@@ -301,8 +302,14 @@ export const AuthenticationPageComponent = props => {
     // Already authenticated, redirect back to the page the user tried to access
     return <Redirect to={from} />;
   } else if (shouldRedirectToLandingPage) {
-    // Already authenticated, redirect to the landing page (this was direct access to /login or /signup)
-    return <NamedRedirect name="LandingPage" />;
+    // Already authenticated, and there was no page the user was trying to reach
+    // (direct access to /login or /signup) - a laundry's real home is its ops
+    // dashboard, not the marketplace landing page (Jonathan, 2026-09-11).
+    return isLaundryUser(user) ? (
+      <NamedRedirect name="LaundryOpsDashboardPage" />
+    ) : (
+      <NamedRedirect name="LandingPage" />
+    );
   } else if (show404) {
     // User type not found, show 404
     return <NotFoundPage staticContext={staticContext} />;
