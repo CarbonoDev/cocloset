@@ -20,6 +20,7 @@ import { requireListingImage } from '../../util/configHelpers';
 import { getCurrentUserTypeRoles, hasPermissionToViewData } from '../../util/userHelpers.js';
 import { userDisplayNameAsString } from '../../util/data';
 import { isMobileSafari } from '../../util/userAgent';
+import { autoAcceptBooking } from '../../util/api';
 
 import {
   INQUIRY_PROCESS_NAME,
@@ -35,6 +36,7 @@ import {
   isInquiryProcess,
   DOWNLOAD_PROCESS_NAME,
   isDownloadProcess,
+  COCLOSET_BOOKING_PROCESS_NAME,
 } from '../../transactions/transaction';
 
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -81,6 +83,7 @@ import {
   sendReview,
   fetchMoreMessages,
   fetchTimeSlots,
+  fetchTransaction,
   fetchTransactionLineItems,
   uploadFile,
   clearUploadedFiles,
@@ -370,6 +373,7 @@ export const TransactionPageComponent = props => {
     transitionInProgress,
     transitionError,
     onTransition,
+    onRefetchTransaction = () => {},
     nextTransitions,
     callSetInitialValues,
     onInitializeCardPaymentData,
@@ -394,6 +398,54 @@ export const TransactionPageComponent = props => {
   } catch (error) {
     // Process was not recognized!
   }
+
+  // A CUSTOMER OR PROVIDER LANDING ON THIS PAGE GETS A SECOND CHANCE AT AUTO-ACCEPT.
+  //
+  //   > "esto ya funciona, pero la transacción no se hace update, el usuario tiene que hacer
+  //   >  refresh (...) necesitamos asegurar que si ocurre el auto-accept se muestre al
+  //   >  cliente el status correcto" (Jonathan, 2026-09-11)
+  //
+  // Checkout already awaits auto-accept before it redirects here (see
+  // CheckoutPageTransactionHelpers.js), so in the normal path this never has anything to do.
+  // But that call is fired from the browser: it never runs at all if the tab closes mid-
+  // checkout, and a failed or timed-out attempt there is swallowed on purpose, so a payment
+  // never looks broken because an accept did not land. Either way, the customer would be
+  // stuck reading "waiting for the provider" on a garment that is sitting at its own laundry,
+  // with nothing short of a manual refresh (once the endpoint is retried some other way) to
+  // notice.
+  //
+  // The endpoint is idempotent and re-checks everything itself (state, `onLaundry`, process)
+  // from the stored data - never from anything this page believes - so calling it again here
+  // is free when there is nothing to do, and self-healing when there was. Ref-guarded to once
+  // per transaction id per page life: a `nothing-to-do` answer must not be retried on every
+  // render, and the endpoint is not a polling target.
+  const autoAcceptAttemptedForTxIdRef = useRef(null);
+  useEffect(() => {
+    const txId = transaction?.id;
+    const isCoclosetBooking = processName === COCLOSET_BOOKING_PROCESS_NAME;
+    const isPreauthorized =
+      !!process && !!transaction && process.getState(transaction) === process.states.PREAUTHORIZED;
+
+    if (!txId || !isCoclosetBooking || !isPreauthorized) {
+      return;
+    }
+    if (autoAcceptAttemptedForTxIdRef.current === txId.uuid) {
+      return;
+    }
+    autoAcceptAttemptedForTxIdRef.current = txId.uuid;
+
+    autoAcceptBooking({ transactionId: txId })
+      .then(response => {
+        if (response?.data?.accepted) {
+          onRefetchTransaction(txId, transactionRole, config);
+        }
+      })
+      .catch(() => {
+        // Swallowed on purpose, same reasoning as the checkout call site: a customer just
+        // viewing their own order must never see an error because a defensive re-check
+        // failed. The provider's manual accept remains the fallback either way.
+      });
+  }, [transaction, process, processName, transactionRole, config, onRefetchTransaction]);
 
   const isTxOnPaymentPending = tx => {
     return process ? process.getState(tx) === process.states.PENDING_PAYMENT : null;
@@ -1194,6 +1246,10 @@ const TransactionPage = props => {
     (txId, transitionName, params) => dispatch(makeTransition(txId, transitionName, params)),
     [dispatch]
   );
+  const onRefetchTransaction = useCallback(
+    (txId, txRole, config) => dispatch(fetchTransaction(txId, txRole, config)),
+    [dispatch]
+  );
   const onShowMoreMessages = useCallback(
     (txId, config) => dispatch(fetchMoreMessages(txId, config)),
     [dispatch]
@@ -1249,6 +1305,7 @@ const TransactionPage = props => {
       transitionError={transitionError}
       scrollingDisabled={scrollingDisabled}
       transaction={transaction}
+      onRefetchTransaction={onRefetchTransaction}
       fetchMessagesInProgress={fetchMessagesInProgress}
       fetchMessagesError={fetchMessagesError}
       totalMessagePages={totalMessagePages}
