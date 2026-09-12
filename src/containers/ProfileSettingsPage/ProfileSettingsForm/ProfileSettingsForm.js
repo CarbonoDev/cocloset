@@ -33,9 +33,17 @@ const UPLOAD_CHANGE_DELAY = 2000; // Show spinner so that browser has time to lo
 const NEIGHBORHOOD_MAX_LENGTH = 60;
 
 const DisplayNameMaybe = props => {
-  const { userTypeConfig, intl } = props;
+  const { userTypeConfig, intl, isLaundry } = props;
 
-  const isDisabled = userTypeConfig?.defaultUserFields?.displayName === false;
+  // NOT FOR STUDIOS, same reasoning as the neighborhood field below.
+  //
+  //   > "Business Name, reemplazando a Display Name" (Jonathan, 2026-09-11)
+  //
+  // A laundry's identity is its Business Name (LaundryProfileForm's `studioName`),
+  // not the personal display name of whoever signed it up - and two boxes for one
+  // answer is how they end up disagreeing (the public ProfilePage heading reads
+  // studioName for a laundry, so this one would look ignored either way).
+  const isDisabled = isLaundry || userTypeConfig?.defaultUserFields?.displayName === false;
   if (isDisabled) {
     return null;
   }
@@ -155,6 +163,7 @@ class ProfileSettingsFormComponent extends Component {
           } = fieldRenderProps;
 
           const user = ensureCurrentUser(currentUser);
+          const isLaundry = isLaundryUser(user);
 
           // First name
           const firstNameLabel = intl.formatMessage({
@@ -376,23 +385,35 @@ class ProfileSettingsFormComponent extends Component {
                 </div>
               </div>
 
-              <DisplayNameMaybe userTypeConfig={userTypeConfig} intl={intl} />
+              <DisplayNameMaybe userTypeConfig={userTypeConfig} intl={intl} isLaundry={isLaundry} />
 
-              <div className={classNames(css.sectionContainer)}>
-                <H4 as="h2" className={css.sectionTitle}>
-                  <FormattedMessage id="ProfileSettingsForm.bioHeading" />
-                </H4>
-                <FieldTextInput
-                  type="textarea"
-                  id="bio"
-                  name="bio"
-                  label={bioLabel}
-                  placeholder={bioPlaceholder}
-                />
-                <p className={css.extraInfo}>
-                  <FormattedMessage id="ProfileSettingsForm.bioInfo" values={{ marketplaceName }} />
-                </p>
-              </div>
+              {/* NOT FOR STUDIOS, same reasoning as DisplayNameMaybe above.
+                    > "Description, reemplazando a Bio" (Jonathan, 2026-09-11)
+
+                  A laundry's "about" text is its Description (LaundryProfileForm's
+                  `description`), shown read-only on its public ProfilePage alongside
+                  address/neighborhood/hours - a second, un-namespaced Bio here would be
+                  a second answer to the same question. */}
+              {isLaundry ? null : (
+                <div className={classNames(css.sectionContainer)}>
+                  <H4 as="h2" className={css.sectionTitle}>
+                    <FormattedMessage id="ProfileSettingsForm.bioHeading" />
+                  </H4>
+                  <FieldTextInput
+                    type="textarea"
+                    id="bio"
+                    name="bio"
+                    label={bioLabel}
+                    placeholder={bioPlaceholder}
+                  />
+                  <p className={css.extraInfo}>
+                    <FormattedMessage
+                      id="ProfileSettingsForm.bioInfo"
+                      values={{ marketplaceName }}
+                    />
+                  </p>
+                </div>
+              )}
 
               {/* NOT FOR STUDIOS.
                     > "el field de neighborhood aplica solo para providers, las laundries
@@ -404,7 +425,7 @@ class ProfileSettingsFormComponent extends Component {
                   and is a fact about the shop rather than about the person who signed it up.
                   Two boxes for one answer is how they end up disagreeing - and the search
                   filter reads the studio's, so the one here would look ignored. */}
-              {isLaundryUser(user) ? null : (
+              {isLaundry ? null : (
                 <>
                   {/* WHERE THIS MEMBER IS, IN THE WORDS THEY USE FOR IT.
                     > "En mi form de profile settings, puedo ingresar el nombre de mi

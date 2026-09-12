@@ -25,6 +25,7 @@ import {
 import {
   getCurrentUserTypeRoles,
   hasPermissionToViewData,
+  isLaundryUser,
   isUserAuthorized,
 } from '../../util/userHelpers';
 import { richText } from '../../util/richText';
@@ -261,6 +262,8 @@ export const MainContent = props => {
     intl,
     hideReviews,
     userTypeRoles,
+    isLaundry,
+    laundryProfile = {},
   } = props;
 
   const hasListings = listings.length > 0;
@@ -270,11 +273,20 @@ export const MainContent = props => {
       ? window.matchMedia(`(max-width: ${MAX_MOBILE_SCREEN_WIDTH}px)`)?.matches
       : true;
 
+  // A laundry's neighborhood is a fact about the shop, resolved from its address on
+  // LaundryProfileForm - not the plain-member field below, which a laundry never gets
+  // on its own settings page (see ProfileSettingsForm's isLaundry gate) so the two
+  // values can never disagree.
+  //
   // Written by the member on their settings page; absent on a profile that has not said.
-  const neighborhood = publicData?.neighborhood;
+  const neighborhood = isLaundry ? laundryProfile.neighborhood : publicData?.neighborhood;
 
-  const hasBio = !!bio;
-  const bioWithLinks = richText(bio, {
+  // A laundry's "about" text is its Description (LaundryProfileForm's `description`),
+  // not the base `bio` attribute - see ProfileSettingsForm, which hides Bio entirely
+  // for a laundry so there is only ever one answer to "about this account".
+  const laundryDescription = laundryProfile.description;
+  const hasBio = isLaundry ? !!laundryDescription : !!bio;
+  const bioWithLinks = richText(isLaundry ? laundryDescription : bio, {
     linkify: true,
     longWordMinLength: MIN_LENGTH_FOR_LONG_WORDS,
     longWordClass: css.longWord,
@@ -294,8 +306,29 @@ export const MainContent = props => {
   return (
     <div>
       <H2 as="h1" className={css.desktopHeading}>
-        <FormattedMessage id="ProfilePage.desktopHeading" values={{ name: displayName }} />
+        {/* A LAUNDRY'S HEADING IS JUST ITS BUSINESS NAME.
+              > "Solo el Business Name reemplazando a 'Hello my name is [user name]'"
+              >  (Jonathan, 2026-09-11)
+
+            No "Hello, I'm" framing - a studio is a place, not a person introducing
+            itself. Falls back to displayName only if studioName was never set, so a
+            laundry mid-onboarding still gets a heading rather than a blank one. */}
+        {isLaundry ? (
+          <FormattedMessage
+            id="ProfilePage.laundryDesktopHeading"
+            values={{ name: laundryProfile.studioName || displayName }}
+          />
+        ) : (
+          <FormattedMessage id="ProfilePage.desktopHeading" values={{ name: displayName }} />
+        )}
       </H2>
+      {/* STORE ADDRESS, THEN NEIGHBORHOOD, THEN BUSINESS HOURS - a laundry only
+          (Jonathan, 2026-09-11: "Hay que mostrar: store address, neighborhood,
+          business hours, y description"). Same treatment as the member's own
+          neighborhood line below: quiet, and simply absent rather than shown empty. */}
+      {isLaundry && laundryProfile.address ? (
+        <p className={css.neighborhood}>{laundryProfile.address}</p>
+      ) : null}
       {/* Where this member is, in their own words - written on the settings page
           (Jonathan, 2026-09-03). Directly under the name because that is what it
           qualifies: a wardrobe organised around neighbourhoods answers "is this
@@ -305,6 +338,9 @@ export const MainContent = props => {
           the same treatment the bio below gets, and for the same reason: there is no
           UI text here to translate, only what they typed. */}
       {neighborhood ? <p className={css.neighborhood}>{neighborhood}</p> : null}
+      {isLaundry && laundryProfile.businessHours ? (
+        <p className={css.neighborhood}>{laundryProfile.businessHours}</p>
+      ) : null}
       {hasBio ? <p className={css.bio}>{bioWithLinks}</p> : null}
 
       {displayName ? (
@@ -400,6 +436,12 @@ export const ProfilePageComponent = props => {
   const isCurrentUser = currentUser?.id && currentUser?.id?.uuid === pathParams.id;
   const profileUser = useCurrentUser ? currentUser : user;
   const { bio, displayName, publicData, metadata } = profileUser?.attributes?.profile || {};
+  // `metadata` is public-read (Integration-API-write-only, same visibility rule as a
+  // listing's), so this works for ANY visitor viewing a laundry's page, not just the
+  // laundry viewing its own - unlike LaundryProfilePage/LaundryOpsPage, which gate on
+  // `currentUser` instead.
+  const isLaundry = isLaundryUser(profileUser);
+  const laundryProfile = publicData?.laundryProfile || {};
   const { userFields } = config.user;
   const isPrivateMarketplace = config.accessControl.marketplace.private === true;
   const isUnauthorizedUser = currentUser && !isUserAuthorized(currentUser);
@@ -483,7 +525,7 @@ export const ProfilePageComponent = props => {
           <AsideContent
             user={profileUser}
             showLinkToProfileSettingsPage={mounted && isCurrentUser}
-            displayName={displayName}
+            displayName={isLaundry ? laundryProfile.studioName || displayName : displayName}
           />
         }
         footer={<FooterContainer />}
@@ -495,9 +537,14 @@ export const ProfilePageComponent = props => {
           publicData={publicData}
           metadata={metadata}
           userFieldConfig={userFields}
-          hideReviews={hasNoViewingRightsOnPrivateMarketplace}
+          // No reviews for a laundry - it isn't a transaction party, so it never
+          // has any (Jonathan, 2026-09-11: "Hay que quitar la sección de reviews
+          // ya que no reviews para laundry").
+          hideReviews={hasNoViewingRightsOnPrivateMarketplace || isLaundry}
           intl={intl}
           userTypeRoles={userTypeRoles}
+          isLaundry={isLaundry}
+          laundryProfile={laundryProfile}
           {...rest}
         />
       </LayoutSideNavigation>

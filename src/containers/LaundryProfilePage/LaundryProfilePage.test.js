@@ -219,6 +219,108 @@ describe('LaundryProfilePage', () => {
     expect(submitted.publicData.acceptedCategories).toEqual(['Eveningwear', 'Sequins']);
   });
 
+  // ================ Logo, description (2026-09-11) ================
+
+  it('saves a typed description, trimmed, at publicData.laundryProfile.description', async () => {
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(laundryUser, onUpdateProfile);
+    });
+
+    await act(async () => {
+      await userEvent.type(
+        screen.getByRole('textbox', { name: 'LaundryProfileForm.descriptionLabel' }),
+        '  A neighborhood dry cleaner.  '
+      );
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile.mock.calls[0][0].publicData.laundryProfile.description).toBe(
+      'A neighborhood dry cleaner.'
+    );
+  });
+
+  it('saves description as null, not an empty string, once cleared', async () => {
+    const onUpdateProfile = jest.fn();
+    const userWithDescription = {
+      ...laundryUser,
+      attributes: {
+        ...laundryUser.attributes,
+        profile: {
+          ...laundryUser.attributes.profile,
+          publicData: {
+            ...laundryUser.attributes.profile.publicData,
+            laundryProfile: {
+              ...laundryUser.attributes.profile.publicData.laundryProfile,
+              description: 'Old description',
+            },
+          },
+        },
+      },
+    };
+    await act(async () => {
+      renderPage(userWithDescription, onUpdateProfile);
+    });
+
+    await act(async () => {
+      await userEvent.clear(
+        screen.getByRole('textbox', { name: 'LaundryProfileForm.descriptionLabel' })
+      );
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile.mock.calls[0][0].publicData.laundryProfile.description).toBeNull();
+  });
+
+  it('attaches profileImageId only when a new logo finished uploading', async () => {
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      render(
+        <LaundryProfilePageComponent
+          intl={fakeIntl}
+          currentUser={laundryUser}
+          scrollingDisabled={false}
+          onUpdateProfile={onUpdateProfile}
+          updateProfileInProgress={false}
+          updateProfileError={null}
+          image={{ id: 'tmp-1', imageId: { uuid: 'img-1' }, file: {} }}
+        />,
+        { config: configWithCategories }
+      );
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Pants' }));
+    });
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile.mock.calls[0][0].profileImageId).toEqual({ uuid: 'img-1' });
+  });
+
+  it('does not attach a profileImageId when no logo was uploaded', async () => {
+    const onUpdateProfile = jest.fn();
+    await act(async () => {
+      renderPage(laundryUser, onUpdateProfile);
+    });
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Pants' }));
+    });
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryProfileForm.saveChanges' }));
+    });
+
+    expect(onUpdateProfile.mock.calls[0][0]).not.toHaveProperty('profileImageId');
+  });
+
   // An emptied number field submits as null, and a null turnaround would change how long
   // every listing this studio handles stays blocked after a rental. Two independent things
   // stop that: the field is `required`, so the form refuses to submit at all (asserted
