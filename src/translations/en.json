@@ -2123,7 +2123,7 @@
   "TransactionPanel.disputeOrder": "Dispute order",
   "TransactionPanel.handoverQr.description": "Show this code at the laundry counter. The same code is scanned when you collect the garment and again when you bring it back, so keep it until the rental is over.",
   "TransactionPanel.handoverQr.descriptionOwnerCollect": "Your garment is ready to collect. Show this code at the laundry counter and they will hand it back to you.",
-  "TransactionPanel.handoverQr.descriptionOwnerDropOff": "Take the garment to the laundry and show this code at the counter. They will check it in and prepare it for the renter.",
+  "TransactionPanel.handoverQr.descriptionOwnerDropOff": "Take the garment to the laundry by {dropOffBy} and show this code at the counter. They will check it in and prepare it for the renter.",
   "TransactionPanel.handoverQr.descriptionWaiting": "Keep this code. The garment owner still has to bring the garment to the laundry, and the laundry has to prepare it — we will let you know when it is ready. Once it is, take this code to the laundry to collect it.",
   "TransactionPanel.handoverQr.heading": "Your handover code",
   "TransactionPanel.handoverQr.ticketCode": "Ticket: {code}",
