@@ -313,6 +313,11 @@ describe('ProfilePage for a laundry', () => {
     expect(screen.getByText('Pigalle')).toBeInTheDocument();
     expect(screen.getByText('Mon-Sat 11:00-21:00')).toBeInTheDocument();
     expect(screen.getByText('A neighborhood dry cleaner since 1998.')).toBeInTheDocument();
+    // The styled details panel (2026-09-12) labels each one.
+    expect(screen.getByText('ProfilePage.laundryDetail.address')).toBeInTheDocument();
+    expect(screen.getByText('ProfilePage.laundryDetail.neighborhood')).toBeInTheDocument();
+    expect(screen.getByText('ProfilePage.laundryDetail.hours')).toBeInTheDocument();
+    expect(screen.getByText('ProfilePage.laundryDetail.about')).toBeInTheDocument();
   });
 
   // "los horarios... Se muestren mejor en una lista, es más cómodo leer asi"
