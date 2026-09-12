@@ -326,7 +326,7 @@ export const MainContent = props => {
   }
   return (
     <div>
-      <H2 as="h1" className={css.desktopHeading}>
+      <H2 as="h1" className={isLaundry ? css.laundryDesktopHeading : css.desktopHeading}>
         {/* A LAUNDRY'S HEADING IS JUST ITS BUSINESS NAME.
               > "Solo el Business Name reemplazando a 'Hello my name is [user name]'"
               >  (Jonathan, 2026-09-11)
@@ -343,40 +343,81 @@ export const MainContent = props => {
           <FormattedMessage id="ProfilePage.desktopHeading" values={{ name: displayName }} />
         )}
       </H2>
-      {/* STORE ADDRESS, THEN NEIGHBORHOOD, THEN BUSINESS HOURS - a laundry only
-          (Jonathan, 2026-09-11: "Hay que mostrar: store address, neighborhood,
-          business hours, y description"). Same treatment as the member's own
-          neighborhood line below: quiet, and simply absent rather than shown empty. */}
-      {isLaundry && laundryProfile.address ? (
-        <p className={css.neighborhood}>{laundryProfile.address}</p>
-      ) : null}
-      {/* Where this member is, in their own words - written on the settings page
-          (Jonathan, 2026-09-03). Directly under the name because that is what it
-          qualifies: a wardrobe organised around neighbourhoods answers "is this
-          person near me" before it answers anything else. Absent when they have
-          not said, rather than rendered as an empty line. */}
-      {/* The member's own words, rendered as content rather than through a message -
-          the same treatment the bio below gets, and for the same reason: there is no
-          UI text here to translate, only what they typed. */}
-      {neighborhood ? <p className={css.neighborhood}>{neighborhood}</p> : null}
-      {isLaundry && hasBusinessHoursList ? (
-        <ul className={css.businessHoursList}>
-          {businessHoursEntries.map(({ day, open, close }) => (
-            <li key={day} className={css.businessHoursRow}>
-              <span className={css.businessHoursDay}>
-                <FormattedMessage id={`ProfilePage.day.${day}`} />
+      {isLaundry ? (
+        // STORE ADDRESS, NEIGHBORHOOD, BUSINESS HOURS, DESCRIPTION - ONE STYLED
+        // PANEL (2026-09-12: "El estilo era para la ruta /u/:id, no el form").
+        // Reuses the brand-accent card + eyebrow-label treatment already
+        // established for the landing page's own sections
+        // (SectionCoclosetSteps.module.css's `.sectionTitle`), which is where this
+        // page's restyle actually belongs per Jonathan - LaundryProfileForm itself
+        // is unchanged.
+        <div className={css.laundryDetails}>
+          {laundryProfile.address ? (
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.address" />
               </span>
-              <span>
-                {open}–{close}
+              <p className={css.laundryDetailValue}>{laundryProfile.address}</p>
+            </div>
+          ) : null}
+          {neighborhood ? (
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.neighborhood" />
               </span>
-            </li>
-          ))}
-        </ul>
-      ) : isLaundry && laundryProfile.businessHours ? (
-        // Saved before the per-day grid existed - the old sentence, verbatim.
-        <p className={css.neighborhood}>{laundryProfile.businessHours}</p>
-      ) : null}
-      {hasBio ? <p className={css.bio}>{bioWithLinks}</p> : null}
+              <p className={css.laundryDetailValue}>{neighborhood}</p>
+            </div>
+          ) : null}
+          {hasBusinessHoursList ? (
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.hours" />
+              </span>
+              <ul className={css.businessHoursList}>
+                {businessHoursEntries.map(({ day, open, close }) => (
+                  <li key={day} className={css.businessHoursRow}>
+                    <span className={css.businessHoursDay}>
+                      <FormattedMessage id={`ProfilePage.day.${day}`} />
+                    </span>
+                    <span>
+                      {open}–{close}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : laundryProfile.businessHours ? (
+            // Saved before the per-day grid existed - the old sentence, verbatim.
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.hours" />
+              </span>
+              <p className={css.laundryDetailValue}>{laundryProfile.businessHours}</p>
+            </div>
+          ) : null}
+          {hasBio ? (
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.about" />
+              </span>
+              <p className={css.laundryDetailValue}>{bioWithLinks}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          {/* Where this member is, in their own words - written on the settings page
+              (Jonathan, 2026-09-03). Directly under the name because that is what it
+              qualifies: a wardrobe organised around neighbourhoods answers "is this
+              person near me" before it answers anything else. Absent when they have
+              not said, rather than rendered as an empty line. */}
+          {/* The member's own words, rendered as content rather than through a message -
+              the same treatment the bio below gets, and for the same reason: there is no
+              UI text here to translate, only what they typed. */}
+          {neighborhood ? <p className={css.neighborhood}>{neighborhood}</p> : null}
+          {hasBio ? <p className={css.bio}>{bioWithLinks}</p> : null}
+        </>
+      )}
 
       {displayName ? (
         <CustomUserFields

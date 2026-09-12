@@ -5,29 +5,6 @@
   flex-direction: column;
 }
 
-/* Section dividers (2026-09-11): grouping labels only, no new fields - same
-   "Cocloset voice" eyebrow treatment the landing page's step sections use
-   (SectionCoclosetSteps.module.css's `.sectionTitle`), so this form reads as
-   part of the same product rather than a bare admin form dropped on top of it. */
-.sectionDivider {
-  composes: marketplaceTinyFontStyles from global;
-  margin: 0 0 16px 0;
-  padding-top: 28px;
-  border-top: 1px solid var(--coclosetBorder);
-  color: var(--coclosetBrand);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-
-  @media (--viewportMedium) {
-    margin-bottom: 20px;
-  }
-}
-
-.sectionDividerFirst {
-  padding-top: 0;
-  border-top: none;
-}
-
 .error {
   composes: h4 from global;
   color: var(--colorFail);

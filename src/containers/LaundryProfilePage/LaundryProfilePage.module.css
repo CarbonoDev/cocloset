@@ -65,8 +65,6 @@
 
 .pageTitle {
   margin: 0 0 18px 0;
-  font-family: var(--fontFamilyDisplay);
-  font-weight: var(--fontWeightMedium);
   color: var(--coclosetInk);
   letter-spacing: -0.4px;
 
@@ -89,29 +87,13 @@
 }
 
 /* The form sits on its own paper card, matching the panel treatment used by
-   the dashboard and inventory screens - lifted a little further off the canvas
-   (soft shadow, brand accent bar) so the settings page reads as part of the same
-   designed product as the landing page, not a bare admin form (Jonathan, 2026-09-11:
-   "se ve muy sencilla, toma la inspiración de la página landing page"). */
+   the dashboard and inventory screens. */
 .form {
-  position: relative;
   margin-top: 18px;
   padding: 18px;
   border: 1px solid var(--coclosetBorder);
   border-radius: var(--coclosetRadius);
   background-color: var(--coclosetSurface);
-  box-shadow: 0 1px 2px rgba(31, 27, 23, 0.04), 0 12px 32px -16px rgba(31, 27, 23, 0.18);
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    border-radius: var(--coclosetRadius) var(--coclosetRadius) 0 0;
-    background: linear-gradient(90deg, var(--coclosetBrand) 0%, var(--coclosetBrandTint) 100%);
-  }
 
   @media (--viewportMedium) {
     margin-top: 24px;
