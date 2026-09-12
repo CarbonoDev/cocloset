@@ -84,6 +84,25 @@ export const SECTION_NAMES_BY_TYPE = {
   // The partner panel with the tile grid.
   coclosetLaundry: ['laundry-section'],
   [LISTINGS]: ['noteworthy-section', 'In the wardrobe this week', 'new-noteworthy-section'],
+
+  // /p/become-a-partner (2026-09-12 redesign). Four sections with layouts none of the stock
+  // types produce - see the SectionCoclosetPartner* components for what each renders.
+  //
+  //   > "make /p/become-a-partner render identical to the screenshots" (Jonathan)
+  //
+  // KNOWN CROSS-PAGE OVERLAP: `benefits` is also, by coincidence, the exact section name
+  // /p/provider_landing_page uses for its own three-tile benefits row (same shape: a title
+  // plus three image+title+text blocks, in fact the same three benefits verbatim). Name
+  // matching here is case-insensitive and page-agnostic by design (see normalizeName above),
+  // so that page's `Benefits` section now ALSO renders through SectionCoclosetPartnerBenefits
+  // instead of the stock `columns` component. Given the identical shape and content, this is
+  // a strict visual upgrade rather than a regression - but it is a real, deliberate side
+  // effect of this change, not an oversight. If a future edit gives the two pages' benefits
+  // sections different shapes, this single shared name will need to become two.
+  coclosetPartnerHero: ['partner-hero'],
+  coclosetPartnerBenefits: ['benefits'],
+  coclosetPartnerFaq: ['faq'],
+  coclosetPartnerForm: ['form'],
 };
 
 // A Map rather than an object, and not only for taste: a plain object would answer

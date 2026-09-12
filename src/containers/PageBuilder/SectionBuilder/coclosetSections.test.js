@@ -6,6 +6,9 @@ import { renderWithProviders as render, testingLibrary } from '../../../util/tes
 import SectionCoclosetHero from './SectionCoclosetHero';
 import SectionCoclosetLaundry from './SectionCoclosetLaundry';
 import SectionCoclosetSteps from './SectionCoclosetSteps';
+import SectionCoclosetPartnerHero from './SectionCoclosetPartnerHero';
+import SectionCoclosetPartnerBenefits from './SectionCoclosetPartnerBenefits';
+import SectionCoclosetPartnerFaq from './SectionCoclosetPartnerFaq';
 
 const { screen } = testingLibrary;
 
@@ -294,5 +297,137 @@ describe('SectionCoclosetLaundry', () => {
     );
 
     expect(screen.queryByText('LIVE TILE')).not.toBeInTheDocument();
+  });
+});
+
+// ===========================================================================
+// /p/become-a-partner (2026-09-12 redesign). Fixtures below are trimmed from the live
+// `become-a-partner` Console asset, fetched via the Asset Delivery API while building this
+// page - same approach as the fixtures above.
+// ===========================================================================
+
+describe('SectionCoclosetPartnerHero', () => {
+  const heroProps = (overrides = {}) => ({
+    title: { content: 'Grow your business with CoCloset.', fieldType: 'heading2' },
+    description: { fieldType: 'paragraph', content: 'Reach new dry cleaning customers at no cost.' },
+    blocks: [
+      {
+        blockName: 'header-title',
+        title: { fieldType: 'heading3' },
+        text: { fieldType: 'markdown', content: 'DRY CLEANING PARTNERS' },
+      },
+    ],
+    ...overrides,
+  });
+
+  it('renders the eyebrow label and the cream card headline + paragraph', () => {
+    renderSection(SectionCoclosetPartnerHero, heroProps());
+
+    expect(screen.getByText('DRY CLEANING PARTNERS')).toBeInTheDocument();
+    expect(screen.getByText('Grow your business with CoCloset.')).toBeInTheDocument();
+    expect(screen.getByText('Reach new dry cleaning customers at no cost.')).toBeInTheDocument();
+  });
+
+  it('survives an empty section', () => {
+    expect(() => renderSection(SectionCoclosetPartnerHero, { blocks: [] })).not.toThrow();
+  });
+});
+
+describe('SectionCoclosetPartnerBenefits', () => {
+  const benefitsProps = () => ({
+    // Console spells the title "Benefits" today; the screenshots say "Partner Benefits" -
+    // a content mismatch this component renders verbatim rather than overriding.
+    title: { content: 'Benefits', fieldType: 'heading2' },
+    description: { fieldType: 'paragraph' },
+    blocks: [
+      {
+        blockName: 'benefit',
+        title: { content: 'Recurring Revenue', fieldType: 'heading3' },
+        text: {
+          fieldType: 'markdown',
+          content: 'Every item is cleaned between rentals, generating added sales each week.',
+        },
+      },
+      {
+        blockName: 'benefit',
+        title: { content: 'More Foot Traffic', fieldType: 'heading3' },
+        text: {
+          fieldType: 'markdown',
+          content: 'New high-intent customers enter your shop to drop-off and pick up rentals.',
+        },
+      },
+      {
+        blockName: 'benefit',
+        title: { content: 'Free Marketing', fieldType: 'heading3' },
+        text: {
+          fieldType: 'markdown',
+          content: 'We handle customer acquisition and promote your business as a preferred partner.',
+        },
+      },
+    ],
+  });
+
+  it('renders the section title verbatim, mismatch and all', () => {
+    renderSection(SectionCoclosetPartnerBenefits, benefitsProps());
+    expect(screen.getByText('Benefits')).toBeInTheDocument();
+  });
+
+  it('renders all three benefit cards, each with its title and text', () => {
+    renderSection(SectionCoclosetPartnerBenefits, benefitsProps());
+
+    expect(screen.getByText('Recurring Revenue')).toBeInTheDocument();
+    expect(screen.getByText('More Foot Traffic')).toBeInTheDocument();
+    expect(screen.getByText('Free Marketing')).toBeInTheDocument();
+    expect(
+      screen.getByText('We handle customer acquisition and promote your business as a preferred partner.')
+    ).toBeInTheDocument();
+  });
+
+  it('survives an empty section', () => {
+    expect(() => renderSection(SectionCoclosetPartnerBenefits, { blocks: [] })).not.toThrow();
+  });
+});
+
+describe('SectionCoclosetPartnerFaq', () => {
+  const faqProps = () => ({
+    title: { fieldType: 'heading2' },
+    description: { fieldType: 'paragraph' },
+    blocks: [
+      { title: { content: 'Q1', fieldType: 'heading3' }, text: { fieldType: 'markdown', content: 'A1' } },
+      { title: { content: 'Q2', fieldType: 'heading3' }, text: { fieldType: 'markdown', content: 'A2' } },
+      { title: { content: 'Q3', fieldType: 'heading3' }, text: { fieldType: 'markdown', content: 'A3' } },
+      { title: { content: 'Q4', fieldType: 'heading3' }, text: { fieldType: 'markdown', content: 'A4' } },
+      { title: { content: 'Q5', fieldType: 'heading3' }, text: { fieldType: 'markdown', content: 'A5' } },
+    ],
+  });
+
+  it('renders every question and answer', () => {
+    renderSection(SectionCoclosetPartnerFaq, faqProps());
+    ['Q1', 'Q2', 'Q3', 'Q4', 'Q5'].forEach(q => expect(screen.getByText(q)).toBeInTheDocument());
+    ['A1', 'A2', 'A3', 'A4', 'A5'].forEach(a => expect(screen.getByText(a)).toBeInTheDocument());
+  });
+
+  it('splits an odd count top-to-bottom per column, not round-robin', () => {
+    // 5 blocks -> ceil(5/2) = 3 down the left (Q1-Q3), the rest down the right (Q4-Q5).
+    const { container } = renderSection(SectionCoclosetPartnerFaq, faqProps());
+    const columns = container.querySelectorAll('.column');
+
+    expect(columns).toHaveLength(2);
+    expect(columns[0]).toHaveTextContent('Q1');
+    expect(columns[0]).toHaveTextContent('Q2');
+    expect(columns[0]).toHaveTextContent('Q3');
+    expect(columns[0]).not.toHaveTextContent('Q4');
+    expect(columns[1]).toHaveTextContent('Q4');
+    expect(columns[1]).toHaveTextContent('Q5');
+  });
+
+  it('renders no heading when Console has not set the section title yet', () => {
+    // The live asset's `faq` section has an empty title today - see the activity log.
+    const { container } = renderSection(SectionCoclosetPartnerFaq, faqProps());
+    expect(container.querySelector('h1,h2,h3')).toBeNull();
+  });
+
+  it('survives an empty section', () => {
+    expect(() => renderSection(SectionCoclosetPartnerFaq, { blocks: [] })).not.toThrow();
   });
 });

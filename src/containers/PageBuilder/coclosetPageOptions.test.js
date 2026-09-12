@@ -42,13 +42,18 @@ describe('the Cocloset skin reaches every hosted page', () => {
   });
 
   it('keeps one options object, so there is nothing per page to forget', () => {
-    // The three bespoke types plus the stock types that get the skin. If a type is added
-    // here it is added for every hosted page at once, which is the whole point.
+    // The bespoke types plus the stock types that get the skin. If a type is added here it
+    // is added for every hosted page at once, which is the whole point. The four
+    // `coclosetPartner*` types are the become-a-partner redesign (2026-09-12).
     expect(Object.keys(coclosetPageOptions.sectionComponents).sort()).toEqual([
       'article',
       'carousel',
       'coclosetHero',
       'coclosetLaundry',
+      'coclosetPartnerBenefits',
+      'coclosetPartnerFaq',
+      'coclosetPartnerForm',
+      'coclosetPartnerHero',
       'coclosetSteps',
       'columns',
       'features',

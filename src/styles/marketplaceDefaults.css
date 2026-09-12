@@ -335,6 +335,18 @@
   --coclosetRadius: 8px;
   --coclosetRadiusSmall: 6px;
   --coclosetRadiusPill: 999px;
+
+  /**
+   * PAGE-SCOPED ACCENT for /p/become-a-partner only - NOT a site rebrand.
+   *
+   * Sampled by eye from the become-a-partner screenshots Jonathan sent (a deep forest/teal
+   * green, distinct from --coclosetBrand's warm terracotta used everywhere else on the site).
+   * Kept as its own pair of tokens, rather than repurposing --coclosetBrand*, so this one
+   * marketing page's palette never silently reskins every other page that reads the brand
+   * tokens. Used by SectionCoclosetPartnerHero/Benefits/Form only.
+   */
+  --coclosetPartnerTeal: #3d6b5c;
+  --coclosetPartnerTealDark: #2c4f43;
 }
 
 /* ================ Global element styles ================ */
