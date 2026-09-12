@@ -71,7 +71,12 @@ const LaundryLinkMaybe = ({ isAuthenticated, currentUser }) => {
   }
 
   return (
-    <NamedLink id="laundry-link" className={css.topbarLink} name="PartnerLandingPage">
+    <NamedLink
+      id="laundry-link"
+      className={css.topbarLink}
+      name="CMSPage"
+      params={{ pageId: 'become-a-partner' }}
+    >
       <span className={css.topbarLinkLabel}>
         <FormattedMessage id="TopbarDesktop.laundry" />
       </span>

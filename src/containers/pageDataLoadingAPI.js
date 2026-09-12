@@ -15,7 +15,6 @@ import { loadData as LaundryOpsPageLoader } from './LaundryOpsPage/LaundryOpsPag
 import { loadData as ListingPageLoader } from './ListingPage/ListingPage.duck';
 import { loadData as MakeOfferPageLoader } from './MakeOfferPage/MakeOfferPage.duck';
 import { loadData as ManageListingsPageLoader } from './ManageListingsPage/ManageListingsPage.duck';
-import { loadData as PartnerLandingPageLoader } from './PartnerLandingPage/PartnerLandingPage.duck';
 import { loadData as PaymentMethodsPageLoader } from './PaymentMethodsPage/PaymentMethodsPage.duck';
 import { loadData as PrivacyPolicyPageLoader } from './PrivacyPolicyPage/PrivacyPolicyPage.duck';
 import { loadData as ProfilePageLoader } from './ProfilePage/ProfilePage.duck';
@@ -71,9 +70,6 @@ const getPageDataLoadingAPI = () => {
     },
     ManageListingsPage: {
       loadData: ManageListingsPageLoader,
-    },
-    PartnerLandingPage: {
-      loadData: PartnerLandingPageLoader,
     },
     PaymentMethodsPage: {
       loadData: PaymentMethodsPageLoader,
