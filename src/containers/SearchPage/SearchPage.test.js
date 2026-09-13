@@ -803,6 +803,100 @@ describe('Duck', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  //   > "hay que agregar un filtro en el search que nos permita filtrar por listings que
+  //   >  esten disponibles para hoy" (Jonathan, 2026-09-11)
+  //
+  // pickupToday is internally just dates=<today>,<today> fed through the same
+  // datesSearchParams the picked-date filter uses, plus a stricter (onLaundry-requiring)
+  // post-filter. These pin the wiring, not the date/cleaning-floor math itself, which the
+  // tests above and searchCleaningFloor.test.js already cover.
+  // -------------------------------------------------------------------------
+  describe('the "Pickup Today" filter (pickupToday)', () => {
+    const withDatesFilter = {
+      ...config,
+      search: {
+        ...config.search,
+        defaultFilters: [
+          ...(config.search?.defaultFilters || []).filter(f => f.key !== 'dates'),
+          { key: 'dates', schemaType: 'dates', availability: 'time-full', dateRangeMode: 'day' },
+        ],
+      },
+    };
+
+    const dispatchSearch = (searchParams, listings) => {
+      const getState = () => ({
+        ...initialState,
+        user: { currentUser },
+        auth: { isAuthenticated: true },
+      });
+      const query = sdkFn(fakeResponse(listings));
+      const sdk = {
+        currentUser: { show: sdkFn(fakeResponse(currentUser)) },
+        listings: { query },
+        authInfo: sdkFn({}),
+      };
+      const dispatch = createFakeDispatch(getState, sdk);
+
+      return dispatch(
+        searchListings({ searchParams, config: withDatesFilter })
+      ).then(result => ({ result, query }));
+    };
+
+    it('asks the API for a window starting today, with no dates param in the URL', () => {
+      return dispatchSearch({ pickupToday: 'true', perPage: 24 }, []).then(({ query }) => {
+        const params = query.mock.calls[0][0];
+
+        // Same shape the picked-date filter produces: a real window, not the empty `{}` a
+        // request with nothing to filter on would send.
+        expect(params.availability).toBe('time-partial');
+        expect(params.minDuration).toBeGreaterThan(0);
+        // `start` is prolonged 14h before "today" to cover other time zones (same as the
+        // picked-date filter) - anchored on right now rather than an exact calendar day,
+        // since the prolongation can push it into yesterday depending on the hour this test
+        // happens to run.
+        const hoursFromNow = (Date.now() - new Date(params.start).getTime()) / (60 * 60 * 1000);
+        expect(hoursFromNow).toBeGreaterThan(-1);
+        expect(hoursFromNow).toBeLessThan(40);
+      });
+    });
+
+    it('keeps only listings already on laundry and free today', () => {
+      const onLaundryToday = createListing('on-laundry', { metadata: { onLaundry: true } });
+      const notOnLaundry = createListing('not-on-laundry', { metadata: { onLaundry: false } });
+
+      return dispatchSearch({ pickupToday: 'true', perPage: 24 }, [
+        onLaundryToday,
+        notOnLaundry,
+      ]).then(({ result }) => {
+        expect(result.payload.data.data.map(l => l.id.uuid)).toEqual(['on-laundry']);
+      });
+    });
+
+    it('defers to an explicit dates filter rather than overriding it with today', async () => {
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const iso = d => d.toISOString().slice(0, 10);
+      const dates = `${iso(tomorrow)},${iso(tomorrow)}`;
+
+      // If pickupToday were overriding the explicit dates param, this query would differ from
+      // the same search made without pickupToday at all.
+      const withPickupToday = await dispatchSearch({ pickupToday: 'true', dates, perPage: 24 }, []);
+      const withoutPickupToday = await dispatchSearch({ dates, perPage: 24 }, []);
+
+      expect(withPickupToday.query.mock.calls[0][0]).toEqual(
+        withoutPickupToday.query.mock.calls[0][0]
+      );
+    });
+
+    it('is a no-op when not requested', () => {
+      const listing = createListing('l', { metadata: { onLaundry: false } });
+
+      return dispatchSearch({ perPage: 24 }, [listing]).then(({ result }) => {
+        expect(result.payload.data.data.map(l => l.id.uuid)).toEqual(['l']);
+      });
+    });
+  });
+
   it('loadData() for full viewing rights user loads listings', () => {
     const getState = () => ({
       ...initialState,

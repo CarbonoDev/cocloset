@@ -898,6 +898,7 @@ export const TransactionPageComponent = props => {
       listing={listing}
       customer={customer}
       provider={provider}
+      booking={booking}
       transitions={txTransitions}
       processName={processName}
       protectedData={transaction?.attributes?.protectedData}

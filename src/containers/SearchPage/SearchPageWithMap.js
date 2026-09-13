@@ -26,6 +26,7 @@ import {
 } from './SearchPage.shared';
 
 import FilterComponent from './FilterComponent';
+import PickupTodayFilterToggle from './PickupTodayFilterToggle';
 import SearchMap from './SearchMap/SearchMap';
 import MainPanelHeader from './MainPanelHeader/MainPanelHeader';
 import SearchFiltersSecondary from './SearchFiltersSecondary/SearchFiltersSecondary';
@@ -373,6 +374,7 @@ export class SearchPageComponent extends Component {
                   />
                 );
               })}
+              <PickupTodayFilterToggle history={this.props.history} location={location} />
             </SearchFiltersMobile>
             <MainPanelHeader
               className={css.mainPanelMapVariant}
@@ -407,6 +409,7 @@ export class SearchPageComponent extends Component {
                     />
                   );
                 })}
+                <PickupTodayFilterToggle history={this.props.history} location={location} />
               </SearchFiltersPrimary>
             </MainPanelHeader>
             {isSecondaryFiltersOpen ? (

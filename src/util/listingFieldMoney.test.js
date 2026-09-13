@@ -16,6 +16,13 @@ describe('isMoneyListingField', () => {
     expect(isMoneyListingField('retailValue')).toBe(true);
   });
 
+  // The $ went missing a second time because the Console field's key drifted from `retailValue`
+  // to `retail_value` underneath this hardcoded list - confirmed on a real published listing.
+  // Both spellings are kept live so a drift back doesn't silently reopen the same report.
+  it('also knows the snake_case spelling live listings actually use', () => {
+    expect(isMoneyListingField('retail_value')).toBe(true);
+  });
+
   // The other keys on a real Dev listing. A size or a colour formatted as currency would be
   // worse than the bare number this replaces.
   it('leaves every other field alone', () => {

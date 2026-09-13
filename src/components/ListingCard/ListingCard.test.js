@@ -1,11 +1,17 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 
-import { getHostedConfiguration, renderWithProviders as render } from '../../util/testHelpers';
+import {
+  getHostedConfiguration,
+  renderWithProviders as render,
+  testingLibrary,
+} from '../../util/testHelpers';
 import en from '../../translations/en.json';
 import { createUser, createListing, fakeIntl } from '../../util/testData';
 
 import { ListingCard } from './ListingCard';
+
+const { screen } = testingLibrary;
 
 const getConfig = () => {
   const hostedConfig = getHostedConfiguration();
@@ -47,6 +53,43 @@ describe('ListingCard', () => {
     );
     const tree = render(<ListingCard listing={listing} intl={fakeIntl} />, { config });
     expect(tree.asFragment().firstChild).toMatchSnapshot();
+  });
+});
+
+// -------------------------------------------------------------------------
+//   > "la tag debe ser mostrada para los listings que esten en laundry y que esten
+//   >  disponibles para hoy (...) esquina superior derecha de la listing card"
+//   >   (Jonathan, 2026-09-11)
+// -------------------------------------------------------------------------
+describe('ListingCard: the "Pickup Today" tag', () => {
+  const onLaundryListing = () =>
+    createListing(
+      'listing1',
+      { metadata: { onLaundry: true } },
+      { author: createUser('user1') }
+    );
+
+  it('shows the tag for a listing on laundry and free today', () => {
+    render(<ListingCard listing={onLaundryListing()} intl={fakeIntl} />);
+
+    expect(screen.getByText('PickupTodayBadge.label')).toBeInTheDocument();
+  });
+
+  it('does not show the tag for a listing that has never reached its laundry', () => {
+    const listing = createListing('listing1', {}, { author: createUser('user1') });
+
+    render(<ListingCard listing={listing} intl={fakeIntl} />);
+
+    expect(screen.queryByText('PickupTodayBadge.label')).not.toBeInTheDocument();
+  });
+
+  it('renders both the tag and the favorite heart without one hiding the other', () => {
+    const { container } = render(
+      <ListingCard listing={onLaundryListing()} intl={fakeIntl} showFavorite />
+    );
+
+    expect(screen.getByText('PickupTodayBadge.label')).toBeInTheDocument();
+    expect(container.querySelector('[class*="cardFavoriteShifted"]')).toBeInTheDocument();
   });
 });
 

@@ -6,6 +6,7 @@ import { propTypes } from '../../../util/types';
 import { userDisplayNameAsString } from '../../../util/data';
 import { createSlug } from '../../../util/urlHelpers';
 import { displayPrice } from '../../../util/configHelpers';
+import { subtractTime } from '../../../util/dates';
 
 import { AvatarLarge, NamedLink, UserDisplayName } from '../../../components';
 
@@ -109,6 +110,7 @@ export class TransactionPanelComponent extends Component {
       listing,
       customer,
       provider,
+      booking,
       transitions,
       processName,
       protectedData,
@@ -158,6 +160,28 @@ export class TransactionPanelComponent extends Component {
       isProviderBanned,
       isProviderDeleted,
     };
+
+    // WHEN THE OWNER NEEDS TO HAVE DROPPED THE GARMENT OFF.
+    //
+    //   > "si debo ir a entregar una prenda, la fecha que se debe mostrar tanto en el inbox
+    //   >  page como en transaction page es dos horas antes de la fecha de inicio del
+    //   >  booking" (Jonathan, 2026-09-11)
+    //
+    // The listing's own timezone, same as InboxTransactionPanel's identical computation for
+    // this exact deadline - a day booking is midnight-to-midnight in the marketplace's zone,
+    // and formatting it in the reader's own zone would move it to the previous day for anyone
+    // east of it.
+    const bookingTimeZone = listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC';
+    const bookingStartForDropOff = booking?.attributes?.displayStart || booking?.attributes?.start;
+    const dropOffBy = bookingStartForDropOff
+      ? intl.formatDate(subtractTime(bookingStartForDropOff, 2, 'hours', bookingTimeZone), {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric',
+          timeZone: bookingTimeZone,
+        })
+      : null;
 
     const { authorDisplayName, customerDisplayName, otherUserDisplayNameString } = displayNames(
       currentUser,
@@ -261,6 +285,7 @@ export class TransactionPanelComponent extends Component {
               metadata={metadata}
               isCustomer={isCustomer}
               isAtLaundry={listing?.attributes?.metadata?.onLaundry === true}
+              dropOffBy={dropOffBy}
             />
 
             {/* The laundry's damage report (design §10). Sits directly below the

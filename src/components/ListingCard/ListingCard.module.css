@@ -241,3 +241,22 @@
     background-color: var(--colorWhite);
   }
 }
+
+/* THE "PICKUP TODAY" TAG, same corner as the heart on purpose (mockup).
+   > "la tag debe ser mostrada (...) en la esquina superior derecha de la listing card"
+   >   (Jonathan, 2026-09-11)
+
+   No z-index, same reasoning as .cardFavorite above: this already paints over the card image
+   for free by being absolutely positioned inside .cardWithFavorite's own stacking context. */
+.cardPickupToday {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* Two badges, one corner: when the pickup-today tag is showing, the heart moves down rather
+   than sitting underneath it. Anchored on the tag's own height plus a gap rather than a fixed
+   guess, so the two never touch regardless of font metrics. */
+.cardFavoriteShifted {
+  top: 44px;
+}

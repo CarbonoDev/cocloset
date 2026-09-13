@@ -452,7 +452,7 @@
 
   @media (--viewportMedium) {
     flex-shrink: 0;
-    width: 280px;
+    /* width: 280px; */
   }
 }
 

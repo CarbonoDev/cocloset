@@ -10,7 +10,7 @@ import {
   listingFieldSearchParams,
 } from '../../util/listingFieldSearch';
 
-import { NamedLink } from '../../components';
+import { NamedLink, PickupTodayBadge } from '../../components';
 
 import css from './ListingPage.module.css';
 
@@ -47,6 +47,8 @@ import css from './ListingPage.module.css';
  *   the page. The average is derived here rather than by each caller, so the two page
  *   variants cannot compute it differently.
  * @param {string} [props.authorDisplayName]
+ * @param {boolean} [props.showPickupToday] - see util/searchCleaningFloor.js's
+ *   isPickupTodayListing; computed by the caller, which holds the full listing entity.
  * @returns {JSX.Element}
  */
 const SectionListingHeader = props => {
@@ -58,6 +60,7 @@ const SectionListingHeader = props => {
     completedRentals,
     reviews,
     authorDisplayName,
+    showPickupToday = false,
   } = props;
 
   // Only reviews OF THE PROVIDER carry a rating that is about this garment's rentals going
@@ -114,6 +117,9 @@ const SectionListingHeader = props => {
 
   return (
     <div className={classNames(css.listingHeader, className)}>
+      {showPickupToday ? (
+        <PickupTodayBadge className={css.listingPickupTodayBadge} />
+      ) : null}
       {brand ? <p className={css.brandEyebrow}>{brandContent}</p> : null}
       <h1 className={css.listingTitle}>{title}</h1>
       {metaParts.length > 0 ? (

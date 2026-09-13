@@ -140,6 +140,7 @@ export { default as OrderPanel } from './OrderPanel/OrderPanel';
 export { default as ListingCard } from './ListingCard/ListingCard';
 export { default as Map } from './Map/Map';
 export { default as Page } from './Page/Page';
+export { default as PickupTodayBadge } from './PickupTodayBadge/PickupTodayBadge';
 export { default as Reviews } from './Reviews/Reviews';
 export { default as SavedCardDetails } from './SavedCardDetails/SavedCardDetails';
 export const SectionText = loadable(() => import(/* webpackChunkName: "SectionText" */ './CustomExtendedDataSection/SectionText'));

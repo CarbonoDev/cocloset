@@ -282,6 +282,17 @@ describe('HandoverQrMaybe', () => {
       expect(dropOff.queryByText(/Take the garment to the laundry/i)).toBeInTheDocument();
       dropOff.unmount();
 
+      // Jonathan, 2026-09-11: "la fecha que se debe mostrar (...) es dos horas antes de la
+      // fecha de inicio del booking" - the drop-off sentence carries that deadline once
+      // TransactionPanel computes and passes it down.
+      const dropOffWithDeadline = renderPanel({
+        processState: 'accepted',
+        isCustomer: false,
+        dropOffBy: 'Sep 19, 10:00 PM',
+      });
+      expect(dropOffWithDeadline.queryByText(/by Sep 19, 10:00 PM/i)).toBeInTheDocument();
+      dropOffWithDeadline.unmount();
+
       const collect = renderPanel({
         processState: 'delivered',
         isCustomer: false,
