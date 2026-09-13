@@ -26,12 +26,15 @@ import {
 } from './SearchPage.shared';
 
 import FilterComponent from './FilterComponent';
-import PickupTodayFilterToggle from './PickupTodayFilterToggle';
 import SearchMap from './SearchMap/SearchMap';
 import MainPanelHeader from './MainPanelHeader/MainPanelHeader';
 import SearchFiltersSecondary from './SearchFiltersSecondary/SearchFiltersSecondary';
 import SearchFiltersPrimary from './SearchFiltersPrimary/SearchFiltersPrimary';
 import SearchFiltersMobile from './SearchFiltersMobile/SearchFiltersMobile';
+// Keep this after SearchFiltersMobile: SearchPageWithGrid imports the same CSS-bearing
+// components in this relative order, and mini-css-extract-plugin fails the build on a
+// conflicting order between the SearchPageWithMap / SearchPageWithGrid chunk groups.
+import PickupTodayFilterToggle from './PickupTodayFilterToggle';
 import SortBy from './SortBy/SortBy';
 import SearchResultsPanel from './SearchResultsPanel/SearchResultsPanel';
 import NoSearchResultsMaybe from './NoSearchResultsMaybe/NoSearchResultsMaybe';
