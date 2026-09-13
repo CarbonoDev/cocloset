@@ -9,16 +9,21 @@
 .layout {
   max-width: var(--contentMaxWidthPages);
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 48px 24px;
   display: grid;
   grid-template-columns: 1fr;
   gap: 32px;
-  align-items: center;
+  /* NOT `center`: the form card can grow much taller than the info copy once validation
+     messages stack up, and centering the shorter column vertically against a tall one
+     pushed the headline down past the fold - "text ends up vertically centered and you
+     need to scroll to see it" (Jonathan, 2026-09-12). Top-aligning keeps the headline
+     pinned to where the section starts regardless of how tall the form gets. */
+  align-items: start;
 
   @media (--viewportLarge) {
     grid-template-columns: 1fr 1fr;
     gap: 56px;
-    padding: 0 36px;
+    padding: 64px 36px;
   }
 }
 

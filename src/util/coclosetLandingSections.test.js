@@ -274,6 +274,7 @@ describe('the become-a-partner page (2026-09-12 redesign)', () => {
   // Asset Delivery API while building this page.
   it.each([
     ['partner-hero', 'coclosetPartnerHero'],
+    ['brand-description', 'coclosetPartnerAbout'],
     ['benefits', 'coclosetPartnerBenefits'],
     ['faq', 'coclosetPartnerFaq'],
     ['form', 'coclosetPartnerForm'],
@@ -295,10 +296,11 @@ describe('the become-a-partner page (2026-09-12 redesign)', () => {
 
     expect(mapped.sections.map(s => s.sectionType)).toEqual([
       'coclosetPartnerHero',
-      // `brand-description` matches no bespoke name: the stock `columns` renderer with two
-      // blocks (image, title+text) already produces the "What is CoCloset?" layout, so it is
-      // deliberately left unclaimed.
-      'columns',
+      // `brand-description` was originally left to the stock `columns` renderer, but Jonathan
+      // flagged (2026-09-12) that the block title it produces doesn't match the reference
+      // screenshot's display-serif, brand-teal "What is CoCloset?" heading - so it now gets
+      // its own layout too, same as the other four sections on this page.
+      'coclosetPartnerAbout',
       'coclosetPartnerBenefits',
       'coclosetPartnerFaq',
       'coclosetPartnerForm',

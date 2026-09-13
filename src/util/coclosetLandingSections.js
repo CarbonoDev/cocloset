@@ -100,6 +100,7 @@ export const SECTION_NAMES_BY_TYPE = {
   // effect of this change, not an oversight. If a future edit gives the two pages' benefits
   // sections different shapes, this single shared name will need to become two.
   coclosetPartnerHero: ['partner-hero'],
+  coclosetPartnerAbout: ['brand-description'],
   coclosetPartnerBenefits: ['benefits'],
   coclosetPartnerFaq: ['faq'],
   coclosetPartnerForm: ['form'],
