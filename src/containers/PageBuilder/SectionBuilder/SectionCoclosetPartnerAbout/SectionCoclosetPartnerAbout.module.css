@@ -1,0 +1,69 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  background-color: var(--coclosetSurface);
+}
+
+.layout {
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+  /* `rootClassName` replaces SectionContainer's own default `32px 0`/`64px 0` vertical
+     padding (see coclosetSkin.js's note on the same substitution), so this restates it. */
+  padding: 48px 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: center;
+
+  @media (--viewportLarge) {
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+    padding: 64px 36px;
+  }
+}
+
+.media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--coclosetRadius);
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.headline {
+  font-family: var(--fontFamilyDisplay);
+  color: var(--coclosetPartnerTeal);
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0 0 20px 0;
+
+  @media (--viewportMedium) {
+    font-size: 40px;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 44px;
+  }
+}
+
+/* Noticeably larger than `marketplaceDefaultFontStyles` (16px) - the reference screenshot
+   sets this paragraph at something closer to a lede than to body copy. */
+.body {
+  color: var(--coclosetInk);
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 0;
+
+  @media (--viewportMedium) {
+    font-size: 20px;
+  }
+}
+
+.body > p {
+  margin: 0;
+}

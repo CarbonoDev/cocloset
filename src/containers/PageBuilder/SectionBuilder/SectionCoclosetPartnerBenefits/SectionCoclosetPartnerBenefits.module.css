@@ -7,10 +7,14 @@
 .layout {
   max-width: var(--contentMaxWidthPages);
   margin: 0 auto;
-  padding: 0 24px;
+  /* `rootClassName` replaces SectionContainer's own default `32px 0`/`64px 0` vertical
+     padding (see coclosetSkin.js's note on the same substitution), so a bespoke section
+     has to restate it itself or the section has none at all - restated here to match
+     the sibling sections on this page. */
+  padding: 48px 24px;
 
   @media (--viewportLarge) {
-    padding: 0 36px;
+    padding: 64px 36px;
   }
 }
 
@@ -23,15 +27,17 @@
   }
 }
 
+/* Sized off the reference screenshot, which sets this considerably larger than a typical
+   section header (~56-60px on desktop, not the 42px other hosted-page titles use). */
 .title {
   font-family: var(--fontFamilyDisplay);
   color: var(--coclosetInk);
-  font-size: 32px;
+  font-size: 36px;
   line-height: 1.1;
   margin: 0;
 
   @media (--viewportMedium) {
-    font-size: 42px;
+    font-size: 56px;
   }
 }
 

@@ -8,6 +8,7 @@ import SectionCoclosetHero from './SectionBuilder/SectionCoclosetHero';
 import SectionCoclosetLaundry from './SectionBuilder/SectionCoclosetLaundry';
 import SectionCoclosetSteps from './SectionBuilder/SectionCoclosetSteps';
 import SectionCoclosetPartnerHero from './SectionBuilder/SectionCoclosetPartnerHero';
+import SectionCoclosetPartnerAbout from './SectionBuilder/SectionCoclosetPartnerAbout';
 import SectionCoclosetPartnerBenefits from './SectionBuilder/SectionCoclosetPartnerBenefits';
 import SectionCoclosetPartnerFaq from './SectionBuilder/SectionCoclosetPartnerFaq';
 import SectionCoclosetPartnerForm from './SectionBuilder/SectionCoclosetPartnerForm';
@@ -44,6 +45,7 @@ export const coclosetPageOptions = {
     // /p/become-a-partner (2026-09-12 redesign). See coclosetLandingSections.js for which
     // Console section names claim each of these.
     coclosetPartnerHero: { component: SectionCoclosetPartnerHero },
+    coclosetPartnerAbout: { component: SectionCoclosetPartnerAbout },
     coclosetPartnerBenefits: { component: SectionCoclosetPartnerBenefits },
     coclosetPartnerFaq: { component: SectionCoclosetPartnerFaq },
     coclosetPartnerForm: { component: SectionCoclosetPartnerForm },
