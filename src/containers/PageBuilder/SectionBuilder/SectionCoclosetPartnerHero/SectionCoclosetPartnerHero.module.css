@@ -1,0 +1,97 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  /* SectionContainer defaults, restated because rootClassName replaces them. */
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  width: 100%;
+  position: relative;
+
+  min-height: 420px;
+
+  @media (--viewportMedium) {
+    min-height: 540px;
+  }
+
+  @media (--viewportLarge) {
+    min-height: 620px;
+  }
+}
+
+.layout {
+  position: relative;
+  z-index: 1;
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+  padding: 8px 24px 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  @media (--viewportMedium) {
+    padding: 16px 36px 0 36px;
+  }
+
+  @media (--viewportLarge) {
+    padding: 8px 36px 0 36px;
+  }
+}
+
+.eyebrow {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInk);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin: 0 0 20px 0;
+}
+
+.eyebrow > * {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+/* The cream card, left-aligned and positioned in the UPPER portion of the photo - not
+   centered, and not floated against the bottom edge like SectionCoclosetHero's card. */
+.card {
+  background-color: var(--coclosetCanvas);
+  border-radius: 20px;
+  padding: 28px 28px 32px 28px;
+  max-width: 560px;
+  width: 100%;
+
+  @media (--viewportMedium) {
+    padding: 36px 40px 40px 40px;
+  }
+}
+
+.headline {
+  font-family: var(--fontFamilyDisplay);
+  color: var(--coclosetPartnerTeal);
+  font-size: 32px;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px 0;
+
+  @media (--viewportMedium) {
+    font-size: 44px;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 48px;
+  }
+}
+
+.description {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  margin: 0;
+}
+
+.description > p {
+  margin: 0;
+}

@@ -3,6 +3,7 @@ const {
   deliverApplication,
   MAX_TURNAROUND_DAYS,
   MAX_CATEGORIES,
+  HONEYPOT_FIELD,
 } = require('./laundryPartnerApplication');
 
 const log = require('../log');
@@ -15,7 +16,8 @@ const validBody = () => ({
   email: 'ana@lavanderiacentral.example',
   phone: '+34 600 111 222',
   address: 'Calle Mayor 1, Madrid',
-  businessHours: 'Mon-Fri 9:00-19:00',
+  cityStateZip: 'Madrid, 28013',
+  website: 'https://lavanderiacentral.example',
   acceptedCategories: 'Dresses, Coats , Suits',
   turnaroundDays: '2',
   notes: 'We have 40m2 of hanging storage.',
@@ -33,7 +35,8 @@ describe('validateApplication', () => {
       email: 'ana@lavanderiacentral.example',
       phone: '+34 600 111 222',
       address: 'Calle Mayor 1, Madrid',
-      businessHours: 'Mon-Fri 9:00-19:00',
+      cityStateZip: 'Madrid, 28013',
+      website: 'https://lavanderiacentral.example',
       acceptedCategories: ['Dresses', 'Coats', 'Suits'],
       turnaroundDays: 2,
       notes: 'We have 40m2 of hanging storage.',
@@ -46,6 +49,14 @@ describe('validateApplication', () => {
 
     expect(result.valid).toBe(true);
     expect(result.application.notes).toBeUndefined();
+  });
+
+  it('treats website as optional', () => {
+    const { website, ...withoutWebsite } = validBody();
+    const result = validateApplication(withoutWebsite);
+
+    expect(result.valid).toBe(true);
+    expect(result.application.website).toBeUndefined();
   });
 
   it('trims whitespace from string fields', () => {
@@ -72,7 +83,7 @@ describe('validateApplication', () => {
     'email',
     'phone',
     'address',
-    'businessHours',
+    'cityStateZip',
     'acceptedCategories',
   ])('rejects a missing %s', field => {
     const body = validBody();
@@ -178,7 +189,10 @@ describe('validateApplication', () => {
   });
 
   it('flags a filled honeypot as spam without surfacing an error', () => {
-    const result = validateApplication({ ...validBody(), website: 'http://spam.example' });
+    const result = validateApplication({
+      ...validBody(),
+      [HONEYPOT_FIELD]: 'http://spam.example',
+    });
 
     expect(result.valid).toBe(true);
     expect(result.isSpam).toBe(true);
@@ -186,7 +200,7 @@ describe('validateApplication', () => {
   });
 
   it('ignores an empty honeypot', () => {
-    const result = validateApplication({ ...validBody(), website: '' });
+    const result = validateApplication({ ...validBody(), [HONEYPOT_FIELD]: '' });
 
     expect(result.valid).toBe(true);
     expect(result.isSpam).toBeUndefined();
@@ -353,7 +367,8 @@ describe('deliverApplication — email sink', () => {
       email: 'ana@example.com',
       phone: '+52 55 1234 5678',
       address: 'Calle Rivera 12, CDMX',
-      businessHours: 'Mon-Fri 9:00-19:00',
+      cityStateZip: 'CDMX, 06700',
+      website: 'https://studiopigalle.example',
       acceptedCategories: ['Eveningwear', 'Silk'],
       turnaroundDays: 2,
       notes: 'We already handle bridal.',
@@ -367,12 +382,13 @@ describe('deliverApplication — email sink', () => {
     expect(html).not.toContain('<ul>');
 
     const expectedRows = [
-      ['Studio name', 'Studio Pigalle'],
+      ['Business name', 'Studio Pigalle'],
       ['Contact name', 'Ana Rivera'],
       ['Email', 'ana@example.com'],
       ['Phone', '+52 55 1234 5678'],
-      ['Address', 'Calle Rivera 12, CDMX'],
-      ['Business hours', 'Mon-Fri 9:00-19:00'],
+      ['Street address', 'Calle Rivera 12, CDMX'],
+      ['City, state, zip', 'CDMX, 06700'],
+      ['Website', 'https://studiopigalle.example'],
       // Arrays render as a readable list rather than "[object Object]" or raw JSON.
       ['Garments accepted', 'Eveningwear, Silk'],
       ['Turnaround (days)', '2'],

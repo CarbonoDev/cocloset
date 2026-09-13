@@ -14,12 +14,13 @@
  * - Every string field has a hard length cap, mirrored on the client.
  *
  * Field names intentionally match `src/containers/LaundryProfilePage/LaundryProfileForm`
- * where they overlap (`studioName`, `businessHours`, `turnaroundDays`,
- * `acceptedCategories`) so an approved application maps onto a real laundry profile
- * without a translation layer. That parity is the reason turnaround is stated in DAYS
- * here: the profile field it maps onto is `privateData.turnaroundDays`, and an
- * application quoting hours would need an operator to convert it by hand — which is
- * exactly the sort of silent unit mismatch this codebase has none of.
+ * where they overlap (`studioName`, `turnaroundDays`, `acceptedCategories`) so an
+ * approved application maps onto a real laundry profile without a translation layer.
+ * That parity is the reason turnaround is stated in DAYS here: the profile field it
+ * maps onto is `privateData.turnaroundDays`, and an application quoting hours would
+ * need an operator to convert it by hand — which is exactly the sort of silent unit
+ * mismatch this codebase has none of. `businessHours` is deliberately NOT collected on
+ * this public form (Jonathan, 2026-09-12) — it's asked for later, during onboarding.
  */
 
 const log = require('../log');
@@ -45,14 +46,17 @@ const FIELD_SPECS = {
   email: { required: true, maxLength: 160, pattern: EMAIL_PATTERN },
   phone: { required: true, maxLength: 40, minLength: 5, pattern: PHONE_PATTERN },
   address: { required: true, maxLength: 300 },
-  businessHours: { required: true, maxLength: 200 },
+  cityStateZip: { required: true, maxLength: 200 },
+  website: { required: false, maxLength: 200 },
   // acceptedCategories: { required: true, maxLength: 300 },
   notes: { required: false, maxLength: 2000 },
 };
 
 // Name of the hidden honeypot input rendered by PartnerApplicationForm. Humans
-// never see it; naive bots fill every input they find.
-const HONEYPOT_FIELD = 'website';
+// never see it; naive bots fill every input they find. NOT `website` — that is now a
+// real, visible, optional field, so the trap uses a different bait name. Must stay in
+// sync with the client's own `HONEYPOT_FIELD` in `PartnerApplicationForm.js`.
+const HONEYPOT_FIELD = 'homepage';
 
 const invalid = message => ({ valid: false, error: message });
 
@@ -150,12 +154,13 @@ const validateApplication = body => {
 // Human-readable labels for the notification email, in the order an operator would read
 // them. Keyed by the validated application's own field names.
 const EMAIL_FIELD_LABELS = [
-  ['studioName', 'Studio name'],
+  ['studioName', 'Business name'],
   ['contactName', 'Contact name'],
   ['email', 'Email'],
   ['phone', 'Phone'],
-  ['address', 'Address'],
-  ['businessHours', 'Business hours'],
+  ['address', 'Street address'],
+  ['cityStateZip', 'City, state, zip'],
+  ['website', 'Website'],
   // ['acceptedCategories', 'Garments accepted'],
   // ['turnaroundDays', 'Turnaround (days)'],
   ['notes', 'Notes'],

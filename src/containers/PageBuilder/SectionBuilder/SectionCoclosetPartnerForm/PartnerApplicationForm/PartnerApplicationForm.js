@@ -2,8 +2,8 @@ import React from 'react';
 import { Form as FinalForm, FormSpy } from 'react-final-form';
 import classNames from 'classnames';
 
-import { FormattedMessage, useIntl } from '../../../util/reactIntl';
-import { propTypes } from '../../../util/types';
+import { FormattedMessage, useIntl } from '../../../../../util/reactIntl';
+import { propTypes } from '../../../../../util/types';
 import {
   composeValidators,
   emailFormatValid,
@@ -11,9 +11,9 @@ import {
   minLength,
   numberAtLeast,
   required,
-} from '../../../util/validators';
+} from '../../../../../util/validators';
 
-import { Form, Button, FieldTextInput, H3 } from '../../../components';
+import { Form, Button, FieldTextInput, H3 } from '../../../../../components';
 
 import css from './PartnerApplicationForm.module.css';
 
@@ -29,7 +29,8 @@ export const MAX_LENGTHS = {
   email: 160,
   phone: 40,
   address: 300,
-  businessHours: 200,
+  cityStateZip: 200,
+  website: 200,
   acceptedCategories: 300,
   notes: 2000,
 };
@@ -42,8 +43,14 @@ export const MAX_TURNAROUND_DAYS = 30;
  * bots fill every input they can find; the server drops any submission where this is
  * non-empty. This is a cheap first line of defence, not a substitute for a real
  * challenge — see the notes in `server/api/laundry-partner-application.js`.
+ *
+ * NOT `website`: that is now a real, visible field (see below), and a hidden trap
+ * sharing its name with a legitimate field would either collide or stop working.
+ * `homepage` keeps the same "looks like something a bot auto-fills" property without
+ * colliding with anything a human sees. Must stay in sync with the server's own
+ * `HONEYPOT_FIELD` in `server/api-util/laundryPartnerApplication.js`.
  */
-export const HONEYPOT_FIELD = 'website';
+export const HONEYPOT_FIELD = 'homepage';
 
 /**
  * PartnerApplicationForm
@@ -52,17 +59,20 @@ export const HONEYPOT_FIELD = 'website';
  * operational partners of the marketplace.
  *
  * Field names deliberately match `LaundryProfileForm` where they overlap
- * (`studioName`, `businessHours`, `turnaroundDays`, `acceptedCategories`, including
- * the comma-separated-string convention for categories) so an approved application
- * maps onto a real laundry profile without renaming anything. Turnaround is stated in
- * DAYS for the same reason: that is the unit the profile field it becomes
+ * (`studioName`, `turnaroundDays`, `acceptedCategories`, including the
+ * comma-separated-string convention for categories) so an approved application maps
+ * onto a real laundry profile without renaming anything. Turnaround is stated in DAYS
+ * for the same reason: that is the unit the profile field it becomes
  * (`privateData.turnaroundDays`) is in, and an application quoting hours would need an
- * operator to convert it by hand.
+ * operator to convert it by hand. `businessHours` is intentionally NOT collected here
+ * (Jonathan, 2026-09-12) — it's asked for later, during onboarding, instead of on this
+ * public intake form.
  *
- * `address` is the one exception: the real profile stores a geocoded `location` place
- * object via FieldLocationAutocompleteInput, which needs a configured map provider.
- * An anonymous marketing page should not depend on that, so the application collects a
- * plain-text address that an operator geocodes during onboarding.
+ * `address`/`cityStateZip` are the one exception: the real profile stores a geocoded
+ * `location` place object via FieldLocationAutocompleteInput, which needs a configured
+ * map provider. An anonymous marketing page should not depend on that, so the
+ * application collects a plain-text street address and city/state/zip that an operator
+ * geocodes during onboarding.
  *
  * @component
  * @param {Object} props
@@ -144,7 +154,7 @@ const PartnerApplicationForm = props => (
             type="text"
             id={`${formId}.address`}
             name="address"
-            autoComplete="street-address"
+            autoComplete="address-line1"
             label={intl.formatMessage({ id: 'PartnerApplicationForm.addressLabel' })}
             placeholder={intl.formatMessage({ id: 'PartnerApplicationForm.addressPlaceholder' })}
             validate={composeValidators(
@@ -156,19 +166,31 @@ const PartnerApplicationForm = props => (
           <FieldTextInput
             className={css.field}
             type="text"
-            id={`${formId}.businessHours`}
-            name="businessHours"
-            label={intl.formatMessage({ id: 'PartnerApplicationForm.businessHoursLabel' })}
+            id={`${formId}.cityStateZip`}
+            name="cityStateZip"
+            autoComplete="address-level2"
+            label={intl.formatMessage({ id: 'PartnerApplicationForm.cityStateZipLabel' })}
             placeholder={intl.formatMessage({
-              id: 'PartnerApplicationForm.businessHoursPlaceholder',
+              id: 'PartnerApplicationForm.cityStateZipPlaceholder',
             })}
             validate={composeValidators(
-              required(intl.formatMessage({ id: 'PartnerApplicationForm.businessHoursRequired' })),
+              required(intl.formatMessage({ id: 'PartnerApplicationForm.cityStateZipRequired' })),
               maxLength(
-                tooLongMessage('businessHours', MAX_LENGTHS.businessHours),
-                MAX_LENGTHS.businessHours
+                tooLongMessage('cityStateZip', MAX_LENGTHS.cityStateZip),
+                MAX_LENGTHS.cityStateZip
               )
             )}
+          />
+
+          <FieldTextInput
+            className={css.field}
+            type="text"
+            id={`${formId}.website`}
+            name="website"
+            autoComplete="url"
+            label={intl.formatMessage({ id: 'PartnerApplicationForm.websiteLabel' })}
+            placeholder={intl.formatMessage({ id: 'PartnerApplicationForm.websitePlaceholder' })}
+            validate={maxLength(tooLongMessage('website', MAX_LENGTHS.website), MAX_LENGTHS.website)}
           />
 
           <H3 className={css.fieldsetLegend}>
@@ -224,10 +246,12 @@ const PartnerApplicationForm = props => (
             )}
           />
 
-          <H3 className={css.fieldsetLegend}>
-            <FormattedMessage id="PartnerApplicationForm.capabilitiesTitle" />
-          </H3>
-{/* 
+          {/* `acceptedCategories`/`turnaroundDays` are parked, not deleted: they exist on the
+              real `LaundryProfileForm` and are meant to come back once onboarding needs them
+              from an application. The heading that used to introduce them here ("What you can
+              handle") is dropped along with them — a heading over only the Notes field below
+              would describe nothing. */}
+{/*
           <FieldTextInput
             className={css.field}
             type="text"

@@ -42,8 +42,8 @@ const CUSTOMER = 'customer';
  * dishonest. Only the framing differs: the owner is told what it means for their
  * garment and their payout, the renter is told explicitly that a report is not a
  * charge. Neither string promises a compensation outcome, because the
- * marketplace has not defined one (see PartnerLandingPage.faq.damage.answer,
- * still `[TBC]`).
+ * marketplace has not yet defined how compensation is settled between the
+ * owner, the renter and the marketplace.
  *
  * NOT STATE-GATED, unlike HandoverQrMaybe. Damage outlives the state it was
  * recorded in: the flag is set on the way into `returned` and stays true through

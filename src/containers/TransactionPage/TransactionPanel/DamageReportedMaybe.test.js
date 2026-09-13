@@ -85,9 +85,9 @@ describe('DamageReportedMaybe', () => {
   });
 
   it('tells the renter explicitly that a report is not a charge', () => {
-    // The renter may end up bearing the cost, and the marketplace has not
-    // defined how compensation is settled (PartnerLandingPage.faq.damage.answer
-    // is still [TBC]). So this panel must not read as a bill.
+    // The renter may end up bearing the cost, and the marketplace has not yet
+    // defined how compensation is settled between the owner, the renter and
+    // the marketplace. So this panel must not read as a bill.
     renderPanel({ transactionRole: 'customer' });
 
     expect(

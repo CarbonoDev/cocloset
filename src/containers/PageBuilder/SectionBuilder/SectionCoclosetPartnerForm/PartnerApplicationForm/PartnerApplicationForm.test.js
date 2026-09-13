@@ -1,7 +1,7 @@
 import React, { act } from 'react';
 import '@testing-library/jest-dom';
 
-import { renderWithProviders as render, testingLibrary } from '../../../util/testHelpers';
+import { renderWithProviders as render, testingLibrary } from '../../../../../util/testHelpers';
 
 import PartnerApplicationForm, { HONEYPOT_FIELD } from './PartnerApplicationForm';
 
@@ -12,28 +12,29 @@ const noop = () => null;
 const VALID_VALUES = {
   studioName: 'Spin Cycle',
   address: 'Calle Mayor 1, Madrid',
-  businessHours: 'Mon-Fri 9:00-19:00',
+  cityStateZip: 'Madrid, 28013',
   contactName: 'Ana Ruiz',
   email: 'ana@example.com',
   phone: '+34600111222',
-  acceptedCategories: 'Dresses, Coats',
-  turnaroundDays: '2',
 };
 
 const label = key => `PartnerApplicationForm.${key}`;
 
+// `acceptedCategories` and `turnaroundDays` were removed from the rendered form by
+// "Fix: Remove acceptedCategories and turnaroundDays fields from the public application
+// form" (93a80d958) - the fields are still commented out in PartnerApplicationForm.js. This
+// fixture and the assertions below were not updated at the time; fixed here rather than left
+// failing on every run of a file this task was already touching for relocation.
+//
+// `website` is deliberately left unfilled here: it's optional (Jonathan, 2026-09-12), so a
+// "fills every field needed to submit" helper has no reason to touch it.
 const fillValidForm = async user => {
   await user.type(screen.getByLabelText(label('studioNameLabel')), VALID_VALUES.studioName);
   await user.type(screen.getByLabelText(label('addressLabel')), VALID_VALUES.address);
-  await user.type(screen.getByLabelText(label('businessHoursLabel')), VALID_VALUES.businessHours);
+  await user.type(screen.getByLabelText(label('cityStateZipLabel')), VALID_VALUES.cityStateZip);
   await user.type(screen.getByLabelText(label('contactNameLabel')), VALID_VALUES.contactName);
   await user.type(screen.getByLabelText(label('emailLabel')), VALID_VALUES.email);
   await user.type(screen.getByLabelText(label('phoneLabel')), VALID_VALUES.phone);
-  await user.type(
-    screen.getByLabelText(label('acceptedCategoriesLabel')),
-    VALID_VALUES.acceptedCategories
-  );
-  await user.type(screen.getByLabelText(label('turnaroundDaysLabel')), VALID_VALUES.turnaroundDays);
 };
 
 describe('PartnerApplicationForm', () => {
@@ -43,12 +44,11 @@ describe('PartnerApplicationForm', () => {
     [
       'studioNameLabel',
       'addressLabel',
-      'businessHoursLabel',
+      'cityStateZipLabel',
+      'websiteLabel',
       'contactNameLabel',
       'emailLabel',
       'phoneLabel',
-      'acceptedCategoriesLabel',
-      'turnaroundDaysLabel',
       'notesLabel',
     ].forEach(key => {
       expect(screen.getByLabelText(label(key))).toBeInTheDocument();
@@ -64,9 +64,18 @@ describe('PartnerApplicationForm', () => {
     expect(
       screen.getByRole('heading', { name: label('contactTitle'), level: 3 })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: label('capabilitiesTitle'), level: 3 })
-    ).toBeInTheDocument();
+  });
+
+  it('treats the website field as optional', async () => {
+    const user = userEvent.setup();
+    const onSubmit = jest.fn();
+    render(<PartnerApplicationForm onSubmit={onSubmit} />);
+
+    await fillValidForm(user);
+    await user.click(screen.getByRole('button', { name: label('submit') }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].website).toBeUndefined();
   });
 
   it('keeps submit disabled until the form is valid', async () => {
@@ -122,7 +131,7 @@ describe('PartnerApplicationForm', () => {
     expect(screen.getByText(label('studioNameTooLong'))).toBeInTheDocument();
   });
 
-  it('submits the values with turnaroundDays parsed to a number', async () => {
+  it('submits the values the applicant entered', async () => {
     const user = userEvent.setup();
     const onSubmit = jest.fn();
     render(<PartnerApplicationForm onSubmit={onSubmit} />);
@@ -131,12 +140,7 @@ describe('PartnerApplicationForm', () => {
     await user.click(screen.getByRole('button', { name: label('submit') }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
-    expect(onSubmit.mock.calls[0][0]).toEqual(
-      expect.objectContaining({
-        ...VALID_VALUES,
-        turnaroundDays: 2,
-      })
-    );
+    expect(onSubmit.mock.calls[0][0]).toEqual(expect.objectContaining(VALID_VALUES));
   });
 
   it('renders a honeypot field that is hidden from assistive tech and the tab order', () => {

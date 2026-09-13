@@ -246,16 +246,63 @@ describe('the provider landing page gets the same steps layout', () => {
     ).toBe('coclosetSteps');
   });
 
-  it('leaves the benefits and the two heroes to the stock components', () => {
+  it('leaves the two heroes to the stock components', () => {
     // There is no bespoke layout for these shapes. Claiming them would mean rendering
     // partner copy through a component built for different content, which is worse than
     // rendering it plainly in the Cocloset skin.
-    ['Benefits', 'Grow Your Dry Cleaning Business with CoCloset', 'Apply Now '].forEach(
-      sectionName => {
-        const section = { sectionName, sectionType: 'columns' };
-        expect(mapCoclosetSection(section)).toBe(section);
-      }
+    ['Grow Your Dry Cleaning Business with CoCloset', 'Apply Now '].forEach(sectionName => {
+      const section = { sectionName, sectionType: 'columns' };
+      expect(mapCoclosetSection(section)).toBe(section);
+    });
+  });
+
+  // `Benefits` USED to be in the list above. It no longer is: as of the become-a-partner
+  // redesign (2026-09-12), `benefits`/`Benefits` is a claimed name (see
+  // `describe('the become-a-partner page (2026-09-12 redesign)')` below), and this page's
+  // own `Benefits` section - same shape, same three benefits, verbatim - is claimed right
+  // along with it. See the long comment on `coclosetPartnerBenefits` in
+  // coclosetLandingSections.js for why that is an accepted, deliberate side effect rather
+  // than a bug.
+  it('now also retypes this page\'s own "Benefits" section to the shared partner-benefits layout', () => {
+    const section = { sectionName: 'Benefits', sectionType: 'columns' };
+    expect(mapCoclosetSection(section).sectionType).toBe('coclosetPartnerBenefits');
+  });
+});
+
+describe('the become-a-partner page (2026-09-12 redesign)', () => {
+  // Fixture section names from the live `become-a-partner` Console asset, fetched via the
+  // Asset Delivery API while building this page.
+  it.each([
+    ['partner-hero', 'coclosetPartnerHero'],
+    ['benefits', 'coclosetPartnerBenefits'],
+    ['faq', 'coclosetPartnerFaq'],
+    ['form', 'coclosetPartnerForm'],
+  ])('maps %s to %s', (sectionName, sectionType) => {
+    expect(mapCoclosetSection({ sectionName, sectionType: 'article' }).sectionType).toBe(
+      sectionType
     );
+  });
+
+  it('retypes the whole become-a-partner asset in one pass', () => {
+    const sections = [
+      { sectionName: 'partner-hero', sectionType: 'article' },
+      { sectionName: 'brand-description', sectionType: 'columns', numColumns: 2 },
+      { sectionName: 'benefits', sectionType: 'columns', numColumns: 3 },
+      { sectionName: 'faq', sectionType: 'article' },
+      { sectionName: 'form', sectionType: 'columns', numColumns: 2 },
+    ];
+    const mapped = mapCoclosetSections({ sections });
+
+    expect(mapped.sections.map(s => s.sectionType)).toEqual([
+      'coclosetPartnerHero',
+      // `brand-description` matches no bespoke name: the stock `columns` renderer with two
+      // blocks (image, title+text) already produces the "What is CoCloset?" layout, so it is
+      // deliberately left unclaimed.
+      'columns',
+      'coclosetPartnerBenefits',
+      'coclosetPartnerFaq',
+      'coclosetPartnerForm',
+    ]);
   });
 });
 
