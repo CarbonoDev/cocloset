@@ -50,7 +50,24 @@ const TEXT_CONTENT = [
 
 // Most fields are primitives but markdown is a bit special case.
 // It gets its own "components" mapping that it uses to render the markdown content
-const MarkdownField = ({ content, components }) => renderMarkdown(content, components);
+//
+// Cocloset: `className`/`rootClassName` used to be silently dropped here - this component
+// only ever destructured `content`/`components`, so every `<Field data={markdown}
+// className={css.something} />` call site across the app (and there are many, in every
+// bespoke Cocloset section that styles a block's body text) passed a class that never
+// reached the DOM. Confirmed via a real browser's computed styles while chasing a report
+// that a section's body copy didn't match its reference design (2026-09-14): the rendered
+// `<p>` had none of the color/weight/width the component's own CSS module declared. Several
+// components already had a `.foo > p { margin: 0 }` rule anticipating a wrapping element
+// that never existed - this wrapper is what makes those rules (and the class itself) finally
+// take effect, everywhere at once, rather than patching each call site's CSS to reach past a
+// non-existent parent.
+const MarkdownField = ({ content, components, className }) =>
+  className ? (
+    <div className={className}>{renderMarkdown(content, components)}</div>
+  ) : (
+    renderMarkdown(content, components)
+  );
 
 ///////////////////////////////////////////
 // Mapping of field types and components //

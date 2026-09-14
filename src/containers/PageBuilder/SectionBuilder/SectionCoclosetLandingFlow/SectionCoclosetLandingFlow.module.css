@@ -85,13 +85,25 @@
   margin: 0 0 8px 0;
 }
 
+/* This class carries the markdown Field's wrapper div (see the `MarkdownField` fix in
+   `src/containers/PageBuilder/Field/Field.js`, 2026-09-14 - before that fix, `className` was
+   silently dropped for every markdown-type field across the app). `color` is inherited, so
+   it's enough on the wrapper. `font-weight` and `max-width` are NOT: the actual text sits in
+   a nested `<p>` from the site's generic markdown-paragraph component, which composes
+   `marketplaceDefaultFontStyles` (Medium/500) - a property set on both an element and its
+   ancestor is decided by the two rules' order in the final stylesheet, not by nesting, and
+   that composed rule wins here. `max-width` additionally never inherits at all in CSS - the
+   `<p>` sets its own (`80ch`) regardless of what an ancestor declares. Both are therefore set
+   directly on `> p`, where they win outright as declarations on the element itself; confirmed
+   via computed style in a real browser, not just code review. */
 .stepBody {
   composes: marketplaceDefaultFontStyles from global;
   color: var(--coclosetInkMuted);
-  max-width: 300px;
   margin: 0 auto;
 }
 
 .stepBody > p {
+  font-weight: var(--fontWeightRegular);
+  max-width: 300px;
   margin: 0;
 }
