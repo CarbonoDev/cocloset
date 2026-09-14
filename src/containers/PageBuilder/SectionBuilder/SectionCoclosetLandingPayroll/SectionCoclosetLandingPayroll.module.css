@@ -1,0 +1,127 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  position: relative;
+  background-color: var(--coclosetCanvas);
+}
+
+/* Opaque, so it sits ON TOP of the section's own full-bleed background photo (rendered by
+   SectionContainer from `appearance`) rather than showing it through the title band - the
+   photo is only meant to show below this band, per the reference screenshot. */
+.titleBand {
+  position: relative;
+  background-color: var(--coclosetCanvas);
+  text-align: center;
+  padding: 40px 24px 28px 24px;
+
+  @media (--viewportLarge) {
+    padding: 56px 36px 36px 36px;
+  }
+}
+
+.headline {
+  font-family: var(--fontFamilyDisplay);
+  color: var(--coclosetPartnerTeal);
+  font-size: 30px;
+  line-height: 1.1;
+  margin: 0 0 8px 0;
+
+  @media (--viewportMedium) {
+    font-size: 44px;
+  }
+}
+
+.subtitle {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  margin: 0;
+}
+
+.subtitle > p {
+  margin: 0;
+}
+
+/* Transparent, so the full-bleed photo shows through behind the cards and the CTA. */
+.photoArea {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 28px;
+  padding: 32px 24px 40px 24px;
+  min-height: 320px;
+
+  @media (--viewportLarge) {
+    gap: 36px;
+    padding: 48px 36px 64px 36px;
+    min-height: 440px;
+  }
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  width: 100%;
+  max-width: var(--contentMaxWidthPages);
+
+  @media (--viewportMedium) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+}
+
+.card {
+  background-color: var(--coclosetSurface);
+  border-radius: var(--coclosetRadius);
+  box-shadow: var(--boxShadowPopup);
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.cardTitle {
+  composes: marketplaceDefaultFontStyles from global;
+  font-weight: var(--fontWeightBold);
+  color: var(--coclosetInk);
+  font-size: 18px;
+  margin: 0 0 8px 0;
+}
+
+.cardBody {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+}
+
+.cardBody > p {
+  margin: 0;
+}
+
+/* Same pink pill as SectionCoclosetLandingHero's CTA - duplicated rather than shared, per
+   this codebase's existing convention of each bespoke section owning its own CSS module
+   (see e.g. SectionCoclosetHero's .primaryAction vs SectionCoclosetPartnerForm's
+   .submitButton, two independent pill styles rather than a shared base). */
+.cta {
+  composes: marketplaceDefaultFontStyles from global;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 32px;
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetLandingRose);
+  color: var(--colorWhite);
+  font-weight: var(--fontWeightSemiBold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all var(--transitionStyleButton);
+}
+
+.cta:hover,
+.cta:focus {
+  background-color: var(--coclosetLandingRoseDark);
+  text-decoration: none;
+}

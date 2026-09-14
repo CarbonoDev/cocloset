@@ -163,6 +163,14 @@ export const submitLaundryPartnerApplication = body => {
   return post('/api/laundry-partner-application', body);
 };
 
+// The landing page's email-list signup ("CoCloset is coming soon to a city near you", the
+// `invite` section). Separate, parallel endpoint from the laundry-partner application above -
+// different fields, different destination. See server/api/email-signup.js for the accepted
+// fields and limits.
+export const submitEmailSignup = body => {
+  return post('/api/email-signup', body);
+};
+
 // The laundries as a PUBLIC name/id list, for the search page's pickup filter.
 //
 // A DIFFERENT ENDPOINT from `fetchLaundries` below, not the same one without a session.

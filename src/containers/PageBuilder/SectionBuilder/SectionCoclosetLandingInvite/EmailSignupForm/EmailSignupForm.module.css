@@ -1,0 +1,120 @@
+@import '../../../../../styles/customMediaQueries.css';
+
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.field {
+  margin-top: 18px;
+
+  &:first-child {
+    margin-top: 0;
+  }
+
+  @media (--viewportMedium) {
+    margin-top: 20px;
+  }
+}
+
+.error {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetToneCriticalFg);
+  margin-top: 20px;
+  margin-bottom: 0;
+}
+
+/* The consent checkbox + its fine print. Given its own margin here - FieldCheckbox's own
+   `.root` sets none - and a smaller line height because the label text runs to several lines
+   of legal copy, unlike a normal one-line checkbox option. */
+.consent {
+  margin-top: 20px;
+}
+
+.consentText {
+  composes: textSmall from global;
+  color: var(--coclosetInkMuted);
+  line-height: 1.4;
+}
+
+.privacyLink {
+  color: var(--coclosetInk);
+  text-decoration: underline;
+}
+
+.privacyLink:hover,
+.privacyLink:focus {
+  color: var(--coclosetPartnerTeal);
+}
+
+/* Same pill treatment as PartnerApplicationForm's submit button (see the long note there on
+   why `rootClassName` and not `className`) - duplicated rather than shared as a base, per
+   this codebase's convention of each form owning its own button styling. */
+.submitButton {
+  composes: marketplaceDefaultFontStyles from global;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  min-height: 48px;
+  width: 100%;
+  margin-top: 24px;
+  padding: 0 28px;
+  border: 1px solid var(--coclosetLandingRose);
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetLandingRose);
+  color: var(--colorWhite);
+  font-weight: var(--fontWeightSemiBold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transitionStyleButton);
+
+  @media (--viewportMedium) {
+    margin-top: 28px;
+  }
+}
+
+.submitButton:hover,
+.submitButton:focus {
+  background-color: var(--coclosetLandingRoseDark);
+  border-color: var(--coclosetLandingRoseDark);
+  text-decoration: none;
+  outline: none;
+}
+
+.submitButton:focus-visible {
+  outline: 2px solid var(--coclosetLandingRose);
+  outline-offset: 3px;
+}
+
+.submitButton:disabled {
+  background-color: var(--coclosetSubtle);
+  border-color: var(--coclosetBorder);
+  color: var(--coclosetInkMuted);
+  cursor: default;
+}
+
+.submitButton:disabled:hover {
+  background-color: var(--coclosetSubtle);
+  border-color: var(--coclosetBorder);
+}
+
+.submitSpinner {
+  width: 24px;
+  height: 24px;
+  stroke: var(--colorWhite);
+}
+
+/* Honeypot wrapper - moved off-screen rather than `display: none`, see the identical note in
+   PartnerApplicationForm.module.css. */
+.honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

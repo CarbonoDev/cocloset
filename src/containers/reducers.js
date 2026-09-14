@@ -17,6 +17,7 @@ import ManageListingsPage from './ManageListingsPage/ManageListingsPage.duck';
 import PasswordChangePage from './PasswordChangePage/PasswordChangePage.duck';
 import PasswordRecoveryPage from './PasswordRecoveryPage/PasswordRecoveryPage.duck';
 import PasswordResetPage from './PasswordResetPage/PasswordResetPage.duck';
+import landingInviteForm from './PageBuilder/SectionBuilder/SectionCoclosetLandingInvite/SectionCoclosetLandingInvite.duck';
 import partnerApplicationForm from './PageBuilder/SectionBuilder/SectionCoclosetPartnerForm/SectionCoclosetPartnerForm.duck';
 import PaymentMethodsPage from './PaymentMethodsPage/PaymentMethodsPage.duck';
 import ManageAccountPage from './ManageAccountPage/ManageAccountPage.duck';
@@ -42,6 +43,7 @@ export {
   PasswordChangePage,
   PasswordRecoveryPage,
   PasswordResetPage,
+  landingInviteForm,
   partnerApplicationForm,
   PaymentMethodsPage,
   ManageAccountPage,

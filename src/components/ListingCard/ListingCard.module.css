@@ -159,9 +159,14 @@
 /* ⚠️ Clamped at two lines, and that is load-bearing rather than cosmetic: the carousel sets
    its container height in JS (calculateCarouselHeight in SectionListings.js) from an estimate
    that assumes exactly this. A third line would be clipped, not scrolled. */
+/* NOT `--fontFamilyDisplay`: the reference screenshot's garment title is a plain sans-serif,
+   the same family as the rest of the card's small print - `marketplaceDefaultFontStyles`
+   already sets that, this class only needs to make it bigger and bolder. An earlier version
+   of this rule re-set the family to the site's display serif, which is what the site's
+   article/section headings use, not a card title (found by comparing the rendered carousel
+   against the reference screenshot). */
 .editorialTitle {
   composes: marketplaceDefaultFontStyles from global;
-  font-family: var(--fontFamilyDisplay);
   font-size: 17px;
   line-height: 20px;
   font-weight: var(--fontWeightSemiBold);
@@ -178,11 +183,20 @@
 .editorialPrice {
   composes: marketplaceDefaultFontStyles from global;
   font-weight: var(--fontWeightSemiBold);
-  color: var(--coclosetInk);
+  color: var(--coclosetInkMuted);
   margin: 0;
   padding: 0;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* The "$50" in "From $50": `.priceValue`/`.perUnit` normally inherit `--marketplaceColor`
+   (the template's stock purple, see ListingCard.module.css above) - fine for the default
+   card, but nothing like the reference screenshot's coral price on the editorial one. Scoped
+   to `.editorialPrice` so the default (non-editorial) card elsewhere is untouched. */
+.editorialPrice .priceValue,
+.editorialPrice .perUnit {
+  color: var(--coclosetBrand);
 }
 
 .editorialMeta {

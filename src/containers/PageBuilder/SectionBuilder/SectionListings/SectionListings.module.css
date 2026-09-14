@@ -1,5 +1,30 @@
 @import '../../../../styles/customMediaQueries.css';
 
+/* Cocloset: this section's own header styling - see the comment in SectionListings.js on why
+   this isn't the shared coclosetSkin. Sized to match the other landing-page section titles
+   ("How it Works", "Partner Benefits", "FAQ"), which the reference screenshots set noticeably
+   larger than the skin's own 28-34px default. */
+.header {
+  margin-bottom: 8px;
+}
+
+.title {
+  font-family: var(--fontFamilyDisplay);
+  color: var(--coclosetInk);
+  font-size: 36px;
+  line-height: 1.1;
+
+  @media (--viewportMedium) {
+    font-size: 56px;
+  }
+}
+
+.description {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin-top: 12px;
+}
+
 .carouselContainer {
   display: flex;
   position: relative;
