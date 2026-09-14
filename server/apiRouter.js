@@ -17,6 +17,7 @@ const initiatePrivileged = require('./api/initiate-privileged');
 const transitionPrivileged = require('./api/transition-privileged');
 const deleteAccount = require('./api/delete-account');
 const laundryPartnerApplication = require('./api/laundry-partner-application');
+const emailSignup = require('./api/email-signup');
 const laundries = require('./api/laundries');
 const laundryOptions = require('./api/laundry-options');
 const brands = require('./api/brands');
@@ -152,6 +153,11 @@ router.post('/init-user-role', initUserRole);
 // The handler never builds a Marketplace or Integration API SDK, so it cannot touch
 // marketplace data. See server/api/laundry-partner-application.js.
 router.post('/laundry-partner-application', laundryPartnerApplication);
+
+// Public, unauthenticated: the landing page's email-list signup form (the `invite` section).
+// Same shape as laundry-partner-application above, own rate limiter, own delivery channel.
+// See server/api/email-signup.js.
+router.post('/email-signup', emailSignup);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed
