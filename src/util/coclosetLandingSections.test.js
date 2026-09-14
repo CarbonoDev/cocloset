@@ -308,6 +308,53 @@ describe('the become-a-partner page (2026-09-12 redesign)', () => {
   });
 });
 
+describe('the main landing page (2026-09-13 visual refresh)', () => {
+  // Fixture section names from the live `landing-page` Console asset, fetched via the Asset
+  // Delivery API while building this refresh.
+  it.each([
+    ['landing-hero', 'coclosetLandingHero'],
+    ['flow-section', 'coclosetLandingFlow'],
+    ['steps', 'coclosetLandingPayroll'],
+    ['invite', 'coclosetLandingInvite'],
+  ])('maps %s to %s', (sectionName, sectionType) => {
+    expect(mapCoclosetSection({ sectionName, sectionType: 'columns' }).sectionType).toBe(
+      sectionType
+    );
+  });
+
+  // THE COLLISION THIS MODULE IS DELIBERATELY AVOIDING. Console's section is literally named
+  // `steps`, which is also the exact word `coclosetSteps` (the numbered how-it-works list,
+  // claimed by `guide`/`How it works`) answers to. If `steps` were ever added to that type's
+  // name list instead of getting its own, the garment-owner payroll pitch would render
+  // through a numbered-list component built for different content and lose its photo
+  // entirely - see the long comment on `coclosetLandingPayroll` above.
+  it('does NOT let the `steps` name collide with the numbered-steps component', () => {
+    const mapped = mapCoclosetSection({ sectionName: 'steps', sectionType: 'columns' });
+    expect(mapped.sectionType).toBe('coclosetLandingPayroll');
+    expect(mapped.sectionType).not.toBe('coclosetSteps');
+  });
+
+  it('retypes the whole landing-page asset in one pass', () => {
+    const sections = [
+      { sectionName: 'landing-hero', sectionType: 'article' },
+      { sectionName: 'flow-section', sectionType: 'columns', numColumns: 3 },
+      { sectionName: 'listings', sectionType: 'listings' },
+      { sectionName: 'steps', sectionType: 'columns', numColumns: 3 },
+      { sectionName: 'invite', sectionType: 'columns', numColumns: 2 },
+    ];
+    const mapped = mapCoclosetSections({ sections });
+
+    expect(mapped.sections.map(s => s.sectionType)).toEqual([
+      'coclosetLandingHero',
+      'coclosetLandingFlow',
+      // `listings` is already its own type in Console and needs no entry in this module.
+      'listings',
+      'coclosetLandingPayroll',
+      'coclosetLandingInvite',
+    ]);
+  });
+});
+
 describe('mapCoclosetSections over a whole asset', () => {
   it('retypes exactly the four claimed sections and no others', () => {
     const mapped = mapCoclosetSections({

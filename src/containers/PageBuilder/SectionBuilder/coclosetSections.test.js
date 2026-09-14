@@ -9,6 +9,9 @@ import SectionCoclosetSteps from './SectionCoclosetSteps';
 import SectionCoclosetPartnerHero from './SectionCoclosetPartnerHero';
 import SectionCoclosetPartnerBenefits from './SectionCoclosetPartnerBenefits';
 import SectionCoclosetPartnerFaq from './SectionCoclosetPartnerFaq';
+import SectionCoclosetLandingHero from './SectionCoclosetLandingHero';
+import SectionCoclosetLandingFlow from './SectionCoclosetLandingFlow';
+import SectionCoclosetLandingPayroll from './SectionCoclosetLandingPayroll';
 
 const { screen } = testingLibrary;
 
@@ -429,5 +432,181 @@ describe('SectionCoclosetPartnerFaq', () => {
 
   it('survives an empty section', () => {
     expect(() => renderSection(SectionCoclosetPartnerFaq, { blocks: [] })).not.toThrow();
+  });
+});
+
+// ===========================================================================
+// Main landing page (2026-09-13 visual refresh). Fixtures below are trimmed from the live
+// `landing-page` Console asset, fetched via the Asset Delivery API while building this page -
+// same approach as the fixtures above.
+// ===========================================================================
+
+describe('SectionCoclosetLandingHero', () => {
+  const heroProps = (overrides = {}) => ({
+    title: { content: 'The shared closet on your corner.', fieldType: 'heading2' },
+    description: {
+      fieldType: 'paragraph',
+      content:
+        'Rent standout looks from stylish neighbors, picked up fresh and clean at your local dry cleaner. No shipping, no scheduling meetups, and zero hassles.',
+    },
+    callToAction: { fieldType: 'internalButtonLink', content: 'BROWSE LISTINGS', href: '/s' },
+    blocks: [
+      { blockName: 'hero-img', media: { fieldType: 'none' } },
+      { blockName: 'hero-img', media: { fieldType: 'none' } },
+      { blockName: 'hero-img', media: { fieldType: 'none' } },
+      { blockName: 'hero-img', media: { fieldType: 'none' } },
+    ],
+    ...overrides,
+  });
+
+  it('renders the headline, the standfirst and the CTA', () => {
+    renderSection(SectionCoclosetLandingHero, heroProps());
+
+    expect(screen.getByText('The shared closet on your corner.')).toBeInTheDocument();
+    expect(screen.getByText(/zero hassles/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'BROWSE LISTINGS' })).toHaveAttribute('href', '/s');
+  });
+
+  it('survives an empty section', () => {
+    expect(() =>
+      renderSection(SectionCoclosetLandingHero, {
+        title: { fieldType: 'heading2' },
+        description: { fieldType: 'paragraph' },
+        callToAction: { fieldType: 'none' },
+        blocks: [],
+      })
+    ).not.toThrow();
+  });
+});
+
+describe('SectionCoclosetLandingFlow', () => {
+  const flowProps = () => ({
+    title: { content: 'How it Works', fieldType: 'heading2' },
+    description: { fieldType: 'paragraph' },
+    blocks: [
+      {
+        blockName: 'flow-block',
+        media: { fieldType: 'none' },
+        title: { content: '1. Find your style', fieldType: 'heading3' },
+        text: {
+          fieldType: 'markdown',
+          content: 'Browse closets in your area, filter by size, occasion, or vibe, and reserve.',
+        },
+      },
+      {
+        blockName: 'flow-block',
+        media: { fieldType: 'none' },
+        title: { content: '2. Pick up at the local dry cleaners', fieldType: 'heading3' },
+        text: {
+          fieldType: 'markdown',
+          content: 'Collect your item —freshly cleaned & pressed— from a partner dry cleaner.',
+        },
+      },
+      {
+        blockName: 'flow-block',
+        media: { fieldType: 'none' },
+        title: { content: '3. Enjoy your outfit!', fieldType: 'heading3' },
+        text: {
+          fieldType: 'markdown',
+          content: 'Live in it. Photograph it. Then drop it back off at the dry cleaner.',
+        },
+      },
+    ],
+  });
+
+  it('renders the section title as a real heading, not a small eyebrow', () => {
+    renderSection(SectionCoclosetLandingFlow, flowProps());
+    expect(screen.getByRole('heading', { name: 'How it Works' })).toBeInTheDocument();
+  });
+
+  it('prints each step title exactly as authored, numeral included', () => {
+    renderSection(SectionCoclosetLandingFlow, flowProps());
+
+    expect(screen.getByText('1. Find your style')).toBeInTheDocument();
+    expect(screen.getByText('2. Pick up at the local dry cleaners')).toBeInTheDocument();
+    expect(screen.getByText('3. Enjoy your outfit!')).toBeInTheDocument();
+  });
+
+  it('renders all three step bodies', () => {
+    renderSection(SectionCoclosetLandingFlow, flowProps());
+    expect(screen.getByText(/filter by size, occasion, or vibe/)).toBeInTheDocument();
+    expect(screen.getByText(/freshly cleaned & pressed/)).toBeInTheDocument();
+    expect(screen.getByText(/drop it back off at the dry cleaner/)).toBeInTheDocument();
+  });
+
+  it('is an ordered list, because these are ordered steps', () => {
+    renderSection(SectionCoclosetLandingFlow, flowProps());
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  it('survives an empty section', () => {
+    expect(() => renderSection(SectionCoclosetLandingFlow, { blocks: [] })).not.toThrow();
+  });
+});
+
+describe('SectionCoclosetLandingPayroll', () => {
+  const payrollProps = (overrides = {}) => ({
+    title: { content: 'Put your closet on payroll.', fieldType: 'heading2' },
+    // The live asset really does duplicate the title here instead of the screenshot's own
+    // subtitle - a Console content bug this component renders verbatim. See the activity log.
+    description: { fieldType: 'paragraph', content: 'Put your closet on payroll.' },
+    callToAction: { fieldType: 'internalButtonLink', content: 'START LISTING', href: '/l/new' },
+    appearance: { fieldType: 'defaultAppearance' },
+    blocks: [
+      {
+        blockName: 'step-block',
+        title: { content: 'Recoup Your Retail Cost', fieldType: 'heading3' },
+        text: {
+          fieldType: 'markdown',
+          content: 'Most pieces pay for themselves in just 3 rentals— everything after that is pure profit.',
+        },
+      },
+      {
+        blockName: 'step-block',
+        title: { content: 'Expert Garment Care', fieldType: 'heading3' },
+        text: {
+          fieldType: 'markdown',
+          content: 'Keep clothes in optimal condition with professional cleaning between rentals.',
+        },
+      },
+      {
+        blockName: 'step-block',
+        title: { content: 'Hassle-Free Handoffs', fieldType: 'heading3' },
+        text: {
+          fieldType: 'markdown',
+          content: 'Drop it off once—we handle every rental, cleaning, and handoff after that.',
+        },
+      },
+    ],
+    ...overrides,
+  });
+
+  it('renders the title band and the CTA', () => {
+    renderSection(SectionCoclosetLandingPayroll, payrollProps());
+
+    // The live asset duplicates "Put your closet on payroll." into both the title and the
+    // description fields (see the fixture's own comment) - this component renders both
+    // verbatim, so both appear, hence `getAllByText` rather than `getByText`.
+    expect(screen.getAllByText('Put your closet on payroll.')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'START LISTING' })).toHaveAttribute('href', '/l/new');
+  });
+
+  it('renders all three benefit cards', () => {
+    renderSection(SectionCoclosetLandingPayroll, payrollProps());
+
+    expect(screen.getByText('Recoup Your Retail Cost')).toBeInTheDocument();
+    expect(screen.getByText('Expert Garment Care')).toBeInTheDocument();
+    expect(screen.getByText('Hassle-Free Handoffs')).toBeInTheDocument();
+  });
+
+  it('survives an empty section', () => {
+    expect(() =>
+      renderSection(SectionCoclosetLandingPayroll, {
+        title: { fieldType: 'heading2' },
+        description: { fieldType: 'paragraph' },
+        callToAction: { fieldType: 'none' },
+        blocks: [],
+      })
+    ).not.toThrow();
   });
 });

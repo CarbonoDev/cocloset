@@ -1,0 +1,127 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  background-color: var(--coclosetCanvas);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  padding: 40px 24px 48px 24px;
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+
+  @media (--viewportLarge) {
+    grid-template-columns: 1.1fr 1fr;
+    align-items: center;
+    gap: 48px;
+    padding: 88px 36px 96px 36px;
+  }
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.headline {
+  font-family: var(--fontFamilyDisplay);
+  color: var(--coclosetPartnerTeal);
+  font-size: 38px;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  margin: 0 0 20px 0;
+  max-width: 460px;
+
+  @media (--viewportMedium) {
+    font-size: 52px;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 46px;
+  }
+
+  @media (--viewportLargeWithPaddings) {
+    font-size: 54px;
+  }
+}
+
+.standfirst {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  max-width: 420px;
+  margin: 0 0 32px 0;
+}
+
+.standfirst > p {
+  margin: 0;
+}
+
+/* The pink pill. --coclosetLandingRose is scoped to this refresh's screenshots, not the
+   site-wide --coclosetBrand terracotta used everywhere else. */
+.cta {
+  composes: marketplaceDefaultFontStyles from global;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 32px;
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetLandingRose);
+  color: var(--colorWhite);
+  font-weight: var(--fontWeightSemiBold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all var(--transitionStyleButton);
+}
+
+.cta:hover,
+.cta:focus {
+  background-color: var(--coclosetLandingRoseDark);
+  text-decoration: none;
+}
+
+/* THE ASYMMETRIC PHOTO COLLAGE.
+ *
+ * A plain 2x2 grid, each tile forced to a 3:4 portrait box regardless of the source photo's
+ * own proportions (see .collageMedia below) - the four `hero-img` blocks carry no layout hint
+ * of their own, just images, so the grid shape lives entirely in this CSS. The second column
+ * is nudged up at the wide breakpoint to read as a staggered collage rather than a flat grid,
+ * matching the reference screenshot; an exact pixel match of that screenshot's grid isn't the
+ * goal, reading as "a compact collage, not 4 stacked rows" is.
+ */
+.collage {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.collageItem {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  aspect-ratio: 3 / 4;
+}
+
+@media (--viewportLarge) {
+  .collageItem:nth-child(2),
+  .collageItem:nth-child(4) {
+    margin-top: -44px;
+  }
+}
+
+/* FieldImage's own AspectRatioWrapper sizes its wrapper from the source image's NATURAL
+   aspect ratio (an inline padding-bottom % on an inner spacer div), which would fight the
+   fixed 3:4 box above. Its absolutely-positioned inner box (.aspectBox in
+   AspectRatioWrapper.module.css) already stretches to fill WHATEVER height this wrapper ends
+   up with, so forcing that one number - the wrapper's own height - to match .collageItem is
+   enough to make the image fill the 3:4 box and get cropped by object-fit: cover. There is no
+   `height` declared on AspectRatioWrapper's own `.root` to begin with, so this does not need
+   `!important` to win a cascade fight - it is simply the only rule that sets the property. */
+.collageMedia {
+  height: 100%;
+}

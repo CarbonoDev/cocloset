@@ -347,6 +347,25 @@
    */
   --coclosetPartnerTeal: #3d6b5c;
   --coclosetPartnerTealDark: #2c4f43;
+
+  /**
+   * PAGE-SCOPED ACCENTS for the main landing page's 2026-09-13 visual refresh.
+   *
+   * `--coclosetLandingRose` is the dusty-rose CTA pill in the reference screenshots
+   * ("BROWSE LISTINGS", "START LISTING", "SIGN UP") - sampled by eye from those screenshots,
+   * and NOT the same hue as --coclosetBrand's warm terracotta used for buttons elsewhere on
+   * the site. Kept as its own token rather than repurposing --coclosetBrand* for the same
+   * reason as the partner teal above: one page's palette should never silently reskin every
+   * other page that reads the brand tokens.
+   *
+   * The headline/section teal in the SAME screenshots (hero headline, "Put your closet on
+   * payroll.", the icon badges) reads as the same deep forest/teal green already captured by
+   * --coclosetPartnerTeal/--coclosetPartnerTealDark above (become-a-partner, 2026-09-12) -
+   * reused rather than duplicated, since sampling both independently landed on
+   * indistinguishable values.
+   */
+  --coclosetLandingRose: #c98a90;
+  --coclosetLandingRoseDark: #b06b72;
 }
 
 /* ================ Global element styles ================ */

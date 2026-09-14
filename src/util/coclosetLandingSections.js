@@ -104,6 +104,32 @@ export const SECTION_NAMES_BY_TYPE = {
   coclosetPartnerBenefits: ['benefits'],
   coclosetPartnerFaq: ['faq'],
   coclosetPartnerForm: ['form'],
+
+  // Main landing page (2026-09-13 visual refresh). Five sections; `listings` (New Arrivals)
+  // already renders correctly through the stock `listings` type/component above and needs no
+  // entry here.
+  //
+  // NAME VS CONCEPT, ONE MORE TIME. `steps` is the Console NAME of the "Put your closet on
+  // payroll." garment-owner pitch (screenshots: cream title band, then a full-bleed photo of
+  // a closet with three cards and a CTA overlaid on it) - it is NOT the numbered how-it-works
+  // list, despite the name being exactly the word `coclosetSteps` above answers to. Mapping
+  // it to `coclosetSteps` would render a garment-owner pitch through a numbered-list
+  // component and lose the photo entirely. It gets its own type,
+  // `coclosetLandingPayroll`, so the two can never collide even if a future Console rename
+  // makes the coincidence worse.
+  //
+  // `flow-section` (the icon-illustrated "How it Works") is ALSO deliberately its own type,
+  // `coclosetLandingFlow`, rather than added to `coclosetSteps`'s name list. `coclosetSteps`
+  // (below, claimed by `guide`/`How it works`) renders a numeral-in-title, no-media, small-
+  // eyebrow-header shape still live on /p/provider_landing_page; `flow-section`'s content
+  // shape is different in every dimension that component assumes (a real icon image per
+  // block, the numeral folded into the title text itself, a large centered display heading
+  // rather than a small eyebrow). Bending one component to both shapes risked breaking the
+  // page that already depends on the old one for a saving that is one lookup entry.
+  coclosetLandingHero: ['landing-hero'],
+  coclosetLandingFlow: ['flow-section'],
+  coclosetLandingPayroll: ['steps'],
+  coclosetLandingInvite: ['invite'],
 };
 
 // A Map rather than an object, and not only for taste: a plain object would answer
