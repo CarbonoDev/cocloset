@@ -82,6 +82,10 @@ export const FavoritesPageComponent = props => {
               aspectWidth={aspectWidth}
               aspectHeight={aspectHeight}
               variantPrefix={variantPrefix}
+              // Cocloset: same editorial card as the search grid (see the comment on the
+              // SearchResultsPanel call site) - one card design across every real browsing
+              // surface, per the client's design.
+              variant="editorial"
               showFavorite
             />
           </li>

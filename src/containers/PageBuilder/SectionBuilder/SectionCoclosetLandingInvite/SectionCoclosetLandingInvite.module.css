@@ -26,15 +26,19 @@
   color: var(--colorWhite);
 }
 
+/* Sized to match the hero headline's scale (both are a two-line display-serif headline in a
+   similarly narrow column) rather than a plain section title - the reference screenshot sets
+   this noticeably larger than the original 30-38px. */
 .headline {
   font-family: var(--fontFamilyDisplay);
   color: var(--colorWhite);
-  font-size: 30px;
-  line-height: 1.15;
+  font-size: 32px;
+  line-height: 1.1;
   margin: 0 0 16px 0;
+  max-width: 420px;
 
   @media (--viewportMedium) {
-    font-size: 38px;
+    font-size: 46px;
   }
 }
 

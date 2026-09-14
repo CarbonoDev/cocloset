@@ -364,9 +364,17 @@ const SectionListings = props => {
       appearance={appearance}
     >
       {hasHeaderFields ? (
-        <header className={defaultClasses.sectionDetails}>
-          <Field data={title} className={defaultClasses.title} options={fieldOptions} />
-          <Field data={description} className={defaultClasses.description} options={fieldOptions} />
+        <header className={classNames(defaultClasses.sectionDetails, css.header)}>
+          {/* Cocloset: `listings` is a native sectionType, not name-matched through
+              coclosetLandingSections.js, so it never goes through withCoclosetSkin and
+              `defaultClasses.title` here is SectionBuilder's own small stock default - not
+              the Cocloset skin used everywhere else on a hosted page. `css.title` is this
+              component's own large centered serif, sized to match the other landing-page
+              section headers (2026-09-14) rather than reusing the shared skin, since a
+              future `listings` section on a plainer page shouldn't inherit a hero-scale
+              header just because this carousel wants one. */}
+          <Field data={title} className={classNames(defaultClasses.title, css.title)} options={fieldOptions} />
+          <Field data={description} className={classNames(defaultClasses.description, css.description)} options={fieldOptions} />
           <Field data={callToAction} className={defaultClasses.ctaButton} options={fieldOptions} />
         </header>
       ) : null}

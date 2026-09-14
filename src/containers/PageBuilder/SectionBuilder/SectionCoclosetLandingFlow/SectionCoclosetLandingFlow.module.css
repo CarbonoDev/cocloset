@@ -27,15 +27,18 @@
   }
 }
 
+/* Sized off the reference screenshot, which sets this considerably larger (~56-60px on
+   desktop) than a typical hosted-page section header - the same lesson already learned on
+   the become-a-partner page's Benefits/FAQ titles. */
 .sectionTitle {
   font-family: var(--fontFamilyDisplay);
   color: var(--coclosetInk);
-  font-size: 32px;
+  font-size: 36px;
   line-height: 1.1;
   margin: 0;
 
   @media (--viewportMedium) {
-    font-size: 44px;
+    font-size: 56px;
   }
 }
 
