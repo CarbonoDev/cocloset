@@ -546,7 +546,7 @@ exports.resolveCleaningFeeInSubunits = (listing, currency) => {
  * @returns {Promise<number>} special-handling fee amount in the currency's subunits
  */
 exports.resolveSpecialHandlingFeeInSubunits = (listing, currency) => {
-  const listingId = listing?.id;
+  const listingId = listing?.id.uuid;
   if (!listingId) {
     return Promise.resolve(0);
   }
