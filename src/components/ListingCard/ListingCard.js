@@ -103,24 +103,21 @@ const ListingCardImage = props => {
  * all of them are absent on some real listing.
  *
  * `assignedLaundryName` is the collection point: server-written when a laundry is assigned
+ * `pickupNeighborhood` checks whether a listing has been assigned a neighborhood; if not, skip it.
  * (see server/api-util/laundryAssignment.js), and the same name the listing page shows.
  */
 const EditorialInfo = props => {
   const { listing, titleFormatted, showPrice, priceMessage, priceTooltip, darkMode } = props;
-  const { brand, size, assignedLaundryName, pickupNeighborhood } = listing?.attributes?.publicData || {};
+  const { brand, size, pickupNeighborhood } = listing?.attributes?.publicData || {};
 
   const meta = [
     size ? <FormattedMessage key="size" id="ListingCard.editorialSize" values={{ size }} /> : null,
-    assignedLaundryName ? (
+    pickupNeighborhood ? (
       <FormattedMessage
         key="pickup"
-        id={
-          pickupNeighborhood
-            ? 'ListingCard.editorialPickupWithNeighborhood'
-            : 'ListingCard.editorialPickup'
-        }
+        id={'ListingCard.editorialPickupWithNeighborhood'}
 
-        values={{ name: assignedLaundryName, neighborhood: pickupNeighborhood }}
+        values={{ neighborhood: pickupNeighborhood }}
       />
     ) : null,
   ].filter(Boolean);
