@@ -897,6 +897,131 @@ describe('Duck', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  //   > "Puedes revisar lo necesario para que en una listing card, solo se muestre 'Pickup
+  //   >  today' solo si realmente puedo reservar a partir de hoy? Es muy confuso para el
+  //   >  usuario si se muestra ese tag pero realmente no puedo reservar hoy" (Jonathan,
+  //   >  2026-09-19)
+  //
+  // An ordinary (non-pickupToday) search still has to tell the CARD which of its results are
+  // genuinely bookable today, so the badge (util/searchCleaningFloor.js's isPickupTodayListing,
+  // metadata-only) can be corrected the same way the listing page's badge already is. Unlike
+  // that page, a search results grid has no per-listing real calendar already in hand - so
+  // this is a bounded, ids-scoped follow-up query instead.
+  // -------------------------------------------------------------------------
+  describe("the card's pickup-today verification (non-filtered search)", () => {
+    const withDatesFilter = {
+      ...config,
+      search: {
+        ...config.search,
+        defaultFilters: [
+          ...(config.search?.defaultFilters || []).filter(f => f.key !== 'dates'),
+          { key: 'dates', schemaType: 'dates', availability: 'time-full', dateRangeMode: 'day' },
+        ],
+      },
+    };
+
+    it('asks a second, ids-scoped query only for the onLaundry candidates, and trusts its answer', () => {
+      const onLaundryFree = createListing('on-laundry-free', { metadata: { onLaundry: true } });
+      const onLaundryBusy = createListing('on-laundry-busy', { metadata: { onLaundry: true } });
+      const notOnLaundry = createListing('not-on-laundry', { metadata: { onLaundry: false } });
+
+      const query = jest
+        .fn()
+        // The main search.
+        .mockImplementationOnce(() =>
+          Promise.resolve(fakeResponse([onLaundryFree, onLaundryBusy, notOnLaundry]))
+        )
+        // The verification pass - only one of the two onLaundry listings actually has a real
+        // window free today.
+        .mockImplementationOnce(() => Promise.resolve(fakeResponse([onLaundryFree])));
+
+      const getState = () => ({
+        ...initialState,
+        user: { currentUser },
+        auth: { isAuthenticated: true },
+      });
+      const sdk = {
+        currentUser: { show: sdkFn(fakeResponse(currentUser)) },
+        listings: { query },
+        authInfo: sdkFn({}),
+      };
+      const dispatch = createFakeDispatch(getState, sdk);
+
+      return dispatch(
+        searchListings({ searchParams: { perPage: 24 }, config: withDatesFilter })
+      ).then(result => {
+        expect(query).toHaveBeenCalledTimes(2);
+        const verifyCallParams = query.mock.calls[1][0];
+        // Scoped to the candidates, not the whole page.
+        expect(verifyCallParams.ids.map(id => id.uuid).sort()).toEqual(
+          ['on-laundry-busy', 'on-laundry-free'].sort()
+        );
+        expect(verifyCallParams.availability).toBe('time-partial');
+
+        // The search's own results are untouched (this is a badge signal, not a filter) - all
+        // three listings still come back.
+        expect(result.payload.data.data.map(l => l.id.uuid).sort()).toEqual(
+          ['not-on-laundry', 'on-laundry-busy', 'on-laundry-free'].sort()
+        );
+        // Only the one the verification query actually confirmed.
+        expect(result.payload.pickupTodayIds).toEqual(['on-laundry-free']);
+      });
+    });
+
+    it('skips the second query entirely when nothing on the page is onLaundry', () => {
+      const query = jest.fn(() =>
+        Promise.resolve(fakeResponse([createListing('l', { metadata: { onLaundry: false } })]))
+      );
+      const getState = () => ({
+        ...initialState,
+        user: { currentUser },
+        auth: { isAuthenticated: true },
+      });
+      const sdk = {
+        currentUser: { show: sdkFn(fakeResponse(currentUser)) },
+        listings: { query },
+        authInfo: sdkFn({}),
+      };
+      const dispatch = createFakeDispatch(getState, sdk);
+
+      return dispatch(
+        searchListings({ searchParams: { perPage: 24 }, config: withDatesFilter })
+      ).then(result => {
+        expect(query).toHaveBeenCalledTimes(1);
+        expect(result.payload.pickupTodayIds).toEqual([]);
+      });
+    });
+
+    it('fails closed: nobody gets the badge if the verification query itself fails', () => {
+      const onLaundry = createListing('on-laundry', { metadata: { onLaundry: true } });
+      const query = jest
+        .fn()
+        .mockImplementationOnce(() => Promise.resolve(fakeResponse([onLaundry])))
+        .mockImplementationOnce(() => Promise.reject(new Error('boom')));
+
+      const getState = () => ({
+        ...initialState,
+        user: { currentUser },
+        auth: { isAuthenticated: true },
+      });
+      const sdk = {
+        currentUser: { show: sdkFn(fakeResponse(currentUser)) },
+        listings: { query },
+        authInfo: sdkFn({}),
+      };
+      const dispatch = createFakeDispatch(getState, sdk);
+
+      return dispatch(
+        searchListings({ searchParams: { perPage: 24 }, config: withDatesFilter })
+      ).then(result => {
+        // The search itself still succeeds - a broken verification must not break the page.
+        expect(result.payload.data.data.map(l => l.id.uuid)).toEqual(['on-laundry']);
+        expect(result.payload.pickupTodayIds).toEqual([]);
+      });
+    });
+  });
+
   it('loadData() for full viewing rights user loads listings', () => {
     const getState = () => ({
       ...initialState,
@@ -947,7 +1072,10 @@ describe('Duck', () => {
 
       // Third action should be searchListings.fulfilled
       expect(actions[2].type).toBe('SearchPage/searchListings/fulfilled');
-      expect(actions[2].payload).toEqual(fakeResponse([l1, l2]));
+      // Neither l1 nor l2 is onLaundry, so the pickup-today verification pass has nothing to
+      // check and resolves to an empty list without an extra query - see its own describe
+      // block below for that behaviour.
+      expect(actions[2].payload).toEqual({ ...fakeResponse([l1, l2]), pickupTodayIds: [] });
     });
   });
 

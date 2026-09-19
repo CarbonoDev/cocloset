@@ -227,6 +227,10 @@ export const ListingCard = props => {
     // card in a positioning element, which is a change to the root of every card on every
     // screen. Defaulting to false keeps the markup byte-identical wherever nobody asked.
     showFavorite = false,
+    // Cocloset: the real, verified answer to "is this bookable starting today" - see the
+    // comment beside showPickupToday for why this overrides rather than supplements the
+    // metadata-only approximation when a caller has it.
+    pickupTodayVerified,
   } = props;
 
   const isEditorial = variant === 'editorial';
@@ -253,9 +257,22 @@ export const ListingCard = props => {
   //   > "la tag debe ser mostrada para los listings que esten en laundry y que esten
   //   >  disponibles para hoy" (Jonathan, 2026-09-11)
   //
-  // See util/searchCleaningFloor.js's isPickupTodayListing for what this does and does not
-  // guarantee - it reads only what a search-response listing already carries.
-  const showPickupToday = isPickupTodayListing(listing);
+  //   > "Puedes revisar lo necesario para que en una listing card, solo se muestre 'Pickup
+  //   >  today' solo si realmente puedo reservar a partir de hoy? Es muy confuso para el
+  //   >  usuario si se muestra ese tag pero realmente no puedo reservar hoy" (Jonathan,
+  //   >  2026-09-19)
+  //
+  // `pickupTodayVerified` is the real answer, computed once per search results page by a
+  // bounded, ids-scoped availability query (SearchPage.duck.js) - not per card. When a caller
+  // supplies it (a boolean, from SearchResultsPanel), it is trusted outright and the
+  // metadata-only approximation is not consulted at all: the approximation's whole job was to
+  // decide whether that verification query was worth running, not to have the final word once
+  // it has an answer. Callers with no way to verify (the landing page carousel, which has no
+  // per-listing availability data at all) get the approximation instead - see
+  // util/searchCleaningFloor.js's isPickupTodayListing for what that does and does not
+  // guarantee.
+  const showPickupToday =
+    typeof pickupTodayVerified === 'boolean' ? pickupTodayVerified : isPickupTodayListing(listing);
 
   const { listingType, cardStyle } = publicData || {};
   const validListingTypes = config.listing.listingTypes || [];

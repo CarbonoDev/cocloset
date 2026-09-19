@@ -18,6 +18,9 @@ import css from './SearchResultsPanel.module.css';
  * @param {Object} props.search - The search
  * @param {Function} props.setActiveListing - The function to handle the active listing
  * @param {boolean} [props.isMapVariant] - Whether the map variant is enabled
+ * @param {Array<string>} [props.pickupTodayIds] - listing ids on this page verified (a real
+ *   availability query, not the card's own metadata-only approximation) as bookable starting
+ *   today - see SearchPage.duck.js's searchListingsPayloadCreator.
  * @returns {JSX.Element}
  */
 const SearchResultsPanel = props => {
@@ -31,6 +34,7 @@ const SearchResultsPanel = props => {
     isMapVariant = true,
     listingTypeParam,
     intl,
+    pickupTodayIds = [],
   } = props;
   const classes = classNames(rootClassName || css.root, className);
   const pageName = listingTypeParam ? 'SearchPageWithListingType' : 'SearchPage';
@@ -96,6 +100,7 @@ const SearchResultsPanel = props => {
               setActiveListing={setActiveListing}
               variant="editorial"
               showFavorite
+              pickupTodayVerified={pickupTodayIds.includes(l.id.uuid)}
             />
           </li>
         ))}
