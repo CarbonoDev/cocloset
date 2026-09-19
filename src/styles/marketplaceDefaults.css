@@ -90,21 +90,25 @@
    * COCLOSET'S DISPLAY FACE.
    *
    * The mockups set every heading - the wordmark, the hero, garment titles, section
-   * headings - in a high-contrast editorial serif, against Inter for everything else. The
+   * headings - in a distinct editorial serif, against Inter for everything else. The
    * template ships no serif at all, which is why the sections built from those mockups came
    * out entirely in the sans.
    *
-   * IDENTIFIED FROM THE MOCKUP IMAGES, NOT FROM A STYLESHEET. Playfair Display is the read:
-   * very thin hairlines against heavy stems, vertical stress, ball terminals, and lining
-   * numerals with the same contrast ("€48"). It is deliberately ONE variable and one <link>
-   * in public/index.html, so if the prototype turns out to name a different face, swapping it
-   * is a two-line change and nothing that consumes it has to move.
+   * Round 3 (2026-09-18): Jonathan named the actual target family as one of Recoleta/Cooper
+   * Black/Cooper Light/Belucian/Zilla Slab, none of which is Playfair Display (the earlier,
+   * mockup-image-read guess this replaces - see git history for that reasoning). Of that
+   * list, Recoleta and Cooper Black/Light are commercial - not on Google Fonts - and
+   * Belucian could not be identified as a real, licensable family at all. Zilla Slab is the
+   * one free, Google-Fonts-hosted option, and Jonathan asked explicitly to only use fonts
+   * confirmed free - so that's the one this loads. It is deliberately ONE variable and one
+   * <link> in public/index.html, so if a licensed file for one of the other names shows up
+   * later, swapping it is a two-line change and nothing that consumes it has to move.
    *
-   * The fallbacks are real serifs rather than the sans stack: if the webfont is slow or
-   * blocked, a heading should still read as a heading.
+   * The fallbacks are real slab/serif faces rather than the sans stack: if the webfont is
+   * slow or blocked, a heading should still read as a heading.
    */
-  --fontFamilyDisplay: 'Playfair Display', 'Iowan Old Style', Georgia, 'Times New Roman',
-    Times, serif;
+  --fontFamilyDisplay: 'Zilla Slab', 'Roboto Slab', 'Iowan Old Style', Georgia,
+    'Times New Roman', Times, serif;
 
   --fontWeightRegular: 400;
   --fontWeightMedium: 500;
