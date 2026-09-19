@@ -951,6 +951,66 @@ describe('Duck', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  //   > "filtrando por pickupToday=true en search me devuelve artículos que no muestran ese
+  //   >  tag" (Jonathan, 2026-09-19)
+  //
+  // The unit tests above dispatch `searchListings` directly with a hand-built searchParams
+  // object, always spelling `pickupToday: 'true'` as a string - which never exercises the
+  // real page-load path. `loadData` parses the URL through `util/urlHelpers.js`'s `parse()`,
+  // which turns the query string "true" into the actual BOOLEAN `true` before this thunk ever
+  // sees it - so `pickupToday === 'true'` (a string comparison) silently never matched
+  // anything a real visitor could trigger, and the filter did nothing on every real request.
+  // This test goes through `loadData` with a real query string, the way production actually
+  // calls it, specifically so a regression here fails a test again instead of only showing up
+  // as "the filter does nothing" in production.
+  // -------------------------------------------------------------------------
+  it('loadData() with a real ?pickupToday=true URL actually applies the filter', () => {
+    const getState = () => ({
+      ...initialState,
+      user: { currentUser },
+      auth: { isAuthenticated: true },
+    });
+
+    const query = sdkFn(fakeResponse([]));
+    const sdk = {
+      currentUser: { show: sdkFn(fakeResponse(currentUser)) },
+      listings: { query },
+      authInfo: sdkFn({}),
+    };
+
+    const dispatch = createFakeDispatch(getState, sdk);
+
+    // Needs a config with the `dates` filter registered - datesSearchParams (which this
+    // reuses internally) returns `{}` outright without one, same as a config with no dates
+    // filter configured at all.
+    const withDatesFilter = {
+      ...config,
+      search: {
+        ...config.search,
+        defaultFilters: [
+          ...(config.search?.defaultFilters || []).filter(f => f.key !== 'dates'),
+          { key: 'dates', schemaType: 'dates', availability: 'time-full', dateRangeMode: 'day' },
+        ],
+      },
+    };
+
+    return loadData(null, '?pickupToday=true', withDatesFilter)(dispatch, getState, sdk).then(() => {
+      const allActions = dispatchedActions(dispatch);
+      const pendingAction = allActions.find(a => a.type === 'SearchPage/searchListings/pending');
+
+      // parse() really does hand this thunk a boolean, not the string - pinning that here
+      // means a future change to parse() itself would also be caught.
+      expect(pendingAction.meta.arg.searchParams.pickupToday).toBe(true);
+
+      const params = query.mock.calls[0][0];
+      // If the filter is not applying, this call carries no date/availability params at all
+      // (an unfiltered search) - the same failure mode reported live.
+      expect(params.availability).toBe('time-partial');
+      expect(params.minDuration).toBeGreaterThan(0);
+    });
+  });
+
   it('loadData() for restricted viewing rights user does not load listings', () => {
     currentUser.effectivePermissionSet.attributes.read = 'permissions/deny';
 

@@ -366,8 +366,19 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
   // datesSearchParams - it inherits every fix already made to that function instead of risking
   // a fourth, independent bug in the same family. An explicit `dates` filter still wins if the
   // reader set one; "today" and a chosen range cannot both be the question being asked.
+  //
+  // TRUE, NOT "true". `util/urlHelpers.js`'s `parse()` - what `loadData` actually feeds this
+  // thunk from the URL - turns the query string "true"/"false" into real booleans before this
+  // function ever sees them, so a URL of `?pickupToday=true` arrives here as the boolean
+  // `true`. Comparing against the STRING `'true'` (as this did originally) never matches
+  // anything reached through the real page-load path: the filter silently did nothing, on
+  // every search, indistinguishable from an unfiltered one - which is exactly the reported
+  // "the filter returns listings that don't even qualify" (Jonathan, 2026-09-19). Checked
+  // against both forms since a caller could still hand this a literal string directly (as the
+  // duck's own tests do, dispatching without going through parse() at all).
+  const isPickupToday = pickupToday === true || pickupToday === 'true';
   const todayIso = today.toISOString().slice(0, 10);
-  const effectiveDates = dates || (pickupToday === 'true' ? `${todayIso},${todayIso}` : dates);
+  const effectiveDates = dates || (isPickupToday ? `${todayIso},${todayIso}` : dates);
   const datesMaybe = datesSearchParams(effectiveDates);
 
   const requestedStart =
@@ -435,10 +446,9 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
       // pickupToday's post-fetch pass is the STRICTER one - the same rule the card badge
       // uses, additionally requiring onLaundry - so it runs instead of (not on top of)
       // withoutUnbookableListings' plain cleaning-floor check.
-      const filtered =
-        pickupToday === 'true'
-          ? withOnlyPickupTodayListings(response)
-          : withoutUnbookableListings(response, requestedStart);
+      const filtered = isPickupToday
+        ? withOnlyPickupTodayListings(response)
+        : withoutUnbookableListings(response, requestedStart);
 
       dispatch(addMarketplaceEntities(filtered, sanitizeConfig));
       return filtered;

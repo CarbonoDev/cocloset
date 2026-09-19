@@ -1,6 +1,7 @@
 import {
   isBookableFrom,
   isPickupTodayListing,
+  showPickupTodayOnListingPage,
   withOnlyPickupTodayListings,
   withoutUnbookableListings,
 } from './searchCleaningFloor';
@@ -133,6 +134,65 @@ describe('withOnlyPickupTodayListings', () => {
     const response = responseWith([listing({ onLaundry: true })], 17);
 
     expect(withOnlyPickupTodayListings(response)).toBe(response);
+  });
+});
+
+// -------------------------------------------------------------------------
+//   > "Hay unas prendas que tienen el tag de Pickup Today, pero al entrar al listing page de
+//   >  ese artículo, en realidad no podemos pedir hoy si no hasta dentro de varios días, un
+//   >  ejemplo de esto es el artículo con id 6aa26840-16da-44df-8a74-ff4ece1da4eb" (Jonathan,
+//   >  2026-09-19)
+//
+// Reproduces the reported listing exactly: onLaundry true, no cleaning-floor block at all (so
+// isPickupTodayListing alone says yes), but its only real free time slot starts tomorrow.
+// -------------------------------------------------------------------------
+describe('showPickupTodayOnListingPage', () => {
+  const timeSlot = (start, end) => ({
+    attributes: { start, end, type: 'time-full', seats: 1 },
+  });
+
+  it('is false when the approximation alone would say yes', () => {
+    expect(isPickupTodayListing(listing({ onLaundry: true }), today())).toBe(true);
+  });
+
+  it("shows optimistically before any month's time slots have loaded", () => {
+    expect(showPickupTodayOnListingPage(listing({ onLaundry: true }), {}, today())).toBe(true);
+    expect(
+      showPickupTodayOnListingPage(
+        listing({ onLaundry: true }),
+        { '2026-09': { fetchTimeSlotsInProgress: true } },
+        today()
+      )
+    ).toBe(true);
+  });
+
+  it('is false once the real calendar shows today has nothing free at all - the reported bug', () => {
+    const garment = listing({ onLaundry: true });
+    // The exact shape of the reported listing: free, but not until tomorrow.
+    const monthlyTimeSlots = {
+      '2026-09': { timeSlots: [timeSlot(daysFromToday(1), daysFromToday(30))] },
+    };
+
+    expect(showPickupTodayOnListingPage(garment, monthlyTimeSlots, today())).toBe(false);
+  });
+
+  it('is true once the real calendar confirms today is inside a free slot', () => {
+    const garment = listing({ onLaundry: true });
+    const monthlyTimeSlots = {
+      '2026-09': { timeSlots: [timeSlot(today(), daysFromToday(30))] },
+    };
+
+    expect(showPickupTodayOnListingPage(garment, monthlyTimeSlots, today())).toBe(true);
+  });
+
+  it('never overrides a "no" from the approximation itself', () => {
+    // Not on laundry at all - the real calendar cannot make this a yes.
+    const garment = listing({ onLaundry: false });
+    const monthlyTimeSlots = {
+      '2026-09': { timeSlots: [timeSlot(today(), daysFromToday(30))] },
+    };
+
+    expect(showPickupTodayOnListingPage(garment, monthlyTimeSlots, today())).toBe(false);
   });
 });
 

@@ -1,5 +1,6 @@
 import { earliestBookableStart, resolveInitialCleaningDays } from './cleaningFloor';
 import { getStartOf } from './dates';
+import { getAllTimeSlots, getTimeSlotsOnDate } from '../components/OrderPanel/booking.shared';
 
 /**
  * Drop the garments a date search would offer but a booking would refuse.
@@ -178,3 +179,46 @@ export const withoutUnbookableListings = (response, requestedStart) => {
  */
 export const withOnlyPickupTodayListings = response =>
   filterSearchResponse(response, listing => isPickupTodayListing(listing));
+
+/**
+ * The "Pickup Today" tag on a LISTING PAGE, self-corrected against the real calendar.
+ *
+ *   > "Hay unas prendas que tienen el tag de Pickup Today, pero al entrar al listing page de
+ *   >  ese artículo, en realidad no podemos pedir hoy si no hasta dentro de varios días"
+ *   >   (Jonathan, 2026-09-19, listing 6aa26840-16da-44df-8a74-ff4ece1da4eb)
+ *
+ * `isPickupTodayListing` is a documented approximation - metadata only, no real availability
+ * exceptions - and it said "yes" for a garment whose only actual free slot started tomorrow,
+ * because nothing in its metadata blocked today. A listing page already fetches
+ * `monthlyTimeSlots` - the SAME real calendar BookingRentalPeriodForm uses for the picker - so
+ * unlike a search results card, it has what it needs to check the real answer instead of only
+ * the approximation.
+ *
+ * OPTIMISTIC UNTIL DATA HAS LOADED AT ALL: `monthlyTimeSlots` is fetched by a mounted child
+ * (BookingRentalPeriodForm) after first paint, so on first render there is nothing to check
+ * yet. Keeping the approximation's answer until then means a page that briefly shows the tag
+ * before the picker mounts, rather than one that never shows it while data loads - the smaller
+ * of the two wrong states.
+ *
+ * NOT a full window-fit check - that also needs the rental period length and the cleaning gap,
+ * both private to BookingRentalPeriodForm. This only asks "does today have anything free at
+ * all", which is exactly the reported case and the most misleading one to get wrong.
+ *
+ * @param {Object} listing
+ * @param {Object} monthlyTimeSlots - state.ListingPage.monthlyTimeSlots, e.g.
+ *   { '2026-09': { timeSlots: [...], fetchTimeSlotsInProgress, fetchTimeSlotsError } }
+ * @param {Date} [today] - for tests; defaults to the real current instant
+ * @returns {boolean}
+ */
+export const showPickupTodayOnListingPage = (listing, monthlyTimeSlots, today = new Date()) => {
+  if (!isPickupTodayListing(listing, today)) {
+    return false;
+  }
+  const months = monthlyTimeSlots || {};
+  const hasLoadedAnyTimeSlots = Object.values(months).some(m => Array.isArray(m?.timeSlots));
+  if (!hasLoadedAnyTimeSlots) {
+    return true;
+  }
+  const timeZone = listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC';
+  return getTimeSlotsOnDate(getAllTimeSlots(months, false), today, timeZone).length > 0;
+};
