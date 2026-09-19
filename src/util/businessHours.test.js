@@ -6,6 +6,7 @@ import {
   dayCloseField,
   dayEnabledField,
   dayOpenField,
+  formatTime12Hour,
   isOpenOn,
   toBusinessHoursByDay,
   toFormValues,
@@ -136,5 +137,30 @@ describe('businessHoursSummary', () => {
 
   it('reads the whole week as one range when every day matches', () => {
     expect(businessHoursSummary(allDays())).toBe('Mon-Sun 09:00-18:00');
+  });
+});
+
+// -------------------------------------------------------------------------
+//   > "En el perfil de laundry se muestra el horario '09:00–18:00', puedes cambiarlo para
+//   >  que sea '09:00 AM –06:00 PM'?" (Jonathan, 2026-09-19)
+// -------------------------------------------------------------------------
+describe('formatTime12Hour', () => {
+  it('formats morning, noon, and midnight correctly', () => {
+    expect(formatTime12Hour('09:00')).toBe('09:00 AM');
+    expect(formatTime12Hour('00:00')).toBe('12:00 AM');
+    expect(formatTime12Hour('12:00')).toBe('12:00 PM');
+  });
+
+  it('formats afternoon and evening correctly', () => {
+    expect(formatTime12Hour('18:00')).toBe('06:00 PM');
+    expect(formatTime12Hour('23:59')).toBe('11:59 PM');
+    expect(formatTime12Hour('13:30')).toBe('01:30 PM');
+  });
+
+  // A business hours field is not something a bad value should be allowed to blank out.
+  it('returns malformed or missing input unchanged rather than throwing', () => {
+    ['not a time', '25:00', '', null, undefined].forEach(value => {
+      expect(formatTime12Hour(value)).toBe(value);
+    });
   });
 });

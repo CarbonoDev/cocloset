@@ -52,6 +52,34 @@ const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const isTime = value => typeof value === 'string' && TIME_RE.test(value);
 
 /**
+ * A stored `HH:MM` (24h) time, as 12-hour clock text for display.
+ *
+ *   > "En el perfil de laundry se muestra el horario '09:00–18:00', puedes cambiarlo para
+ *   >  que sea '09:00 AM – 06:00 PM'?" (Jonathan, 2026-09-19)
+ *
+ * Storage and the `<input type="time">` fields in the edit form stay 24h - that input's own
+ * display already follows the browser's locale, and the stored value is what every other
+ * function in this file compares and sorts. This is display-only, for the one place
+ * (ProfilePage) that prints the hours as plain text rather than through a native time input.
+ *
+ * Malformed input (not `isTime`) is returned unchanged rather than thrown on - a business
+ * hours field is not something a bad value should be allowed to blank out.
+ *
+ * @param {string} time - `HH:MM`, 24h
+ * @returns {string} e.g. "09:00 AM", "06:00 PM"
+ */
+export const formatTime12Hour = time => {
+  if (!isTime(time)) {
+    return time;
+  }
+  const [hourStr, minute] = time.split(':');
+  const hour24 = Number(hourStr);
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${String(hour12).padStart(2, '0')}:${minute} ${period}`;
+};
+
+/**
  * Is this studio open on this day, according to a stored record?
  *
  * @param {Object} [byDay] - `laundryProfile.businessHoursByDay`

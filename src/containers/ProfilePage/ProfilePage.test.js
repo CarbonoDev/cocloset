@@ -338,9 +338,10 @@ describe('ProfilePage for a laundry', () => {
     });
 
     expect(screen.getByText('ProfilePage.day.mon')).toBeInTheDocument();
-    expect(screen.getByText('09:00–18:00')).toBeInTheDocument();
+    // 12-hour clock, per Jonathan's 2026-09-19 request - was "09:00–18:00".
+    expect(screen.getByText('09:00 AM – 06:00 PM')).toBeInTheDocument();
     expect(screen.getByText('ProfilePage.day.tue')).toBeInTheDocument();
-    expect(screen.getByText('09:00–14:00')).toBeInTheDocument();
+    expect(screen.getByText('09:00 AM – 02:00 PM')).toBeInTheDocument();
     // The list replaces the old sentence entirely - not shown alongside it.
     expect(screen.queryByText('Mon-Sat 11:00-21:00')).not.toBeInTheDocument();
     // Only open days appear - Wed was never ticked in this fixture.

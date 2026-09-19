@@ -167,6 +167,67 @@ describe('ListingCard: the editorial variant', () => {
     expect(screen.queryByText(/user1/i)).not.toBeInTheDocument();
   });
 
+  // -------------------------------------------------------------------------
+  //   > "se muestra 'x_small', lo cual es correcto porque es su valor guardado, pero debe
+  //   >  mostrar 'X-Small', que es el valor del label de listing field que viene de la
+  //   >  consola" (Jonathan, 2026-09-19)
+  // -------------------------------------------------------------------------
+  it("shows the Console label for size, not the stored enum option", () => {
+    const hostedConfig = getHostedConfiguration();
+    const config = {
+      ...hostedConfig,
+      // The raw hosted-asset shape mergeConfig expects (see ListingPage.test.js's getConfig) -
+      // it processes this into config.listing.listingFields, which is what the component
+      // actually reads.
+      listingFields: {
+        listingFields: [
+          {
+            key: 'size',
+            scope: 'public',
+            schemaType: 'enum',
+            enumOptions: [
+              { option: 'x_small', label: 'X-Small' },
+              { option: 'medium', label: 'Medium' },
+            ],
+          },
+        ],
+      },
+    };
+
+    const { container } = render(
+      <ListingCard
+        listing={editorialListing({ size: 'x_small' })}
+        intl={fakeIntl}
+        variant="editorial"
+      />,
+      { messages: en, config }
+    );
+
+    expect(container.textContent).toContain('X-Small');
+    expect(container.textContent).not.toContain('x_small');
+  });
+
+  it('falls back to the stored value when Console has no matching option (renamed or deleted)', () => {
+    const hostedConfig = getHostedConfiguration();
+    const config = {
+      ...hostedConfig,
+      listingFields: {
+        listingFields: [{ key: 'size', scope: 'public', schemaType: 'enum', enumOptions: [] }],
+      },
+    };
+
+    const { container } = render(
+      <ListingCard
+        listing={editorialListing({ size: 'x_small' })}
+        intl={fakeIntl}
+        variant="editorial"
+      />,
+      { messages: en, config }
+    );
+
+    expect(container.textContent).toContain('x_small');
+  });
+
   it('still links to the listing', () => {
     renderEditorial();
     expect(screen.getByRole('link')).toHaveAttribute(

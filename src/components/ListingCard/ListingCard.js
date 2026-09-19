@@ -107,12 +107,38 @@ const ListingCardImage = props => {
  * (see server/api-util/laundryAssignment.js), and the same name the listing page shows.
  */
 const EditorialInfo = props => {
-  const { listing, titleFormatted, showPrice, priceMessage, priceTooltip, darkMode } = props;
+  const {
+    listing,
+    titleFormatted,
+    showPrice,
+    priceMessage,
+    priceTooltip,
+    darkMode,
+    listingFieldConfigs,
+  } = props;
   const { brand, size, assignedLaundryName, pickupNeighborhood } =
     listing?.attributes?.publicData || {};
 
+  // THE CONSOLE LABEL, NOT THE STORED VALUE.
+  //
+  //   > "se muestra 'x_small', lo cual es correcto porque es su valor guardado, pero debe
+  //   >  mostrar 'X-Small', que es el valor del label de listing field que viene de la
+  //   >  consola" (Jonathan, 2026-09-19)
+  //
+  // `size` in publicData is the enum's stored OPTION (`x_small`), never the label an operator
+  // typed in Console (`X-Small`) - the two only look the same by coincidence for options
+  // nobody bothered to capitalize. Same lookup ListingPage's own details grid already does
+  // (util/fieldHelpers.js's getDetailCustomFieldValue) - falls back to the raw value so an
+  // option Console no longer lists (renamed or deleted) still shows something rather than
+  // nothing.
+  const sizeFieldConfig = listingFieldConfigs?.find(f => f.key === 'size');
+  const sizeLabel =
+    sizeFieldConfig?.enumOptions?.find(o => `${o.option}` === size)?.label || size;
+
   const meta = [
-    size ? <FormattedMessage key="size" id="ListingCard.editorialSize" values={{ size }} /> : null,
+    size ? (
+      <FormattedMessage key="size" id="ListingCard.editorialSize" values={{ size: sizeLabel }} />
+    ) : null,
     assignedLaundryName ? (
       <FormattedMessage
         key="pickup"
@@ -288,6 +314,7 @@ export const ListingCard = props => {
           priceMessage={priceMessage}
           priceTooltip={priceTooltip}
           darkMode={darkMode}
+          listingFieldConfigs={config.listing.listingFields}
         />
       ) : (
         <div className={css.info}>
