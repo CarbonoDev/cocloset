@@ -140,15 +140,10 @@ const InboxTransactionPanel = props => {
   // convention as the listing page and the price breakdown, so the three agree.
   const inclusiveEnd = bookingEnd ? subtractTime(bookingEnd, 1, 'days', timeZone) : null;
 
-  // The lender's deadline to drop the garment off: 2 hours before the rental starts.
-  //
-  //   > "si debo ir a entregar una prenda, la fecha que se debe mostrar (...) es dos horas
-  //   >  antes de la fecha de inicio del booking" (Jonathan, 2026-09-11)
-  //
-  // Previously 48h before, for the studio's cleaning turnaround - replaced outright per this
-  // instruction, not layered on top of it. Same helper and timezone as inclusiveEnd, so all
+  // The lender's deadline to drop the garment off: 48 hours before the rental starts, to
+  // leave the studio time to clean it. Same helper and timezone as inclusiveEnd, so all
   // three dates in this panel agree with each other.
-  const recommendedDropTime = bookingStart ? subtractTime(bookingStart, 2, 'hours', timeZone) : null;
+  const recommendedDropTime = bookingStart ? subtractTime(bookingStart, 48, 'hours', timeZone) : null;
 
   const formatDate = date =>
     date ? intl.formatDate(new Date(date), { ...DATE_FORMAT, timeZone }) : null;
@@ -259,7 +254,7 @@ const InboxTransactionPanel = props => {
                 id="InboxPage.panel.pickupTitle.recommendedDropTimeLender"
                 values={{
                   laundryName,
-                  recommendedDropTime: formatDateTimeNoYear(recommendedDropTime),
+                  recommendedDropTime: formatDateNoYear(recommendedDropTime),
                   startDate: formatDateNoYear(bookingStart),
                 }}
               />
@@ -269,7 +264,7 @@ const InboxTransactionPanel = props => {
           {pickupAddress ? (
             <address className={css.panelCardAddress}>{pickupAddress}</address>
           ) : null}
-          {bookingStart ? <p className={css.panelCardValue}>{formatDate(bookingStart)}</p> : null}
+          {bookingStart && transactionRole === 'customer' ? <p className={css.panelCardValue}>{formatDate(bookingStart)}</p> : null}
           <p className={css.panelCardBody}>
             {transactionRole === 'customer' ? (
               <FormattedMessage id="InboxPage.panel.pickupBody" />
@@ -288,7 +283,13 @@ const InboxTransactionPanel = props => {
             )}
           </h3>
           {laundryName ? <p className={css.panelCardStrong}>{laundryName}</p> : null}
-          {inclusiveEnd ? <p className={css.panelCardValue}>{formatDate(inclusiveEnd)}</p> : null}
+          {inclusiveEnd ? (
+            <p className={css.panelCardValue}>
+              {bookingStart && transactionRole !== 'customer'
+                ? `${formatDateNoYear(bookingStart)} – ${formatDate(inclusiveEnd)}`
+                : formatDate(inclusiveEnd)}
+            </p>
+          ) : null}
           <p className={css.panelCardBody}>
             {transactionRole === 'customer' ? (
               <FormattedMessage id="InboxPage.panel.returnBody" />
