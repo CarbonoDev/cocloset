@@ -6,15 +6,30 @@
 }
 
 .field {
-  margin-top: 18px;
+  margin-top: 12px;
 
   &:first-child {
     margin-top: 0;
   }
 
   @media (--viewportMedium) {
-    margin-top: 20px;
+    margin-top: 14px;
   }
+}
+
+/* Round 2 (2026-09-19): same placeholder-driven, compact-field treatment Jonathan asked for
+   on PartnerApplicationForm - see the long note on `.visuallyHiddenLabel` there. Duplicated
+   rather than shared, per this codebase's convention of each form owning its own styling. */
+.visuallyHiddenLabel {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  white-space: nowrap;
+  clip: rect(0 0 0 0);
+  border: 0;
 }
 
 .error {
@@ -28,7 +43,7 @@
    `.root` sets none - and a smaller line height because the label text runs to several lines
    of legal copy, unlike a normal one-line checkbox option. */
 .consent {
-  margin-top: 20px;
+  margin-top: 14px;
 }
 
 .consentText {

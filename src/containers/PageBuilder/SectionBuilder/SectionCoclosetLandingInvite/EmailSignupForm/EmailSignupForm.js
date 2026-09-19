@@ -112,6 +112,7 @@ const EmailSignupForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="text"
             id={`${formId}.name`}
             name="name"
@@ -126,6 +127,7 @@ const EmailSignupForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="email"
             id={`${formId}.email`}
             name="email"
@@ -141,6 +143,7 @@ const EmailSignupForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="text"
             id={`${formId}.zipCode`}
             name="zipCode"
