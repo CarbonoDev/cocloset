@@ -78,6 +78,8 @@
    forced it white with a CSS filter, assuming a transparent line icon; against an opaque
    image that filter crushes the icon's internal white-on-teal contrast into a blank white
    disc (found by comparing the rendered page against the reference screenshots). */
+/* 2.5x the original 64px, per Jonathan's explicit multiplier (2026-09-19) - not a
+   measured-off-the-reference size like the section title above, a direct instruction. */
 .badge {
   width: 160px;
   height: 160px;

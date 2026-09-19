@@ -132,6 +132,7 @@ const PartnerApplicationForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="text"
             id={`${formId}.studioName`}
             name="studioName"
@@ -151,6 +152,7 @@ const PartnerApplicationForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="text"
             id={`${formId}.address`}
             name="address"
@@ -165,6 +167,7 @@ const PartnerApplicationForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="text"
             id={`${formId}.cityStateZip`}
             name="cityStateZip"
@@ -184,6 +187,7 @@ const PartnerApplicationForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="text"
             id={`${formId}.website`}
             name="website"
@@ -199,6 +203,7 @@ const PartnerApplicationForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="text"
             id={`${formId}.contactName`}
             name="contactName"
@@ -218,6 +223,7 @@ const PartnerApplicationForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="email"
             id={`${formId}.email`}
             name="email"
@@ -233,6 +239,7 @@ const PartnerApplicationForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="tel"
             id={`${formId}.phone`}
             name="phone"
@@ -301,6 +308,7 @@ const PartnerApplicationForm = props => (
 
           <FieldTextInput
             className={css.field}
+            labelClassName={css.visuallyHiddenLabel}
             type="textarea"
             id={`${formId}.notes`}
             name="notes"

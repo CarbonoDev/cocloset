@@ -69,7 +69,7 @@ const SectionCoclosetPartnerBenefits = props => {
                       <Field
                         data={block.media}
                         className={css.badgeImage}
-                        sizes="64px"
+                        sizes="160px"
                         options={fieldOptions}
                       />
                     </div>
