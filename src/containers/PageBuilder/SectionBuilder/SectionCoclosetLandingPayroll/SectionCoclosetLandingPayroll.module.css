@@ -19,6 +19,10 @@
   }
 }
 
+/* Round 3 (2026-09-18): 44px (the largest size this ever reached, with nothing past the
+   768px breakpoint) was still far short of the reference - measured the rendered "Put your
+   closet on payroll." against the reference at the same 1280px viewport, ~74px, in line with
+   the same-sized bump this round gave "How it Works" and "New Arrivals". */
 .headline {
   font-family: var(--fontFamilyDisplay);
   color: var(--coclosetPartnerTeal);
@@ -27,7 +31,11 @@
   margin: 0 0 8px 0;
 
   @media (--viewportMedium) {
-    font-size: 44px;
+    font-size: 56px;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 74px;
   }
 }
 

@@ -12,8 +12,13 @@
   max-width: var(--contentMaxWidthPages);
   margin: 0 auto;
 
+  /* 1.3fr:1fr rather than the near-even 1.1fr:1fr this started at - the bigger headline
+     below (2026-09-18 round 3) needs more of the row to keep its reference two-line break
+     ("The shared closet" / "on your corner.") instead of wrapping to three lines. The
+     collage column shrinks to match; its tiles are aspect-ratio boxes, so they just get a
+     little narrower/taller, not distorted. */
   @media (--viewportLarge) {
-    grid-template-columns: 1.1fr 1fr;
+    grid-template-columns: 1.3fr 1fr;
     align-items: center;
     gap: 48px;
     padding: 88px 36px 96px 36px;
@@ -26,33 +31,50 @@
   align-items: flex-start;
 }
 
+/* Sized off the round-3 reference screenshot (2026-09-18). First pass here bumped the
+   1280px-viewport size to 80px (~1.5x the previous 54px) - real-browser verification against
+   the reference at the same 1280px viewport showed that overshot: the reference's "The shared
+   closet" / "on your corner." two-line break measures out to ~63-68px in this column, not 80,
+   and 80px pushed the headline to a three-line wrap instead. Corrected the top breakpoint back
+   down to match viewportLarge's 68px (flat past 1024px, not a further bump) - verified via
+   screenshot that this restores the reference's two-line break at 1280px. max-width stays
+   raised at 640px so the (correctly, moderately) bigger text still reaches that same two-line
+   break rather than collapsing to three lines in a column that didn't grow. Also made
+   monotonic (38/52/46/54 across breakpoints, previously non-monotonic - see the 2026-09-13
+   log - is not repeated). */
 .headline {
   font-family: var(--fontFamilyDisplay);
   color: var(--coclosetPartnerTeal);
-  font-size: 38px;
-  line-height: 1.08;
+  font-size: 40px;
+  line-height: 1.05;
   letter-spacing: -0.01em;
   margin: 0 0 20px 0;
-  max-width: 460px;
+  max-width: 640px;
 
   @media (--viewportMedium) {
-    font-size: 52px;
+    font-size: 58px;
   }
 
   @media (--viewportLarge) {
-    font-size: 46px;
-  }
-
-  @media (--viewportLargeWithPaddings) {
-    font-size: 54px;
+    font-size: 68px;
   }
 }
 
+/* Round 3 (2026-09-18): the standfirst had no explicit font-size at all, inheriting the
+   generic 16px body copy - the reference sets this paragraph noticeably larger. max-width
+   raised to match so it still wraps to the reference's ~3 lines instead of ~5 at the bigger
+   size. */
 .standfirst {
   composes: marketplaceDefaultFontStyles from global;
   color: var(--coclosetInk);
-  max-width: 420px;
+  font-size: 17px;
+  line-height: 1.6;
+  max-width: 480px;
   margin: 0 0 32px 0;
+
+  @media (--viewportMedium) {
+    font-size: 19px;
+  }
 }
 
 .standfirst > p {

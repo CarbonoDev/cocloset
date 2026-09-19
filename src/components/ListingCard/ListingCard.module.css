@@ -147,15 +147,6 @@
   padding: 0;
 }
 
-/* Garment on the left, price on the right, baselines aligned. `align-items: baseline` rather
-   than `center` so a two-line title still lines its FIRST line up with the price. */
-.editorialHeadline {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 /* ⚠️ Clamped at two lines, and that is load-bearing rather than cosmetic: the carousel sets
    its container height in JS (calculateCarouselHeight in SectionListings.js) from an estimate
    that assumes exactly this. A third line would be clipped, not scrolled. */
@@ -164,11 +155,14 @@
    already sets that, this class only needs to make it bigger and bolder. An earlier version
    of this rule re-set the family to the site's display serif, which is what the site's
    article/section headings use, not a card title (found by comparing the rendered carousel
-   against the reference screenshot). */
+   against the reference screenshot).
+   Round 3 (2026-09-18): sits alone on its own row now - the price moved down to pair with
+   the size/collection-point line instead (see .editorialMetaRow), matching the round-3
+   reference. Bumped 17px -> 19px alongside that, closer to the reference's weight. */
 .editorialTitle {
   composes: marketplaceDefaultFontStyles from global;
-  font-size: 17px;
-  line-height: 20px;
+  font-size: 19px;
+  line-height: 22px;
   font-weight: var(--fontWeightSemiBold);
   color: var(--coclosetInk);
   margin: 0;
@@ -179,12 +173,25 @@
   overflow: hidden;
 }
 
-/* Never lets a long price wrap under itself or get squeezed by the title. */
+/* Round 3 (2026-09-18): the size/collection-point line and the price, on one row, price
+   pushed to the far right - this is what the reference actually pairs the price with, not
+   the title (see the removed .editorialHeadline and EditorialInfo in ListingCard.js).
+   `margin-left: auto` on .editorialPrice rather than `justify-content: space-between` here,
+   so the price still lands on the right even on a listing with no size/neighborhood at all
+   (a lone flex child has nothing to space-between against). */
+.editorialMetaRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+/* Never lets a long price wrap under itself or get squeezed by the meta line. */
 .editorialPrice {
   composes: marketplaceDefaultFontStyles from global;
   font-weight: var(--fontWeightSemiBold);
   color: var(--coclosetInkMuted);
-  margin: 0;
+  margin: 0 0 0 auto;
   padding: 0;
   white-space: nowrap;
   flex-shrink: 0;
@@ -199,10 +206,12 @@
   color: var(--coclosetBrand);
 }
 
+/* Round 3 (2026-09-18): top margin moved to the new .editorialMetaRow wrapper (it now has a
+   sibling, .editorialPrice, sharing the same row) - a margin here too would double it up. */
 .editorialMeta {
   composes: marketplaceTinyFontStyles from global;
   color: var(--coclosetInkMuted);
-  margin: 4px 0 0 0;
+  margin: 0;
   padding: 0;
 }
 

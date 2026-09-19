@@ -68,7 +68,7 @@ const SectionCoclosetLandingFlow = props => {
                   <Field
                     data={block.media}
                     className={css.icon}
-                    sizes="80px"
+                    sizes="112px"
                     options={fieldOptions}
                   />
                 ) : null}

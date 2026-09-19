@@ -117,17 +117,21 @@ const calculateCarouselHeight = (
   const cardImageHeight = cardWidth / parsedAspectRatio;
   const cardInfoHeight = priceHeight + titleHeightSingleLine + authorInfoHeight + cardInfoPadding;
 
-  // ⚠️ Cocloset: the editorial card is a different stack - a brand eyebrow, then a title of
-  // up to TWO lines with the price beside it, then the size/collection-point line. Same
-  // hardcoded-pixel bargain the rest of this function makes, and the same maintenance rule
-  // applies: these mirror .editorial* in ListingCard.module.css.
+  // ⚠️ Cocloset: the editorial card is a different stack - a brand eyebrow, a title of up to
+  // TWO lines on its own row, then a size/collection-point + price row below it (moved there
+  // in round 3, 2026-09-18 - it used to sit beside the title). Same hardcoded-pixel bargain
+  // the rest of this function makes, and the same maintenance rule applies: these mirror
+  // .editorial* in ListingCard.module.css.
   //
   // The two-line bound is not an assumption, it is enforced - .editorialTitle clamps at two
   // lines - because this container's height is set in JS and anything taller is CLIPPED. A
   // card that grows past the estimate loses its bottom row with nothing to say why.
   const editorialBrandHeight = 16 + 4; // line + margin-bottom
-  const editorialTitleHeight = 2 * 20; // clamped at two lines
-  const editorialMetaHeight = 16 + 4; // line + margin-top
+  const editorialTitleHeight = 2 * 22; // clamped at two lines (line-height 22px, round 3)
+  // The price shares this row now and uses marketplaceDefaultFontStyles (24px line-height),
+  // taller than the meta text's own 16px - the row's height is driven by the taller sibling,
+  // plus the row's own top margin.
+  const editorialMetaHeight = 24 + 4; // taller sibling's line height + row's margin-top
   const editorialPaddingTop = 12;
   const editorialInfoHeight =
     editorialBrandHeight + editorialTitleHeight + editorialMetaHeight + editorialPaddingTop;
