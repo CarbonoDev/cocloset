@@ -195,7 +195,12 @@ const LaundryOrderRow = props => {
           <span className={css.secondaryText}>{row.currentRack || '—'}</span>
         </td>
         <td className={css.cell}>
-          <span className={css.primaryText}>{row.customerName || '—'}</span>
+          <span className={css.primaryText}>
+            <FormattedMessage
+              id="LaundryOpsPage.table.renterLine"
+              values={{ name: row.customerName || '—' }}
+            />
+          </span>
           <span className={css.secondaryText}>
             <FormattedMessage
               id="LaundryOpsPage.table.ownerLine"
