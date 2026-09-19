@@ -108,45 +108,56 @@ const ListingCardImage = props => {
  */
 const EditorialInfo = props => {
   const { listing, titleFormatted, showPrice, priceMessage, priceTooltip, darkMode } = props;
-  const { brand, size, pickupNeighborhood } = listing?.attributes?.publicData || {};
+  const { brand, size, assignedLaundryName, pickupNeighborhood } =
+    listing?.attributes?.publicData || {};
 
   const meta = [
     size ? <FormattedMessage key="size" id="ListingCard.editorialSize" values={{ size }} /> : null,
-    pickupNeighborhood ? (
+    assignedLaundryName ? (
       <FormattedMessage
         key="pickup"
-        id={'ListingCard.editorialPickupWithNeighborhood'}
-
-        values={{ neighborhood: pickupNeighborhood }}
+        id={
+          pickupNeighborhood
+            ? 'ListingCard.editorialPickupWithNeighborhood'
+            : 'ListingCard.editorialPickup'
+        }
+        values={{ name: assignedLaundryName, neighborhood: pickupNeighborhood }}
       />
     ) : null,
   ].filter(Boolean);
+
+  const hasMetaRow = meta.length > 0 || showPrice;
 
   return (
     <div className={classNames(css.editorialInfo, { [css.lightText]: darkMode })}>
       {brand ? <p className={css.editorialBrand}>{brand}</p> : null}
 
-      <div className={css.editorialHeadline}>
-        <p className={css.editorialTitle}>{titleFormatted}</p>
-        {showPrice ? (
-          <p className={css.editorialPrice} title={priceTooltip}>
-            {priceMessage}
-          </p>
-        ) : null}
-      </div>
+      {/* Round 3 (2026-09-18): the price used to sit on THIS row, next to the title - the
+          reference pairs it with the size/collection-point line below instead. Title now
+          renders alone. */}
+      <p className={css.editorialTitle}>{titleFormatted}</p>
 
-      {meta.length > 0 ? (
-        <p className={css.editorialMeta}>
-          {meta.map((entry, index) => (
-            <React.Fragment key={index}>
-              {/* A middot separator rather than a list, because these read as one line of
-                  provenance. Rendered between entries only, so a garment with just one of
-                  the two does not trail a stray dot. */}
-              {index > 0 ? <span aria-hidden="true"> · </span> : null}
-              {entry}
-            </React.Fragment>
-          ))}
-        </p>
+      {hasMetaRow ? (
+        <div className={css.editorialMetaRow}>
+          {meta.length > 0 ? (
+            <p className={css.editorialMeta}>
+              {meta.map((entry, index) => (
+                <React.Fragment key={index}>
+                  {/* A middot separator rather than a list, because these read as one line of
+                      provenance. Rendered between entries only, so a garment with just one of
+                      the two does not trail a stray dot. */}
+                  {index > 0 ? <span aria-hidden="true"> · </span> : null}
+                  {entry}
+                </React.Fragment>
+              ))}
+            </p>
+          ) : null}
+          {showPrice ? (
+            <p className={css.editorialPrice} title={priceTooltip}>
+              {priceMessage}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
