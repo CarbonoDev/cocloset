@@ -745,7 +745,7 @@ export const withNeighborhoodFilter = (listingFields = [], laundryOptions = [], 
         filterType: 'SelectSingleFilter',
         label: intl
           ? intl.formatMessage({ id: 'SearchPage.neighborhoodFilterLabel' })
-          : 'Neighbourhood',
+          : 'Neighborhood',
       },
     },
   ];
