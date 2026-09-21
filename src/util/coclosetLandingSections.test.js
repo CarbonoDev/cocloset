@@ -308,6 +308,42 @@ describe('the become-a-partner page (2026-09-12 redesign)', () => {
   });
 });
 
+describe('the about page (2026-09-21 redesign)', () => {
+  // Fixture section names from the live `/p/about` Console asset, fetched via the Asset
+  // Delivery API while building this page.
+  it.each([
+    ['Our story', 'coclosetAboutIntro'],
+    ['Our team', 'coclosetAboutFounder'],
+  ])('maps %s to %s', (sectionName, sectionType) => {
+    expect(mapCoclosetSection({ sectionName, sectionType: 'features' }).sectionType).toBe(
+      sectionType
+    );
+  });
+
+  // "How we're different" is deliberately NOT in this list - it stays on the stock `article`
+  // type, which the Cocloset skin (coclosetSkin.js) already styles with the same serif
+  // heading the mockup shows for it, so no bespoke layout was needed.
+  it("leaves 'How we're different' on the stock article type", () => {
+    const section = { sectionName: "How we're different", sectionType: 'article' };
+    expect(mapCoclosetSection(section)).toBe(section);
+  });
+
+  it('retypes the whole about-page asset in one pass', () => {
+    const sections = [
+      { sectionName: 'Our story', sectionType: 'features' },
+      { sectionName: "How we're different", sectionType: 'article' },
+      { sectionName: 'Our team', sectionType: 'features' },
+    ];
+    const mapped = mapCoclosetSections({ sections });
+
+    expect(mapped.sections.map(s => s.sectionType)).toEqual([
+      'coclosetAboutIntro',
+      'article',
+      'coclosetAboutFounder',
+    ]);
+  });
+});
+
 describe('the main landing page (2026-09-13 visual refresh)', () => {
   // Fixture section names from the live `landing-page` Console asset, fetched via the Asset
   // Delivery API while building this refresh.

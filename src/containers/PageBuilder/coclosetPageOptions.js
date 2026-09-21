@@ -16,6 +16,8 @@ import SectionCoclosetLandingHero from './SectionBuilder/SectionCoclosetLandingH
 import SectionCoclosetLandingFlow from './SectionBuilder/SectionCoclosetLandingFlow';
 import SectionCoclosetLandingPayroll from './SectionBuilder/SectionCoclosetLandingPayroll';
 import SectionCoclosetLandingInvite from './SectionBuilder/SectionCoclosetLandingInvite';
+import SectionCoclosetAboutIntro from './SectionBuilder/SectionCoclosetAboutIntro';
+import SectionCoclosetAboutFounder from './SectionBuilder/SectionCoclosetAboutFounder';
 import { withCoclosetSkin } from './SectionBuilder/coclosetSkin';
 
 /**
@@ -61,6 +63,11 @@ export const coclosetPageOptions = {
     coclosetLandingFlow: { component: SectionCoclosetLandingFlow },
     coclosetLandingPayroll: { component: SectionCoclosetLandingPayroll },
     coclosetLandingInvite: { component: SectionCoclosetLandingInvite },
+
+    // /p/about (2026-09-21 redesign). See coclosetLandingSections.js for which Console
+    // section names claim each of these.
+    coclosetAboutIntro: { component: SectionCoclosetAboutIntro },
+    coclosetAboutFounder: { component: SectionCoclosetAboutFounder },
 
     // Every OTHER section type - the ones with no bespoke layout, including the two the
     // client asked to leave alone - keeps its stock component and gets the Cocloset voice

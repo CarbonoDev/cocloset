@@ -1,0 +1,56 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  background-color: var(--coclosetCanvas);
+}
+
+.layout {
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+  padding: 48px 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: center;
+
+  @media (--viewportLarge) {
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+    padding: 64px 36px;
+  }
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.name {
+  font-weight: var(--fontWeightBold);
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--coclosetInk);
+  margin: 0 0 16px 0;
+}
+
+.body {
+  color: var(--coclosetInk);
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.body > p {
+  margin: 0 0 16px 0;
+}
+
+.body > p:last-child {
+  margin-bottom: 0;
+}
+
+.media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--coclosetRadius);
+}

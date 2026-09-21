@@ -130,6 +130,13 @@ export const SECTION_NAMES_BY_TYPE = {
   coclosetLandingFlow: ['flow-section'],
   coclosetLandingPayroll: ['steps'],
   coclosetLandingInvite: ['invite'],
+
+  // /p/about (2026-09-21 redesign): "Welcome to CoCloset" + one photo/text block, then a
+  // text-only section ('How we're different', left on the stock `article` type - it already
+  // renders full-width text with the Cocloset skin's own serif heading, which is what the
+  // reference screenshots show for it), then the founder bio band.
+  coclosetAboutIntro: ['Our story'],
+  coclosetAboutFounder: ['Our team'],
 };
 
 // A Map rather than an object, and not only for taste: a plain object would answer
