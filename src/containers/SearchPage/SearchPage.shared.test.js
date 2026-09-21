@@ -766,11 +766,12 @@ describe('withBrandFilter', () => {
     expect(brandField().filterConfig.indexForSearch).toBe(true);
   });
 
-  // enum, NOT multi-enum: a multi-select would encode its query with the `has_any:` prefix that
-  // multi-enum uses, and `pub_brand` is a plain enum - the two would silently disagree.
-  it('is a single-select enum, matching the schema that was pushed', () => {
+  // enum, NOT multi-enum: multi-select still works on a plain enum via a comma-separated OR
+  // (`pub_brand=Zara,Nike`) - the `has_any:` prefix is only for multi-enum's array-valued
+  // fields, so switching schemaType was never needed to switch filterType (2026-09-21).
+  it('is a multi-select enum, matching the schema that was pushed', () => {
     expect(brandField().schemaType).toBe('enum');
-    expect(brandField().filterConfig.filterType).toBe('SelectSingleFilter');
+    expect(brandField().filterConfig.filterType).toBe('SelectMultipleFilter');
   });
 
   // Rendering an empty dropdown reads as "there are no brands", which is a different and

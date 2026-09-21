@@ -671,9 +671,14 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
         indexForSearch: true,
         showFilter: true,
         group: 'primary',
-        // One studio at a time. A garment has exactly one collection point, so a multi-select
-        // would offer combinations that are just "or", and the design draws a single dropdown.
-        filterType: 'SelectSingleFilter',
+        // MULTI-SELECT NOW (Jonathan, 2026-09-21: "debe ser para todos los fields"). This
+        // REVERSES the single-dropdown design this filter originally shipped with - "a garment
+        // has exactly one collection point" is true of a LISTING, but says nothing about how
+        // many studios a renter may want to search across at once ("show me everything pickable
+        // up at these two studios" is a real, different question from the single-listing fact).
+        // Same mechanism as brand/size: still one `assignedLaundryId` per listing, only the
+        // search query can now name several.
+        filterType: 'SelectMultipleFilter',
         label: intl ? intl.formatMessage({ id: 'SearchPage.laundryPickupFilterLabel' }) : 'Pickup',
       },
     },
@@ -740,9 +745,11 @@ export const withNeighborhoodFilter = (listingFields = [], laundryOptions = [], 
         indexForSearch: true,
         showFilter: true,
         group: 'primary',
-        // One part of town at a time, matching the pickup filter it sits beside. A garment has
-        // exactly one, so a multi-select would only ever express "or".
-        filterType: 'SelectSingleFilter',
+        // MULTI-SELECT NOW, same reversal and reasoning as the pickup filter beside it
+        // (Jonathan, 2026-09-21: "debe ser para todos los fields") - a renter searching across
+        // several parts of town at once is a real question, even though any one garment still
+        // sits in exactly one neighborhood.
+        filterType: 'SelectMultipleFilter',
         label: intl
           ? intl.formatMessage({ id: 'SearchPage.neighborhoodFilterLabel' })
           : 'Neighborhood',
@@ -799,10 +806,13 @@ export const withBrandFilter = (listingFields = [], brandOptions = [], intl) => 
         showFilter: true,
         // "brand como primary filter", verbatim.
         group: 'primary',
-        // One brand at a time, matching the pickup filter. A multi-select would need the
-        // `has_any:` syntax that multi-enum uses, and `pub_brand` is a plain enum - so the two
-        // would silently disagree about how to encode a query.
-        filterType: 'SelectSingleFilter',
+        // MULTI-SELECT (Jonathan, 2026-09-21: "puedo buscar dos brands... a la vez"). The
+        // `has_any:` prefix the old comment here worried about is only for `multi-enum`
+        // (array-valued) fields - a plain `enum` field like this one already encodes "any of
+        // these" as an ordinary comma-separated value (`pub_brand=Zara,Nike`), which Sharetribe
+        // resolves as OR natively. No schema change, no data migration: a listing still stores
+        // one brand string, only the search query can now name several.
+        filterType: 'SelectMultipleFilter',
         label: intl ? intl.formatMessage({ id: 'SearchPage.brandFilterLabel' }) : 'Brand',
       },
     },
