@@ -151,6 +151,12 @@ const InboxTransactionPanel = props => {
   const formatDateNoYear = date =>
     date ? intl.formatDate(new Date(date), { ...DATE_FORMAT_NO_YEAR, timeZone }) : null;
 
+  // Returns true when the booking end date has already passed
+  const isBookingEnd = date =>
+    date ? new Date(date).getTime() < Date.now() : false;
+
+  const bookingEnded = isBookingEnd(bookingEnd);
+
   // A 2-hour deadline usually falls on the SAME calendar day as the rental start, so the
   // date-only format above would print the drop-off deadline and the start date as identical
   // text ("by Sep 15" ... "starting Sep 15"). This one carries the time of day too, since that
@@ -248,7 +254,7 @@ const InboxTransactionPanel = props => {
               <FormattedMessage id="InboxPage.panel.pickupTitleLender" />
             )}
           </h3>
-          {transactionRole !== 'customer' && !isAtLaundry ? (
+          {transactionRole !== 'customer' && !isAtLaundry && !bookingEnded ? (
             <p className={css.panelCardBody}>
               <FormattedMessage
                 id="InboxPage.panel.pickupTitle.recommendedDropTimeLender"
