@@ -39,6 +39,11 @@ const laundryNextStatus = ({ state, cleaningPhase, onLaundry } = {}) => {
     // be taken in and washed; one already on the rack is ready now.
     case STATES.ACCEPTED:
       return onLaundry === true ? 'ready-for-pickup' : 'garment-received';
+    // The garment just finished its first wash (2026-09-21) - the only way out is the same
+    // "mark ready" button as the onLaundry-already-true case above. See laundryActionsFor's
+    // matching case in src/util/laundryStatuses.js.
+    case STATES.INITIAL_CLEANING:
+      return 'ready-for-pickup';
     case STATES.READY_FOR_PICKUP:
       return 'picked-up';
     // Both mean "out with the customer"; the endpoint picks laundry-confirm-return vs

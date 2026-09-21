@@ -56,7 +56,39 @@ export const transitions = {
   // Sharetribe has no 'laundry' actor role, so they are fired server-side
   // through the Integration API after server/api-util/laundryAuth.js has
   // verified the caller is the laundry assigned to this transaction.
+  //
+  // LAUNDRY_RECEIVE_FROM_PROVIDER gives the FIRST-TIME drop-off its own real
+  // state (2026-09-21):
+  //
+  //   > "cuando laundry ingrese el ticket para iniciar el lavado, entre a un status de IN
+  //   >  CLEANING, en ambas direcciones, es decir, cuando el provider lleve la prenda por
+  //   >  primera vez" (Jonathan, 2026-09-21)
+  //
+  // It replaces server/api/laundry-receive-garment.js's former metadata-only write, which
+  // deliberately fired no transition to avoid a process push. Now that a push is happening
+  // anyway (bundled with the review-flow change below), the garment being physically received
+  // gets INITIAL_CLEANING instead of staying invisible inside ACCEPTED.
+  //
+  // ONLY on the "not already at the studio" path - server/api/laundry-receive-garment.js only
+  // ever calls this when the listing's onLaundry was false. A garment that starts a rental
+  // already on the studio's rack (onLaundry true, already cleaned from a previous cycle) skips
+  // this and goes straight from ACCEPTED to READY_FOR_PICKUP via LAUNDRY_MARK_READY below,
+  // unchanged from before this change.
+  LAUNDRY_RECEIVE_FROM_PROVIDER: 'transition/laundry-receive-from-provider',
+  // Every other laundry-managed limbo state has a cancel and a payout-carrying auto-complete
+  // backstop (see PAYOUT_TRANSITIONS below and the EDN's own "every pre-payout state has an
+  // operator cancel" invariant) - INITIAL_CLEANING needs both for the same reason: it is
+  // pre-payout, and the laundry might never mark it ready.
+  CANCEL_FROM_INITIAL_CLEANING: 'transition/cancel-from-initial-cleaning',
+  AUTO_COMPLETE_FROM_INITIAL_CLEANING: 'transition/auto-complete-from-initial-cleaning',
+  // ONE STEP, TWO NAMES. "Mark ready" from a garment already at the studio (ACCEPTED) and
+  // "mark ready" from a garment that just finished its first wash (INITIAL_CLEANING) are the
+  // same operator action reaching the same READY_FOR_PICKUP outcome, but the EDN's `:from` is
+  // single-valued - same reason LAUNDRY_CONFIRM_RETURN/-_LATE are two names for "the garment
+  // came back". server/api-util/coclosetBookingProcess.js's transitionForStatus() picks
+  // between them from the transaction's real current state.
   LAUNDRY_MARK_READY: 'transition/laundry-mark-ready',
+  LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING: 'transition/laundry-mark-ready-from-initial-cleaning',
   LAUNDRY_CONFIRM_PICKUP: 'transition/laundry-confirm-pickup',
   LAUNDRY_CONFIRM_RETURN: 'transition/laundry-confirm-return',
   LAUNDRY_CONFIRM_RETURN_LATE: 'transition/laundry-confirm-return-late',
@@ -98,15 +130,18 @@ export const transitions = {
   COMPLETE: 'transition/complete',
   OPERATOR_COMPLETE: 'transition/operator-complete',
 
-  // Reviews are given through transaction transitions. Review 1 can be
-  // by provider or customer, and review 2 will be the other party of
-  // the transaction.
-  REVIEW_1_BY_PROVIDER: 'transition/review-1-by-provider',
-  REVIEW_2_BY_PROVIDER: 'transition/review-2-by-provider',
+  // ONE-SIDED REVIEWS (2026-09-21).
+  //
+  //   > "puedes eliminar el flujo en el que el provider haga review del customer, de manera
+  //   >  que si el customer hace un review, se publica el review y ahi finaliza la
+  //   >  transaccion" (Jonathan, 2026-09-21)
+  //
+  // The provider can no longer review the customer at all: REVIEW_1_BY_PROVIDER,
+  // REVIEW_2_BY_PROVIDER, REVIEW_2_BY_CUSTOMER, EXPIRE_CUSTOMER_REVIEW_PERIOD and
+  // EXPIRE_PROVIDER_REVIEW_PERIOD (all only reachable through a provider review) are gone.
+  // REVIEW_1_BY_CUSTOMER now publishes and ends the transaction in the same step, since the
+  // customer is the only reviewer left.
   REVIEW_1_BY_CUSTOMER: 'transition/review-1-by-customer',
-  REVIEW_2_BY_CUSTOMER: 'transition/review-2-by-customer',
-  EXPIRE_CUSTOMER_REVIEW_PERIOD: 'transition/expire-customer-review-period',
-  EXPIRE_PROVIDER_REVIEW_PERIOD: 'transition/expire-provider-review-period',
   EXPIRE_REVIEW_PERIOD: 'transition/expire-review-period',
 };
 
@@ -127,6 +162,10 @@ export const states = {
   PREAUTHORIZED: 'preauthorized',
   DECLINED: 'declined',
   ACCEPTED: 'accepted',
+  // The first-time drop-off's own "in cleaning" state (2026-09-21) - see
+  // LAUNDRY_RECEIVE_FROM_PROVIDER above. The return leg's equivalent moment already has one
+  // (CLEANING); this is the same idea for the leg that used to have none.
+  INITIAL_CLEANING: 'initial-cleaning',
   READY_FOR_PICKUP: 'ready-for-pickup',
   PICKED_UP: 'picked-up',
   OVERDUE: 'overdue',
@@ -135,9 +174,9 @@ export const states = {
   EXPIRED: 'expired',
   CANCELED: 'canceled',
   DELIVERED: 'delivered',
+  // REVIEWED_BY_CUSTOMER and REVIEWED_BY_PROVIDER are gone (2026-09-21): with only one
+  // reviewer left, REVIEW_1_BY_CUSTOMER goes straight from DELIVERED to REVIEWED.
   REVIEWED: 'reviewed',
-  REVIEWED_BY_CUSTOMER: 'reviewed-by-customer',
-  REVIEWED_BY_PROVIDER: 'reviewed-by-provider',
 };
 
 /**
@@ -194,10 +233,24 @@ export const graph = {
     [states.EXPIRED]: {},
     [states.ACCEPTED]: {
       on: {
+        // Garment already at the studio (onLaundry was true): straight to READY_FOR_PICKUP,
+        // no wash needed. See LAUNDRY_MARK_READY's comment above.
         [transitions.LAUNDRY_MARK_READY]: states.READY_FOR_PICKUP,
+        // Garment coming from its owner for the first time: it gets a wash first.
+        [transitions.LAUNDRY_RECEIVE_FROM_PROVIDER]: states.INITIAL_CLEANING,
         [transitions.CANCEL]: states.CANCELED,
         [transitions.COMPLETE]: states.DELIVERED,
         [transitions.OPERATOR_COMPLETE]: states.DELIVERED,
+      },
+    },
+
+    // First-time drop-off's "in cleaning" moment (2026-09-21) - see
+    // LAUNDRY_RECEIVE_FROM_PROVIDER above.
+    [states.INITIAL_CLEANING]: {
+      on: {
+        [transitions.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING]: states.READY_FOR_PICKUP,
+        [transitions.CANCEL_FROM_INITIAL_CLEANING]: states.CANCELED,
+        [transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING]: states.DELIVERED,
       },
     },
 
@@ -243,26 +296,15 @@ export const graph = {
     },
 
     [states.CANCELED]: {},
+    // Only one exit left (2026-09-21): REVIEW_1_BY_CUSTOMER now publishes and lands on REVIEWED
+    // directly, since there is no provider review to wait for any more.
     [states.DELIVERED]: {
       on: {
         [transitions.EXPIRE_REVIEW_PERIOD]: states.REVIEWED,
-        [transitions.REVIEW_1_BY_CUSTOMER]: states.REVIEWED_BY_CUSTOMER,
-        [transitions.REVIEW_1_BY_PROVIDER]: states.REVIEWED_BY_PROVIDER,
+        [transitions.REVIEW_1_BY_CUSTOMER]: states.REVIEWED,
       },
     },
 
-    [states.REVIEWED_BY_CUSTOMER]: {
-      on: {
-        [transitions.REVIEW_2_BY_PROVIDER]: states.REVIEWED,
-        [transitions.EXPIRE_PROVIDER_REVIEW_PERIOD]: states.REVIEWED,
-      },
-    },
-    [states.REVIEWED_BY_PROVIDER]: {
-      on: {
-        [transitions.REVIEW_2_BY_CUSTOMER]: states.REVIEWED,
-        [transitions.EXPIRE_CUSTOMER_REVIEW_PERIOD]: states.REVIEWED,
-      },
-    },
     [states.REVIEWED]: { type: 'final' },
   },
 };
@@ -275,6 +317,7 @@ export const isRelevantPastTransition = transition => {
     transitions.ACCEPT,
     transitions.OPERATOR_ACCEPT,
     transitions.CANCEL,
+    transitions.CANCEL_FROM_INITIAL_CLEANING,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,
     transitions.CANCEL_FROM_OVERDUE,
@@ -287,7 +330,9 @@ export const isRelevantPastTransition = transition => {
     transitions.EXPIRE,
     // The laundry custody chain is the customer-facing timeline, so every
     // step of it belongs in the activity feed.
+    transitions.LAUNDRY_RECEIVE_FROM_PROVIDER,
     transitions.LAUNDRY_MARK_READY,
+    transitions.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING,
     transitions.LAUNDRY_CONFIRM_PICKUP,
     transitions.LAUNDRY_CONFIRM_RETURN,
     transitions.LAUNDRY_CONFIRM_RETURN_LATE,
@@ -297,29 +342,26 @@ export const isRelevantPastTransition = transition => {
     transitions.LAUNDRY_MARK_AVAILABLE,
     transitions.MARK_OVERDUE,
     // The backstops move money and end the rental, so they are shown too.
+    transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
     transitions.AUTO_COMPLETE_FROM_READY,
     transitions.AUTO_COMPLETE_FROM_PICKED_UP,
     transitions.AUTO_COMPLETE_FROM_OVERDUE,
     transitions.AUTO_COMPLETE_FROM_RETURNED,
     transitions.AUTO_COMPLETE_FROM_CLEANING,
     transitions.REVIEW_1_BY_CUSTOMER,
-    transitions.REVIEW_1_BY_PROVIDER,
-    transitions.REVIEW_2_BY_CUSTOMER,
-    transitions.REVIEW_2_BY_PROVIDER,
   ].includes(transition);
 };
 
 // Processes might be different on how reviews are handled.
 // Default processes use two-sided diamond shape, where either party can make the review first
 export const isCustomerReview = transition => {
-  return [transitions.REVIEW_1_BY_CUSTOMER, transitions.REVIEW_2_BY_CUSTOMER].includes(transition);
+  return [transitions.REVIEW_1_BY_CUSTOMER].includes(transition);
 };
 
-// Processes might be different on how reviews are handled.
-// Default processes use two-sided diamond shape, where either party can make the review first
-export const isProviderReview = transition => {
-  return [transitions.REVIEW_1_BY_PROVIDER, transitions.REVIEW_2_BY_PROVIDER].includes(transition);
-};
+// ONE-SIDED REVIEWS (2026-09-21): the provider can no longer review the customer at all, so
+// this always returns false. Kept (rather than deleted) because ActivityFeed.js calls
+// `process.isProviderReview` generically across every process module.
+export const isProviderReview = () => false;
 
 // Check if the given transition is privileged.
 //
@@ -342,6 +384,7 @@ export const isPrivileged = transition => {
 export const isCompleted = transition => {
   const txCompletedTransitions = [
     transitions.LAUNDRY_MARK_AVAILABLE,
+    transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
     transitions.AUTO_COMPLETE_FROM_READY,
     transitions.AUTO_COMPLETE_FROM_PICKED_UP,
     transitions.AUTO_COMPLETE_FROM_OVERDUE,
@@ -350,12 +393,7 @@ export const isCompleted = transition => {
     transitions.COMPLETE,
     transitions.OPERATOR_COMPLETE,
     transitions.REVIEW_1_BY_CUSTOMER,
-    transitions.REVIEW_1_BY_PROVIDER,
-    transitions.REVIEW_2_BY_CUSTOMER,
-    transitions.REVIEW_2_BY_PROVIDER,
     transitions.EXPIRE_REVIEW_PERIOD,
-    transitions.EXPIRE_CUSTOMER_REVIEW_PERIOD,
-    transitions.EXPIRE_PROVIDER_REVIEW_PERIOD,
   ];
   return txCompletedTransitions.includes(transition);
 };
@@ -372,6 +410,7 @@ export const isRefunded = transition => {
     transitions.EXPIRE_PAYMENT,
     transitions.EXPIRE,
     transitions.CANCEL,
+    transitions.CANCEL_FROM_INITIAL_CLEANING,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,
     transitions.CANCEL_FROM_OVERDUE,
@@ -433,6 +472,7 @@ export const HANDOVER_QR_TRANSITIONS = [
  */
 export const PAYOUT_TRANSITIONS = [
   transitions.LAUNDRY_MARK_PENDING_CLEANING,
+  transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
   transitions.AUTO_COMPLETE_FROM_READY,
   transitions.AUTO_COMPLETE_FROM_PICKED_UP,
   transitions.AUTO_COMPLETE_FROM_OVERDUE,
@@ -474,8 +514,15 @@ export const hasPaidOut = (txTransitions = []) =>
 // "que acepte o que se autoacepte" needs no branch. Auto-accept is a transition INTO
 // ACCEPTED, exactly like a manual accept - the two paths differ in who triggered them, not in
 // where they land - so a rule keyed on the state covers both without knowing which happened.
+//
+// INITIAL_CLEANING belongs in this list too (2026-09-21): it sits BETWEEN accept and the first
+// handover, on the leg where the garment goes to the studio for its first wash before the
+// renter ever collects it. The code does not change while it is there - leaving it out would
+// make the customer's own code vanish the moment the studio received the garment and reappear
+// at READY_FOR_PICKUP, for no reason a renter could see.
 const HANDOVER_QR_STATES_AFTER_ACCEPT = [
   states.ACCEPTED,
+  states.INITIAL_CLEANING,
   states.READY_FOR_PICKUP,
   states.PICKED_UP,
   states.OVERDUE,
@@ -529,12 +576,10 @@ export const HANDOVER_QR_PROVIDER_DROP_OFF_STATES = [states.ACCEPTED];
 
 export const HANDOVER_QR_PROVIDER_COLLECT_STATES = [
   states.DELIVERED,
-  // The wash is finished at DELIVERED and the garment does not move again on its own; the
-  // review states are bookkeeping between two humans that happen afterwards. An owner who
+  // The wash is finished at DELIVERED and the garment does not move again on its own; REVIEWED
+  // is bookkeeping between the customer and the process that happens afterwards. An owner who
   // has not been to collect yet still needs the code on the day they go.
   states.REVIEWED,
-  states.REVIEWED_BY_CUSTOMER,
-  states.REVIEWED_BY_PROVIDER,
   states.CANCELED,
 ];
 

@@ -60,7 +60,20 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
   // namespace.
   const transitionMessages = [
     {
+      // The first-time drop-off's own "in cleaning" moment (2026-09-21) - see
+      // transitions.LAUNDRY_RECEIVE_FROM_PROVIDER in transactionProcessCoclosetBooking.js.
+      transition: transitions.LAUNDRY_RECEIVE_FROM_PROVIDER,
+      translationId:
+        'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-receive-from-provider',
+    },
+    {
       transition: transitions.LAUNDRY_MARK_READY,
+      translationId: 'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-mark-ready',
+    },
+    {
+      // Same outcome, same message as LAUNDRY_MARK_READY above - see that transition's comment
+      // in transactionProcessCoclosetBooking.js for why "mark ready" has two names.
+      transition: transitions.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING,
       translationId: 'TransactionPage.ActivityFeed.cocloset-booking.transition.laundry-mark-ready',
     },
     {
@@ -145,6 +158,11 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
       .cond([states.ACCEPTED, _], () => {
         return { ...shared, showDetailCardHeadings: true };
       })
+      // The first-time drop-off's own "in cleaning" moment (2026-09-21). Same shape as
+      // ACCEPTED/RETURNED/CLEANING: nobody but the laundry acts here.
+      .cond([states.INITIAL_CLEANING, _], () => {
+        return { ...shared, showDetailCardHeadings: true };
+      })
       .cond([states.READY_FOR_PICKUP, CUSTOMER], () => {
         return { ...shared, showDetailCardHeadings: true, showExtraInfo: true };
       })
@@ -173,7 +191,12 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
       // ---- Completion and reviews ----------------------------------------
       // Reaching `delivered` is what opens the review window, exactly as in
       // default-booking - it just happens later here, when cleaning finishes.
-      .cond([states.DELIVERED, _], () => {
+      //
+      // CUSTOMER ONLY (2026-09-21): the provider can no longer review the customer at all -
+      // see the EDN's :transition/review-1-by-customer comment. REVIEWED_BY_PROVIDER and
+      // REVIEWED_BY_CUSTOMER are gone with it (nothing can reach them any more), so there is
+      // no second review step to show either party.
+      .cond([states.DELIVERED, CUSTOMER], () => {
         return {
           ...shared,
           showDetailCardHeadings: true,
@@ -182,23 +205,8 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
           primaryButtonProps: leaveReviewProps,
         };
       })
-      .cond([states.REVIEWED_BY_PROVIDER, CUSTOMER], () => {
-        return {
-          ...shared,
-          showDetailCardHeadings: true,
-          showReviewAsSecondLink: true,
-          showActionButtons: true,
-          primaryButtonProps: leaveReviewProps,
-        };
-      })
-      .cond([states.REVIEWED_BY_CUSTOMER, PROVIDER], () => {
-        return {
-          ...shared,
-          showDetailCardHeadings: true,
-          showReviewAsSecondLink: true,
-          showActionButtons: true,
-          primaryButtonProps: leaveReviewProps,
-        };
+      .cond([states.DELIVERED, PROVIDER], () => {
+        return { ...shared, showDetailCardHeadings: true };
       })
       .cond([states.REVIEWED, _], () => {
         return { ...shared, showDetailCardHeadings: true, showReviews: true };

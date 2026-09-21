@@ -27,6 +27,7 @@ const TRANSITION_PER_STATE = {
   accepted: transitions.ACCEPT,
   declined: transitions.DECLINE,
   expired: transitions.EXPIRE,
+  'initial-cleaning': transitions.LAUNDRY_RECEIVE_FROM_PROVIDER,
   'ready-for-pickup': transitions.LAUNDRY_MARK_READY,
   'picked-up': transitions.LAUNDRY_CONFIRM_PICKUP,
   overdue: transitions.MARK_OVERDUE,
@@ -34,8 +35,6 @@ const TRANSITION_PER_STATE = {
   cleaning: transitions.LAUNDRY_MARK_PENDING_CLEANING,
   canceled: transitions.CANCEL,
   delivered: transitions.LAUNDRY_MARK_AVAILABLE,
-  'reviewed-by-customer': transitions.REVIEW_1_BY_CUSTOMER,
-  'reviewed-by-provider': transitions.REVIEW_1_BY_PROVIDER,
   reviewed: transitions.EXPIRE_REVIEW_PERIOD,
 };
 
@@ -68,13 +67,15 @@ describe('InboxPage state data for cocloset-booking', () => {
   it('flags the customer, and only the customer, during the states they have to act on', () => {
     // The laundry drives most of the chain and has no inbox, so `actionNeeded`
     // must not light up rows nobody can do anything about.
-    const customerActs = ['ready-for-pickup', 'overdue'];
+    // `delivered` joined this list 2026-09-21: the provider can no longer review the customer
+    // at all, so reaching `delivered` is only ever "on" the customer now.
+    const customerActs = ['ready-for-pickup', 'overdue', 'delivered'];
     customerActs.forEach(state => {
       expect(stateDataFor(TRANSITION_PER_STATE[state], 'customer').actionNeeded).toBe(true);
       expect(stateDataFor(TRANSITION_PER_STATE[state], 'provider').actionNeeded).toBeFalsy();
     });
 
-    ['accepted', 'picked-up', 'returned', 'cleaning'].forEach(state => {
+    ['accepted', 'initial-cleaning', 'picked-up', 'returned', 'cleaning'].forEach(state => {
       ROLES.forEach(role => {
         expect(stateDataFor(TRANSITION_PER_STATE[state], role).actionNeeded).toBeFalsy();
       });
@@ -127,6 +128,7 @@ describe('InboxPage state data for cocloset-booking', () => {
       // A rental in progress is not a verdict. Colouring the whole chain would
       // leave nothing for the two endings to stand out against.
       [
+        'initial-cleaning',
         'ready-for-pickup',
         'picked-up',
         'overdue',

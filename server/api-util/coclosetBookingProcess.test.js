@@ -257,7 +257,15 @@ describe('coclosetBookingProcess', () => {
   describe('ACTIVE_STATES / ACTIVE_LAST_TRANSITIONS', () => {
     it('is exactly "accepted, and not yet in a terminal state"', () => {
       expect(ACTIVE_STATES.slice().sort()).toEqual(
-        ['accepted', 'cleaning', 'overdue', 'picked-up', 'ready-for-pickup', 'returned'].sort()
+        [
+          'accepted',
+          'initial-cleaning',
+          'cleaning',
+          'overdue',
+          'picked-up',
+          'ready-for-pickup',
+          'returned',
+        ].sort()
       );
     });
 
@@ -279,8 +287,6 @@ describe('coclosetBookingProcess', () => {
         STATES.CANCELED,
         STATES.DELIVERED,
         STATES.REVIEWED,
-        STATES.REVIEWED_BY_CUSTOMER,
-        STATES.REVIEWED_BY_PROVIDER,
       ].forEach(state => expect(ACTIVE_STATES).not.toContain(state));
     });
 

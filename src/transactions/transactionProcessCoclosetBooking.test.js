@@ -111,7 +111,11 @@ describe('the JS graph matches ext/transaction-processes/cocloset-booking/proces
   const ednTransitions = readEdnTransitions();
 
   it('reads a plausible number of transitions out of the EDN', () => {
-    expect(ednTransitions.length).toEqual(38);
+    // 2026-09-21: +4 for the initial-cleaning split (laundry-receive-from-provider,
+    // laundry-mark-ready-from-initial-cleaning, cancel-from-initial-cleaning,
+    // auto-complete-from-initial-cleaning), -5 for the removed provider-review diamond
+    // (review-1/-2-by-provider, review-2-by-customer, expire-customer/-provider-review-period).
+    expect(ednTransitions.length).toEqual(37);
   });
 
   it('declares exactly the transitions the EDN declares', () => {
@@ -189,6 +193,7 @@ describe('cocloset-booking graph shape', () => {
 
   it('gives every laundry state an automatic exit to delivered', () => {
     const backstops = {
+      [states.INITIAL_CLEANING]: transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
       [states.READY_FOR_PICKUP]: transitions.AUTO_COMPLETE_FROM_READY,
       [states.PICKED_UP]: transitions.AUTO_COMPLETE_FROM_PICKED_UP,
       [states.OVERDUE]: transitions.AUTO_COMPLETE_FROM_OVERDUE,
@@ -203,6 +208,7 @@ describe('cocloset-booking graph shape', () => {
   it('has no laundry state without an outgoing edge', () => {
     [
       states.ACCEPTED,
+      states.INITIAL_CLEANING,
       states.READY_FOR_PICKUP,
       states.PICKED_UP,
       states.OVERDUE,
@@ -213,21 +219,23 @@ describe('cocloset-booking graph shape', () => {
     });
   });
 
-  it('leaves the review diamond reachable only from delivered', () => {
-    expect(process.getTransitionsToStates([states.REVIEWED_BY_CUSTOMER])).toEqual([
-      transitions.REVIEW_1_BY_CUSTOMER,
-    ]);
-    expect(process.getTransitionsToStates([states.REVIEWED_BY_PROVIDER])).toEqual([
-      transitions.REVIEW_1_BY_PROVIDER,
-    ]);
+  it('leaves reviewed reachable only from delivered, with no diamond any more (2026-09-21)', () => {
+    // There used to be a two-sided diamond (reviewed-by-customer / reviewed-by-provider)
+    // between delivered and reviewed. The provider can no longer review at all, so
+    // review-1-by-customer now goes straight to REVIEWED, alongside expire-review-period -
+    // exactly the two edges DELIVERED already has (see the "walks... to delivered" tests).
+    expect(process.getTransitionsToStates([states.REVIEWED]).sort()).toEqual(
+      [transitions.REVIEW_1_BY_CUSTOMER, transitions.EXPIRE_REVIEW_PERIOD].sort()
+    );
   });
 
-  it('lists all eight ways of reaching delivered', () => {
+  it('lists all nine ways of reaching delivered', () => {
     expect(process.getTransitionsToStates([states.DELIVERED]).sort()).toEqual(
       [
         transitions.COMPLETE,
         transitions.OPERATOR_COMPLETE,
         transitions.LAUNDRY_MARK_AVAILABLE,
+        transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
         transitions.AUTO_COMPLETE_FROM_READY,
         transitions.AUTO_COMPLETE_FROM_PICKED_UP,
         transitions.AUTO_COMPLETE_FROM_OVERDUE,
@@ -256,6 +264,7 @@ describe('cocloset-booking payout and cancel topology', () => {
       [
         transitions.COMPLETE,
         transitions.OPERATOR_COMPLETE,
+        transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
         transitions.AUTO_COMPLETE_FROM_READY,
         transitions.AUTO_COMPLETE_FROM_PICKED_UP,
         transitions.AUTO_COMPLETE_FROM_OVERDUE,
@@ -282,6 +291,7 @@ describe('cocloset-booking payout and cancel topology', () => {
         transitions.OPERATOR_DECLINE,
         transitions.EXPIRE,
         transitions.CANCEL,
+        transitions.CANCEL_FROM_INITIAL_CLEANING,
         transitions.CANCEL_FROM_READY_FOR_PICKUP,
         transitions.CANCEL_FROM_PICKED_UP,
         transitions.CANCEL_FROM_OVERDUE,
@@ -325,6 +335,7 @@ describe('cocloset-booking payout and cancel topology', () => {
   it('offers an operator cancel from every state that has not been paid out yet', () => {
     const cancelFrom = {
       [states.ACCEPTED]: transitions.CANCEL,
+      [states.INITIAL_CLEANING]: transitions.CANCEL_FROM_INITIAL_CLEANING,
       [states.READY_FOR_PICKUP]: transitions.CANCEL_FROM_READY_FOR_PICKUP,
       [states.PICKED_UP]: transitions.CANCEL_FROM_PICKED_UP,
       [states.OVERDUE]: transitions.CANCEL_FROM_OVERDUE,
@@ -350,18 +361,18 @@ describe('cocloset-booking predicates', () => {
     expect(isPrivileged(transitions.LAUNDRY_CONFIRM_RETURN)).toEqual(false);
   });
 
-  it('isCompleted covers every transition into delivered plus the review diamond', () => {
+  it('isCompleted covers every transition into delivered plus the one-sided review exit', () => {
     [
       transitions.COMPLETE,
       transitions.OPERATOR_COMPLETE,
       transitions.LAUNDRY_MARK_AVAILABLE,
+      transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
       transitions.AUTO_COMPLETE_FROM_READY,
       transitions.AUTO_COMPLETE_FROM_PICKED_UP,
       transitions.AUTO_COMPLETE_FROM_OVERDUE,
       transitions.AUTO_COMPLETE_FROM_RETURNED,
       transitions.AUTO_COMPLETE_FROM_CLEANING,
       transitions.REVIEW_1_BY_CUSTOMER,
-      transitions.REVIEW_2_BY_PROVIDER,
       transitions.EXPIRE_REVIEW_PERIOD,
     ].forEach(t => expect(isCompleted(t)).toEqual(true));
 
@@ -378,6 +389,7 @@ describe('cocloset-booking predicates', () => {
       transitions.EXPIRE_PAYMENT,
       transitions.EXPIRE,
       transitions.CANCEL,
+      transitions.CANCEL_FROM_INITIAL_CLEANING,
       transitions.CANCEL_FROM_READY_FOR_PICKUP,
       transitions.CANCEL_FROM_PICKED_UP,
       transitions.CANCEL_FROM_OVERDUE,
@@ -399,7 +411,9 @@ describe('cocloset-booking predicates', () => {
 
   it('isRelevantPastTransition shows the whole laundry timeline', () => {
     [
+      transitions.LAUNDRY_RECEIVE_FROM_PROVIDER,
       transitions.LAUNDRY_MARK_READY,
+      transitions.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING,
       transitions.LAUNDRY_CONFIRM_PICKUP,
       transitions.LAUNDRY_CONFIRM_RETURN,
       transitions.LAUNDRY_CONFIRM_RETURN_LATE,
@@ -419,13 +433,13 @@ describe('cocloset-booking predicates', () => {
     ].forEach(t => expect(isRelevantPastTransition(t)).toEqual(false));
   });
 
-  it('isCustomerReview / isProviderReview are unchanged from default-booking', () => {
+  it('isCustomerReview is the only reviewer left; isProviderReview always false (2026-09-21)', () => {
+    // Unlike default-booking's still-bidirectional diamond, the provider can no longer review
+    // the customer at all here - see the EDN's :transition/review-1-by-customer comment.
     expect(isCustomerReview(transitions.REVIEW_1_BY_CUSTOMER)).toEqual(true);
-    expect(isCustomerReview(transitions.REVIEW_2_BY_CUSTOMER)).toEqual(true);
-    expect(isCustomerReview(transitions.REVIEW_1_BY_PROVIDER)).toEqual(false);
-    expect(isProviderReview(transitions.REVIEW_1_BY_PROVIDER)).toEqual(true);
-    expect(isProviderReview(transitions.REVIEW_2_BY_PROVIDER)).toEqual(true);
+    expect(isCustomerReview(transitions.EXPIRE_REVIEW_PERIOD)).toEqual(false);
     expect(isProviderReview(transitions.REVIEW_1_BY_CUSTOMER)).toEqual(false);
+    expect(isProviderReview(undefined)).toEqual(false);
   });
 
   it('only preauthorized needs the garment owner to act', () => {
@@ -565,15 +579,6 @@ describe('cocloset-booking owner notifications', () => {
       });
     });
 
-    it('survives the owner reviewing first', () => {
-      // review-1-by-provider leaves :state/delivered, which cancels everything
-      // scheduled there - including a reminder the renter still needs, since
-      // review-2-by-customer is open from :state/reviewed-by-provider.
-      const reminders = reminderOn(transitions.REVIEW_1_BY_PROVIDER);
-      expect(reminders.length).toEqual(1);
-      expect(reminders[0].role).toEqual('customer');
-    });
-
     it('is never scheduled where the renter cannot review yet', () => {
       // The literal reading of "three days after they returned the garment".
       // At :state/returned there is no review transition to point at.
@@ -666,6 +671,7 @@ describe('cocloset-booking owner notifications', () => {
   // -----------------------------------------------------------------------
   const CANCEL_TRANSITIONS = [
     transitions.CANCEL,
+    transitions.CANCEL_FROM_INITIAL_CLEANING,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,
     transitions.CANCEL_FROM_OVERDUE,
@@ -707,10 +713,12 @@ describe('cocloset-booking owner notifications', () => {
     });
   });
 
-  it('gives every one of the ten entries its own name', () => {
+  it('gives every one of the twelve entries its own name', () => {
+    // Six cancel transitions x two roles each = twelve (2026-09-21 added
+    // cancel-from-initial-cleaning as the sixth).
     const names = CANCEL_TRANSITIONS.flatMap(notificationsOn);
-    expect(names).toHaveLength(10);
-    expect(new Set(names).size).toEqual(10);
+    expect(names).toHaveLength(12);
+    expect(new Set(names).size).toEqual(12);
   });
 });
 
