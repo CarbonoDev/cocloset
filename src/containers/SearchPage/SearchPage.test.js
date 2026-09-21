@@ -127,6 +127,12 @@ const listingFields = [
     },
   },
   {
+    // Named for what this field's OWN config still says, not for how it renders any more:
+    // `validFilterType` (configHelpers.js) now forces every enum/multi-enum field to
+    // SelectMultipleFilter regardless of what filterType is configured here (Jonathan,
+    // 2026-09-21: "no solo es para brand o size, debe ser para todos los fields"). This fixture
+    // exists specifically to prove that override reaches even a field explicitly configured
+    // for single-select, the same as `enumOptions`-driven fields would be on the live app.
     key: 'singleSelectTest',
     scope: 'public',
     schemaType: 'enum',
@@ -371,8 +377,11 @@ describe('SearchPage', () => {
       expect(queryByText('Boat')).not.toBeInTheDocument();
       // Has(!) Amenities filter (secondary filter) (it contains also legend for screen readers)
       expect(getAllByText('Amenities')).toHaveLength(2);
-      // Has Single Select Test filter
-      expect(getByText('Single Select Test')).toBeInTheDocument();
+      // Has Single Select Test filter - now rendered as multi-select regardless of its own
+      // `filterType: 'SelectSingleFilter'` config (2026-09-21), so it duplicates its label the
+      // same way the multi-enum 'Amenities' filter above does (fieldset legend for screen
+      // readers, same as an inline SelectMultipleFilter always has).
+      expect(getAllByText('Single Select Test')).toHaveLength(2);
       expect(getByText('Enum 1')).toBeInTheDocument();
       expect(getByText('Enum 2')).toBeInTheDocument();
 

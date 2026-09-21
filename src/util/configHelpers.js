@@ -530,15 +530,33 @@ const validSchemaOptions = (enumOptions, schemaType) => {
 
 // listingFieldsConfig.filterConfig
 const filterTypes = ['SelectSingleFilter', 'SelectMultipleFilter'];
+// EVERY ENUM/MULTI-ENUM FILTER IS MULTI-SELECT NOW.
+//
+//   > "puedes hacer que los filtros sean multiples? Es decir, que no se seleccione una única
+//   >  opción, por ejemplo, puedo buscar dos brands o tres sizes a la vez... no solo es para
+//   >  brand o size, debe ser para todos los fields" (Jonathan, 2026-09-21)
+//
+// Whatever `filterType` a Console-hosted listing field is configured with is now IGNORED for
+// enum/multi-enum schema types - this always emits `SelectMultipleFilter`, which is what
+// FilterComponent.js reads to decide between a single dropdown and a checkbox group. That is
+// the one lever needed: an enum field's STORED value is unchanged (still one option per
+// listing), and Sharetribe already resolves a comma-separated value on a plain enum param as
+// "any of these" natively - no search-schema change, no data migration, no change to how a
+// provider fills the field in when creating a listing.
+//
+// This is deliberately unconditional rather than "default to multi, unless Console says
+// otherwise": Jonathan asked for every field, and an operator who explicitly set
+// SelectSingleFilter in Console for some field would otherwise still get single-select,
+// silently contradicting "todos los fields". If a field ever needs to go back to single-select,
+// that is a code change here, not a Console setting, until a real per-field decision is asked
+// for again.
 const validFilterType = (filterType, schemaType) => {
   const isEnumSchemaType = ['enum', 'multi-enum'].includes(schemaType);
   const isUndefined = typeof searchMode === 'undefined';
   const isKnownFilterType = filterTypes.includes(filterType);
   const shouldHaveFilterType = isEnumSchemaType && (isKnownFilterType || isUndefined);
   const isValid = !isEnumSchemaType || shouldHaveFilterType;
-  const filterTypeMaybe = shouldHaveFilterType
-    ? { filterType: filterType || 'SelectMultipleFilter' }
-    : {};
+  const filterTypeMaybe = shouldHaveFilterType ? { filterType: 'SelectMultipleFilter' } : {};
   return [isValid, filterTypeMaybe];
 };
 
