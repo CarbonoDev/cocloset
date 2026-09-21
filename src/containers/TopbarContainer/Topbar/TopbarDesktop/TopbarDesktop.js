@@ -78,7 +78,11 @@ const LaundryLinkMaybe = ({ isAuthenticated, currentUser }) => {
       params={{ pageId: 'become-a-partner' }}
     >
       <span className={css.topbarLinkLabel}>
-        <FormattedMessage id="TopbarDesktop.laundry" />
+        {/* Anonymous readers get "Partner", not "Laundry" - the link goes to the partner
+            pitch either way, but a visitor who has never heard of the studio side reads
+            "Laundry" as a filter/category rather than as an invitation to sign up as one.
+            An authenticated laundry account keeps "Laundry" (its own ops dashboard). */}
+        <FormattedMessage id="TopbarDesktop.becomePartner" />
       </span>
     </NamedLink>
   );
