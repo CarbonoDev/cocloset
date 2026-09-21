@@ -105,11 +105,58 @@
   ;; privileged actions without :privileged? true.
   ;; ---------------------------------------------------------------------
 
+  {:name :transition/laundry-receive-from-provider,
+   :actor :actor.role/operator,
+   ;; THE FIRST-TIME LEG GETS AN "IN CLEANING" STATUS TOO.
+   ;;
+   ;;   > "cuando laundry ingrese el ticket para iniciar el lavado, entre a un status de IN
+   ;;   >  CLEANING, en ambas direcciones, es decir, cuando el provider lleve la prenda por
+   ;;   >  primera vez" (Jonathan, 2026-09-21)
+   ;;
+   ;; ONLY on the path where the garment was NOT already at the studio - server/api/
+   ;; laundry-receive-garment.js only ever calls this when the listing's `onLaundry` was false,
+   ;; exactly the case this quote describes ("por primera vez"). A garment that starts a rental
+   ;; already sitting on the studio's rack (`onLaundry` true - it never left after a previous
+   ;; cycle, and was already cleaned then) skips this entirely and goes straight from
+   ;; :state/accepted to :state/ready-for-pickup via :transition/laundry-mark-ready below,
+   ;; unchanged from before this quote: there is nothing to wash a second time.
+   ;;
+   ;; Replaces server/api/laundry-receive-garment.js's former metadata-only write (see the
+   ;; comment that used to live there, quoted in the client mirror): that endpoint deliberately
+   ;; fired NO transition, specifically to avoid a process push. Now that a push is happening
+   ;; anyway (bundled with the review-flow change below, per Jonathan's request), the garment
+   ;; being physically received gets its own real state instead of hiding inside `accepted`.
+   ;;
+   ;; NO METADATA CHANGES HERE. `onLaundry` stays a LISTING field (this action can only write
+   ;; TRANSACTION metadata) and `laundryCode` keeps being written by the endpoint's own
+   ;; existing, separate Integration API calls - unchanged behaviour, now just wrapped in a real
+   ;; transition instead of none. The action is carried anyway, matching every other laundry
+   ;; transition, in case a future write needs to ride along.
+   :actions [{:name :action/privileged-update-metadata}],
+   :from :state/accepted,
+   :to :state/initial-cleaning}
   {:name :transition/laundry-mark-ready,
    :actor :actor.role/operator,
+   ;; THE "ALREADY AT THE STUDIO" PATH. :from stayed :state/accepted (unchanged by the
+   ;; 2026-09-21 change above) because this is what fires when `onLaundry` was already true at
+   ;; acceptance - see the note on :transition/laundry-receive-from-provider. A second,
+   ;; :from :state/initial-cleaning transition covers the other path; `:from` is single-valued
+   ;; in the EDN, so one "mark ready" step now needs two names, exactly like
+   ;; laundry-confirm-return / laundry-confirm-return-late already do for "the garment came
+   ;; back". server/api-util/coclosetBookingProcess.js's transitionForStatus() picks between
+   ;; them from the transaction's real current state, the same way it already does for that.
+   ;;
    ;; Metadata written here: ticketCode, currentRack, preparedBy.
    :actions [{:name :action/privileged-update-metadata}],
    :from :state/accepted,
+   :to :state/ready-for-pickup}
+  {:name :transition/laundry-mark-ready-from-initial-cleaning,
+   :actor :actor.role/operator,
+   ;; THE "CAME IN FOR ITS FIRST WASH" PATH. Same outcome, same metadata as
+   ;; :transition/laundry-mark-ready above - see that transition's comment for why this is a
+   ;; second name rather than a second legal :from on one transition.
+   :actions [{:name :action/privileged-update-metadata}],
+   :from :state/initial-cleaning,
    :to :state/ready-for-pickup}
   {:name :transition/laundry-confirm-pickup,
    :actor :actor.role/operator,
@@ -282,6 +329,21 @@
    :actions [],
    :from :state/cleaning,
    :to :state/delivered}
+  {:name :transition/auto-complete-from-initial-cleaning,
+   ;; NEW (2026-09-21), alongside :state/initial-cleaning itself. The laundry received the
+   ;; garment for its first wash but never marked it ready - the same "laundry stopped
+   ;; scanning" failure every other laundry-managed state already guards against. Carries the
+   ;; payout, same as auto-complete-from-ready/-picked-up/-overdue/-returned: none of those has
+   ;; fired yet on this path. 30 days, matching auto-complete-from-ready - both describe a
+   ;; garment that is essentially through the laundry's part of the job with nobody closing the
+   ;; loop, not a live rental in progress.
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/initial-cleaning]}
+     {:fn/period ["P30D"]}]},
+   :actions [{:name :action/stripe-create-payout}],
+   :from :state/initial-cleaning,
+   :to :state/delivered}
 
   ;; ---------------------------------------------------------------------
   ;; Completion and cancellation
@@ -295,24 +357,29 @@
   ;;
   ;; Payout fires exactly once on every path to :state/delivered:
   ;;
-  ;;   accepted    -> complete / operator-complete
-  ;;   ready-...   -> auto-complete-from-ready
-  ;;   picked-up   -> auto-complete-from-picked-up
-  ;;   overdue     -> auto-complete-from-overdue
-  ;;   returned    -> laundry-mark-pending-cleaning (into :state/cleaning)
-  ;;   returned    -> auto-complete-from-returned
+  ;;   accepted          -> complete / operator-complete
+  ;;   initial-cleaning  -> auto-complete-from-initial-cleaning
+  ;;   ready-...         -> auto-complete-from-ready
+  ;;   picked-up         -> auto-complete-from-picked-up
+  ;;   overdue           -> auto-complete-from-overdue
+  ;;   returned          -> laundry-mark-pending-cleaning (into :state/cleaning)
+  ;;   returned          -> auto-complete-from-returned
   ;;
   ;; :state/cleaning therefore has no payout on either of its exits
   ;; (laundry-mark-available, auto-complete-from-cleaning): the owner was
-  ;; already paid on entering it.
+  ;; already paid on entering it. :state/initial-cleaning is NOT the same
+  ;; kind of exception - it sits on the FIRST-time leg, before any payout
+  ;; has fired on any path, so unlike :state/cleaning it still needs (and
+  ;; has) both a cancel and a payout-carrying backstop.
   ;;
   ;; Consequently every pre-payout state has an operator cancel:
   ;;
-  ;;   accepted         -> cancel
-  ;;   ready-for-pickup -> cancel-from-ready-for-pickup
-  ;;   picked-up        -> cancel-from-picked-up
-  ;;   overdue          -> cancel-from-overdue
-  ;;   returned         -> cancel-from-returned
+  ;;   accepted          -> cancel
+  ;;   initial-cleaning  -> cancel-from-initial-cleaning
+  ;;   ready-for-pickup  -> cancel-from-ready-for-pickup
+  ;;   picked-up         -> cancel-from-picked-up
+  ;;   overdue           -> cancel-from-overdue
+  ;;   returned          -> cancel-from-returned
   ;;
   ;; and :state/cleaning deliberately has none, because a refund there is
   ;; not expressible.
@@ -341,6 +408,21 @@
     ;; the transition
     {:name :action/cancel-booking}],
    :from :state/accepted,
+   :to :state/cancelled}
+  {:name :transition/cancel-from-initial-cleaning,
+   :actor :actor.role/operator,
+   ;; NEW (2026-09-21), alongside :state/initial-cleaning itself: no payout has fired on this
+   ;; path yet, so this is a full refund, same actions as :transition/cancel. Without this, a
+   ;; booking whose garment reached the laundry for its first wash would have no cancel path at
+   ;; all until the laundry marked it ready - the exact gap the process's own invariant above
+   ;; ("every pre-payout state has an operator cancel") says should not exist.
+   :actions
+   [{:name :action/calculate-full-refund}
+    {:name :action/stripe-refund-payment}
+    ;; Keep this action last in the list of actions for
+    ;; the transition
+    {:name :action/cancel-booking}],
+   :from :state/initial-cleaning,
    :to :state/cancelled}
   {:name :transition/cancel-from-ready-for-pickup,
    :actor :actor.role/operator,
@@ -420,53 +502,39 @@
   ;; entirely eliminate the review window for a slow cleaning cycle.
   ;; ---------------------------------------------------------------------
 
-  {:name :transition/review-1-by-provider,
-   :actor :actor.role/provider,
-   :actions [{:name :action/post-review-by-provider}],
-   :from :state/delivered,
-   :to :state/reviewed-by-provider}
-  {:name :transition/review-2-by-provider,
-   :actor :actor.role/provider,
-   :actions
-   [{:name :action/post-review-by-provider}
-    {:name :action/publish-reviews}],
-   :from :state/reviewed-by-customer,
-   :to :state/reviewed}
   {:name :transition/review-1-by-customer,
    :actor :actor.role/customer,
-   :actions [{:name :action/post-review-by-customer}],
-   :from :state/delivered,
-   :to :state/reviewed-by-customer}
-  {:name :transition/review-2-by-customer,
-   :actor :actor.role/customer,
+   ;; ONE-SIDED REVIEWS.
+   ;;
+   ;;   > "puedes eliminar el flujo en el que el provider haga review del customer, de manera
+   ;;   >  que si el customer hace un review, se publica el review y ahi finaliza la
+   ;;   >  transaccion" (Jonathan, 2026-09-21)
+   ;;
+   ;; The customer's review used to park in :state/reviewed-by-customer, waiting for the
+   ;; provider's own review (or its 7-day expiry) to publish and finish the transaction. There
+   ;; is no more provider review to wait for - this now goes straight to :state/reviewed and
+   ;; publishes in the same step, since the customer is the only reviewer left. The provider
+   ;; can no longer review the customer at all: :transition/review-1-by-provider,
+   ;; review-2-by-provider, review-2-by-customer, expire-provider-review-period and
+   ;; expire-customer-review-period (all only reachable through a provider review) are removed
+   ;; below, along with the two states nothing can reach any more,
+   ;; :state/reviewed-by-provider and :state/reviewed-by-customer.
    :actions
    [{:name :action/post-review-by-customer}
     {:name :action/publish-reviews}],
-   :from :state/reviewed-by-provider,
+   :from :state/delivered,
    :to :state/reviewed}
   {:name :transition/expire-review-period,
+   ;; UNCHANGED: the customer still gets the same wait Jonathan asked to keep ("se debe
+   ;; esperar un tiempo para que el customer haga el review tal y como se hace ahora") - if
+   ;; they never review within 7 days of :state/delivered, the transaction still finishes on
+   ;; its own, with nothing to publish.
    :at
    {:fn/plus
     [{:fn/timepoint [:time/first-entered-state :state/delivered]}
      {:fn/period ["P7D"]}]},
    :actions [],
    :from :state/delivered,
-   :to :state/reviewed}
-  {:name :transition/expire-provider-review-period,
-   :at
-   {:fn/plus
-    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
-     {:fn/period ["P7D"]}]},
-   :actions [{:name :action/publish-reviews}],
-   :from :state/reviewed-by-customer,
-   :to :state/reviewed}
-  {:name :transition/expire-customer-review-period,
-   :at
-   {:fn/plus
-    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
-     {:fn/period ["P7D"]}]},
-   :actions [{:name :action/publish-reviews}],
-   :from :state/reviewed-by-provider,
    :to :state/reviewed}],
  :notifications
  [{:name :notification/booking-new-request,
@@ -529,6 +597,25 @@
    :template :booking-pickup-reminder}
   {:name :notification/booking-garment-ready-to-provider,
    :on :transition/laundry-mark-ready,
+   :to :actor.role/provider,
+   :template :booking-garment-ready}
+  ;; SAME THREE, FOR THE OTHER "MARK READY" (2026-09-21). :on takes one transition, and
+  ;; :transition/laundry-mark-ready-from-initial-cleaning is a different transition reaching the
+  ;; same outcome - see its comment in the transitions above. Same three templates as
+  ;; laundry-confirm-return / laundry-confirm-return-late already duplicate for the same reason.
+  {:name :notification/booking-ready-for-pickup-from-initial-cleaning,
+   :on :transition/laundry-mark-ready-from-initial-cleaning,
+   :to :actor.role/customer,
+   :template :booking-ready-for-pickup}
+  {:name :notification/booking-pickup-reminder-from-initial-cleaning,
+   :on :transition/laundry-mark-ready-from-initial-cleaning,
+   :at
+   {:fn/minus
+    [{:fn/timepoint [:time/booking-start]} {:fn/period ["P1D"]}]},
+   :to :actor.role/customer,
+   :template :booking-pickup-reminder}
+  {:name :notification/booking-garment-ready-to-provider-from-initial-cleaning,
+   :on :transition/laundry-mark-ready-from-initial-cleaning,
    :to :actor.role/provider,
    :template :booking-garment-ready}
   {:name :notification/booking-pickup-completed,
@@ -625,10 +712,8 @@
    :on :transition/laundry-mark-available,
    :to :actor.role/provider,
    :template :booking-item-available}
-  {:name :notification/review-period-start-provider-laundry-mark-available,
-   :on :transition/laundry-mark-available,
-   :to :actor.role/provider,
-   :template :booking-review-by-provider-wanted}
+  ;; NO provider-side "review wanted" invite here any more - the provider
+  ;; can no longer review the customer at all (see the reviews block below).
   {:name :notification/review-period-start-customer-laundry-mark-available,
    :on :transition/laundry-mark-available,
    :to :actor.role/customer,
@@ -644,10 +729,6 @@
    :on :transition/complete,
    :to :actor.role/provider,
    :template :booking-money-paid}
-  {:name :notification/review-period-start-provider,
-   :on :transition/complete,
-   :to :actor.role/provider,
-   :template :booking-review-by-provider-wanted}
   {:name :notification/review-period-start-customer,
    :on :transition/complete,
    :to :actor.role/customer,
@@ -656,22 +737,24 @@
    :on :transition/operator-complete,
    :to :actor.role/provider,
    :template :booking-money-paid}
-  {:name :notification/review-period-start-provider-operator-complete,
-   :on :transition/operator-complete,
-   :to :actor.role/provider,
-   :template :booking-review-by-provider-wanted}
   {:name :notification/review-period-start-customer-operator-complete,
    :on :transition/operator-complete,
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
+  ;; NEW (2026-09-21), alongside :transition/auto-complete-from-initial-cleaning itself - same
+  ;; two-notification pattern as every other auto-complete-from-* below.
+  {:name :notification/booking-money-paid-auto-complete-from-initial-cleaning,
+   :on :transition/auto-complete-from-initial-cleaning,
+   :to :actor.role/provider,
+   :template :booking-money-paid}
+  {:name :notification/review-period-start-customer-auto-complete-from-initial-cleaning,
+   :on :transition/auto-complete-from-initial-cleaning,
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
   {:name :notification/booking-money-paid-auto-complete-from-ready,
    :on :transition/auto-complete-from-ready,
    :to :actor.role/provider,
    :template :booking-money-paid}
-  {:name :notification/review-period-start-provider-auto-complete-from-ready,
-   :on :transition/auto-complete-from-ready,
-   :to :actor.role/provider,
-   :template :booking-review-by-provider-wanted}
   {:name :notification/review-period-start-customer-auto-complete-from-ready,
    :on :transition/auto-complete-from-ready,
    :to :actor.role/customer,
@@ -681,11 +764,6 @@
    :to :actor.role/provider,
    :template :booking-money-paid}
   {:name
-   :notification/review-period-start-provider-auto-complete-from-picked-up,
-   :on :transition/auto-complete-from-picked-up,
-   :to :actor.role/provider,
-   :template :booking-review-by-provider-wanted}
-  {:name
    :notification/review-period-start-customer-auto-complete-from-picked-up,
    :on :transition/auto-complete-from-picked-up,
    :to :actor.role/customer,
@@ -694,11 +772,6 @@
    :on :transition/auto-complete-from-overdue,
    :to :actor.role/provider,
    :template :booking-money-paid}
-  {:name
-   :notification/review-period-start-provider-auto-complete-from-overdue,
-   :on :transition/auto-complete-from-overdue,
-   :to :actor.role/provider,
-   :template :booking-review-by-provider-wanted}
   {:name
    :notification/review-period-start-customer-auto-complete-from-overdue,
    :on :transition/auto-complete-from-overdue,
@@ -711,20 +784,10 @@
    :to :actor.role/provider,
    :template :booking-money-paid}
   {:name
-   :notification/review-period-start-provider-auto-complete-from-returned,
-   :on :transition/auto-complete-from-returned,
-   :to :actor.role/provider,
-   :template :booking-review-by-provider-wanted}
-  {:name
    :notification/review-period-start-customer-auto-complete-from-returned,
    :on :transition/auto-complete-from-returned,
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
-  {:name
-   :notification/review-period-start-provider-auto-complete-from-cleaning,
-   :on :transition/auto-complete-from-cleaning,
-   :to :actor.role/provider,
-   :template :booking-review-by-provider-wanted}
   {:name
    :notification/review-period-start-customer-auto-complete-from-cleaning,
    :on :transition/auto-complete-from-cleaning,
@@ -748,18 +811,28 @@
   ;; :transition/review-1-by-customer. So there is no flag to check and no
   ;; way for a reviewer to be nagged: reviewing cancels the reminder.
   ;;
-  ;; The entry on :transition/review-1-by-provider is what keeps that true
-  ;; when the OWNER reviews first. That also leaves :state/delivered and
-  ;; would otherwise cancel a reminder the renter still needs, so it is
-  ;; re-scheduled from :state/reviewed-by-provider - where
-  ;; :transition/review-2-by-customer is still open - off the same
-  ;; timepoint. If the owner reviews after day three, that :at is already
-  ;; in the past; verify in Dev whether the platform then sends it at once
-  ;; or drops it (see the runbook).
+  ;; THE OWNER CAN NO LONGER REVIEW FIRST (2026-09-21). There used to be an
+  ;; entry on :transition/review-1-by-provider re-scheduling this reminder
+  ;; for the case where the OWNER reviewed before the renter did, since that
+  ;; also left :state/delivered without the renter having reviewed. That
+  ;; transition - and :state/reviewed-by-provider, the state it re-scheduled
+  ;; from - no longer exist: the renter is the only reviewer now, and
+  ;; :transition/review-1-by-customer is the only way out of :state/delivered
+  ;; on the review side, so the entries above already cover every exit.
   ;; -------------------------------------------------------------------
 
   {:name :notification/review-reminder-customer-laundry-mark-available,
    :on :transition/laundry-mark-available,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P3D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-reminder}
+  ;; NEW (2026-09-21), alongside :transition/auto-complete-from-initial-cleaning itself - every
+  ;; other way into :state/delivered gets one of these, and this backstop is no exception.
+  {:name :notification/review-reminder-customer-auto-complete-from-initial-cleaning,
+   :on :transition/auto-complete-from-initial-cleaning,
    :at
    {:fn/plus
     [{:fn/timepoint [:time/first-entered-state :state/delivered]}
@@ -822,15 +895,6 @@
      {:fn/period ["P3D"]}]},
    :to :actor.role/customer,
    :template :booking-review-reminder}
-  {:name :notification/review-reminder-customer-after-provider-review,
-   :on :transition/review-1-by-provider,
-   :at
-   {:fn/plus
-    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
-     {:fn/period ["P3D"]}]},
-   :to :actor.role/customer,
-   :template :booking-review-reminder}
-
   ;; -------------------------------------------------------------------
   ;; Cancellation
   ;;
@@ -881,6 +945,16 @@
    :on :transition/cancel,
    :to :actor.role/provider,
    :template :booking-cancelled-owner}
+  ;; NEW (2026-09-21), alongside :transition/cancel-from-initial-cleaning itself - same
+  ;; two-notification pattern as every other cancel-from-* below.
+  {:name :notification/booking-cancelled-from-initial-cleaning-to-customer,
+   :on :transition/cancel-from-initial-cleaning,
+   :to :actor.role/customer,
+   :template :booking-cancelled}
+  {:name :notification/booking-cancelled-from-initial-cleaning-to-provider,
+   :on :transition/cancel-from-initial-cleaning,
+   :to :actor.role/provider,
+   :template :booking-cancelled-owner}
   {:name :notification/booking-cancelled-from-ready-for-pickup-to-customer,
    :on :transition/cancel-from-ready-for-pickup,
    :to :actor.role/customer,
@@ -916,21 +990,18 @@
 
   ;; -------------------------------------------------------------------
   ;; Reviews
+  ;;
+  ;; ONE-SIDED NOW (2026-09-21). :transition/review-1-by-provider,
+  ;; review-2-by-provider and review-2-by-customer are gone along with the
+  ;; provider's ability to review at all - see :transition/review-1-by-customer
+  ;; above. That transition now runs :action/publish-reviews in the same
+  ;; step, so the provider's notification changes from "a review is waiting,
+  ;; unpublished, for your own review to unlock it" to "a review was posted
+  ;; and is already live" - :booking-review-by-other-party-published, not
+  ;; -unpublished, even though this is the renter's FIRST (only) review.
   ;; -------------------------------------------------------------------
 
-  {:name :notification/review-by-provider-first,
-   :on :transition/review-1-by-provider,
-   :to :actor.role/customer,
-   :template :booking-review-by-other-party-unpublished}
   {:name :notification/review-by-customer-first,
    :on :transition/review-1-by-customer,
-   :to :actor.role/provider,
-   :template :booking-review-by-other-party-unpublished}
-  {:name :notification/review-by-provider-second,
-   :on :transition/review-2-by-provider,
-   :to :actor.role/customer,
-   :template :booking-review-by-other-party-published}
-  {:name :notification/review-by-customer-second,
-   :on :transition/review-2-by-customer,
    :to :actor.role/provider,
    :template :booking-review-by-other-party-published}]}

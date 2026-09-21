@@ -34,6 +34,9 @@
  */
 export const LAUNDRY_STATES = [
   'accepted',
+  // The first-time drop-off's own "in cleaning" state (2026-09-21) - see
+  // src/transactions/transactionProcessCoclosetBooking.js's INITIAL_CLEANING.
+  'initial-cleaning',
   'ready-for-pickup',
   'picked-up',
   'overdue',
@@ -92,10 +95,11 @@ export const isGarmentAtLaundry = readinessStatus =>
  * server/api-util/coclosetBookingProcess.js.
  */
 export const LAUNDRY_ACTION_STATUSES = [
-  // NOT a transition, and the only one here that is not. Reception is a custody write on the
-  // listing, posted to /api/laundry-receive-garment - see that file for why the transaction
-  // stays in `accepted` while the garment is being washed. It is in this list because it is
-  // one of the steps a studio advances through, and the screens speak one vocabulary.
+  // Posted to /api/laundry-receive-garment, a dedicated endpoint rather than
+  // /api/laundry-transaction-status - see that file for why. It fires
+  // transition/laundry-receive-from-provider (2026-09-21, accepted -> initial-cleaning) and
+  // writes the listing custody flag; it is in this list because it is one of the steps a
+  // studio advances through, and the screens speak one vocabulary.
   'garment-received',
   'ready-for-pickup',
   'picked-up',
@@ -207,6 +211,7 @@ export const opsStatus = row => {
  */
 export const CUSTODY_ACTIVE_STATES = [
   'accepted',
+  'initial-cleaning',
   'ready-for-pickup',
   'picked-up',
   'overdue',
@@ -279,6 +284,13 @@ export const laundryActionsFor = row => {
       // is what announced a coat as collectable the moment its ticket was typed.
       case 'accepted':
         return row.onLaundry === true ? 'ready-for-pickup' : 'garment-received';
+      // The garment just finished its first wash (2026-09-21) - the only way out is the same
+      // "mark ready" button as the onLaundry-already-true path above. The server picks which
+      // of the two `laundry-mark-ready*` transitions to fire from the real current state (see
+      // transitionForStatus() in server/api-util/coclosetBookingProcess.js); the client only
+      // ever needs to know the status name, same as the existing `returned` split.
+      case 'initial-cleaning':
+        return 'ready-for-pickup';
       case 'ready-for-pickup':
         return 'picked-up';
       // Both of these mean "the garment is out with the customer"; the server

@@ -45,10 +45,12 @@ const setup = ({
   lastTransition = 'transition/accept',
   onLaundry = false,
   updateImpl,
+  transitionImpl,
   authorizeFails = null,
 } = {}) => {
   const listingsUpdate = updateImpl || jest.fn(() => Promise.resolve({ data: { data: {} } }));
   const updateMetadata = jest.fn(() => Promise.resolve({ data: { data: {} } }));
+  const transition = transitionImpl || jest.fn(() => Promise.resolve({ data: { data: {} } }));
   const show = jest.fn(() =>
     Promise.resolve({
       data: {
@@ -70,14 +72,14 @@ const setup = ({
   );
 
   getIntegrationSdk.mockReturnValue({
-    transactions: { show, updateMetadata },
+    transactions: { show, updateMetadata, transition },
     listings: { update: listingsUpdate },
   });
   authorizeLaundryCaller.mockImplementation(() =>
     authorizeFails ? Promise.reject(authorizeFails) : Promise.resolve({ id: { uuid: LAUNDRY_ID } })
   );
 
-  return { listingsUpdate, updateMetadata, show };
+  return { listingsUpdate, updateMetadata, transition, show };
 };
 
 const run = async (body = { transactionId: TX_ID }) => {
@@ -110,13 +112,35 @@ describe('laundry-receive-garment', () => {
     expect(custodyCall.metadata.handedBackAt).toBeNull();
   });
 
-  it('fires no transition, so the rental stays accepted while it is washed', async () => {
-    const { show } = setup();
-    const sdk = getIntegrationSdk();
+  it('fires transition/laundry-receive-from-provider, moving the rental into initial-cleaning (2026-09-21)', async () => {
+    // This used to fire no transition at all, to avoid the cost of a flex-cli process push for
+    // a first pass - see the comment at the top of laundry-receive-garment.js for why that
+    // trade-off no longer applies.
+    const { show, transition } = setup();
     await run();
 
     expect(show).toHaveBeenCalled();
-    expect(sdk.transactions.transition).toBeUndefined();
+    expect(transition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: TX_ID,
+        transition: 'transition/laundry-receive-from-provider',
+      }),
+      expect.anything()
+    );
+  });
+
+  it('reports a 409, not a 500, when Sharetribe refuses the transition as illegal', async () => {
+    const invalidTransitionError = new Error('invalid transition');
+    invalidTransitionError.data = { errors: [{ code: 'transaction-invalid-transition' }] };
+    const { listingsUpdate } = setup({
+      transitionImpl: jest.fn(() => Promise.reject(invalidTransitionError)),
+    });
+
+    const res = await run();
+
+    expect(res.statusCode).toBe(409);
+    // The transition was refused, so nothing downstream of it should have run.
+    expect(listingsUpdate).not.toHaveBeenCalled();
   });
 
   it('writes the studio code to the rental and to the garment', async () => {

@@ -407,7 +407,7 @@ describe('propagateAddressToAssignedListings()', () => {
             assignedLaundryName: 'Maison du Marais',
             // Part of the comparison now: it is a copy, so it can be stale, so "already
             // correct" has to include it. Without this the listing looks correct on the
-            // other three and a studio that moved neighbourhoods never converges.
+            // other three and a studio that moved neighborhoods never converges.
             pickupNeighborhood: null,
           },
           geolocation: NEW_ORIGIN,
@@ -478,12 +478,12 @@ describe('propagateAddressToAssignedListings()', () => {
 // ---------------------------------------------------------------------------
 //   > "el vecindario tambien debe guardarse en el listing" (Jonathan, 2026-09-09)
 //
-// A copy is a thing that can go stale, so the moment the neighbourhood became a copy it also
+// A copy is a thing that can go stale, so the moment the neighborhood became a copy it also
 // became something this propagation has to notice. The assertion that matters: a listing
 // correct on the other three fields is NOT correct if this one has moved.
 // ---------------------------------------------------------------------------
-describe('propagateAddressToAssignedListings(): the neighbourhood', () => {
-  it('re-stamps a listing whose only stale field is the neighbourhood', async () => {
+describe('propagateAddressToAssignedListings(): the neighborhood', () => {
+  it('re-stamps a listing whose only stale field is the neighborhood', async () => {
     const { integrationSdk, update } = setupListings([
       [
         listingEntity({
@@ -509,7 +509,7 @@ describe('propagateAddressToAssignedListings(): the neighbourhood', () => {
     expect(update.mock.calls[0][0].publicData.pickupNeighborhood).toBe('Le Sentier');
   });
 
-  it('leaves a listing alone once its neighbourhood already matches', async () => {
+  it('leaves a listing alone once its neighborhood already matches', async () => {
     const { integrationSdk, update } = setupListings([
       [
         listingEntity({

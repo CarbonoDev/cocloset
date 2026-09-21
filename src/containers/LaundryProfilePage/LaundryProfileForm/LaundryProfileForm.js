@@ -596,7 +596,7 @@ const LaundryProfileForm = props => (
               submit handler prefers it - a studio that moves picks a new address and the
               district follows on its own. This box exists for the addresses Mapbox has no
               district for, and it is here rather than on the user's profile settings because
-              a studio's neighbourhood is a fact about the shop, not about the person who
+              a studio's neighborhood is a fact about the shop, not about the person who
               signed it up.
 
               Always shown rather than revealed after a failed lookup: the geocoder runs on

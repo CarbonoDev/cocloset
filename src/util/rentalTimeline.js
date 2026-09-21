@@ -187,21 +187,17 @@ const OFF_TIMELINE_STATES = [
   coclosetStates.CANCELED,
 ];
 
-// Has THIS reader already written their review? The process records the two reviews
-// separately, and `reviewed` means both are in.
-const hasReviewed = (processState, audience) =>
-  processState === coclosetStates.REVIEWED ||
-  (audience === TIMELINE_AUDIENCE_CUSTOMER &&
-    processState === coclosetStates.REVIEWED_BY_CUSTOMER) ||
-  (audience === TIMELINE_AUDIENCE_PROVIDER && processState === coclosetStates.REVIEWED_BY_PROVIDER);
+// Is the review step done? THERE IS ONLY ONE REVIEWER NOW (2026-09-21): the provider can no
+// longer write one at all, so `reviewed-by-customer` / `reviewed-by-provider` - which used to
+// tell the two halves of the review apart while the process waited on the second party - no
+// longer exist. `reviewed` is reached the moment the customer reviews (or the 7-day window
+// lapses with no review), so it is the one fact either audience needs: the owner still gets a
+// `review` step on their timeline (they watch it the same way they watch `cleaning`, without
+// it being their action), and it goes DONE for them at the same instant it does for the renter.
+const hasReviewed = processState => processState === coclosetStates.REVIEWED;
 
 // Is the rental far enough along for a review to be possible at all?
-const REVIEWABLE_STATES = [
-  coclosetStates.DELIVERED,
-  coclosetStates.REVIEWED,
-  coclosetStates.REVIEWED_BY_CUSTOMER,
-  coclosetStates.REVIEWED_BY_PROVIDER,
-];
+const REVIEWABLE_STATES = [coclosetStates.DELIVERED, coclosetStates.REVIEWED];
 
 /**
  * Mark a reader's steps against a transaction's current state.
@@ -210,10 +206,11 @@ const REVIEWABLE_STATES = [
  * progress, and the timeline's job is to say where the garment is, not to scold. The lateness
  * is surfaced by the status pill, which is where a reader looks for a problem.
  *
- * THE REVIEW STEP IS ANSWERED SEPARATELY, and it is the reason the review states no longer
- * simply collapse into `delivered`. `reviewed-by-customer` means the CUSTOMER has written
- * one: that step is done for them and still waiting for the owner. Folding both into
- * "finished" would tell one of the two parties they had done something they had not.
+ * THE REVIEW STEP USED TO BE ANSWERED SEPARATELY per audience, back when either party could
+ * review first and `reviewed-by-customer` / `reviewed-by-provider` recorded which one had. Now
+ * that only the customer can review at all (2026-09-21), `reviewed` is reached in one step and
+ * both audiences' `review` step goes DONE together - there is no longer a "done for them, still
+ * waiting for the owner" split to preserve.
  *
  * @param {string} [processState] - from `resolveLatestProcessName`-aware state derivation
  * @param {Object} [options]
@@ -229,11 +226,7 @@ export const timelineStatusFor = (processState, options = {}) => {
   const normalised =
     processState === coclosetStates.OVERDUE
       ? coclosetStates.PICKED_UP
-      : [
-          coclosetStates.REVIEWED,
-          coclosetStates.REVIEWED_BY_CUSTOMER,
-          coclosetStates.REVIEWED_BY_PROVIDER,
-        ].includes(processState)
+      : processState === coclosetStates.REVIEWED
       ? coclosetStates.DELIVERED
       : processState;
 
@@ -247,7 +240,7 @@ export const timelineStatusFor = (processState, options = {}) => {
       : lastIndexForState(steps)[normalised];
 
   const canReview = REVIEWABLE_STATES.includes(processState);
-  const reviewStatus = hasReviewed(processState, audience)
+  const reviewStatus = hasReviewed(processState)
     ? STEP_DONE
     : canReview
     ? STEP_CURRENT

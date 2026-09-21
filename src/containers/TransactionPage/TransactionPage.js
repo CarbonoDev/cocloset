@@ -37,6 +37,7 @@ import {
   DOWNLOAD_PROCESS_NAME,
   isDownloadProcess,
   COCLOSET_BOOKING_PROCESS_NAME,
+  isCoclosetBookingProcess,
 } from '../../transactions/transaction';
 
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -578,26 +579,36 @@ export const TransactionPageComponent = props => {
 
     // The download process only supports a single customer-side review transition.
     // Bidirectional review transitions (REVIEW_1/REVIEW_2) don't exist in that process.
-    const transitionOptions = isDownloadProcess(processName)
-      ? {
-          reviewAsFirst: transitions.REVIEW,
-          hasOtherPartyReviewedFirst: false,
-        }
-      : transactionRole === CUSTOMER
-      ? {
-          reviewAsFirst: transitions.REVIEW_1_BY_CUSTOMER,
-          reviewAsSecond: transitions.REVIEW_2_BY_CUSTOMER,
-          hasOtherPartyReviewedFirst: process
-            .getTransitionsToStates([states.REVIEWED_BY_PROVIDER])
-            .includes(transaction.attributes.lastTransition),
-        }
-      : {
-          reviewAsFirst: transitions.REVIEW_1_BY_PROVIDER,
-          reviewAsSecond: transitions.REVIEW_2_BY_PROVIDER,
-          hasOtherPartyReviewedFirst: process
-            .getTransitionsToStates([states.REVIEWED_BY_CUSTOMER])
-            .includes(transaction.attributes.lastTransition),
-        };
+    //
+    // cocloset-booking is the SAME SHAPE (2026-09-21): the provider can no longer review the
+    // customer at all, so REVIEW_1_BY_CUSTOMER always publishes immediately and there is no
+    // "other party reviewed first" to wait for - see the EDN's :transition/review-1-by-customer
+    // comment. The provider branch below is unreachable for this process (the UI does not offer
+    // a review button to the provider at DELIVERED - see TransactionPage.stateDataCoclosetBooking.js),
+    // so it is never hit here.
+    const transitionOptions =
+      isDownloadProcess(processName) || isCoclosetBookingProcess(processName)
+        ? {
+            reviewAsFirst: isDownloadProcess(processName)
+              ? transitions.REVIEW
+              : transitions.REVIEW_1_BY_CUSTOMER,
+            hasOtherPartyReviewedFirst: false,
+          }
+        : transactionRole === CUSTOMER
+        ? {
+            reviewAsFirst: transitions.REVIEW_1_BY_CUSTOMER,
+            reviewAsSecond: transitions.REVIEW_2_BY_CUSTOMER,
+            hasOtherPartyReviewedFirst: process
+              .getTransitionsToStates([states.REVIEWED_BY_PROVIDER])
+              .includes(transaction.attributes.lastTransition),
+          }
+        : {
+            reviewAsFirst: transitions.REVIEW_1_BY_PROVIDER,
+            reviewAsSecond: transitions.REVIEW_2_BY_PROVIDER,
+            hasOtherPartyReviewedFirst: process
+              .getTransitionsToStates([states.REVIEWED_BY_CUSTOMER])
+              .includes(transaction.attributes.lastTransition),
+          };
     const params = { reviewRating: rating, reviewContent };
 
     onSendReview(transaction, transitionOptions, params, config)

@@ -80,7 +80,7 @@ export class SearchPageComponent extends Component {
       location,
       urlQueryParams: validUrlQueryParamsFromProps(this.props),
       setState: this.setState.bind(this),
-      // The pickup, neighbourhood and brand filters are built from these, so a reset that
+      // The pickup, neighborhood and brand filters are built from these, so a reset that
       // does not know about them leaves them in the URL. See onResetAll.
       laundryOptions: this.props.laundryOptions,
       brandOptions: this.props.brandOptions,
@@ -150,6 +150,7 @@ export class SearchPageComponent extends Component {
       currentUser,
       laundryOptions,
       brandOptions,
+      pickupTodayIds,
     } = this.props;
 
     const {
@@ -333,6 +334,7 @@ export class SearchPageComponent extends Component {
                   isMapVariant={false}
                   listingTypeParam={listingTypePathParam}
                   intl={intl}
+                  pickupTodayIds={pickupTodayIds}
                 />
               </div>
             </div>
@@ -366,6 +368,9 @@ const SearchPage = props => {
     laundryOptions,
     // Same contract, for the brand filter. See withBrandFilter in SearchPage.shared.js.
     brandOptions,
+    // Cocloset: listing ids on this page verified as genuinely bookable today - see
+    // SearchPage.duck.js's searchListingsPayloadCreator and ListingCard's pickupTodayVerified.
+    pickupTodayIds,
   } = useSelector(state => state.SearchPage);
   const listings = useSelector(state =>
     selectListingsById(state, state.SearchPage.currentPageResultIds)
@@ -391,6 +396,7 @@ const SearchPage = props => {
       searchParams={searchParams}
       laundryOptions={laundryOptions}
       brandOptions={brandOptions}
+      pickupTodayIds={pickupTodayIds}
       onManageDisableScrolling={onManageDisableScrolling}
     />
   );

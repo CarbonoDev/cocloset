@@ -325,7 +325,7 @@ const laundryDerivedListingFields = laundry => ({
   // current (api-util/laundryAddress.js).
   //
   // Null rather than absent when the studio has not got one: the field has to be written on
-  // every pass or a studio that clears its neighbourhood would leave the old value stranded
+  // every pass or a studio that clears its neighborhood would leave the old value stranded
   // on its garments.
   pickupNeighborhood: laundry.neighborhood || null,
   geolocation: { lat: laundry.origin.lat, lng: laundry.origin.lng },

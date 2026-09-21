@@ -47,11 +47,14 @@ describe('the Cocloset skin reaches every hosted page', () => {
     // `coclosetPartner*` types are the become-a-partner redesign (2026-09-12; `About` added
     // the same day once the stock `columns` render of "What is CoCloset?" turned out not to
     // match the reference screenshot's typography). The four `coclosetLanding*` types are the
-    // main landing page's 2026-09-13 visual refresh - see coclosetLandingSections.js for which
-    // Console section names claim each of them.
+    // main landing page's 2026-09-13 visual refresh. The two `coclosetAbout*` types are
+    // /p/about's own 2026-09-21 redesign - see coclosetLandingSections.js for which Console
+    // section names claim each of them.
     expect(Object.keys(coclosetPageOptions.sectionComponents).sort()).toEqual([
       'article',
       'carousel',
+      'coclosetAboutFounder',
+      'coclosetAboutIntro',
       'coclosetHero',
       'coclosetLandingFlow',
       'coclosetLandingHero',

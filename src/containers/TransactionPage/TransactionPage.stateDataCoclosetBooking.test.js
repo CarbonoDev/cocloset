@@ -52,6 +52,7 @@ const TRANSITION_PER_STATE = {
   accepted: transitions.ACCEPT,
   declined: transitions.DECLINE,
   expired: transitions.EXPIRE,
+  'initial-cleaning': transitions.LAUNDRY_RECEIVE_FROM_PROVIDER,
   'ready-for-pickup': transitions.LAUNDRY_MARK_READY,
   'picked-up': transitions.LAUNDRY_CONFIRM_PICKUP,
   overdue: transitions.MARK_OVERDUE,
@@ -59,8 +60,6 @@ const TRANSITION_PER_STATE = {
   cleaning: transitions.LAUNDRY_MARK_PENDING_CLEANING,
   canceled: transitions.CANCEL,
   delivered: transitions.LAUNDRY_MARK_AVAILABLE,
-  'reviewed-by-customer': transitions.REVIEW_1_BY_CUSTOMER,
-  'reviewed-by-provider': transitions.REVIEW_1_BY_PROVIDER,
   reviewed: transitions.EXPIRE_REVIEW_PERIOD,
 };
 
@@ -142,7 +141,8 @@ describe('TransactionPage state data for cocloset-booking', () => {
 
   it('distinguishes the two return transitions and the three cleaning sub-phases', () => {
     // The whole reason transition-keyed messages exist here: these five
-    // transitions collapse into two states.
+    // transitions collapse into two states, and each needs its own wording
+    // (late vs on-time; which cleaning sub-phase).
     const { transitionMessages } = stateDataFor(transitions.ACCEPT, 'customer');
     const covered = transitionMessages.map(m => m.transition);
     [
@@ -153,14 +153,34 @@ describe('TransactionPage state data for cocloset-booking', () => {
       transitions.LAUNDRY_START_QUALITY_INSPECTION,
     ].forEach(t => expect(covered).toContain(t));
 
-    const ids = transitionMessages.map(m => m.translationId);
-    expect(new Set(ids).size).toBe(ids.length);
+    const byTransition = new Map(transitionMessages.map(m => [m.transition, m.translationId]));
+    const distinguishedIds = [
+      transitions.LAUNDRY_CONFIRM_RETURN,
+      transitions.LAUNDRY_CONFIRM_RETURN_LATE,
+      transitions.LAUNDRY_MARK_PENDING_CLEANING,
+      transitions.LAUNDRY_START_CLEANING,
+      transitions.LAUNDRY_START_QUALITY_INSPECTION,
+    ].map(t => byTransition.get(t));
+    expect(new Set(distinguishedIds).size).toBe(distinguishedIds.length);
+  });
+
+  it('gives the two "mark ready" transitions the same message on purpose (2026-09-21)', () => {
+    // Unlike the return/cleaning split above, these two are not distinguished: they are
+    // literally the same user-facing event ("your garment is ready for pickup") reached from
+    // two different starting states, purely because the EDN's `:from` is single-valued - see
+    // LAUNDRY_MARK_READY's comment in transactionProcessCoclosetBooking.js. Sharing one message
+    // is correct here, not an oversight.
+    const { transitionMessages } = stateDataFor(transitions.ACCEPT, 'customer');
+    const byTransition = new Map(transitionMessages.map(m => [m.transition, m.translationId]));
+    expect(byTransition.get(transitions.LAUNDRY_MARK_READY)).toEqual(
+      byTransition.get(transitions.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING)
+    );
   });
 
   it('offers no action buttons during the laundry custody chain', () => {
     // Those steps are driven by the laundry through the ops dashboard, not by
     // either party of the transaction.
-    ['ready-for-pickup', 'picked-up', 'overdue', 'returned', 'cleaning'].forEach(state => {
+    ['initial-cleaning', 'ready-for-pickup', 'picked-up', 'overdue', 'returned', 'cleaning'].forEach(state => {
       ROLES.forEach(role => {
         const stateData = stateDataFor(TRANSITION_PER_STATE[state], role);
         expect(stateData.showActionButtons).toBeFalsy();

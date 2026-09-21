@@ -27,7 +27,7 @@ describe('placeNeighborhood', () => {
     ).toBe('Le Marais');
   });
 
-  it('falls back to the locality where Mapbox carries no neighbourhood', () => {
+  it('falls back to the locality where Mapbox carries no neighborhood', () => {
     // Its answer for places whose districts it does not have. A village name is a better
     // answer than none.
     expect(
@@ -37,7 +37,7 @@ describe('placeNeighborhood', () => {
     ).toBe('Sant Antoni');
   });
 
-  it('prefers the neighbourhood when both are present', () => {
+  it('prefers the neighborhood when both are present', () => {
     expect(
       placeNeighborhood(
         feature([
@@ -56,7 +56,7 @@ describe('placeNeighborhood', () => {
     expect(placeNeighborhood(feature([{ id: 'country.1', text: 'Spain' }]))).toBeNull();
   });
 
-  it('uses the feature itself when the studio searched for a neighbourhood', () => {
+  it('uses the feature itself when the studio searched for a neighborhood', () => {
     // Searching "Le Marais" rather than a street address: the answer is the feature's own
     // text, and there is no context entry for it.
     expect(

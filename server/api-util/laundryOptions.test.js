@@ -36,7 +36,7 @@ const plainUser = id => ({
 });
 
 describe('buildLaundryOptions', () => {
-  it('returns exactly an id, a name and a neighbourhood, and nothing else', () => {
+  it('returns exactly an id, a name and a neighborhood, and nothing else', () => {
     // THE WHOLE POINT. Adding a key here is adding it to a public surface, so it has to be a
     // decision rather than a spread - and this test is what makes it one.
     //
@@ -50,7 +50,7 @@ describe('buildLaundryOptions', () => {
 
   //   > "filtremos por laundry pero usando el nombre del vecindario que tenga en su
   //   >  dirección, solo es cambiar el label en las opciones de búsqueda"
-  it('carries the neighbourhood when the studio has given one', () => {
+  it('carries the neighborhood when the studio has given one', () => {
     const [option] = buildLaundryOptions([laundryUser('l1', 'Maison du Marais', {}, 'Le Marais')]);
     expect(option.neighborhood).toBe('Le Marais');
     // The name still goes too: it is the fallback label, and it is what every listing card
@@ -58,7 +58,7 @@ describe('buildLaundryOptions', () => {
     expect(option.name).toBe('Maison du Marais');
   });
 
-  it('sends null rather than dropping the key when there is no neighbourhood', () => {
+  it('sends null rather than dropping the key when there is no neighborhood', () => {
     // A missing key and an absent value would be indistinguishable to the client, which has
     // to choose a fallback label from exactly this.
     const [option] = buildLaundryOptions([laundryUser('l1', 'Maison du Marais')]);

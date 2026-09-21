@@ -408,7 +408,7 @@ export const MainContent = props => {
         <>
           {/* Where this member is, in their own words - written on the settings page
               (Jonathan, 2026-09-03). Directly under the name because that is what it
-              qualifies: a wardrobe organised around neighbourhoods answers "is this
+              qualifies: a wardrobe organised around neighborhoods answers "is this
               person near me" before it answers anything else. Absent when they have
               not said, rather than rendered as an empty line. */}
           {/* The member's own words, rendered as content rather than through a message -
