@@ -13,7 +13,7 @@ import {
 describe('splitTrailingLinks', () => {
   const HERO_TEXT =
     'Cocloset is a designer rental wardrobe with a twist: every piece is stored, cleaned and ' +
-    'exchanged at a neighbourhood laundry partner. Lend what you love. Rent what you need.\n\n' +
+    'exchanged at a neighborhood laundry partner. Lend what you love. Rent what you need.\n\n' +
     '[Browse the wardrobe](/)\n[Lend a piece](/)';
 
   it('pulls the two hero buttons off the end, in order', () => {
@@ -122,8 +122,8 @@ describe('splitHeadline', () => {
 
   it('leaves a single-line headline entirely plain', () => {
     // No break means no instruction, and the heading renders like any other heading.
-    expect(splitHeadline('A storefront for every neighbourhood laundry.')).toEqual({
-      lead: 'A storefront for every neighbourhood laundry.',
+    expect(splitHeadline('A storefront for every neighborhood laundry.')).toEqual({
+      lead: 'A storefront for every neighborhood laundry.',
       accent: null,
     });
   });

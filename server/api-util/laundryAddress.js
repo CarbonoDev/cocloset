@@ -374,7 +374,7 @@ const propagateAddressToAssignedListings = ({ integrationSdk, laundryId, laundry
           publicData.assignedLaundryName === (laundry.studioName || laundry.displayName || null) &&
           // Same reason as the name above: this is a copy, so it is something that can be
           // stale, so it is something this comparison has to know about. Omitting it would
-          // leave a studio that moved neighbourhoods printing the old one forever, because
+          // leave a studio that moved neighborhoods printing the old one forever, because
           // every listing would look "already correct" on the other three fields.
           publicData.pickupNeighborhood === (laundry.neighborhood || null);
 

@@ -421,7 +421,7 @@ class ProfileSettingsFormComponent extends Component {
                     >  (...) pero debe estar en settings de laundry, no en profile settings
                     >  del user" (Jonathan, 2026-09-07)
 
-                  A studio's neighbourhood comes from its address, on its own settings page,
+                  A studio's neighborhood comes from its address, on its own settings page,
                   and is a fact about the shop rather than about the person who signed it up.
                   Two boxes for one answer is how they end up disagreeing - and the search
                   filter reads the studio's, so the one here would look ignored. */}
@@ -431,7 +431,7 @@ class ProfileSettingsFormComponent extends Component {
                     > "En mi form de profile settings, puedo ingresar el nombre de mi
                     >  vecindario y éste se debe mostrar en mi perfil"
 
-                  Free text, and deliberately not a picker: a neighbourhood is what
+                  Free text, and deliberately not a picker: a neighborhood is what
                   people who live somewhere call it, and no geocoder's list agrees
                   with all of them. It is also optional - a member who does not want
                   to say leaves it blank and their profile simply does not carry a

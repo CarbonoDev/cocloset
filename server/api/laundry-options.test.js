@@ -99,12 +99,12 @@ describe('laundry-options', () => {
     });
   });
 
-  it('sends nothing but an id, a name and a neighbourhood', async () => {
+  it('sends nothing but an id, a name and a neighborhood', async () => {
     // The shape IS the security contract: this endpoint is public, and the authenticated
     // directory it sits beside carries addresses, coordinates, hours and a turnaround
     // resolved from privateData.
     //
-    // The neighbourhood joined that list deliberately on 2026-09-03, to label the search
+    // The neighborhood joined that list deliberately on 2026-09-03, to label the search
     // filter. It is a district the studio typed about itself - the granularity a shopper
     // picks a pickup point by - and the street address it sits near is still not sent.
     setupSdk([laundryUser('l1', 'Maison du Marais')]);

@@ -66,7 +66,7 @@ const placeNeighborhood = prediction => {
     null
   );
 
-  // The feature itself can BE a neighbourhood, when somebody searches for one rather than for
+  // The feature itself can BE a neighborhood, when somebody searches for one rather than for
   // a street address. Its own text is then the answer and there is no context entry for it.
   const isOwnType =
     Array.isArray(prediction?.place_type) &&

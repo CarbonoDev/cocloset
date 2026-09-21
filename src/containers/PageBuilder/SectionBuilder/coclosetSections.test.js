@@ -238,7 +238,7 @@ describe('SectionCoclosetLaundry', () => {
     blocks: [
       {
         blockId: 'laundry-partners',
-        title: { content: 'A storefront for every neighbourhood laundry.', fieldType: 'heading3' },
+        title: { content: 'A storefront for every neighborhood laundry.', fieldType: 'heading3' },
         text: {
           fieldType: 'markdown',
           content:
@@ -273,7 +273,7 @@ describe('SectionCoclosetLaundry', () => {
   it('renders the headline, the pitch and the dashboard link', () => {
     renderSection(SectionCoclosetLaundry, laundryProps());
 
-    expect(screen.getByText('A storefront for every neighbourhood laundry.')).toBeInTheDocument();
+    expect(screen.getByText('A storefront for every neighborhood laundry.')).toBeInTheDocument();
     expect(screen.getByText(/ticketed operations dashboard/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open the laundry dashboard' })).toHaveAttribute(
       'href',
@@ -284,7 +284,7 @@ describe('SectionCoclosetLaundry', () => {
   it('renders the pitch alone when the tiles block is missing', () => {
     renderSection(SectionCoclosetLaundry, laundryProps({ blocks: [laundryProps().blocks[0]] }));
 
-    expect(screen.getByText('A storefront for every neighbourhood laundry.')).toBeInTheDocument();
+    expect(screen.getByText('A storefront for every neighborhood laundry.')).toBeInTheDocument();
     expect(screen.queryByText('Incoming garments')).not.toBeInTheDocument();
   });
 

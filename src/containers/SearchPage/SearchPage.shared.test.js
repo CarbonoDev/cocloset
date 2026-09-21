@@ -806,13 +806,13 @@ describe('withLaundryPickupFilter labels', () => {
     return filter.enumOptions;
   };
 
-  it('labels a studio by its neighbourhood', () => {
+  it('labels a studio by its neighborhood', () => {
     expect(optionsFor([{ id: 'l1', name: 'Maison du Marais', neighborhood: 'Le Marais' }])).toEqual(
       [{ option: 'l1', label: 'Le Marais' }]
     );
   });
 
-  it('falls back to the studio name when there is no neighbourhood', () => {
+  it('falls back to the studio name when there is no neighborhood', () => {
     // A studio that has not filled it in would otherwise be a blank row in the dropdown,
     // which is worse than a name the reader has to look up.
     expect(optionsFor([{ id: 'l1', name: 'Maison du Marais', neighborhood: null }])).toEqual([
@@ -839,7 +839,7 @@ describe('withLaundryPickupFilter labels', () => {
 //   >   (Jonathan, 2026-09-09)
 //
 // It returns the same listings as the pickup filter - one studio per garment, one part of
-// town per studio - and asks a different question: each neighbourhood once, rather than one
+// town per studio - and asks a different question: each neighborhood once, rather than one
 // row per studio. What is worth pinning is the deduplication, since that IS the difference.
 // ---------------------------------------------------------------------------
 describe('withNeighborhoodFilter', () => {
@@ -870,7 +870,7 @@ describe('withNeighborhoodFilter', () => {
     expect(field.scope).toBe('public');
   });
 
-  it('skips studios with no neighbourhood rather than offering a blank row', () => {
+  it('skips studios with no neighborhood rather than offering a blank row', () => {
     const field = fieldFrom([
       { id: 'l1', name: 'A', neighborhood: null },
       { id: 'l2', name: 'B', neighborhood: '   ' },
@@ -880,8 +880,8 @@ describe('withNeighborhoodFilter', () => {
     expect(field.enumOptions).toEqual([{ option: 'Sant Antoni', label: 'Sant Antoni' }]);
   });
 
-  it('renders no filter at all when nothing has a neighbourhood', () => {
-    // A dropdown offering nothing reads as "this marketplace has no neighbourhoods", which is
+  it('renders no filter at all when nothing has a neighborhood', () => {
+    // A dropdown offering nothing reads as "this marketplace has no neighborhoods", which is
     // worse than no dropdown.
     expect(fieldFrom([{ id: 'l1', name: 'A', neighborhood: null }])).toBeNull();
     expect(fieldFrom([])).toBeNull();
@@ -897,7 +897,7 @@ describe('withNeighborhoodFilter', () => {
 //   > "si doy click en Reset All no se limpia, se limpia hasta que doy click manualmente a
 //   >  ese filtro" (Jonathan, 2026-09-09)
 //
-// Three of the filters on this page are not in Console - pickup, neighbourhood and brand are
+// Three of the filters on this page are not in Console - pickup, neighborhood and brand are
 // synthesised from the studios and brands that exist. "Reset all" strips the params it knows
 // about, and it only knew about the Console ones, so it cleared some filters and left others.
 // A reset that resets most things is worse than one that resets nothing: it reads as done.
@@ -934,7 +934,7 @@ describe('onResetAll', () => {
     return pushedTo;
   };
 
-  it('clears the pickup, neighbourhood and brand filters as well as the Console ones', () => {
+  it('clears the pickup, neighborhood and brand filters as well as the Console ones', () => {
     const url = resetFrom({
       pub_size: 'M',
       price: '0,100',
@@ -1083,7 +1083,7 @@ describe('the filter row the page renders', () => {
     expect(keysOf(availableFilters)[0]).toBe('Brands');
   });
 
-  it('offers the neighbourhood filter once a studio has one', () => {
+  it('offers the neighborhood filter once a studio has one', () => {
     const { availableFilters } = deriveWith({
       laundryOptions: [{ id: 'l1', name: 'Maison du Marais', neighborhood: 'Le Marais' }],
     });
@@ -1091,9 +1091,9 @@ describe('the filter row the page renders', () => {
     expect(keysOf(availableFilters)).toContain('pickupNeighborhood');
   });
 
-  it('offers no neighbourhood filter while no studio has set one', () => {
+  it('offers no neighborhood filter while no studio has set one', () => {
     // The honest empty case: this is what a marketplace looks like before any studio has
-    // saved a neighbourhood, and it is why the filter can be "missing" without being broken.
+    // saved a neighborhood, and it is why the filter can be "missing" without being broken.
     const { availableFilters } = deriveWith({
       laundryOptions: [{ id: 'l1', name: 'Maison du Marais', neighborhood: null }],
     });

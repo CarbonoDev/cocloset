@@ -73,7 +73,7 @@ describe('LaundryProfileForm', () => {
     //   >  en settings de laundry, no en profile settings del user" (Jonathan, 2026-09-07)
     //
     // The fallback for addresses Mapbox has no district for. It lives HERE and not on the
-    // user's profile settings: a studio's neighbourhood is a fact about the shop.
+    // user's profile settings: a studio's neighborhood is a fact about the shop.
     expect(
       screen.getByRole('textbox', { name: 'LaundryProfileForm.neighborhoodLabel' })
     ).toBeInTheDocument();

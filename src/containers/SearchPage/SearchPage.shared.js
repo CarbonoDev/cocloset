@@ -658,7 +658,7 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
       //
       // Someone choosing where to collect is choosing a part of town. The studio name is
       // the fallback rather than the default: a studio that has not filled its
-      // neighbourhood in would otherwise become a blank row in the dropdown, which is
+      // neighborhood in would otherwise become a blank row in the dropdown, which is
       // worse than a name the reader has to look up.
       enumOptions: laundryOptions.map(option => ({
         option: option.id,
@@ -681,7 +681,7 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
 };
 
 /**
- * The neighbourhood filter.
+ * The neighborhood filter.
  *
  *   > "el vecindario tambien debe guardarse en el listing y debemos poder filtrar por
  *   >  vecindario, el cual me dará el mismo resultado que filtrar por laundry, pero es algo
@@ -694,7 +694,7 @@ export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [],
  * offers each part of town once. That is the question a renter actually has.
  *
  * BUILT FROM THE STUDIOS, FILTERED ON THE LISTINGS. The options are the distinct
- * neighbourhoods of the studios that exist, deduplicated here; the query runs against
+ * neighborhoods of the studios that exist, deduplicated here; the query runs against
  * `publicData.pickupNeighborhood`, which the assignment stamps onto each listing and
  * the propagation keeps current (server/api-util/laundryAssignment.js).
  *
@@ -721,7 +721,7 @@ export const withNeighborhoodFilter = (listingFields = [], laundryOptions = [], 
   ].sort((a, b) => a.localeCompare(b));
 
   // No dropdown rather than an empty one, for the same reason as the pickup filter: a filter
-  // offering nothing reads as "this marketplace has no neighbourhoods".
+  // offering nothing reads as "this marketplace has no neighborhoods".
   if (neighborhoods.length === 0) {
     return listingFields;
   }
@@ -732,7 +732,7 @@ export const withNeighborhoodFilter = (listingFields = [], laundryOptions = [], 
       key: 'pickupNeighborhood',
       scope: 'public',
       schemaType: 'enum',
-      // The value IS the label. A neighbourhood has no id of its own - it is a string a studio
+      // The value IS the label. A neighborhood has no id of its own - it is a string a studio
       // typed or Mapbox returned - so inventing one would mean a second mapping to keep in
       // step with the studios, for nothing.
       enumOptions: neighborhoods.map(name => ({ option: name, label: name })),
@@ -1043,7 +1043,7 @@ export const onResetAll = ({
   //   > "si doy click en Reset All no se limpia, se limpia hasta que doy click manualmente a
   //   >  ese filtro" (Jonathan, 2026-09-09)
   //
-  // Three of the filters on this page do not come from Console - pickup, neighbourhood and
+  // Three of the filters on this page do not come from Console - pickup, neighborhood and
   // brand are built from the studios and the brands that exist (see withLaundryPickupFilter
   // and the two below it). "Reset all" strips the params it knows about, and it was reading
   // only `config.listing.listingFields` - so it stripped every Console filter and left ours

@@ -96,7 +96,7 @@ module.exports = (req, res) => {
         laundryId: currentUser.id.uuid,
         // Built by the SAME function the assignment endpoint resolves a laundry with, rather
         // than spelled out here. That is what guarantees this writes byte for byte what an
-        // assignment would have written - and it is why adding the neighbourhood to the
+        // assignment would have written - and it is why adding the neighborhood to the
         // derived fields did not need a second edit in this file.
         laundry: toLaundryDirectoryEntry(currentUser),
       });

@@ -14,7 +14,7 @@ import css from './PickupTodayFilterToggle.module.css';
  *
  * WHY IT DOES NOT GO THROUGH FilterComponent / validURLParamForExtendedData. Every filter on
  * that path is either Console-hosted extended data with a real `flex-cli search` schema
- * (brand, category) or a synthesised listing field built the same way (pickup, neighbourhood -
+ * (brand, category) or a synthesised listing field built the same way (pickup, neighborhood -
  * see withLaundryPickupFilter). "Available today" has no stored field to index at all - it is
  * computed per-search from booking dates and a cleaning floor (SearchPage.duck.js reuses the
  * date filter's own machinery internally). Forcing a computed value through a system built for
