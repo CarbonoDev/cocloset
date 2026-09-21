@@ -21,11 +21,14 @@ import {
  * the provider genuinely has something to do:
  *
  *   accepted          - nobody. Waiting on the laundry to prepare the garment.
+ *   initial-cleaning  - nobody. The garment came in for its first wash (2026-09-21).
  *   ready-for-pickup  - the CUSTOMER: the garment is at the studio to collect.
  *   picked-up         - nobody. The rental is simply running.
  *   overdue           - the CUSTOMER: it is late, bring it back.
  *   returned          - nobody. Waiting on the laundry to open a cleaning ticket.
  *   cleaning          - nobody. The rental is over; this is studio work.
+ *   delivered         - the CUSTOMER only (2026-09-21): the provider can no longer review the
+ *                       customer at all, so this is not "on them" any more.
  *
  * `isFinal` marks the states nothing can leave. `delivered` is deliberately
  * NOT final: the review window opens there.
@@ -71,6 +74,11 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
       })
 
       // ---- The laundry custody chain -------------------------------------
+      // First-time drop-off's own "in cleaning" moment (2026-09-21) - nobody but the laundry
+      // acts here, same as READY_FOR_PICKUP/PICKED_UP/RETURNED/CLEANING below.
+      .cond([states.INITIAL_CLEANING, _], () => {
+        return { processName, processState };
+      })
       .cond([states.READY_FOR_PICKUP, CUSTOMER], () => {
         return { processName, processState, actionNeeded: true };
       })
@@ -103,14 +111,14 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
       .cond([states.EXPIRED, _], () => {
         return { processName, processState, isFinal: true, tone: NEGATIVE };
       })
-      .cond([states.DELIVERED, _], () => {
+      // CUSTOMER ONLY (2026-09-21): the provider can no longer review the customer at all, so
+      // DELIVERED is not "on them" any more - see the EDN's :transition/review-1-by-customer
+      // comment. REVIEWED_BY_PROVIDER / REVIEWED_BY_CUSTOMER are gone with it.
+      .cond([states.DELIVERED, CUSTOMER], () => {
         return { processName, processState, actionNeeded: true };
       })
-      .cond([states.REVIEWED_BY_PROVIDER, CUSTOMER], () => {
-        return { processName, processState, actionNeeded: true };
-      })
-      .cond([states.REVIEWED_BY_CUSTOMER, PROVIDER], () => {
-        return { processName, processState, actionNeeded: true };
+      .cond([states.DELIVERED, PROVIDER], () => {
+        return { processName, processState };
       })
       .cond([states.REVIEWED, _], () => {
         // A rental that ran its whole course. Green, as it already was - what

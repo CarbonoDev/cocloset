@@ -50,7 +50,16 @@ describe('HandoverQrMaybe', () => {
   describe('one QR for both handover events', () => {
     // The same single code must be on screen through the collection AND the
     // return. If a future change ever splits it in two, these four break.
-    it.each([['accepted'], ['ready-for-pickup'], ['picked-up'], ['overdue']])(
+    it.each([
+      ['accepted'],
+      // 2026-09-21: the first-time wash sits between accept and the first handover; the
+      // customer's code must not vanish while the garment is in it (see
+      // HANDOVER_QR_STATES_AFTER_ACCEPT's comment in transactionProcessCoclosetBooking.js).
+      ['initial-cleaning'],
+      ['ready-for-pickup'],
+      ['picked-up'],
+      ['overdue'],
+    ])(
       'renders exactly one code in state %s',
       state => {
         renderPanel({ processState: state });
@@ -77,7 +86,7 @@ describe('HandoverQrMaybe', () => {
     // Derived from the transaction's real process state, not from a metadata
     // flag: the only ways into `returned` are the two return transitions, so
     // being in `returned` already means the second handover happened.
-    it.each([['returned'], ['cleaning'], ['delivered'], ['reviewed-by-customer'], ['reviewed']])(
+    it.each([['returned'], ['cleaning'], ['delivered'], ['reviewed']])(
       'renders nothing in state %s',
       state => {
         const { container } = renderPanel({ processState: state });
@@ -254,14 +263,28 @@ describe('HandoverQrMaybe', () => {
       expect(qr(view)).not.toBeInTheDocument();
     });
 
+    it('hides it from the owner during the first wash (2026-09-21)', () => {
+      // By 'initial-cleaning' the garment has definitely left the owner - that transition
+      // fires only once the studio has received it - so there is no drop-off errand left, and
+      // the collect errand does not open until 'delivered'.
+      const view = renderPanel({
+        processState: 'initial-cleaning',
+        isCustomer: false,
+        isAtLaundry: true,
+      });
+
+      expect(qr(view)).not.toBeInTheDocument();
+    });
+
     it('shows it to the owner again once the wash is done and it can be collected', () => {
-      ['delivered', 'reviewed', 'reviewed-by-customer', 'reviewed-by-provider'].forEach(
-        processState => {
-          const view = renderPanel({ processState, isCustomer: false, isAtLaundry: true });
-          expect(qr(view)).toBeInTheDocument();
-          view.unmount();
-        }
-      );
+      // 'reviewed-by-customer'/'reviewed-by-provider' are gone (2026-09-21): the provider can
+      // no longer review at all, so 'reviewed' is reached in one step - see the EDN's
+      // :transition/review-1-by-customer comment.
+      ['delivered', 'reviewed'].forEach(processState => {
+        const view = renderPanel({ processState, isCustomer: false, isAtLaundry: true });
+        expect(qr(view)).toBeInTheDocument();
+        view.unmount();
+      });
     });
 
     it('shows it to the owner after a cancellation, so they can take the garment back', () => {

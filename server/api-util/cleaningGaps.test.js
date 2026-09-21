@@ -268,13 +268,10 @@ describe('countCompletedRentals', () => {
 
   it('still counts it once somebody has reviewed it', () => {
     // A garment must not lose a rental from its count because a review was written about it.
-    const reviewed = [
-      'transition/review-1-by-customer',
-      'transition/review-1-by-provider',
-      'transition/review-2-by-customer',
-      'transition/review-2-by-provider',
-      'transition/expire-review-period',
-    ];
+    // Only two transitions reach `reviewed` now (2026-09-21): the provider can no longer
+    // review at all, so review-1-by-provider/review-2-by-customer/review-2-by-provider are
+    // gone along with the states they used to lead through.
+    const reviewed = ['transition/review-1-by-customer', 'transition/expire-review-period'];
     reviewed.forEach(t => {
       expect(countCompletedRentals([tx(t)])).toBe(1);
     });

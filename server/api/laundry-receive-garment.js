@@ -9,7 +9,12 @@ const {
   buildListingCodeRecord,
   validateLaundryCode,
 } = require('../api-util/laundryCode');
-const { STATES, stateFromLastTransition } = require('../api-util/coclosetBookingProcess');
+const {
+  STATES,
+  TRANSITIONS,
+  stateFromLastTransition,
+  isInvalidTransitionError,
+} = require('../api-util/coclosetBookingProcess');
 const log = require('../log');
 
 // The studio taking a garment IN from its owner, at the start of a rental.
@@ -40,13 +45,19 @@ const log = require('../log');
 // So the ops screens offer THIS step while the flag is false and `laundry-mark-ready` once it
 // is true, and no new transaction state was invented to say what a listing already knew.
 //
-// NO TRANSITION IS FIRED. The transaction stays in `accepted` for the length of the initial
-// wash, which is what it means: the booking is agreed and the garment is not with the
-// customer. `accepted -> accepted` would have been expressible (see
-// `transition/laundry-start-cleaning`, a self-transition on `cleaning`), but it costs a
-// `flex-cli process push` plus an alias update, and it would strand any transaction accepted
-// under the old version. What is recorded instead is the physical fact, on the listing, which
-// is where custody lives for every other reader already.
+// FIRES transition/laundry-receive-from-provider (2026-09-21), moving the transaction from
+// `accepted` to `initial-cleaning`:
+//
+//   > "cuando laundry ingrese el ticket para iniciar el lavado, entre a un status de IN
+//   >  CLEANING, en ambas direcciones, es decir, cuando el provider lleve la prenda por
+//   >  primera vez" (Jonathan, 2026-09-21)
+//
+// This used to be a metadata-only write with NO transition, specifically to avoid the cost of
+// a `flex-cli process push` plus an alias update for a first pass. That trade-off no longer
+// applies: a push is happening anyway (bundled with the review-flow change this same day), so
+// the garment being physically received gets a real, visible state instead of hiding inside
+// `accepted`. The custody and code writes below are unchanged - only the missing transition
+// call is new.
 //
 // ---------------------------------------------------------------------------
 // WHY THE CUSTODY WRITE IS NOT GATED HERE
@@ -128,7 +139,20 @@ module.exports = (req, res) => {
       });
     })
     .then(({ listing }) =>
-      // The custody flag FIRST, because it is what the ops screens read to decide which step
+      // THE TRANSITION FIRST (2026-09-21), because Sharetribe's own legality check is the
+      // authoritative one - the state check above can be stale by the time this runs, exactly
+      // like every other endpoint that fires a real transition (laundry-transaction-status.js,
+      // auto-accept-booking.js). If the platform disagrees, nothing else in this request should
+      // run.
+      integrationSdk.transactions
+        .transition(
+          { id: transactionId, transition: TRANSITIONS.LAUNDRY_RECEIVE_FROM_PROVIDER, params: {} },
+          { expand: true }
+        )
+        .then(() => listing)
+    )
+    .then(listing =>
+      // The custody flag NEXT, because it is what the ops screens read to decide which step
       // to offer next. The code writes below are useful but not load-bearing: if one of them
       // fails the studio can type the code again, whereas a lost custody write leaves the
       // step it just completed still on offer.
@@ -175,6 +199,19 @@ module.exports = (req, res) => {
         .end();
     })
     .catch(e => {
+      // Sharetribe refusing transition/laundry-receive-from-provider as illegal from the
+      // current state is an expected, client-visible outcome (a stale ops screen), not a
+      // server fault - same reshaping as laundry-transaction-status.js.
+      if (isInvalidTransitionError(e)) {
+        handleError(
+          res,
+          httpError(
+            409,
+            `This rental is not awaiting drop-off (transaction ${transactionId} is not at accepted).`
+          )
+        );
+        return;
+      }
       handleError(res, e);
     });
 };

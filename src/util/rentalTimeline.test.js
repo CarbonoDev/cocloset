@@ -190,8 +190,15 @@ describe('who sees which steps', () => {
 
 // ---------------------------------------------------------------------------
 // The review step is the only one that is not "the rental reached this point" but "it is your
-// turn, and have you taken it" - a different question for each party, since the process
-// records the two reviews separately.
+// turn, and have you taken it".
+//
+// BOTH AUDIENCES SHARE ONE ANSWER NOW (2026-09-21). There used to be two review states,
+// `reviewed-by-customer` / `reviewed-by-provider`, recording which party had gone first while
+// the process waited on the other - so this step's status genuinely differed per reader. The
+// provider can no longer review at all: `reviewed` is reached in one step (the customer's
+// review, or the 7-day expiry), so both audiences' `review` step goes DONE at the same instant.
+// `audience` still exists as a parameter - see hasReviewed's comment in rentalTimeline.js - it
+// just no longer changes the answer for this particular step.
 // ---------------------------------------------------------------------------
 describe('the review step', () => {
   const reviewStatus = (state, audience) =>
@@ -208,18 +215,7 @@ describe('the review step', () => {
     expect(reviewStatus('delivered', TIMELINE_AUDIENCE_PROVIDER)).toBe(STEP_CURRENT);
   });
 
-  // THE POINT OF DOING THIS PER READER. `reviewed-by-customer` means the CUSTOMER wrote one.
-  // Folding both review states into "finished" - which is what happened before - told the
-  // owner they had done something they had not.
-  it('is done for whoever wrote the review, and still waiting for the other', () => {
-    expect(reviewStatus('reviewed-by-customer', TIMELINE_AUDIENCE_CUSTOMER)).toBe(STEP_DONE);
-    expect(reviewStatus('reviewed-by-customer', TIMELINE_AUDIENCE_PROVIDER)).toBe(STEP_CURRENT);
-
-    expect(reviewStatus('reviewed-by-provider', TIMELINE_AUDIENCE_PROVIDER)).toBe(STEP_DONE);
-    expect(reviewStatus('reviewed-by-provider', TIMELINE_AUDIENCE_CUSTOMER)).toBe(STEP_CURRENT);
-  });
-
-  it('is done for both once both have reviewed', () => {
+  it('is done for both the instant it is done for either', () => {
     expect(reviewStatus('reviewed', TIMELINE_AUDIENCE_CUSTOMER)).toBe(STEP_DONE);
     expect(reviewStatus('reviewed', TIMELINE_AUDIENCE_PROVIDER)).toBe(STEP_DONE);
   });

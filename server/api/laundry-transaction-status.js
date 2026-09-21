@@ -139,7 +139,15 @@ const buildTransitionMetadata = ({
 }) => {
   const metadata = {};
 
-  if (transition === TRANSITIONS.LAUNDRY_MARK_READY) {
+  if (
+    transition === TRANSITIONS.LAUNDRY_MARK_READY ||
+    transition === TRANSITIONS.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING
+  ) {
+    // Both "mark ready" transitions (2026-09-21) are the same ops step reaching the same
+    // outcome from two different starting states - see their comment in
+    // server/api-util/coclosetBookingProcess.js. The ticket code and rack are written either
+    // way.
+    //
     // The cosmetic, human-readable ticket code (design §11, e.g. "PIG-A3F91C")
     // shown to laundry staff on paper and ops screens - NOT the QR payload,
     // which is the transaction id itself.

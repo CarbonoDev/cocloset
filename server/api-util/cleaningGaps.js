@@ -188,15 +188,10 @@ const collectBookingsAwaitingCleaning = ({
  * that was accepted and then cancelled is not that, and neither is one still out.
  *
  * `delivered` is the state a rental reaches when the studio marks the garment available again;
- * the review states are the same rental with a review attached, and a garment must not lose a
- * rental from its count because somebody wrote about it.
+ * `reviewed` is the same rental with a review attached, and a garment must not lose a rental
+ * from its count because somebody wrote about it.
  */
-const COMPLETED_RENTAL_STATES = [
-  STATES.DELIVERED,
-  STATES.REVIEWED,
-  STATES.REVIEWED_BY_CUSTOMER,
-  STATES.REVIEWED_BY_PROVIDER,
-];
+const COMPLETED_RENTAL_STATES = [STATES.DELIVERED, STATES.REVIEWED];
 
 /**
  * How many rentals of this garment have run their course.

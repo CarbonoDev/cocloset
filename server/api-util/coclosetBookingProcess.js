@@ -43,6 +43,9 @@ const STATES = {
   PREAUTHORIZED: 'preauthorized',
   DECLINED: 'declined',
   ACCEPTED: 'accepted',
+  // First-time drop-off's own "in cleaning" state (2026-09-21). See
+  // TRANSITIONS.LAUNDRY_RECEIVE_FROM_PROVIDER below.
+  INITIAL_CLEANING: 'initial-cleaning',
   READY_FOR_PICKUP: 'ready-for-pickup',
   PICKED_UP: 'picked-up',
   OVERDUE: 'overdue',
@@ -52,8 +55,6 @@ const STATES = {
   CANCELED: 'canceled',
   DELIVERED: 'delivered',
   REVIEWED: 'reviewed',
-  REVIEWED_BY_CUSTOMER: 'reviewed-by-customer',
-  REVIEWED_BY_PROVIDER: 'reviewed-by-provider',
 };
 
 // ---------------------------------------------------------------------------
@@ -72,7 +73,16 @@ const TRANSITIONS = {
   OPERATOR_DECLINE: 'transition/operator-decline',
   EXPIRE: 'transition/expire',
 
+  // Fired by laundry-receive-garment.js (2026-09-21) instead of that endpoint's former
+  // metadata-only write - see the comment on :transition/laundry-receive-from-provider in the
+  // EDN for why. ONLY on the "not already at the studio" path (onLaundry was false).
+  LAUNDRY_RECEIVE_FROM_PROVIDER: 'transition/laundry-receive-from-provider',
+  // ONE STEP, TWO NAMES: "mark ready" from ACCEPTED (garment was already at the studio) and
+  // from INITIAL_CLEANING (garment just finished its first wash) reach the same outcome, but
+  // the EDN's `:from` is single-valued - same reason LAUNDRY_CONFIRM_RETURN/-_LATE exist.
+  // transitionForStatus() below picks between them from the transaction's real current state.
   LAUNDRY_MARK_READY: 'transition/laundry-mark-ready',
+  LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING: 'transition/laundry-mark-ready-from-initial-cleaning',
   LAUNDRY_CONFIRM_PICKUP: 'transition/laundry-confirm-pickup',
   LAUNDRY_CONFIRM_RETURN: 'transition/laundry-confirm-return',
   LAUNDRY_CONFIRM_RETURN_LATE: 'transition/laundry-confirm-return-late',
@@ -82,6 +92,7 @@ const TRANSITIONS = {
   LAUNDRY_MARK_AVAILABLE: 'transition/laundry-mark-available',
   MARK_OVERDUE: 'transition/mark-overdue',
 
+  AUTO_COMPLETE_FROM_INITIAL_CLEANING: 'transition/auto-complete-from-initial-cleaning',
   AUTO_COMPLETE_FROM_READY: 'transition/auto-complete-from-ready',
   AUTO_COMPLETE_FROM_PICKED_UP: 'transition/auto-complete-from-picked-up',
   AUTO_COMPLETE_FROM_OVERDUE: 'transition/auto-complete-from-overdue',
@@ -89,6 +100,7 @@ const TRANSITIONS = {
   AUTO_COMPLETE_FROM_CLEANING: 'transition/auto-complete-from-cleaning',
 
   CANCEL: 'transition/cancel',
+  CANCEL_FROM_INITIAL_CLEANING: 'transition/cancel-from-initial-cleaning',
   CANCEL_FROM_READY_FOR_PICKUP: 'transition/cancel-from-ready-for-pickup',
   CANCEL_FROM_PICKED_UP: 'transition/cancel-from-picked-up',
   CANCEL_FROM_OVERDUE: 'transition/cancel-from-overdue',
@@ -97,12 +109,9 @@ const TRANSITIONS = {
   COMPLETE: 'transition/complete',
   OPERATOR_COMPLETE: 'transition/operator-complete',
 
-  REVIEW_1_BY_PROVIDER: 'transition/review-1-by-provider',
-  REVIEW_2_BY_PROVIDER: 'transition/review-2-by-provider',
+  // ONE-SIDED REVIEWS (2026-09-21): the provider can no longer review the customer at all -
+  // see the EDN's :transition/review-1-by-customer comment for the removed transitions.
   REVIEW_1_BY_CUSTOMER: 'transition/review-1-by-customer',
-  REVIEW_2_BY_CUSTOMER: 'transition/review-2-by-customer',
-  EXPIRE_CUSTOMER_REVIEW_PERIOD: 'transition/expire-customer-review-period',
-  EXPIRE_PROVIDER_REVIEW_PERIOD: 'transition/expire-provider-review-period',
   EXPIRE_REVIEW_PERIOD: 'transition/expire-review-period',
 };
 
@@ -120,7 +129,9 @@ const TRANSITION_TO_STATE = {
   [TRANSITIONS.OPERATOR_DECLINE]: STATES.DECLINED,
   [TRANSITIONS.EXPIRE]: STATES.EXPIRED,
 
+  [TRANSITIONS.LAUNDRY_RECEIVE_FROM_PROVIDER]: STATES.INITIAL_CLEANING,
   [TRANSITIONS.LAUNDRY_MARK_READY]: STATES.READY_FOR_PICKUP,
+  [TRANSITIONS.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING]: STATES.READY_FOR_PICKUP,
   [TRANSITIONS.LAUNDRY_CONFIRM_PICKUP]: STATES.PICKED_UP,
   [TRANSITIONS.LAUNDRY_CONFIRM_RETURN]: STATES.RETURNED,
   [TRANSITIONS.LAUNDRY_CONFIRM_RETURN_LATE]: STATES.RETURNED,
@@ -132,6 +143,7 @@ const TRANSITION_TO_STATE = {
   [TRANSITIONS.LAUNDRY_MARK_AVAILABLE]: STATES.DELIVERED,
   [TRANSITIONS.MARK_OVERDUE]: STATES.OVERDUE,
 
+  [TRANSITIONS.AUTO_COMPLETE_FROM_INITIAL_CLEANING]: STATES.DELIVERED,
   [TRANSITIONS.AUTO_COMPLETE_FROM_READY]: STATES.DELIVERED,
   [TRANSITIONS.AUTO_COMPLETE_FROM_PICKED_UP]: STATES.DELIVERED,
   [TRANSITIONS.AUTO_COMPLETE_FROM_OVERDUE]: STATES.DELIVERED,
@@ -139,6 +151,7 @@ const TRANSITION_TO_STATE = {
   [TRANSITIONS.AUTO_COMPLETE_FROM_CLEANING]: STATES.DELIVERED,
 
   [TRANSITIONS.CANCEL]: STATES.CANCELED,
+  [TRANSITIONS.CANCEL_FROM_INITIAL_CLEANING]: STATES.CANCELED,
   [TRANSITIONS.CANCEL_FROM_READY_FOR_PICKUP]: STATES.CANCELED,
   [TRANSITIONS.CANCEL_FROM_PICKED_UP]: STATES.CANCELED,
   [TRANSITIONS.CANCEL_FROM_OVERDUE]: STATES.CANCELED,
@@ -147,12 +160,7 @@ const TRANSITION_TO_STATE = {
   [TRANSITIONS.COMPLETE]: STATES.DELIVERED,
   [TRANSITIONS.OPERATOR_COMPLETE]: STATES.DELIVERED,
 
-  [TRANSITIONS.REVIEW_1_BY_PROVIDER]: STATES.REVIEWED_BY_PROVIDER,
-  [TRANSITIONS.REVIEW_2_BY_PROVIDER]: STATES.REVIEWED,
-  [TRANSITIONS.REVIEW_1_BY_CUSTOMER]: STATES.REVIEWED_BY_CUSTOMER,
-  [TRANSITIONS.REVIEW_2_BY_CUSTOMER]: STATES.REVIEWED,
-  [TRANSITIONS.EXPIRE_CUSTOMER_REVIEW_PERIOD]: STATES.REVIEWED,
-  [TRANSITIONS.EXPIRE_PROVIDER_REVIEW_PERIOD]: STATES.REVIEWED,
+  [TRANSITIONS.REVIEW_1_BY_CUSTOMER]: STATES.REVIEWED,
   [TRANSITIONS.EXPIRE_REVIEW_PERIOD]: STATES.REVIEWED,
 };
 
@@ -199,7 +207,17 @@ const isCoclosetBookingListing = listing => {
 // transition writes, and doubles as the sub-phase the ops UI displays.
 
 const LAUNDRY_STATUS_TRANSITIONS = {
-  'ready-for-pickup': { transition: TRANSITIONS.LAUNDRY_MARK_READY },
+  // A SECOND TWO-WAY BRANCH (2026-09-21), for the same reason as `returned` below:
+  // LAUNDRY_MARK_READY only accepts ACCEPTED and LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING only
+  // accepts INITIAL_CLEANING. The ops row is still just "mark ready" either way; the server
+  // reads the transaction's real state to pick.
+  'ready-for-pickup': {
+    byState: {
+      [STATES.ACCEPTED]: TRANSITIONS.LAUNDRY_MARK_READY,
+      [STATES.INITIAL_CLEANING]: TRANSITIONS.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING,
+    },
+    fallback: TRANSITIONS.LAUNDRY_MARK_READY,
+  },
   'picked-up': { transition: TRANSITIONS.LAUNDRY_CONFIRM_PICKUP },
   returned: {
     // The two-way branch. `fallback` is used when the current state is
@@ -274,7 +292,9 @@ const transitionForStatus = (status, currentState) => {
 const OPS_LAST_TRANSITIONS = [
   TRANSITIONS.ACCEPT,
   TRANSITIONS.OPERATOR_ACCEPT,
+  TRANSITIONS.LAUNDRY_RECEIVE_FROM_PROVIDER,
   TRANSITIONS.LAUNDRY_MARK_READY,
+  TRANSITIONS.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING,
   TRANSITIONS.LAUNDRY_CONFIRM_PICKUP,
   TRANSITIONS.LAUNDRY_CONFIRM_RETURN,
   TRANSITIONS.LAUNDRY_CONFIRM_RETURN_LATE,
@@ -283,6 +303,7 @@ const OPS_LAST_TRANSITIONS = [
   TRANSITIONS.LAUNDRY_START_QUALITY_INSPECTION,
   TRANSITIONS.LAUNDRY_MARK_AVAILABLE,
   TRANSITIONS.MARK_OVERDUE,
+  TRANSITIONS.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
   TRANSITIONS.AUTO_COMPLETE_FROM_READY,
   TRANSITIONS.AUTO_COMPLETE_FROM_PICKED_UP,
   TRANSITIONS.AUTO_COMPLETE_FROM_OVERDUE,
@@ -291,18 +312,14 @@ const OPS_LAST_TRANSITIONS = [
   TRANSITIONS.COMPLETE,
   TRANSITIONS.OPERATOR_COMPLETE,
   TRANSITIONS.CANCEL,
+  TRANSITIONS.CANCEL_FROM_INITIAL_CLEANING,
   TRANSITIONS.CANCEL_FROM_READY_FOR_PICKUP,
   TRANSITIONS.CANCEL_FROM_PICKED_UP,
   TRANSITIONS.CANCEL_FROM_OVERDUE,
   TRANSITIONS.CANCEL_FROM_RETURNED,
-  // A completed rental keeps showing on the "Completed" tab while the two
-  // parties review each other, so the review states are in scope too.
-  TRANSITIONS.REVIEW_1_BY_PROVIDER,
-  TRANSITIONS.REVIEW_2_BY_PROVIDER,
+  // A completed rental keeps showing on the "Completed" tab while the customer's review
+  // window is still open (2026-09-21: one-sided now, so just these two).
   TRANSITIONS.REVIEW_1_BY_CUSTOMER,
-  TRANSITIONS.REVIEW_2_BY_CUSTOMER,
-  TRANSITIONS.EXPIRE_CUSTOMER_REVIEW_PERIOD,
-  TRANSITIONS.EXPIRE_PROVIDER_REVIEW_PERIOD,
   TRANSITIONS.EXPIRE_REVIEW_PERIOD,
 ];
 
@@ -316,10 +333,10 @@ const ACCEPT_TRANSITIONS = [TRANSITIONS.ACCEPT, TRANSITIONS.OPERATOR_ACCEPT];
 // ---------------------------------------------------------------------------
 //
 // THE DEFINITION: a transaction is ACTIVE when it has been accepted and has not
-// yet reached a terminal state. Concretely, the six states below - everything
+// yet reached a terminal state. Concretely, the seven states below - everything
 // from `accept` up to (but not including) the states nothing can leave:
 //
-//   accepted, ready-for-pickup, picked-up, overdue, returned, cleaning
+//   accepted, initial-cleaning, ready-for-pickup, picked-up, overdue, returned, cleaning
 //
 // Read off the EDN, that is exactly "someone has committed a real garment to a
 // real booking, and the booking is not finished". Its complement, deliberately:
@@ -329,8 +346,8 @@ const ACCEPT_TRANSITIONS = [TRANSITIONS.ACCEPT, TRANSITIONS.OPERATOR_ACCEPT];
 //     an inquiry as active would freeze a listing on the strength of a stranger
 //     asking a question, and every transaction in Dev is at `inquire`.
 //   * declined / expired - the booking never happened.
-//   * delivered / reviewed / reviewed-by-* - the rental is over. Reviews are
-//     bookkeeping between two humans; they do not hold a garment.
+//   * delivered / reviewed - the rental is over. A review is bookkeeping
+//     between the customer and the process; it does not hold a garment.
 //   * canceled - over, by definition.
 //
 // WHERE IT IS USED, AND WHICH WAY IT FAILS
@@ -348,6 +365,7 @@ const ACCEPT_TRANSITIONS = [TRANSITIONS.ACCEPT, TRANSITIONS.OPERATOR_ACCEPT];
 // where it would already be breaking stateFromLastTransition().
 const ACTIVE_STATES = [
   STATES.ACCEPTED,
+  STATES.INITIAL_CLEANING,
   STATES.READY_FOR_PICKUP,
   STATES.PICKED_UP,
   STATES.OVERDUE,

@@ -409,6 +409,22 @@ export const isDownloadProcess = processName => {
 };
 
 /**
+ * Check if the process is Cocloset's laundry-mediated booking process.
+ *
+ * Needed by TransactionPage.js's review submission (2026-09-21): cocloset-booking removed the
+ * provider's ability to review the customer at all, so it needs the download process's
+ * single-review branch rather than default-booking's two-sided one, even though it otherwise
+ * counts as a booking process (isBookingProcess above).
+ *
+ * @param {String} processName
+ */
+export const isCoclosetBookingProcess = processName => {
+  const latestProcessName = resolveLatestProcessName(processName);
+  const processInfo = PROCESSES.find(process => process.name === latestProcessName);
+  return [COCLOSET_BOOKING_PROCESS_NAME].includes(processInfo?.name);
+};
+
+/**
  * Check if the process/alias points to a download process
  *
  * @param {String} processAlias
