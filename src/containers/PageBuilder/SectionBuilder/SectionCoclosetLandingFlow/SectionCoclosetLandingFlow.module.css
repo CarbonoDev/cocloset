@@ -27,9 +27,11 @@
   }
 }
 
-/* Sized off the reference screenshot, which sets this considerably larger (~56-60px on
-   desktop) than a typical hosted-page section header - the same lesson already learned on
-   the become-a-partner page's Benefits/FAQ titles. */
+/* Sized off the reference screenshot. Round 3 (2026-09-18): 56px was still ~1.33x too small -
+   measured the rendered "How it Works" run against the round-3 reference at the same 1280px
+   viewport and it comes out to ~74px, not 56px. Same ratio confirmed independently against
+   "New Arrivals" (SectionListings.module.css's own `.title`, kept at the same size on
+   purpose - see that file), so this isn't a one-off, it's the actual gap. */
 .sectionTitle {
   font-family: var(--fontFamilyDisplay);
   color: var(--coclosetInk);
@@ -38,7 +40,7 @@
   margin: 0;
 
   @media (--viewportMedium) {
-    font-size: 56px;
+    font-size: 74px;
   }
 }
 
@@ -71,10 +73,19 @@
 }
 
 /* The Console-hosted icon image already IS the filled teal circle - this only bounds its
-   size and centers it, it does not draw a badge behind it. */
+   size and centers it, it does not draw a badge behind it. Steps 2 and 3's Console assets are
+   plain teal glyphs with no circle baked in, unlike step 1's - checked against the round-3
+   reference screenshot in a real browser (2026-09-18) and confirmed that's not a mismatch,
+   the reference itself only circles step 1 too. Bumped from a flat 80px (no responsive
+   scaling at all) to match the reference's noticeably larger icons, with its own
+   mobile-down/desktop-up steps rather than one fixed number everywhere. */
 .icon {
-  width: 80px;
+  width: 88px;
   margin: 0 auto 20px auto;
+
+  @media (--viewportMedium) {
+    width: 112px;
+  }
 }
 
 .stepTitle {

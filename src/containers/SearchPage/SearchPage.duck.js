@@ -366,9 +366,26 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
   // datesSearchParams - it inherits every fix already made to that function instead of risking
   // a fourth, independent bug in the same family. An explicit `dates` filter still wins if the
   // reader set one; "today" and a chosen range cannot both be the question being asked.
+  //
+  // TRUE, NOT "true". `util/urlHelpers.js`'s `parse()` - what `loadData` actually feeds this
+  // thunk from the URL - turns the query string "true"/"false" into real booleans before this
+  // function ever sees them, so a URL of `?pickupToday=true` arrives here as the boolean
+  // `true`. Comparing against the STRING `'true'` (as this did originally) never matches
+  // anything reached through the real page-load path: the filter silently did nothing, on
+  // every search, indistinguishable from an unfiltered one - which is exactly the reported
+  // "the filter returns listings that don't even qualify" (Jonathan, 2026-09-19). Checked
+  // against both forms since a caller could still hand this a literal string directly (as the
+  // duck's own tests do, dispatching without going through parse() at all).
+  const isPickupToday = pickupToday === true || pickupToday === 'true';
   const todayIso = today.toISOString().slice(0, 10);
-  const effectiveDates = dates || (pickupToday === 'true' ? `${todayIso},${todayIso}` : dates);
+  const effectiveDates = dates || (isPickupToday ? `${todayIso},${todayIso}` : dates);
   const datesMaybe = datesSearchParams(effectiveDates);
+
+  // THE SAME REAL WINDOW, kept around regardless of whether THIS search is filtered by
+  // pickupToday - see the verification pass below, which needs it for every search so the
+  // CARD badge (not just the filter) can tell the truth. Cheap to compute; only occasionally
+  // spent.
+  const todayWindowParams = datesSearchParams(`${todayIso},${todayIso}`);
 
   const requestedStart =
     datesMaybe.start &&
@@ -435,13 +452,55 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
       // pickupToday's post-fetch pass is the STRICTER one - the same rule the card badge
       // uses, additionally requiring onLaundry - so it runs instead of (not on top of)
       // withoutUnbookableListings' plain cleaning-floor check.
-      const filtered =
-        pickupToday === 'true'
-          ? withOnlyPickupTodayListings(response)
-          : withoutUnbookableListings(response, requestedStart);
+      const filtered = isPickupToday
+        ? withOnlyPickupTodayListings(response)
+        : withoutUnbookableListings(response, requestedStart);
 
-      dispatch(addMarketplaceEntities(filtered, sanitizeConfig));
-      return filtered;
+      // VERIFY THE CARD'S OWN CLAIM, NOT JUST THE FILTER'S.
+      //
+      //   > "Puedes revisar lo necesario para que en una listing card, solo se muestre
+      //   >  'Pickup today' solo si realmente puedo reservar a partir de hoy? Es muy confuso
+      //   >  para el usuario si se muestra ese tag pero realmente no puedo reservar hoy"
+      //   >   (Jonathan, 2026-09-19)
+      //
+      // isPickupTodayListing (util/searchCleaningFloor.js) is a metadata-only approximation,
+      // on purpose - a real per-card availability check would mean one query per card in a
+      // grid of 24. The compromise: ONE bounded follow-up query per search results PAGE,
+      // scoped only to the `onLaundry` candidates already on it (typically far fewer than the
+      // full page), asking Sharetribe the exact question the picker and the pickupToday
+      // filter already ask - does a whole rental window fit starting today. Its answer is
+      // what the card actually renders from now on; the approximation is only what decides
+      // whether this query runs at all.
+      //
+      // Skipped entirely when isPickupToday: withOnlyPickupTodayListings already ran the real
+      // query to build `filtered`, so every id in it is already verified.
+      const onLaundryCandidateIds = isPickupToday
+        ? []
+        : (filtered?.data?.data || [])
+            .filter(listing => listing?.attributes?.metadata?.onLaundry === true)
+            .map(listing => listing.id);
+
+      const verifyPickupToday =
+        onLaundryCandidateIds.length === 0
+          ? Promise.resolve([])
+          : sdk.listings
+              .query({
+                ids: onLaundryCandidateIds,
+                ...todayWindowParams,
+                perPage: onLaundryCandidateIds.length,
+              })
+              .then(verifyResponse => verifyResponse.data.data.map(listing => listing.id.uuid))
+              // Fails closed: nobody gets the badge rather than everybody, if the check
+              // itself cannot be answered.
+              .catch(() => []);
+
+      return verifyPickupToday.then(verifiedIds => {
+        dispatch(addMarketplaceEntities(filtered, sanitizeConfig));
+        const pickupTodayIds = isPickupToday
+          ? (filtered?.data?.data || []).map(listing => listing.id.uuid)
+          : verifiedIds;
+        return { ...filtered, pickupTodayIds };
+      });
     })
     .catch(e => {
       const error = storableError(e);
@@ -527,6 +586,9 @@ const searchPageSlice = createSlice({
     // public endpoint answers, and on any failure - the filter then renders nothing rather than
     // an empty dropdown, which would read as "there are no brands".
     brandOptions: [],
+    // Cocloset: listing ids on the current page verified (a real availability query, not the
+    // metadata-only approximation) as bookable starting today. See searchListingsPayloadCreator.
+    pickupTodayIds: [],
   },
   reducers: {
     setActiveListing: (state, action) => {
@@ -545,6 +607,10 @@ const searchPageSlice = createSlice({
         state.currentPageResultIds = resultIds(action.payload.data);
         state.pagination = action.payload.data.meta;
         state.searchInProgress = false;
+        // Which of this page's results are verified, for real, as bookable from today - see
+        // the "VERIFY THE CARD'S OWN CLAIM" comment in searchListingsPayloadCreator. Plain
+        // uuid strings, matched against listing.id.uuid wherever a card renders.
+        state.pickupTodayIds = action.payload.pickupTodayIds || [];
       })
       .addCase(searchListings.rejected, (state, action) => {
         console.error(action.payload);

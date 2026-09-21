@@ -8,6 +8,9 @@
   margin-bottom: 8px;
 }
 
+/* Round 3 (2026-09-18): 56px was still ~1.33x too small next to the round-3 reference - see
+   the matching note on SectionCoclosetLandingFlow's .sectionTitle, sized off the same
+   measurement against the same reference set. */
 .title {
   font-family: var(--fontFamilyDisplay);
   color: var(--coclosetInk);
@@ -15,7 +18,7 @@
   line-height: 1.1;
 
   @media (--viewportMedium) {
-    font-size: 56px;
+    font-size: 74px;
   }
 }
 
@@ -31,17 +34,6 @@
   align-items: center;
   scroll-behavior: smooth;
   padding: 32px 0 0 0;
-
-  &:hover .carouselArrows {
-    opacity: 1;
-  }
-
-  /* smartphones, touchscreens: we don't need to show arrows */
-  @media (any-hover: none) and (pointer: coarse) {
-    &:hover .carouselArrows {
-      opacity: 0;
-    }
-  }
 }
 
 .dynamicContainer {
@@ -49,10 +41,17 @@
   position: relative;
 }
 
+/* Round 3 (2026-09-18): the reference shows these permanently visible, plain white circles
+   with a soft shadow - not the previous hover-only, flat-grey pair (opacity: 0 until the
+   whole carousel was hovered, which a static screenshot comparison can never show as "on").
+   Kept hidden on touch/coarse-pointer devices, where hover has no meaning and a swipeable
+   carousel doesn't need on-screen arrows. */
 .carouselArrows {
-  opacity: 0;
   z-index: 2;
-  transition: all ease-in-out 500ms;
+
+  @media (any-hover: none) and (pointer: coarse) {
+    display: none;
+  }
 }
 
 .carouselArrowPrev,
@@ -70,17 +69,16 @@
   border-radius: 100%;
   border: none;
 
-  background-color: lightgrey;
-  opacity: 0.9;
-  font-size: 30px;
-  color: black;
+  background-color: var(--colorWhite);
+  box-shadow: var(--boxShadowPopup, 0 2px 8px rgba(0, 0, 0, 0.15));
+  font-size: 24px;
+  color: var(--coclosetInk);
   transition: all ease-in-out 100ms;
 
   &:hover {
-    opacity: 1;
     cursor: pointer;
-    background: black;
-    color: white;
+    background: var(--coclosetPartnerTeal);
+    color: var(--colorWhite);
   }
 }
 
@@ -196,10 +194,18 @@
   }
 }
 
+/* Round 3 (2026-09-18): the reference's card corners read as noticeably more rounded than
+   the stock --borderRadiusMedium (4px) - close to 16px at this card width. Scoped to this
+   carousel's own hover-effect class rather than the shared ListingCard.module.css, so a
+   default (non-editorial) card elsewhere keeps its regular corner. */
 .carouselImageHoverEffect {
   transition: var(--transitionStyleButton);
   background: var(--colorGrey100);
-  border-radius: var(--borderRadiusMedium);
+  border-radius: 16px;
+  /* Neither this wrapper nor ListingCard's own .rootForImage clip their content - the
+     previous 4px radius was nearly invisible without this, so the square image corners were
+     quietly poking past its rounded edge the whole time. At 16px that would be obvious. */
+  overflow: hidden;
 
   @media (--viewportMedium) {
     &:hover {

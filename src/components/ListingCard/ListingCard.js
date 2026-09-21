@@ -107,46 +107,83 @@ const ListingCardImage = props => {
  * (see server/api-util/laundryAssignment.js), and the same name the listing page shows.
  */
 const EditorialInfo = props => {
-  const { listing, titleFormatted, showPrice, priceMessage, priceTooltip, darkMode } = props;
-  const { brand, size, pickupNeighborhood } = listing?.attributes?.publicData || {};
+  const {
+    listing,
+    titleFormatted,
+    showPrice,
+    priceMessage,
+    priceTooltip,
+    darkMode,
+    listingFieldConfigs,
+  } = props;
+  const { brand, size, assignedLaundryName, pickupNeighborhood } =
+    listing?.attributes?.publicData || {};
+
+  // THE CONSOLE LABEL, NOT THE STORED VALUE.
+  //
+  //   > "se muestra 'x_small', lo cual es correcto porque es su valor guardado, pero debe
+  //   >  mostrar 'X-Small', que es el valor del label de listing field que viene de la
+  //   >  consola" (Jonathan, 2026-09-19)
+  //
+  // `size` in publicData is the enum's stored OPTION (`x_small`), never the label an operator
+  // typed in Console (`X-Small`) - the two only look the same by coincidence for options
+  // nobody bothered to capitalize. Same lookup ListingPage's own details grid already does
+  // (util/fieldHelpers.js's getDetailCustomFieldValue) - falls back to the raw value so an
+  // option Console no longer lists (renamed or deleted) still shows something rather than
+  // nothing.
+  const sizeFieldConfig = listingFieldConfigs?.find(f => f.key === 'size');
+  const sizeLabel =
+    sizeFieldConfig?.enumOptions?.find(o => `${o.option}` === size)?.label || size;
 
   const meta = [
-    size ? <FormattedMessage key="size" id="ListingCard.editorialSize" values={{ size }} /> : null,
-    pickupNeighborhood ? (
+    size ? (
+      <FormattedMessage key="size" id="ListingCard.editorialSize" values={{ size: sizeLabel }} />
+    ) : null,
+    assignedLaundryName ? (
       <FormattedMessage
         key="pickup"
-        id={'ListingCard.editorialPickupWithNeighborhood'}
-
-        values={{ neighborhood: pickupNeighborhood }}
+        id={
+          pickupNeighborhood
+            ? 'ListingCard.editorialPickupWithNeighborhood'
+            : 'ListingCard.editorialPickup'
+        }
+        values={{ name: assignedLaundryName, neighborhood: pickupNeighborhood }}
       />
     ) : null,
   ].filter(Boolean);
+
+  const hasMetaRow = meta.length > 0 || showPrice;
 
   return (
     <div className={classNames(css.editorialInfo, { [css.lightText]: darkMode })}>
       {brand ? <p className={css.editorialBrand}>{brand}</p> : null}
 
-      <div className={css.editorialHeadline}>
-        <p className={css.editorialTitle}>{titleFormatted}</p>
-        {showPrice ? (
-          <p className={css.editorialPrice} title={priceTooltip}>
-            {priceMessage}
-          </p>
-        ) : null}
-      </div>
+      {/* Round 3 (2026-09-18): the price used to sit on THIS row, next to the title - the
+          reference pairs it with the size/collection-point line below instead. Title now
+          renders alone. */}
+      <p className={css.editorialTitle}>{titleFormatted}</p>
 
-      {meta.length > 0 ? (
-        <p className={css.editorialMeta}>
-          {meta.map((entry, index) => (
-            <React.Fragment key={index}>
-              {/* A middot separator rather than a list, because these read as one line of
-                  provenance. Rendered between entries only, so a garment with just one of
-                  the two does not trail a stray dot. */}
-              {index > 0 ? <span aria-hidden="true"> · </span> : null}
-              {entry}
-            </React.Fragment>
-          ))}
-        </p>
+      {hasMetaRow ? (
+        <div className={css.editorialMetaRow}>
+          {meta.length > 0 ? (
+            <p className={css.editorialMeta}>
+              {meta.map((entry, index) => (
+                <React.Fragment key={index}>
+                  {/* A middot separator rather than a list, because these read as one line of
+                      provenance. Rendered between entries only, so a garment with just one of
+                      the two does not trail a stray dot. */}
+                  {index > 0 ? <span aria-hidden="true"> · </span> : null}
+                  {entry}
+                </React.Fragment>
+              ))}
+            </p>
+          ) : null}
+          {showPrice ? (
+            <p className={css.editorialPrice} title={priceTooltip}>
+              {priceMessage}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -190,6 +227,10 @@ export const ListingCard = props => {
     // card in a positioning element, which is a change to the root of every card on every
     // screen. Defaulting to false keeps the markup byte-identical wherever nobody asked.
     showFavorite = false,
+    // Cocloset: the real, verified answer to "is this bookable starting today" - see the
+    // comment beside showPickupToday for why this overrides rather than supplements the
+    // metadata-only approximation when a caller has it.
+    pickupTodayVerified,
   } = props;
 
   const isEditorial = variant === 'editorial';
@@ -216,9 +257,22 @@ export const ListingCard = props => {
   //   > "la tag debe ser mostrada para los listings que esten en laundry y que esten
   //   >  disponibles para hoy" (Jonathan, 2026-09-11)
   //
-  // See util/searchCleaningFloor.js's isPickupTodayListing for what this does and does not
-  // guarantee - it reads only what a search-response listing already carries.
-  const showPickupToday = isPickupTodayListing(listing);
+  //   > "Puedes revisar lo necesario para que en una listing card, solo se muestre 'Pickup
+  //   >  today' solo si realmente puedo reservar a partir de hoy? Es muy confuso para el
+  //   >  usuario si se muestra ese tag pero realmente no puedo reservar hoy" (Jonathan,
+  //   >  2026-09-19)
+  //
+  // `pickupTodayVerified` is the real answer, computed once per search results page by a
+  // bounded, ids-scoped availability query (SearchPage.duck.js) - not per card. When a caller
+  // supplies it (a boolean, from SearchResultsPanel), it is trusted outright and the
+  // metadata-only approximation is not consulted at all: the approximation's whole job was to
+  // decide whether that verification query was worth running, not to have the final word once
+  // it has an answer. Callers with no way to verify (the landing page carousel, which has no
+  // per-listing availability data at all) get the approximation instead - see
+  // util/searchCleaningFloor.js's isPickupTodayListing for what that does and does not
+  // guarantee.
+  const showPickupToday =
+    typeof pickupTodayVerified === 'boolean' ? pickupTodayVerified : isPickupTodayListing(listing);
 
   const { listingType, cardStyle } = publicData || {};
   const validListingTypes = config.listing.listingTypes || [];
@@ -277,6 +331,7 @@ export const ListingCard = props => {
           priceMessage={priceMessage}
           priceTooltip={priceTooltip}
           darkMode={darkMode}
+          listingFieldConfigs={config.listing.listingFields}
         />
       ) : (
         <div className={css.info}>

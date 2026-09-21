@@ -7,7 +7,7 @@ import classNames from 'classnames';
 import { FormattedMessage } from '../../util/reactIntl';
 import { LISTING_STATE_CLOSED, propTypes } from '../../util/types';
 import { OFFER, REQUEST } from '../../transactions/transaction';
-import { isPickupTodayListing } from '../../util/searchCleaningFloor';
+import { showPickupTodayOnListingPage } from '../../util/searchCleaningFloor';
 
 // Global ducks (for Redux actions and thunks)
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -103,6 +103,10 @@ export const ListingPageComponent = props => {
     // everything in that rest object is forwarded to OrderPanel.
     cleaningTurnaroundDays,
     completedRentals,
+    // Cocloset: the real fetched availability calendar, also forwarded to OrderPanel via
+    // restOfProps below - named here too so the "Pickup Today" tag can self-correct against
+    // it. See the comment beside showPickupToday.
+    monthlyTimeSlots,
     ...restOfProps
   } = props;
 
@@ -249,6 +253,15 @@ export const ListingPageComponent = props => {
     />
   );
 
+  // THE "PICKUP TODAY" TAG, SELF-CORRECTED ONCE THE REAL CALENDAR IS IN.
+  //
+  //   > "Hay unas prendas que tienen el tag de Pickup Today, pero al entrar al listing page
+  //   >  de ese artículo, en realidad no podemos pedir hoy si no hasta dentro de varios días"
+  //   >   (Jonathan, 2026-09-19, listing 6aa26840-16da-44df-8a74-ff4ece1da4eb)
+  //
+  // See showPickupTodayOnListingPage in util/searchCleaningFloor.js for the full reasoning.
+  const showPickupToday = showPickupTodayOnListingPage(currentListing, monthlyTimeSlots);
+
   return (
     <Page
       title={schemaTitle}
@@ -302,7 +315,7 @@ export const ListingPageComponent = props => {
               completedRentals={completedRentals}
               reviews={reviews}
               authorDisplayName={authorDisplayName}
-              showPickupToday={isPickupTodayListing(currentListing)}
+              showPickupToday={showPickupToday}
             />
             {showDescription && <SectionText text={description} showAsIngress />}
 
@@ -371,6 +384,7 @@ export const ListingPageComponent = props => {
               onManageDisableScrolling={onManageDisableScrolling}
               onContactUser={onContactUser}
               {...restOfProps}
+              monthlyTimeSlots={monthlyTimeSlots}
               validListingTypes={config.listing.listingTypes}
               marketplaceCurrency={config.currency}
               dayCountAvailableForBooking={config.stripe.dayCountAvailableForBooking}

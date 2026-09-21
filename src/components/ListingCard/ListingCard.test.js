@@ -91,6 +91,44 @@ describe('ListingCard: the "Pickup Today" tag', () => {
     expect(screen.getByText('PickupTodayBadge.label')).toBeInTheDocument();
     expect(container.querySelector('[class*="cardFavoriteShifted"]')).toBeInTheDocument();
   });
+
+  // -------------------------------------------------------------------------
+  //   > "Puedes revisar lo necesario para que en una listing card, solo se muestre 'Pickup
+  //   >  today' solo si realmente puedo reservar a partir de hoy? Es muy confuso para el
+  //   >  usuario si se muestra ese tag pero realmente no puedo reservar hoy" (Jonathan,
+  //   >  2026-09-19)
+  //
+  // pickupTodayVerified is the real, per-search-page answer (SearchResultsPanel passes it,
+  // computed once by SearchPage.duck.js's bounded verification query) - when supplied, it has
+  // the final word over the metadata-only approximation, in both directions.
+  // -------------------------------------------------------------------------
+  it('hides the tag when the approximation says yes but verification says no', () => {
+    render(
+      <ListingCard listing={onLaundryListing()} intl={fakeIntl} pickupTodayVerified={false} />
+    );
+
+    expect(screen.queryByText('PickupTodayBadge.label')).not.toBeInTheDocument();
+  });
+
+  it('trusts an explicit "verified" answer outright, even over a "no" from the approximation', () => {
+    // In practice SearchPage.duck.js only ever verifies onLaundry candidates, so this
+    // combination should not occur for a real search result - but the component's own
+    // contract is "trust the verified answer when supplied", not "AND it with the
+    // approximation", and that contract is what this pins.
+    const listing = createListing('listing1', {}, { author: createUser('user1') });
+
+    render(<ListingCard listing={listing} intl={fakeIntl} pickupTodayVerified />);
+
+    expect(screen.getByText('PickupTodayBadge.label')).toBeInTheDocument();
+  });
+
+  it('falls back to the approximation when no verified answer is supplied', () => {
+    // undefined, not false - the landing page carousel and other callers with no way to
+    // verify must still get the approximation's answer, not a hidden tag by default.
+    render(<ListingCard listing={onLaundryListing()} intl={fakeIntl} />);
+
+    expect(screen.getByText('PickupTodayBadge.label')).toBeInTheDocument();
+  });
 });
 
 // ================ Cocloset: the editorial variant ================
@@ -165,6 +203,67 @@ describe('ListingCard: the editorial variant', () => {
     // browsing grid is about comparing sellers; this one is not.
     renderEditorial();
     expect(screen.queryByText(/user1/i)).not.toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  //   > "se muestra 'x_small', lo cual es correcto porque es su valor guardado, pero debe
+  //   >  mostrar 'X-Small', que es el valor del label de listing field que viene de la
+  //   >  consola" (Jonathan, 2026-09-19)
+  // -------------------------------------------------------------------------
+  it("shows the Console label for size, not the stored enum option", () => {
+    const hostedConfig = getHostedConfiguration();
+    const config = {
+      ...hostedConfig,
+      // The raw hosted-asset shape mergeConfig expects (see ListingPage.test.js's getConfig) -
+      // it processes this into config.listing.listingFields, which is what the component
+      // actually reads.
+      listingFields: {
+        listingFields: [
+          {
+            key: 'size',
+            scope: 'public',
+            schemaType: 'enum',
+            enumOptions: [
+              { option: 'x_small', label: 'X-Small' },
+              { option: 'medium', label: 'Medium' },
+            ],
+          },
+        ],
+      },
+    };
+
+    const { container } = render(
+      <ListingCard
+        listing={editorialListing({ size: 'x_small' })}
+        intl={fakeIntl}
+        variant="editorial"
+      />,
+      { messages: en, config }
+    );
+
+    expect(container.textContent).toContain('X-Small');
+    expect(container.textContent).not.toContain('x_small');
+  });
+
+  it('falls back to the stored value when Console has no matching option (renamed or deleted)', () => {
+    const hostedConfig = getHostedConfiguration();
+    const config = {
+      ...hostedConfig,
+      listingFields: {
+        listingFields: [{ key: 'size', scope: 'public', schemaType: 'enum', enumOptions: [] }],
+      },
+    };
+
+    const { container } = render(
+      <ListingCard
+        listing={editorialListing({ size: 'x_small' })}
+        intl={fakeIntl}
+        variant="editorial"
+      />,
+      { messages: en, config }
+    );
+
+    expect(container.textContent).toContain('x_small');
   });
 
   it('still links to the listing', () => {

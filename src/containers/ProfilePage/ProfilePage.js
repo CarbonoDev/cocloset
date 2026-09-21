@@ -29,7 +29,7 @@ import {
   isUserAuthorized,
 } from '../../util/userHelpers';
 import { richText } from '../../util/richText';
-import { BUSINESS_DAYS } from '../../util/businessHours';
+import { BUSINESS_DAYS, formatTime12Hour } from '../../util/businessHours';
 
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -380,7 +380,7 @@ export const MainContent = props => {
                       <FormattedMessage id={`ProfilePage.day.${day}`} />
                     </span>
                     <span>
-                      {open}–{close}
+                      {formatTime12Hour(open)} – {formatTime12Hour(close)}
                     </span>
                   </li>
                 ))}
