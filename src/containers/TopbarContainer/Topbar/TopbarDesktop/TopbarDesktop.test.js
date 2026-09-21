@@ -71,3 +71,34 @@ describe('TopbarDesktop: the Borrow link', () => {
     expect(borrowLink()).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+//   > "puedes cambiar el label, si el usuario no está logeado, entonces debe decir 'Partner'"
+//   >   (Jonathan, 2026-09-21)
+//
+// Same link (the partner pitch, for anonymous; the ops dashboard, for a signed-in studio),
+// different words depending on who is reading - "Laundry" reads as a filter/category to
+// someone who has never heard of the studio side, "Partner" reads as an invitation.
+// ---------------------------------------------------------------------------
+describe('TopbarDesktop: the Laundry/Partner link label', () => {
+  it('says "Partner" for an anonymous reader', async () => {
+    renderTopbar();
+
+    expect(screen.getByText('TopbarDesktop.becomePartner')).toBeInTheDocument();
+    expect(screen.queryByText('TopbarDesktop.laundry')).not.toBeInTheDocument();
+  });
+
+  it('still says "Laundry" for a signed-in studio', async () => {
+    renderTopbar({ isAuthenticated: true, currentUser: laundryUser });
+
+    expect(screen.getByText('TopbarDesktop.laundry')).toBeInTheDocument();
+    expect(screen.queryByText('TopbarDesktop.becomePartner')).not.toBeInTheDocument();
+  });
+
+  it('renders neither label for a signed-in non-laundry user', async () => {
+    renderTopbar({ isAuthenticated: true, currentUser: createCurrentUser('renter-1') });
+
+    expect(screen.queryByText('TopbarDesktop.laundry')).not.toBeInTheDocument();
+    expect(screen.queryByText('TopbarDesktop.becomePartner')).not.toBeInTheDocument();
+  });
+});
