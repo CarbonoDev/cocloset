@@ -4,18 +4,27 @@
   background-color: var(--coclosetSurface);
 }
 
+/* 2026-09-21 (follow-up): this was the only heading on the page NOT in the display serif -
+   plain bold sans at a size (32-40px) actually SMALLER than the block headline below it
+   (.headline, 32-40px teal serif). An H1 reading weaker than the H2 under it is a real, code-
+   verifiable inconsistency regardless of the exact reference mockup, and matches every other
+   page-level title on the site (How it Works, New Arrivals, Partner Benefits all use
+   `--fontFamilyDisplay` + `--coclosetInk` at this same 36-56px scale) - Jonathan reported
+   "falta la fuente, los colores, el peso" and this is the one heading that literally had
+   none of the three. */
 .pageTitle {
   max-width: var(--contentMaxWidthPages);
   margin: 0 auto;
   padding: 48px 24px 0 24px;
   text-align: center;
-  font-size: 32px;
+  font-family: var(--fontFamilyDisplay);
+  font-size: 36px;
   font-weight: var(--fontWeightBold);
   color: var(--coclosetInk);
 
   @media (--viewportMedium) {
     padding: 64px 36px 0 36px;
-    font-size: 40px;
+    font-size: 56px;
   }
 }
 
