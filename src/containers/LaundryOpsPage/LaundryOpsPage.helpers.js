@@ -163,7 +163,7 @@ export const filterByView = (rows, view) => {
  * ("Ticket, customer, garment...").
  */
 export const filterBySearch = (rows, query) => {
-  const q = (query || '').trim().toLowerCase();
+  const q = String(query ?? '').trim().toLowerCase();
   if (!q) {
     return rows;
   }
@@ -173,7 +173,7 @@ export const filterBySearch = (rows, query) => {
     // `ticketCode` stays searchable too: it is still the fallback the column falls back TO.
     [r.laundryCode, r.ticketCode, r.customerName, r.ownerName, r.title, r.brand, r.currentRack]
       .filter(Boolean)
-      .some(field => field.toLowerCase().includes(q))
+      .some(field => String(field).toLowerCase().includes(q))
   );
 };
 
