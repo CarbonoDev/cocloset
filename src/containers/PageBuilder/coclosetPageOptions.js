@@ -17,6 +17,7 @@ import SectionCoclosetLandingFlow from './SectionBuilder/SectionCoclosetLandingF
 import SectionCoclosetLandingPayroll from './SectionBuilder/SectionCoclosetLandingPayroll';
 import SectionCoclosetLandingInvite from './SectionBuilder/SectionCoclosetLandingInvite';
 import SectionCoclosetAboutIntro from './SectionBuilder/SectionCoclosetAboutIntro';
+import SectionCoclosetAboutDifference from './SectionBuilder/SectionCoclosetAboutDifference';
 import SectionCoclosetAboutFounder from './SectionBuilder/SectionCoclosetAboutFounder';
 import { withCoclosetSkin } from './SectionBuilder/coclosetSkin';
 
@@ -67,6 +68,7 @@ export const coclosetPageOptions = {
     // /p/about (2026-09-21 redesign). See coclosetLandingSections.js for which Console
     // section names claim each of these.
     coclosetAboutIntro: { component: SectionCoclosetAboutIntro },
+    coclosetAboutDifference: { component: SectionCoclosetAboutDifference },
     coclosetAboutFounder: { component: SectionCoclosetAboutFounder },
 
     // Every OTHER section type - the ones with no bespoke layout, including the two the

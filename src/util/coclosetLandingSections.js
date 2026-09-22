@@ -136,6 +136,7 @@ export const SECTION_NAMES_BY_TYPE = {
   // renders full-width text with the Cocloset skin's own serif heading, which is what the
   // reference screenshots show for it), then the founder bio band.
   coclosetAboutIntro: ['Our story'],
+  coclosetAboutDifference: ["How we're different"],
   coclosetAboutFounder: ['Our team'],
 };
 
