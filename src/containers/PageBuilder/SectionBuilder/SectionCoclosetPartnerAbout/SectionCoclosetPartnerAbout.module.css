@@ -11,44 +11,67 @@
      padding (see coclosetSkin.js's note on the same substitution), so this restates it. */
   padding: 48px 24px;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 32px;
   align-items: center;
 
   @media (--viewportLarge) {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 56px;
     padding: 64px 36px;
+  }
+}
+
+.media {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 607.25 / 404.84;
+  overflow: hidden;
+  border-radius: var(--coclosetRadius);
+
+  @media (--viewportLarge) {
+    width: 607.25px;
+    max-width: 100%;
+    height: 404.84px;
+    aspect-ratio: auto;
   }
 }
 
 .media img {
   display: block;
   width: 100%;
-  height: auto;
-  border-radius: var(--coclosetRadius);
+  height: 100%;
+  max-width: 100%;
+  object-fit: cover;
 }
 
 .copy {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .headline {
   font-family: var(--fontFamilyDisplay);
-  color: var(--coclosetPartnerTeal);
+  color: #355F58;
   font-size: 32px;
   line-height: 1.1;
-  letter-spacing: -0.01em;
+  letter-spacing: 0px;
   margin: 0 0 20px 0;
+  font-weight: 400;
+  text-align: left;
 
   @media (--viewportMedium) {
     font-size: 40px;
   }
 
   @media (--viewportLarge) {
-    font-size: 44px;
+    font-size: 56px;
+    line-height: 63px;
   }
+
+
 }
 
 /* Noticeably larger than `marketplaceDefaultFontStyles` (16px) - the reference screenshot
@@ -66,4 +89,20 @@
 
 .body > p {
   margin: 0;
+  color: #2E221B;
+  font-size: 20px;
+  line-height: 1.5;
+  font-weight: 400;
+  letter-spacing: 0px;
+
+  @media (--viewportMedium) {
+    font-size: 26px;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 29.33px;
+    line-height: 41px;
+  }
+
+
 }

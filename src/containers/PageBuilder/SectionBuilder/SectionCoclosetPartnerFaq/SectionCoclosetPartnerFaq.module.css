@@ -31,13 +31,14 @@
    section header (~56-60px on desktop, not the 42px other hosted-page titles use). */
 .title {
   font-family: var(--fontFamilyDisplay);
-  color: var(--coclosetInk);
-  font-size: 36px;
-  line-height: 1.1;
+  color: #000000;
+  font-weight: 400;
   margin: 0;
 
   @media (--viewportMedium) {
-    font-size: 56px;
+    font-size: 63px;
+    line-height: 73px;
+    text-align: center;
   }
 }
 
@@ -71,11 +72,17 @@
 
 .question {
   composes: marketplaceDefaultFontStyles from global;
-  color: var(--coclosetInk);
-  font-weight: var(--fontWeightBold);
+  color: #121212;
+  font-weight: 700;
   margin: 0 0 6px 0;
-}
 
+  @media (--viewportMedium) {
+    font-size: 21.33px;
+    line-height: 29px;
+    letter-spacing: 0px;
+    text-align: left;
+  }
+}
 .answer {
   composes: marketplaceDefaultFontStyles from global;
   color: var(--coclosetInkMuted);
@@ -84,4 +91,13 @@
 
 .answer > p {
   margin: 0;
+  color: #121212;
+  font-weight: 400;
+
+  @media (--viewportMedium) {
+    font-size: 21.33px;
+    line-height: 29px;
+    letter-spacing: 0px;
+    text-align: left;
+  }
 }

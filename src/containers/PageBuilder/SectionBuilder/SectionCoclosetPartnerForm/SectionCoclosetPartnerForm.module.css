@@ -36,10 +36,18 @@
   color: var(--colorWhite);
   font-size: 32px;
   line-height: 1.1;
+  font-weight: 400;
   margin: 0 0 16px 0;
 
   @media (--viewportMedium) {
     font-size: 42px;
+  }
+
+  @media (--viewportMedium) {
+    font-size: 63px;
+    line-height: 73px;
+    letter-spacing: 0px;
+    text-align: left;
   }
 }
 
@@ -50,7 +58,16 @@
 }
 
 .body > p {
+  font-weight: 400;
   margin: 0;
+  color: var(--colorWhite);
+
+  @media (--viewportMedium) {
+    font-size: 26.67px;
+    line-height: 37px;
+    letter-spacing: 0px;
+    text-align: left;
+  }
 }
 
 .card {

@@ -1,7 +1,7 @@
 @import '../../../../styles/customMediaQueries.css';
 
 .root {
-  background-color: var(--coclosetCanvas);
+  background-color: rgb(255, 246, 238);
 }
 
 .layout {
@@ -31,13 +31,20 @@
    section header (~56-60px on desktop, not the 42px other hosted-page titles use). */
 .title {
   font-family: var(--fontFamilyDisplay);
-  color: var(--coclosetInk);
+  color: #000000;
+  font-weight: 400;
   font-size: 36px;
   line-height: 1.1;
   margin: 0;
 
   @media (--viewportMedium) {
     font-size: 56px;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 61.33px;
+    line-height: 25px;
+    letter-spacing: 0px;
   }
 }
 
@@ -97,9 +104,12 @@
 
 .cardTitle {
   composes: marketplaceDefaultFontStyles from global;
-  color: var(--coclosetInk);
-  font-weight: var(--fontWeightBold);
-  font-size: 18px;
+  color: #000000;
+  font-size: 26.67px;
+  line-height: 25px;
+  font-weight: 700;
+  letter-spacing: 0px;
+  text-align: center;
   margin: 0 0 10px 0;
 }
 
@@ -111,4 +121,10 @@
 
 .cardText > p {
   margin: 0;
+
+  font-size: 21.33px;
+  line-height: 29px;
+  font-weight: 400;
+  letter-spacing: 0px;
+  text-align: center;
 }

@@ -51,12 +51,13 @@ const SectionCoclosetPartnerHero = props => {
       options={fieldOptions}
     >
       <div className={css.layout}>
-        {hasEyebrow ? (
-          <Field data={eyebrowBlock.text} className={css.eyebrow} options={fieldOptions} />
-        ) : null}
 
         {hasCard ? (
           <div className={css.card}>
+            {hasEyebrow ? (
+              <Field data={eyebrowBlock.text} className={css.eyebrow} options={fieldOptions} />
+            ) : null}
+            
             <Field data={title} className={css.headline} options={fieldOptions} />
             <Field data={description} className={css.description} options={fieldOptions} />
           </div>
