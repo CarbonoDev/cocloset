@@ -440,8 +440,50 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
     perPage,
   };
 
-  return sdk.listings
-    .query(params)
+  // pickupToday: the API paginates BEFORE we filter, so we fetch all the
+  // candidates (up to 5 pages of 100), filter them, and paginate ourselves.
+  const fetchAllPickupCandidates = async () => {
+    const { page: _page, ...base } = params;
+    const query = p => sdk.listings.query({ ...base, perPage: 100, page: p });
+    const first = await query(1);
+    const totalPages = Math.min(first.data.meta?.totalPages || 1, 5);
+    const rest = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) => query(i + 2))
+    );
+    const all = [first, ...rest];
+    return {
+      ...first,
+      data: {
+        ...first.data,
+        data: all.flatMap(r => r.data.data),
+        included: all.flatMap(r => r.data.included || []),
+      },
+    };
+  };
+
+  const paginateLocally = res => {
+    if (!isPickupToday) return res;
+    const items = res.data.data;
+    const pageSize = params.perPage;
+    const page = Number(params.page) || 1;
+    const from = (page - 1) * pageSize;
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: items.slice(from, from + pageSize),
+        meta: {
+          ...res.data.meta,
+          page,
+          perPage: pageSize,
+          totalItems: items.length,
+          totalPages: Math.max(1, Math.ceil(items.length / pageSize)),
+        },
+      },
+    };
+  };
+
+  return (isPickupToday ? fetchAllPickupCandidates() : sdk.listings.query(params))
     .then(response => {
       const listingFields = config?.listing?.listingFields;
       const sanitizeConfig = { listingFields };
@@ -452,9 +494,11 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
       // pickupToday's post-fetch pass is the STRICTER one - the same rule the card badge
       // uses, additionally requiring onLaundry - so it runs instead of (not on top of)
       // withoutUnbookableListings' plain cleaning-floor check.
-      const filtered = isPickupToday
-        ? withOnlyPickupTodayListings(response)
-        : withoutUnbookableListings(response, requestedStart);
+      const filtered = paginateLocally(
+        isPickupToday
+          ? withOnlyPickupTodayListings(response)
+          : withoutUnbookableListings(response, requestedStart)
+      );
 
       // VERIFY THE CARD'S OWN CLAIM, NOT JUST THE FILTER'S.
       //
