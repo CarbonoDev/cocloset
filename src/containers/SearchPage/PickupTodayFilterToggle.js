@@ -22,10 +22,10 @@ import css from './PickupTodayFilterToggle.module.css';
  * every one of validURLParamForExtendedData's branches for a filter that behaves like none of
  * them. A plain URL param and a plain checkbox says exactly what this is.
  *
- * `pickupToday` naturally survives "Reset all": that button rebuilds the URL from
- * `urlQueryParams`, which only ever holds recognised filter params (see
- * validFilterParams/pickSearchParamsOnly) - this one is never among them, so a reset drops it
- * without needing to know it exists.
+ * `pickupToday` is a plain URL param, not a recognised filter, so
+ * validUrlQueryParamsFromProps lets it through (dropNonFilterParams = false).
+ * "Reset all" removes it explicitly in onResetAll (SearchPage.shared.js), and the
+ * filter-change handlers re-read it from the URL so stale state cannot bring it back.
  *
  * @component
  * @param {Object} props
@@ -37,12 +37,12 @@ import css from './PickupTodayFilterToggle.module.css';
 const PickupTodayFilterToggle = props => {
   const { history, location, className } = props;
   const params = parse(location.search);
-  const checked = params.pickupToday === 'true';
+  const checked = params.pickupToday === true || params.pickupToday === 'true';
 
   const handleChange = () => {
-    const { pickupToday, ...rest } = params;
-    const nextParams = checked ? rest : { ...rest, pickupToday: 'true' };
-    history.push({ search: stringify(nextParams) });
+    const { pickupToday, page, mapSearch, ...rest } = params;
+    const nextParams = checked ? rest : { ...rest, pickupToday: true };
+    history.push({ pathname: location.pathname, search: stringify(nextParams) });
   };
 
   return (

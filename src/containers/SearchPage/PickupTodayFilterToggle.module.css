@@ -1,13 +1,22 @@
 .root {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
-  cursor: pointer;
+  width: 100%;
+  margin: 10px 0 0 0;
   padding: 8px 0;
+  cursor: pointer;
   font-size: 14px;
+  font-weight: 600;
   color: var(--colorGrey700, #4a4a4a);
 }
 
 .input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
   cursor: pointer;
 }

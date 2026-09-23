@@ -1074,7 +1074,7 @@ export const onResetAll = ({
 
   setState({ currentQueryParams: {} });
 
-  const queryParams = omit(urlQueryParams, filterQueryParamNames);
+  const queryParams = omit(urlQueryParams, [...filterQueryParamNames, 'pickupToday']);
 
   const { routeName, pathParams } = getSearchPageResourceLocatorStringParams(
     routeConfiguration,
@@ -1110,7 +1110,8 @@ export const onApplyFilters = ({
     currentPathParams,
   };
 
-  const searchParams = { ...urlQueryParams, ...currentQueryParams };
+  const { pickupToday: _stalePickupToday, ...stateWithoutPickupToday } = currentQueryParams || {};
+  const searchParams = { ...urlQueryParams, ...stateWithoutPickupToday };
   const search = cleanSearchFromConflictingParams(searchParams, filterConfigs, sortConfig);
 
   const { routeName, pathParams } = getSearchPageResourceLocatorStringParams(
@@ -1157,7 +1158,8 @@ export const createFilterValueChangeHandler = (
   return updatedURLParams => {
     const updater = prevState => {
       const { address, bounds, keywords } = urlQueryParams;
-      const mergedQueryParams = { ...urlQueryParams, ...prevState.currentQueryParams };
+      const { pickupToday: _stalePickupToday, ...stateWithoutPickupToday } = prevState.currentQueryParams || {};
+      const mergedQueryParams = { ...urlQueryParams, ...stateWithoutPickupToday };
 
       const keywordsMaybe = isMainSearchTypeKeywords(config) ? { keywords } : {};
 
@@ -1180,7 +1182,10 @@ export const createFilterValueChangeHandler = (
 
     const callback = () => {
       if (useHistoryPush) {
-        const searchParams = getState().currentQueryParams;
+        const pickupTodayMaybe = urlQueryParams.pickupToday
+          ? { pickupToday: urlQueryParams.pickupToday }
+          : {};
+        const searchParams = { ...getState().currentQueryParams, ...pickupTodayMaybe };
         const search = cleanSearchFromConflictingParams(searchParams, filterConfigs, sortConfig);
 
         const { routeName, pathParams } = getSearchPageResourceLocatorStringParams(
