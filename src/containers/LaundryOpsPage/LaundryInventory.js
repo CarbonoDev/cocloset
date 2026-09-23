@@ -9,8 +9,9 @@ import { statusTone } from './LaundryOpsPage.helpers';
 import css from './LaundryOpsPage.module.css';
 
 /**
- * "Inventory in studio" card grid (mockup 04.jpg) - one card per garment
- * assigned to this laundry, showing its rack location and status badge.
+ * "Inventory in studio" card grid - one card per garment
+ * assigned to this laundry, showing its internal laundry code
+ * and status badge.
  *
  * This is the listing-readiness view of the same data the Orders table renders
  * as transactions (design doc §8): exactly one card per assigned listing,
@@ -65,15 +66,14 @@ const LaundryInventory = props => {
           //   >  ingresado internamente, no el ticket de la transacción"
           //   >  (Jonathan, 2026-09-03)
           //
-          // `ticketCode` belongs to a rental. `laundryCode` is what this studio
-          // wrote on the garment when it received it - the label that says where
-          // it is on their own shelving (server/api-util/laundryCode.js) - which
-          // is the only one of the two that answers the question this screen is
-          // for: go and find that garment.
+          // `ticketCode` belongs to a rental. `laundryCode` is the internal identifier
+          // that this studio assigns to the garment when it receives it. It is the code
+          // used by the laundry to recognize the garment within its own inventory and
+          // is the identifier this screen should display.
           //
-          // It is also shown regardless of state now. The old condition hid it on
-          // `delivered`, which is precisely the garment sitting in stock waiting
-          // to be found again.
+          // The laundry code is shown regardless of garment state. Previously it was
+          // hidden for `delivered`, even though delivered garments are still part of
+          // the studio inventory and need to be identifiable.
           const internalCode = item.laundryCode;
           return (
             <li key={item.id} className={css.inventoryCard}>
@@ -87,9 +87,6 @@ const LaundryInventory = props => {
                 )}
               </div>
               <span className={css.primaryText}>{item.title || '—'}</span>
-              <span className={css.secondaryText}>
-                {item.currentRack || <FormattedMessage id="LaundryOpsPage.inventory.noRack" />}
-              </span>
               {internalCode ? <span className={css.secondaryText}>#{internalCode}</span> : null}
               {labelKey ? (
                 <span className={classNames(css.statusBadge, css[`tone${statusTone(item)}`])}>
