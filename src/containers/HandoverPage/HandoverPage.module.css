@@ -235,3 +235,8 @@
   color: var(--coclosetInkMuted);
   margin: 12px 0 0 0;
 }
+
+.dashboardButton {
+  composes: buttonPrimary from global;
+  margin: 0;
+}

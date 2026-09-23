@@ -97,6 +97,19 @@ const instructionMessageId = (step, viewerRole) => {
     : handoverStepMessageId(step, 'waiting');
 };
 
+/**
+ * Title for the step, in the laundry's own words when there are some.
+ *
+ * The studio reads the step as work to do ("Process this garment for cleaning:") while the
+ * counterparties read it as an event at the counter; only some steps have that second
+ * wording, so the shared title is the fallback rather than a missing-key crash.
+ */
+const stepTitleMessageId = (step, viewerRole, intl) => {
+  const titleId = handoverStepMessageId(step, 'title');
+  const laundryId = `${titleId}.laundry`;
+  return viewerRole === 'laundry' && intl.messages[laundryId] ? laundryId : titleId;
+};
+
 export const HandoverPageComponent = props => {
   const intl = useIntl();
   const {
@@ -302,7 +315,7 @@ export const HandoverPageComponent = props => {
         {step ? (
           <>
             <H3 as="h2" className={css.stepTitle}>
-              <FormattedMessage id={handoverStepMessageId(step, 'title')} />
+              <FormattedMessage id={stepTitleMessageId(step, viewerRole, intl)} />
             </H3>
             <CounterpartyLine step={step} />
             {step.isLate ? (
@@ -318,14 +331,26 @@ export const HandoverPageComponent = props => {
                 own shop with the garment in its hands very much has something to do, and this
                 page told it otherwise. */}
             <FormattedMessage
-              id={action ? `HandoverPage.status.${processState}` : 'HandoverPage.nothingDue.title'}
+              id={
+                processState === 'initial-cleaning' && viewerRole === 'laundry'
+                  ? 'HandoverPage.cleaningInProgress.title'
+                  : action
+                  ? `HandoverPage.status.${processState}`
+                  : 'HandoverPage.nothingDue.title'
+              }
             />
           </H3>
         )}
 
+        {processState === 'initial-cleaning' && viewerRole === 'laundry' ? (
+          <p className={css.instruction}>
+            <FormattedMessage id="HandoverPage.cleaningInProgress.instruction" />
+          </p>
+        ) : null}
+
         {canConfirm ? (
           <>
-            {step ? (
+            {step && step.status !== 'garment-received' ? (
               <p className={css.instruction}>
                 <FormattedMessage id={handoverStepMessageId(step, 'laundry')} />
               </p>
@@ -451,58 +476,66 @@ export const HandoverPageComponent = props => {
                 <FormattedMessage id="HandoverPage.error.confirmFailed" />
               </p>
             ) : null}
-            <PrimaryButton
-              className={css.confirmButton}
-              type="button"
-              inProgress={confirmInProgress}
-              disabled={confirmInProgress}
-              onClick={() =>
-                onConfirm({
-                  transactionId: handover.transactionId,
-                  status: action.status,
-                  // Only sent when this step takes it AND the box holds a usable whole
-                  // number. A blank box is NOT a zero: the server reads "absent" as "apply
-                  // the configured turnaround", while 0 means "ready today" and would block
-                  // nothing at all.
-                  // Clamped here as well as on the server. Not belt-and-braces for its own
-                  // sake: a browser's `max` is advisory on a typed value, and posting 4 to be
-                  // silently stored as 2 is the behaviour this change exists to remove.
-                  ...(Number.isInteger(defaultCleaningDays) && /^\d+$/.test(cleaningDays.trim())
-                    ? {
-                        cleaningDays: hasCleaningCeiling
-                          ? Math.min(Number.parseInt(cleaningDays, 10), maxCleaningDays)
-                          : Number.parseInt(cleaningDays, 10),
-                      }
-                    : {}),
-                  // Only at the step that takes it, and only when something was typed. A
-                  // blank box is "not decided yet" rather than "clear the code": the server
-                  // reads an absent value as "leave it alone", so a studio confirming a step
-                  // without touching the field cannot wipe a code it set earlier.
-                  ...(takesLaundryCode && codeInput.trim() !== ''
-                    ? { laundryCode: codeInput.trim() }
-                    : {}),
-                  // The note only travels when damage was actually reported: a note left
-                  // behind after un-ticking the box would attach a description of damage to a
-                  // garment recorded as fine.
-                  ...(takesDamageReport ? { damaged, damageNote: damaged ? damageNote : '' } : {}),
-                })
-              }
-            >
-              {/* THE SAME LABEL THE OPS TABLE PRINTS.
+            {processState === 'initial-cleaning' ? (
+              <NamedLink name="LaundryOpsDashboardPage" className={css.dashboardButton}>
+                <FormattedMessage id="HandoverPage.goToDashboard" />
+              </NamedLink>
+            ) : (
+              <PrimaryButton
+                className={css.confirmButton}
+                type="button"
+                inProgress={confirmInProgress}
+                disabled={confirmInProgress}
+                onClick={() =>
+                  onConfirm({
+                    transactionId: handover.transactionId,
+                    status: action.status,
+                    // Only sent when this step takes it AND the box holds a usable whole
+                    // number. A blank box is NOT a zero: the server reads "absent" as "apply
+                    // the configured turnaround", while 0 means "ready today" and would block
+                    // nothing at all.
+                    // Clamped here as well as on the server. Not belt-and-braces for its own
+                    // sake: a browser's `max` is advisory on a typed value, and posting 4 to be
+                    // silently stored as 2 is the behaviour this change exists to remove.
+                    ...(Number.isInteger(defaultCleaningDays) && /^\d+$/.test(cleaningDays.trim())
+                      ? {
+                          cleaningDays: hasCleaningCeiling
+                            ? Math.min(Number.parseInt(cleaningDays, 10), maxCleaningDays)
+                            : Number.parseInt(cleaningDays, 10),
+                        }
+                      : {}),
+                    // Only at the step that takes it, and only when something was typed. A
+                    // blank box is "not decided yet" rather than "clear the code": the server
+                    // reads an absent value as "leave it alone", so a studio confirming a step
+                    // without touching the field cannot wipe a code it set earlier.
+                    ...(takesLaundryCode && codeInput.trim() !== ''
+                      ? { laundryCode: codeInput.trim() }
+                      : {}),
+                    // The note only travels when damage was actually reported: a note left
+                    // behind after un-ticking the box would attach a description of damage to a
+                    // garment recorded as fine.
+                    ...(takesDamageReport
+                      ? { damaged, damageNote: damaged ? damageNote : '' }
+                      : {}),
+                  })
+                }
+              >
+                {/* THE SAME LABEL THE OPS TABLE PRINTS.
                     > "el handover tiene que funcionar igual que en la pestaña orders de
                     >  laundry" (Jonathan, 2026-09-08)
 
                   Keyed on the ACTION, not the step, because the two do not always coincide:
                   the cleaning phases have no counter event at all, and the page used to offer
                   nothing there. `step` is still what names the counter above. */}
-              <FormattedMessage
-                id={
-                  step
-                    ? handoverStepMessageId(step, 'confirm')
-                    : `LaundryOpsPage.action.${action.status}`
-                }
-              />
-            </PrimaryButton>
+                <FormattedMessage
+                  id={
+                    step
+                      ? handoverStepMessageId(step, 'confirm')
+                      : `LaundryOpsPage.action.${action.status}`
+                  }
+                />
+              </PrimaryButton>
+            )}
           </>
         ) : (
           <p className={css.instruction}>
