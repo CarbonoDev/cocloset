@@ -27,10 +27,14 @@
 
 .name {
   font-weight: var(--fontWeightBold);
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1.2;
   color: var(--coclosetInk);
   margin: 0 0 16px 0;
+
+  @media (--viewportLarge) {
+    font-size: 32px;
+  }
 }
 
 .body {
@@ -42,6 +46,11 @@
 
 .body > p {
   margin: 0 0 16px 0;
+  font-size: 16px;
+
+  @media (--viewportMedium) {
+    font-size: 20px;
+  }
 }
 
 .body > p:last-child {
@@ -53,4 +62,9 @@
   width: 100%;
   height: auto;
   border-radius: var(--coclosetRadius);
+}
+
+section[class*="SectionCoclosetAboutFounder"] 
+div[class*="SectionContainer_sectionContent"] {
+  padding: 0;
 }

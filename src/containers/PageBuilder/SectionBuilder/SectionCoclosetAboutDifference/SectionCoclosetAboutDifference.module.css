@@ -22,17 +22,17 @@
 .headline {
   font-family: var(--fontFamilyDisplay);
   color: var(--coclosetPartnerTeal);
-  font-size: 32px;
+  font-size: 36px;
   line-height: 1.1;
   letter-spacing: -0.01em;
   margin: 0 0 20px 0;
 
   @media (--viewportMedium) {
-    font-size: 40px;
+    font-size: 44px;
   }
 
   @media (--viewportLarge) {
-    font-size: 44px;
+    font-size: 64px;
   }
 }
 
@@ -45,8 +45,18 @@
 
 .body > p {
   margin: 0 0 16px 0;
+  font-size: 16px;
+
+  @media (--viewportMedium) {
+    font-size: 20px;
+  }
 }
 
 .body > p:last-child {
   margin-bottom: 0;
+}
+
+section[class*="SectionCoclosetAboutDifference"] 
+div[class*="SectionContainer_sectionContent"] {
+  padding: 0;
 }
