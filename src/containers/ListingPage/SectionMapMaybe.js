@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { FormattedMessage } from '../../util/reactIntl';
 import classNames from 'classnames';
 import { propTypes } from '../../util/types';
+import { BUSINESS_DAYS, formatTime12Hour } from '../../util/businessHours';
 import { getAssignedLaundryLocation, getPickupLocation } from '../../util/listingLocation';
 import { obfuscatedCoordinates } from '../../util/maps';
 import { Heading, Map } from '../../components';
@@ -43,6 +44,9 @@ import css from './ListingPage.module.css';
  * @param {Object} props.mapsConfig - config.maps
  * @param {number} [props.cleaningTurnaroundDays] - Cocloset: the assigned studio's live
  *   turnaround, resolved by ListingPage.duck.js. Omitted from the card when not known.
+ * @param {Object} [props.businessHoursByDay] - Cocloset: the assigned studio's opening hours,
+ *   `{ mon: { open, close }, ... }` with open days only, from its public profile. Omitted
+ *   from the card when not known.
  * @returns {JSX.Element} section map maybe component
  */
 class SectionMapMaybe extends Component {
@@ -60,10 +64,18 @@ class SectionMapMaybe extends Component {
       listingId,
       mapsConfig,
       cleaningTurnaroundDays,
+      businessHoursByDay,
     } = this.props;
 
     // The studio name + street address, or null when no laundry has been assigned.
     const laundryLocation = getAssignedLaundryLocation(publicData);
+
+    // The studio's open days, in the marketplace's week order. Same derivation as
+    // ProfilePage's, which renders the studio's own copy of this list - a garment's page and
+    // its studio's page disagreeing about opening hours would be its own small bug.
+    const businessHoursEntries = BUSINESS_DAYS.filter(day => businessHoursByDay?.[day]).map(
+      day => ({ day, ...businessHoursByDay[day] })
+    );
 
     // Either half alone is worth a section. A missing `geolocation` used to hide
     // the whole block, which would now also swallow an address we do have — and
@@ -111,6 +123,40 @@ class SectionMapMaybe extends Component {
                   values={{ days: cleaningTurnaroundDays }}
                 />
               </p>
+            ) : null}
+            {/* WHEN THE COUNTER IS ACTUALLY OPEN.
+                  > "se puede reservar aunque laundry haya cerrado, solo aseguremonos que se
+                  >  muestren los horarios de la laundry en la listing page, o en el checkout
+                  >  o en transaction page" (Jonathan, 2026-09-28)
+
+                A rental can now start the day it is booked, at any hour - a closed studio is
+                deliberately NOT a reason to refuse the booking. That makes these hours the
+                one thing a customer booking a same-day collection at 23:50 cannot work out
+                and has to know. Hours are a property of the STUDIO, so they are read from its
+                public profile at page load rather than copied onto the garment (see
+                fetchAssignedLaundryHoursThunk); absent until that answers, and on any
+                failure, in which case this block simply is not there. */}
+            {businessHoursEntries.length > 0 ? (
+              <div className={css.pickupLocationHours}>
+                <span className={css.pickupLocationHoursLabel}>
+                  <FormattedMessage id="ListingPage.pickupLocationHoursLabel" />
+                </span>
+                {/* One row per OPEN day. A closed day carries no hours and is simply absent
+                    from the record, so this list is the studio's open days by construction -
+                    see util/businessHours.js on why there is no `closed: true`. */}
+                <ul className={css.pickupLocationHoursList}>
+                  {businessHoursEntries.map(({ day, open, close }) => (
+                    <li key={day} className={css.pickupLocationHoursRow}>
+                      <span className={css.pickupLocationHoursDay}>
+                        <FormattedMessage id={`ProfilePage.day.${day}`} />
+                      </span>
+                      <span>
+                        {formatTime12Hour(open)} – {formatTime12Hour(close)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
             <p className={css.pickupLocationNote}>
               <FormattedMessage id="ListingPage.pickupLocationNote" />

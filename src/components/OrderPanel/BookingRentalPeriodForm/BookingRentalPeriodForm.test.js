@@ -107,6 +107,39 @@ describe('isWindowAvailableFn', () => {
     expect(isAvailable(day(1), 0)).toBe(false);
     expect(isAvailable(day(1), undefined)).toBe(false);
   });
+
+  // THE FIRST DAY OF A SLOT IS OFFERABLE, INCLUDING WHEN THAT DAY IS TODAY.
+  //
+  //   > "el día de hoy esté habilitado para seleccionarlo y que la fecha de reserva sea hoy"
+  //   >   (Jonathan, 2026-09-28)
+  //
+  // Today was refused for a whole month on the belief that the API truncates the current day's
+  // slot at the moment of the query, and a previous fix tried to compensate HERE, at day
+  // granularity. Both were wrong: the slot starts wherever the QUERY starts, and the listing
+  // page was querying from tomorrow. These two cases pin the two halves of that, so neither
+  // belief can come back.
+  it('accepts a start on the first day of the slot, whatever date that is', () => {
+    // Nothing about today is special to this function. Given a slot that begins on the day
+    // being asked about, a window that fits is available - which is all it ever needed to do
+    // once the fetch started including today. See isWindowAvailableFn's comment for the
+    // measurements.
+    expect(isAvailable(day(1), 9)).toBe(true);
+  });
+
+  it('refuses a start before the slot begins, and is not lenient about part-days', () => {
+    // The flip side, and the reason the comparison is an exact instant again: a slot that
+    // genuinely begins mid-day (an availability exception, not a query artefact) does not make
+    // that whole day offerable. A day-granularity comparison here would have said otherwise -
+    // and would have been indistinguishable from the bug it was meant to fix.
+    const midDay = new Date(Date.UTC(2026, 8, 5, 15, 0, 0));
+    const fromMidDay = isWindowAvailableFn(
+      [{ ...slot(5, 20), attributes: { ...slot(5, 20).attributes, start: midDay } }],
+      TZ
+    );
+
+    expect(fromMidDay(day(5), 9)).toBe(false);
+    expect(fromMidDay(day(6), 9)).toBe(true);
+  });
 });
 
 describe('dateFormatOptionsIn', () => {

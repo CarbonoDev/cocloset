@@ -1,5 +1,8 @@
-import { earliestBookableStart, resolveInitialCleaningDays } from './cleaningFloor';
-import { getStartOf } from './dates';
+import {
+  canBeCollectedToday,
+  earliestBookableStart,
+  resolveInitialCleaningDays,
+} from './cleaningFloor';
 import { getAllTimeSlots, getTimeSlotsOnDate } from '../components/OrderPanel/booking.shared';
 
 /**
@@ -96,13 +99,16 @@ export const isBookableFrom = (listing, requestedStart) => {
  * @returns {boolean}
  */
 export const isPickupTodayListing = (listing, today = new Date()) => {
-  const onLaundry = listing?.attributes?.metadata?.onLaundry === true;
-  if (!onLaundry) {
-    return false;
-  }
   const timeZone = listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC';
-  const startOfToday = getStartOf(today, 'day', timeZone);
-  return isBookableFrom(listing, startOfToday);
+  // The shared rule, not a local copy of it: the booking picker gates today's date on the
+  // SAME function, so the badge and the calendar cannot disagree about which garments may go
+  // out today. See canBeCollectedToday in util/cleaningFloor.js.
+  return canBeCollectedToday(
+    listing?.attributes?.metadata?.onLaundry,
+    earliestBookableStartForListing(listing),
+    timeZone,
+    today
+  );
 };
 
 /**

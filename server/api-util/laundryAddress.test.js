@@ -427,6 +427,123 @@ describe('propagateAddressToAssignedListings()', () => {
     expect(update).toHaveBeenCalledTimes(1);
   });
 
+  // THE API DOES NOT STORE BACK WHAT IT IS GIVEN, and until this was measured nothing here
+  // knew it. Writing 40.733144 / -73.990137 and reading the listing again returns
+  // 40.733143 / -73.990135 (Dev, 2026-09-28). With an exact `===` the listing therefore looked
+  // stale the instant after the write that made it correct, so this function rewrote every
+  // garment a studio holds on every call and reported all of them as updated - including from
+  // /api/laundry-listings-refresh, which runs on EVERY profile save and documents itself as
+  // writing nothing when a studio saves its opening hours. The fixtures above could not catch
+  // it: they hand back the same float they were given, which a real round trip does not.
+  it('treats a coordinate that survived a round trip as unchanged', async () => {
+    const quantised = { lat: NEW_ORIGIN.lat - 0.000001, lng: NEW_ORIGIN.lng + 0.000002 };
+    const { integrationSdk, update } = setupListings([
+      [
+        listingEntity({
+          id: 'round-tripped',
+          publicData: {
+            pickupAddress: NEW_ADDRESS,
+            assignedLaundryName: 'Maison du Marais',
+            pickupNeighborhood: null,
+          },
+          geolocation: quantised,
+        }),
+      ],
+    ]);
+
+    const result = await propagateAddressToAssignedListings({
+      integrationSdk,
+      laundryId: LAUNDRY_ID,
+      laundry: laundryRecord,
+    });
+
+    expect(result.skipped.map(entry => entry.id)).toEqual(['round-tripped']);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  // THE SAME BUG, ONE FIELD ALONG. Writing `pickupNeighborhood: null` DELETES the key rather
+  // than storing null, so the listing reads back with it absent and a bare `=== null` is false
+  // forever. Every studio with no neighborhood re-stamped all of its garments on every call.
+  // Found by running the propagation twice against Dev and watching it not converge.
+  it('treats an absent neighbourhood as the null it was written with', async () => {
+    const { integrationSdk, update } = setupListings([
+      [
+        listingEntity({
+          id: 'no-neighbourhood',
+          publicData: {
+            pickupAddress: NEW_ADDRESS,
+            assignedLaundryName: 'Maison du Marais',
+            // Not `pickupNeighborhood: null` - the key is simply not there, which is what the
+            // API returns after a null write.
+          },
+          geolocation: NEW_ORIGIN,
+        }),
+      ],
+    ]);
+
+    const result = await propagateAddressToAssignedListings({
+      integrationSdk,
+      laundryId: LAUNDRY_ID,
+      laundry: { ...laundryRecord, neighborhood: null },
+    });
+
+    expect(result.skipped.map(entry => entry.id)).toEqual(['no-neighbourhood']);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('still notices a studio that gained a neighbourhood', async () => {
+    const { integrationSdk, update } = setupListings([
+      [
+        listingEntity({
+          id: 'needs-neighbourhood',
+          publicData: {
+            pickupAddress: NEW_ADDRESS,
+            assignedLaundryName: 'Maison du Marais',
+          },
+          geolocation: NEW_ORIGIN,
+        }),
+      ],
+    ]);
+
+    const result = await propagateAddressToAssignedListings({
+      integrationSdk,
+      laundryId: LAUNDRY_ID,
+      laundry: { ...laundryRecord, neighborhood: 'Le Marais' },
+    });
+
+    expect(result.updated.map(entry => entry.id)).toEqual(['needs-neighbourhood']);
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it('still notices a studio that genuinely moved', async () => {
+    // The slack is a metre. A move worth propagating is tens of metres at the very least, so
+    // it must not be hidden - a listing left on the old pin is a customer sent to the wrong
+    // door, which is the whole reason this propagation exists.
+    const movedAway = { lat: NEW_ORIGIN.lat + 0.001, lng: NEW_ORIGIN.lng };
+    const { integrationSdk, update } = setupListings([
+      [
+        listingEntity({
+          id: 'moved',
+          publicData: {
+            pickupAddress: NEW_ADDRESS,
+            assignedLaundryName: 'Maison du Marais',
+            pickupNeighborhood: null,
+          },
+          geolocation: movedAway,
+        }),
+      ],
+    ]);
+
+    const result = await propagateAddressToAssignedListings({
+      integrationSdk,
+      laundryId: LAUNDRY_ID,
+      laundry: laundryRecord,
+    });
+
+    expect(result.updated.map(entry => entry.id)).toEqual(['moved']);
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
   // A DRY RUN MUST WRITE NOTHING. This is the whole safety property of
   // scripts/update-laundry-address.js --dry-run.
   it('writes nothing at all in dry-run mode, but still reports what it would change', async () => {

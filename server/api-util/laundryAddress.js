@@ -309,6 +309,30 @@ const findListingsAssignedToLaundry = ({ integrationSdk, laundryId }) => {
   return fetchPage(1).then(({ truncated }) => ({ listings: collected, scanned, truncated }));
 };
 
+/**
+ * How far apart two coordinates may be and still count as the same place, in degrees.
+ *
+ * ~1.1 m at the equator, and it exists because the API DOES NOT STORE BACK WHAT IT IS GIVEN.
+ * Measured against Dev on 2026-09-28: writing `40.733144 / -73.990137` and reading the listing
+ * again returns `40.733143 / -73.990135`. The values are quantised, not rounded to fewer
+ * decimals, so an exact `===` between a listing's stored geolocation and its studio's origin is
+ * false immediately after the write that was supposed to make them equal.
+ *
+ * WHAT THAT COST BEFORE THIS EXISTED: `alreadyCorrect` below was never true, so every call
+ * rewrote every listing the studio holds and reported all of them as "updated". That is not
+ * only noise in a script's output - /api/laundry-listings-refresh runs on EVERY studio profile
+ * save, and its own comment claims a studio saving its opening hours "writes nothing at all".
+ * It wrote one Integration API update per garment, every time.
+ *
+ * Chosen against what it has to tell apart: two different street addresses are tens of metres
+ * apart at the very least, so a metre of slack cannot hide a studio that actually moved, while
+ * comfortably covering the storage quantisation.
+ */
+const COORDINATE_EPSILON_DEGREES = 1e-5;
+
+const sameCoordinate = (a, b) =>
+  typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < COORDINATE_EPSILON_DEGREES;
+
 const describeListing = listing =>
   `${listing?.attributes?.title || '(untitled)'} [${listing?.attributes?.state}] (${
     listing?.id?.uuid
@@ -366,8 +390,10 @@ const propagateAddressToAssignedListings = ({ integrationSdk, laundryId, laundry
         const geolocation = listing?.attributes?.geolocation || {};
         const alreadyCorrect =
           publicData.pickupAddress === laundry.address &&
-          geolocation.lat === laundry.origin.lat &&
-          geolocation.lng === laundry.origin.lng &&
+          // Within a metre, not identical: the API quantises stored coordinates, so `===` here
+          // is false even against the value it was just handed. See COORDINATE_EPSILON_DEGREES.
+          sameCoordinate(geolocation.lat, laundry.origin.lat) &&
+          sameCoordinate(geolocation.lng, laundry.origin.lng) &&
           // Same precedence as `laundryDerivedListingFields` in api-util/laundryAssignment.js,
           // which is what writes this field. The two must agree or a listing either re-stamps
           // on every pass or never converges.
@@ -376,7 +402,15 @@ const propagateAddressToAssignedListings = ({ integrationSdk, laundryId, laundry
           // stale, so it is something this comparison has to know about. Omitting it would
           // leave a studio that moved neighborhoods printing the old one forever, because
           // every listing would look "already correct" on the other three fields.
-          publicData.pickupNeighborhood === (laundry.neighborhood || null);
+          //
+          // `?? null` because ABSENT AND NULL ARE THE SAME FACT HERE and the API only ever
+          // returns one of them: writing `pickupNeighborhood: null` DELETES the key (extended
+          // data treats null as a delete, see writeLaundryAssignment), so it reads back as
+          // `undefined` and a bare `===` against `null` is false forever. Every studio with no
+          // neighborhood therefore re-stamped all of its garments on every single call. Same
+          // shape of bug as the coordinates above: a comparison against a value the API never
+          // actually stores.
+          (publicData.pickupNeighborhood ?? null) === (laundry.neighborhood || null);
 
         if (alreadyCorrect) {
           skipped.push({ id: listing.id.uuid, description: describeListing(listing) });

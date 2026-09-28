@@ -34,6 +34,7 @@ import {
   resolveInitialCleaningDays,
   resolveReadyAt,
 } from '../BookingDatesForm/BookingDatesForm';
+import { canBeCollectedToday } from '../../../util/cleaningFloor';
 
 import AvailabilityCalendar from '../AvailabilityCalendar/AvailabilityCalendar';
 import RentalPeriodChips from './RentalPeriodChips';
@@ -96,6 +97,32 @@ export const dateFormatOptionsIn = timeZone => ({
  * This way an unfetched day has no containing slot and the start date is refused, which is
  * the safe direction to be wrong in.
  *
+ * ── WHETHER TODAY IS IN HERE AT ALL IS DECIDED BEFORE THIS FUNCTION RUNS ────
+ *
+ *   > "aun el problema persiste (...) el día de hoy esté habilitado para seleccionarlo y que
+ *   >  la fecha de reserva sea hoy" (Jonathan, 2026-09-28)
+ *
+ * Today used to be refused here, and the reason was mistaken for a platform rule TWICE - once
+ * in cleaningFloor.js and once in a fix to this very comparison. The belief was that
+ * `/timeslots/query` truncates the current day's slot at the moment of the query, so today's
+ * midnight could never fall inside a slot. It does not truncate anything: the first slot it
+ * returns starts exactly where the QUERY starts, in the past as readily as in the future.
+ * Measured against Dev on 2026-09-28, same listing, same instant (19:11Z):
+ *
+ *   query start = now              -> slot 2026-09-28T19:11Z -> 2026-10-31
+ *   query start = today 00:00Z     -> slot 2026-09-28T00:00Z -> 2026-10-31
+ *   query start = yesterday 00:00Z -> slot 2026-09-27T00:00Z -> 2026-10-31
+ *
+ * So the slot appeared to begin mid-day only because the app asked from mid-day. The listing
+ * page in fact asked from TOMORROW's midnight (`findNextBoundary` in ListingPage.duck.js), so
+ * today was absent from the availability data altogether and no comparison here could have
+ * recovered it - which is exactly why loosening this comparison to day granularity changed
+ * nothing when it was tried. The fetch is where it was fixed; this comparison is back to
+ * asking its own question, as an exact instant, against slots that now start at midnight.
+ *
+ * Whether the garment may be collected TODAY is a different question again - permission, not
+ * availability - and it is answered in `isOutsideRange` by `canBeCollectedToday`.
+ *
  * @param {Array<Object>} allTimeSlots - merged time slots
  * @param {string} timeZone - IANA key
  * @returns {(startDay: Date, windowDays: number) => boolean}
@@ -150,7 +177,13 @@ const fetchMonthData = (
   const endOfRangeDate = getStartOf(TODAY, 'day', timeZone, dayCountAvailableForBooking, 'days');
 
   if (isInRange(date, TODAY, endOfRangeDate)) {
-    const start = isDateSameOrAfter(TODAY, date) ? TODAY : date;
+    // THE START OF TODAY, NOT THIS INSTANT. A query that starts mid-day gets a first slot that
+    // starts mid-day (the API returns availability from wherever it is asked), and today's
+    // midnight then falls outside it - so paging to another month and back used to un-offer
+    // today. Same reason ListingPage.duck.js's fetchMonthlyTimeSlots asks from the start of
+    // today; the two have to agree or the calendar changes its mind as the reader browses.
+    const startOfToday = getStartOf(TODAY, 'day', timeZone);
+    const start = isDateSameOrAfter(startOfToday, date) ? startOfToday : date;
     const nextMonthDate = nextMonthFn(date, timeZone);
     const end = isDateSameOrAfter(nextMonthDate, endOfRangeDate)
       ? getStartOf(endOfRangeDate, 'day', timeZone)
@@ -329,6 +362,13 @@ export const BookingRentalPeriodForm = props => {
   // gate in api-util/bookingRules.js both read a field that is written before it.
   const earliestStartDate = earliestBookableStart(initialCleaningBlockDays, readyAt, timeZone);
 
+  // May this garment go out TODAY? The client's two conditions - at its studio, cleaning
+  // finished - resolved through the same function the "Pickup Today" badge uses, so the date
+  // the picker opens and the tag the customer clicked through cannot disagree. This is what
+  // lets `isWindowAvailableFn` compare today at day granularity; see its comment for why
+  // today needs that and other days do not.
+  const allowStartToday = canBeCollectedToday(onLaundry, earliestStartDate, timeZone);
+
   // Which of the two floors is binding, so the notice above the picker names the right
   // reason. A `readyAt` that has already passed moves nothing and is not announced.
   const cleaningReadyDate =
@@ -419,12 +459,30 @@ export const BookingRentalPeriodForm = props => {
           );
         };
 
+        // WHERE "ONLY THESE GARMENTS MAY GO OUT TODAY" IS ENFORCED.
+        //
+        //   > "solo en aquellos listings que cumplan esas condiciones, que esten en laundry y
+        //   >  que hayan terminado su proceso de lavado" (Jonathan, 2026-09-28)
+        //
+        // Availability now covers today (see isWindowAvailableFn on why it did not), so the
+        // only thing keeping today off the calendar for the wrong garments is this. It belongs
+        // here rather than in the availability check because it is not an availability
+        // question: the garment is free today, it simply cannot be handed over today unless it
+        // is already sitting at its studio with its cleaning done.
+        //
+        // Note which listings this actually bites on. A garment awaiting its first wash, or in
+        // one right now, already has a cleaning floor past today and is refused by the
+        // comparison below without any help. What is left is the garment with NO stored
+        // turnaround at all - floor of today, never been to a studio - and offering today for
+        // one of those is precisely what the client ruled out.
         const isOutsideRange = day => {
           if (!windowDays) {
             return true;
           }
           const dayInTz = getStartOf(timeOfDayFromLocalToTimeZone(day, timeZone), 'day', timeZone);
+          const isToday = dayInTz.getTime() === getStartOf(TODAY, 'day', timeZone).getTime();
           return (
+            (isToday && !allowStartToday) ||
             !isDateSameOrAfter(dayInTz, earliestStartDate) ||
             !isDateSameOrAfter(latestStart, dayInTz)
           );
@@ -675,6 +733,10 @@ export const BookingRentalPeriodForm = props => {
               // the field directly above it refuses: two right answers to two different
               // questions, stacked, read as one wrong one.
               windowDays={windowDays}
+              // Same argument, for the one cell a reader looks at first. Today is genuinely
+              // available for most garments now, so the strip needs to be told which ones may
+              // actually go out today or it will offer a day the field refuses.
+              canStartToday={allowStartToday}
             />
           </Form>
         );

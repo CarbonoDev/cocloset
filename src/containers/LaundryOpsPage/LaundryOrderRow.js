@@ -8,7 +8,7 @@ import {
   laundryActionsFor,
   statusLabelKey,
 } from '../../util/laundryStatuses';
-import { isLate } from './LaundryOpsPage.helpers';
+import { isDeliverToday, isLate } from './LaundryOpsPage.helpers';
 import { HandBackToOwnerButton, InlineTextButton, PrimaryButton } from '../../components';
 
 import { statusTone } from './LaundryOpsPage.helpers';
@@ -104,6 +104,7 @@ const LaundryOrderRow = props => {
   const labelKey = statusLabelKey(row);
   const start = formatBookingDate(row.bookingStart, intl);
   const end = formatBookingDate(lastBookedDayIso(row.bookingEnd), intl);
+  const deliverToday = isDeliverToday(row);
 
   // Only transaction rows have a process state to advance. Inventory-only
   // rows (§8's listings with no booking) move via the readiness endpoint on
@@ -218,6 +219,15 @@ const LaundryOrderRow = props => {
           {start || end ? (
             <>
               <span className={css.primaryText}>{start || '—'}</span>
+              {/* SAME-DAY RENTALS NEED SAYING, NOT CALCULATING. A booking can now start on
+                  the day it is placed, so this row may be the one thing in the table that
+                  has to happen before closing - and a date that happens to be today's is
+                  easy to read straight past in a column of dates. See isDeliverToday. */}
+              {deliverToday ? (
+                <span className={css.deliverToday}>
+                  <FormattedMessage id="LaundryOpsPage.table.deliverToday" />
+                </span>
+              ) : null}
               <span className={css.secondaryText}>{end || '—'}</span>
             </>
           ) : (

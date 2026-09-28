@@ -245,6 +245,26 @@
   line-height: 17px;
 }
 
+/* "Deliver today" on a rental that starts the day it was booked. Amber rather than a status
+   tone: this is a deadline, not a state of the garment - the STATUS column next to it still
+   says what state the garment is in, and reusing one of those tones here would read as a
+   second, contradicting status. Sits between the two dates in the column, so it is scanned
+   with them rather than competing with the status badge. */
+.deliverToday {
+  display: inline-block;
+  margin: 2px 0;
+  padding: 1px 8px;
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetToneAmberBg);
+  color: var(--coclosetToneAmberFg);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemiBold);
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .emptyState {
   margin: 0;
   padding: 32px 0;

@@ -5,6 +5,7 @@ import {
   isSameDayAs,
   isWithinNextHours,
   isDamaged,
+  isDeliverToday,
   isLate,
   isAwaitingPickup,
   filterByTab,
@@ -82,6 +83,44 @@ describe('LaundryOpsPage.helpers', () => {
       // ops screen that stopped flagging it there would hide the problem.
       expect(isLate(row({ state: 'returned', returnedLate: true }))).toBe(true);
       expect(isLate(row({ state: 'returned' }))).toBe(false);
+    });
+
+    // Same-day rentals: a garment already at its studio with its cleaning finished can now be
+    // booked for collection TODAY (see canBeCollectedToday in util/cleaningFloor.js), so this
+    // row can appear at any hour and is the one an operator has to act on first.
+    it('isDeliverToday flags a rental that starts today and has not gone out', () => {
+      expect(isDeliverToday(row({ bookingStart: NOW.toISOString(), state: 'accepted' }), NOW)).toBe(
+        true
+      );
+      expect(
+        isDeliverToday(row({ bookingStart: NOW.toISOString(), state: 'ready-for-pickup' }), NOW)
+      ).toBe(true);
+      // Booked today, still in its first-time wash - it is due out today all the same, and the
+      // studio is the one that has to finish that wash to make it happen.
+      expect(
+        isDeliverToday(row({ bookingStart: NOW.toISOString(), state: 'initial-cleaning' }), NOW)
+      ).toBe(true);
+    });
+
+    it('isDeliverToday stops once the garment is with the renter', () => {
+      // "Deliver today" on an order handed over this morning is an instruction to do something
+      // already done.
+      ['picked-up', 'overdue', 'returned', 'cleaning', 'delivered'].forEach(state => {
+        expect(isDeliverToday(row({ bookingStart: NOW.toISOString(), state }), NOW)).toBe(false);
+      });
+    });
+
+    it('isDeliverToday ignores rentals that start on another day, and rows with no booking', () => {
+      // A day clear of NOW in the test runner's own zone: `isSameDayAs` compares LOCAL
+      // calendar days (the operator's, which is the right one for a studio's day sheet), so a
+      // midnight-UTC timestamp the day after NOW is still NOW's day in any western zone.
+      expect(
+        isDeliverToday(row({ bookingStart: '2026-08-02T12:00:00.000Z', state: 'accepted' }), NOW)
+      ).toBe(false);
+      expect(isDeliverToday(row({ rowType: 'listing', readinessStatus: 'stored' }), NOW)).toBe(
+        false
+      );
+      expect(isDeliverToday(undefined, NOW)).toBe(false);
     });
 
     it('isAwaitingPickup covers both the transaction and the readiness side of the union', () => {

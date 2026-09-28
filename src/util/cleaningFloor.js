@@ -125,9 +125,22 @@ export const resolveInitialCleaningDays = (
  * cleaning days run from there, and the first bookable day is the one after those.
  *
  * The previous version counted from today (`today + n`), which made a ONE-day turnaround
- * invisible: today is already unbookable anyway, because Sharetribe's availability slot for
- * the current day starts at the moment of the query rather than at midnight, so `today + 1`
- * was the floor with or without the rule. The client noticed exactly that.
+ * invisible, and the client noticed exactly that.
+ *
+ * AN EARLIER VERSION OF THIS COMMENT EXPLAINED THAT AWAY WITH A CLAIM THAT IS FALSE, and it
+ * is corrected here rather than deleted because it caused a second bug on its own. It said
+ * "today is already unbookable anyway, because Sharetribe's availability slot for the
+ * current day starts at the moment of the query rather than at midnight". Half of that is
+ * true: `/timeslots/query` DOES report today's slot as starting at the moment of the query,
+ * because that endpoint only reports availability that is still ahead. The inference is not.
+ * Booking validation does not use that truncation - it uses the availability plan - so
+ * Sharetribe accepts a rental starting at today's midnight on a garment that is free.
+ * Verified against Dev with speculative `transition/request-payment` calls (2026-09-28): a
+ * start of today's midnight was accepted, a start of YESTERDAY's midnight was accepted, and
+ * a genuinely occupied range was refused with `transaction-booking-time-not-available` -
+ * which is what makes the first two results mean anything. So "today is unbookable" was
+ * never a platform rule, only a misread of a query result, and the +1 below rests solely on
+ * the business rule quoted above: the first cleaning day is tomorrow.
  *
  * With no block this is still the stock floor, `getStartOf(today, 'day', timeZone)` - the
  * +1 applies only when there is a turnaround to wait for, so `onLaundry === true` and a
@@ -197,4 +210,44 @@ export const earliestBookableStart = (initialCleaningDays, readyAt, timeZone, to
   }
   const readyFloor = getStartOf(resolved, 'day', timeZone);
   return readyFloor.getTime() > cleaningFloor.getTime() ? readyFloor : cleaningFloor;
+};
+
+/**
+ * May this garment be collected TODAY?
+ *
+ *   > "el UX debe permitirnos hacer el booking a partir del día de hoy, sea cual sea la hora,
+ *   >  solo en aquellos listings que cumplan esas condiciones, que esten en laundry y que
+ *   >  hayan terminado su proceso de lavado" (Jonathan, 2026-09-28)
+ *
+ * TWO CONDITIONS, AND THEY ARE THE CLIENT'S TWO. The garment is physically at its studio
+ * (`metadata.onLaundry === true`, the same `=== true` every other reader of custody uses),
+ * and no cleaning floor still stands in front of today - which is what `earliestStart`
+ * already encodes, whichever of the two floors produced it.
+ *
+ * THE ONE IMPLEMENTATION OF THE RULE, deliberately. Three surfaces ask this question - the
+ * "Pickup Today" badge (util/searchCleaningFloor.js `isPickupTodayListing`), the search
+ * filter behind it, and now the booking picker, which is the one that has to let the day be
+ * CLICKED. A picker that offered today to a garment the badge does not call pickup-today, or
+ * refused it to one it does, is the same class of bug as the badge-vs-picker disagreement
+ * reported on 2026-09-19.
+ *
+ * Note what is NOT here: real availability. This answers "is the garment allowed to go out
+ * today", not "is it free today" - an accepted booking sitting across today is a time-slot
+ * fact, and its callers check it where they hold the calendar (isWindowAvailableFn in
+ * BookingRentalPeriodForm, getTimeSlotsOnDate in showPickupTodayOnListingPage).
+ *
+ * @param {boolean} [onLaundry] - listing.attributes.metadata.onLaundry
+ * @param {Date|null} [earliestStart] - from `earliestBookableStart`; null means no floor
+ * @param {string} timeZone - IANA key
+ * @param {Date} [today]
+ * @returns {boolean}
+ */
+export const canBeCollectedToday = (onLaundry, earliestStart, timeZone, today = TODAY) => {
+  if (onLaundry !== true) {
+    return false;
+  }
+  if (!(earliestStart instanceof Date)) {
+    return true;
+  }
+  return earliestStart.getTime() <= getStartOf(today, 'day', timeZone).getTime();
 };

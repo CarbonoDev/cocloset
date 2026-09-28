@@ -125,6 +125,75 @@ describe('buildCalendarDays', () => {
     const cleaning = days.filter(d => d.status === DAY_CLEANING).map(d => d.date.getUTCDate());
     expect(cleaning).toEqual([24, 25]);
   });
+
+  // TODAY, which this strip used to paint "No longer available" on every listing every day.
+  //
+  //   > "el día de hoy esté habilitado para seleccionarlo" (Jonathan, 2026-09-28)
+  //
+  // The cause was never here: the listing page asked Sharetribe for availability from
+  // TOMORROW's midnight, so today had no containing slot, came out BOOKED, and was then
+  // relabelled past. With the fetch fixed (see fetchMonthlyTimeSlots in ListingPage.duck.js)
+  // today is an ordinary day - and the strip has to agree with the picker about which garments
+  // may actually go out on it.
+  describe('today', () => {
+    const todayIso = '2026-08-12';
+    const build = extra =>
+      buildCalendarDays({
+        today: day(todayIso),
+        allTimeSlots: TIME_SLOTS,
+        cleaningGaps: GAPS,
+        timeZone: UTC,
+        firstDayOfWeek: 1,
+        ...extra,
+      });
+    const todayCell = built => built.find(d => d.date.getTime() === day(todayIso).getTime());
+
+    it('is not past, and is available when the garment may go out today', () => {
+      const cell = todayCell(build({ canStartToday: true }));
+
+      expect(cell.isPast).toBe(false);
+      expect(cell.status).toBe(DAY_AVAILABLE);
+    });
+
+    it('defaults to available for a caller that says nothing about custody', () => {
+      // A default of "restricted" would have every other consumer of this module silently
+      // hide today; the picker is the one that knows, and it always passes the flag.
+      expect(todayCell(build({})).status).toBe(DAY_AVAILABLE);
+    });
+
+    it('is no-room, not available, when the garment may NOT go out today', () => {
+      // Free - nobody has it - but a rental cannot start here. Calling it available would be
+      // the strip promising a day the picker refuses, which is the whole reason DAY_NO_ROOM
+      // exists; calling it booked would say someone has the garment, which is false.
+      const cell = todayCell(build({ canStartToday: false }));
+
+      expect(cell.status).toBe(DAY_NO_ROOM);
+      expect(cell.isPast).toBe(false);
+    });
+
+    it('does not restrict any day other than today', () => {
+      const built = build({ canStartToday: false });
+      const tomorrow = built.find(d => d.date.getTime() === day('2026-08-13').getTime());
+
+      expect(tomorrow.status).toBe(DAY_AVAILABLE);
+    });
+
+    it('still calls today booked when someone actually has the garment', () => {
+      // Precedence: availability first. "Cannot go out today" must not overwrite the more
+      // specific truth that the garment is out on a rental.
+      const built = buildCalendarDays({
+        today: day('2026-08-18'), // inside the 17-24 Aug booking
+        allTimeSlots: TIME_SLOTS,
+        cleaningGaps: GAPS,
+        timeZone: UTC,
+        firstDayOfWeek: 1,
+        canStartToday: false,
+      });
+      const cell = built.find(d => d.date.getTime() === day('2026-08-18').getTime());
+
+      expect(cell.status).toBe(DAY_BOOKED);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -103,6 +103,9 @@ export const ListingPageComponent = props => {
     // everything in that rest object is forwarded to OrderPanel.
     cleaningTurnaroundDays,
     completedRentals,
+    // Cocloset: the assigned studio's opening hours, for the pickup card. A same-day rental
+    // can be booked after the counter has shut, so the page has to say when it opens.
+    assignedLaundryHours,
     // Cocloset: the real fetched availability calendar, also forwarded to OrderPanel via
     // restOfProps below - named here too so the "Pickup Today" tag can self-correct against
     // it. See the comment beside showPickupToday.
@@ -328,6 +331,7 @@ export const ListingPageComponent = props => {
               listingId={currentListing.id}
               mapsConfig={config.maps}
               cleaningTurnaroundDays={cleaningTurnaroundDays}
+              businessHoursByDay={assignedLaundryHours}
             />
             {/* Why the calendar holds days after a rental, and what happens between paying and
                 wearing. Both sit here, after the pickup location, because both are about the
@@ -456,6 +460,8 @@ const ListingPage = props => {
     // completed. Same page-load call as the gaps above.
     cleaningTurnaroundDays,
     completedRentals,
+    // Cocloset: the assigned studio's opening hours, read from its public profile at load.
+    assignedLaundryHours,
   } = useSelector(state => state.ListingPage);
   const currentUser = useSelector(state => state.user?.currentUser);
   const scrollingDisabled = useSelector(state => isScrollingDisabled(state));
@@ -527,6 +533,7 @@ const ListingPage = props => {
       cleaningGaps={cleaningGaps}
       cleaningTurnaroundDays={cleaningTurnaroundDays}
       completedRentals={completedRentals}
+      assignedLaundryHours={assignedLaundryHours}
       sendInquiryInProgress={sendInquiryInProgress}
       sendInquiryError={sendInquiryError}
       onManageDisableScrolling={onManageDisableScrolling}
