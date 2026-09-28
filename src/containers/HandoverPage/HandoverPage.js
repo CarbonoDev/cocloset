@@ -10,6 +10,7 @@ import {
   handoverStepMessageId,
 } from '../../util/handoverSteps';
 import { MAX_LAUNDRY_CODE_LENGTH } from '../../util/laundryStatuses';
+import { getBookingOverdueDays } from '../../util/dates';
 
 import { isScrollingDisabled, manageDisableScrolling } from '../../ducks/ui.duck';
 
@@ -250,6 +251,8 @@ export const HandoverPageComponent = props => {
       bookingStart,
       bookingEnd,
     } = handover;
+
+    const daysOverdue = getBookingOverdueDays(bookingEnd);
 
     return (
       <div className={css.card}>
@@ -543,6 +546,20 @@ export const HandoverPageComponent = props => {
           </p>
         )}
 
+        {daysOverdue > 0 &&
+          ['picked-up', 'overdue'].includes(processState) &&
+          ['laundry', 'customer'].includes(viewerRole) ? (
+            <p className={css.warning}>
+              <FormattedMessage
+                id={
+                  viewerRole === 'laundry'
+                    ? 'HandoverPage.laundryDeliveryOverdue'
+                    : 'HandoverPage.customerDeliveryOverdue'
+                }
+                values={{ daysOverdue }}
+              />
+            </p>
+          ) : null}
         {/* HANDING THE GARMENT BACK TO ITS OWNER.
               > "el botón para devolver la prenda en el lado de laundry debe aparecer en
               >  order, handover o inventory" (Jonathan, 2026-09-07)

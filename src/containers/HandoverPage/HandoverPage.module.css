@@ -240,3 +240,9 @@
   composes: buttonPrimary from global;
   margin: 0;
 }
+
+.warning {
+  margin: 10px 0 12px 0;
+  color: var(--colorAttentionDark);
+  font-size: 14px;
+}

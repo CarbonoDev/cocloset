@@ -9,6 +9,7 @@ import {
   statusLabelKey,
 } from '../../util/laundryStatuses';
 import { isDeliverToday, isLate } from './LaundryOpsPage.helpers';
+import { getBookingOverdueDays } from '../../util/dates';
 import { HandBackToOwnerButton, InlineTextButton, PrimaryButton } from '../../components';
 
 import { statusTone } from './LaundryOpsPage.helpers';
@@ -147,6 +148,9 @@ const LaundryOrderRow = props => {
   const parsedCleaningDays = Number.parseInt(cleaningDays, 10);
   const hasCleaningDays =
     cleaningDays !== '' && Number.isInteger(parsedCleaningDays) && parsedCleaningDays >= 0;
+
+  // Overdue days
+  const daysOverdue = getBookingOverdueDays(row.bookingEnd)
 
   // A blank box is "not decided yet", never a delete: the server treats an empty string as
   // "not given" and leaves whatever is stored alone, which is what lets a studio advance a
@@ -379,6 +383,15 @@ const LaundryOrderRow = props => {
                         </span>
                       </div>
                     ) : null}
+                  {daysOverdue > 0 &&
+                    ['picked-up', 'overdue'].includes(row.state) && (
+                      <p className={css.warning}>
+                        <FormattedMessage
+                          id="LaundryOpsPage.detail.laundryDeliveryOverdue"
+                          values={{ daysOverdue }}
+                        />
+                      </p>
+                    )}
                     {action.needsDamageReport ? (
                       <div className={css.damageFields}>
                         <label className={css.damageToggle}>

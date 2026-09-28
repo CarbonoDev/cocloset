@@ -6,7 +6,7 @@ import { propTypes } from '../../../util/types';
 import { userDisplayNameAsString } from '../../../util/data';
 import { createSlug } from '../../../util/urlHelpers';
 import { displayPrice } from '../../../util/configHelpers';
-import { subtractTime } from '../../../util/dates';
+import { subtractTime, getBookingOverdueDays  } from '../../../util/dates';
 
 import { AvatarLarge, NamedLink, UserDisplayName } from '../../../components';
 
@@ -146,6 +146,9 @@ export class TransactionPanelComponent extends Component {
     const isCustomer = transactionRole === 'customer';
     const isProvider = transactionRole === 'provider';
 
+    const bookingEnd = booking?.attributes?.displayEnd || booking?.attributes?.end;
+    const daysOverdue = getBookingOverdueDays(bookingEnd);
+
     const listingDeleted = !!listing?.attributes?.deleted;
     const isCustomerBanned = !!customer?.attributes?.banned;
     const isCustomerDeleted = !!customer?.attributes?.deleted;
@@ -262,6 +265,17 @@ export class TransactionPanelComponent extends Component {
             {requestQuote}
             {offer}
             {transactionFieldsComponent}
+
+            {daysOverdue > 0 &&
+              ['picked-up', 'overdue'].includes(stateData.processState) &&
+              isCustomer ? (
+                <p className={css.warning}>
+                  <FormattedMessage
+                    id="TransactionPanel.customerDeliveryOverdue"
+                    values={{ daysOverdue }}
+                  />
+                </p>
+              ) : null}
 
             {/* The handover QR (mockups 16/17). Placed high in the main column,
                 above the message feed, because its whole job is to be found
