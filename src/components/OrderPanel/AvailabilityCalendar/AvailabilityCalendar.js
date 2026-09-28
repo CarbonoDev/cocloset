@@ -42,6 +42,9 @@ import css from './AvailabilityCalendar.module.css';
  * @param {Date} [props.today] - injectable for tests
  * @param {number} [props.windowDays] - period + turnaround, so a day the picker will refuse
  *   stops calling itself available. See DAY_NO_ROOM.
+ * @param {boolean} [props.canStartToday] - may this garment go out TODAY? Same reason as
+ *   `windowDays`: today is now genuinely available for most garments, and the strip must not
+ *   call it available for the ones the picker still refuses.
  * @returns {JSX.Element}
  */
 const AvailabilityCalendar = props => {
@@ -58,6 +61,9 @@ const AvailabilityCalendar = props => {
     // plus the studio's turnaround. Supplied by the form, which is where both numbers are
     // already known. Absent until a period is picked, and then no day claims there is no room.
     windowDays,
+    // Whether the garment may be handed over today. Supplied rather than derived for the same
+    // reason `windowDays` is: the form has already resolved custody and both cleaning floors.
+    canStartToday,
   } = props;
   const intl = useIntl();
 
@@ -71,6 +77,7 @@ const AvailabilityCalendar = props => {
     firstDayOfWeek,
     weeks: CALENDAR_WEEKS,
     windowDays,
+    canStartToday,
   });
 
   const statusClass = {
@@ -92,12 +99,14 @@ const AvailabilityCalendar = props => {
 
   // NO_ROOM is in the legend only when it can occur - i.e. once a period is chosen. A key for
   // a colour nothing on screen uses is a reader wondering what they missed.
+  // `canStartToday === false` also produces a NO_ROOM cell (today's), so the key has to be
+  // there for it even before a period is chosen.
   const legend = [
     DAY_AVAILABLE,
     DAY_SELECTED,
     DAY_BOOKED,
     DAY_CLEANING,
-    ...(windowDays > 0 ? [DAY_NO_ROOM] : []),
+    ...(windowDays > 0 || canStartToday === false ? [DAY_NO_ROOM] : []),
   ];
 
   return (

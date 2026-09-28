@@ -382,6 +382,10 @@ describe('Duck', () => {
         // leaves the line out rather than stating a number it did not read.
         cleaningTurnaroundDays: null,
         completedRentals: null,
+        // Cocloset: the assigned studio's opening hours, for the pickup card. Same contract
+        // as its neighbours - null until the read answers and on any failure, so the card
+        // omits the hours rather than implying the counter is open.
+        assignedLaundryHours: null,
       });
     });
 

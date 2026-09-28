@@ -948,6 +948,43 @@
   margin: 6px 0 0 0;
 }
 
+/* ── The studio's opening hours ──────────────────────────────────────────────
+   A definition-style list rather than a comma-joined sentence, for the same
+   reason ProfilePage renders one: seven days of hours read as noise on one
+   line, and this is information a renter checks a single row of ("am I making
+   it there today?"). */
+.pickupLocationHours {
+  margin: 10px 0 0 0;
+}
+
+.pickupLocationHoursLabel {
+  composes: h5 from global;
+  display: block;
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0;
+}
+
+.pickupLocationHoursList {
+  list-style: none;
+  margin: 2px 0 0 0;
+  padding: 0;
+}
+
+.pickupLocationHoursRow {
+  composes: h5 from global;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 260px;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+}
+
+.pickupLocationHoursDay {
+  text-transform: capitalize;
+}
+
 /* ── The garment's own heading ───────────────────────────────────────────────
    Brand as an eyebrow, the title in the display serif, then one line of
    provenance. Replaces the template's "ListingPage.orderTitle" heading in the

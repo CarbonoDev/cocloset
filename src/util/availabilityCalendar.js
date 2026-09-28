@@ -61,15 +61,18 @@ export const DAY_NO_ROOM = 'noRoom';
 /**
  * A day that has gone by. NOT one of the four the legend explains.
  *
- * It exists because the alternative is worse. A rental is a whole day, so Sharetribe stops
- * offering today the moment today starts - its first free slot begins at tomorrow's midnight.
- * Classified by availability alone, today therefore comes out BOOKED, and the calendar paints
- * a solid "somebody has this garment" square on a garment that is sitting on a rack. Verified
- * in the browser against Dev, which is the only place it shows.
+ * Drawn dim and neutral, named for what it is, and kept out of the legend - which describes
+ * the states of the GARMENT, and this is a fact about the clock.
  *
- * So a day nobody can book any more is its own thing: drawn dim and neutral, named for what it
- * is, and kept out of the legend - which describes the states of the GARMENT, and this is a
- * fact about the clock.
+ * IT NO LONGER APPLIES TO TODAY, and the reason it used to is worth keeping. The comment here
+ * said "Sharetribe stops offering today the moment today starts - its first free slot begins
+ * at tomorrow's midnight", so today was classified BOOKED and this status existed to stop the
+ * strip painting a solid "somebody has this garment" square on a garment sitting on a rack.
+ * The platform does no such thing: the listing page was simply asking for availability from
+ * tomorrow's midnight (see fetchMonthlyTimeSlots in ListingPage.duck.js, now fixed), so today
+ * was missing from the data rather than unavailable in it. Today is now classified like any
+ * other day. This status stays for days that really have passed, which the strip still draws
+ * because it starts on the week containing today rather than on today.
  */
 export const DAY_PAST = 'past';
 
@@ -132,6 +135,8 @@ export const selectedRange = (startDate, periodDays, timeZone) => {
  * @param {number} [params.windowDays] - the rental window a start here would need. Omitted
  *   when no period is chosen yet, and then no day is classified DAY_NO_ROOM - "nothing fits"
  *   is not something that can be said before there is something to fit.
+ * @param {boolean} [params.isNotCollectableToday] - true when THIS day is today and the
+ *   garment may not be handed over today. See buildCalendarDays.
  * @returns {string} one of the DAY_* constants
  */
 export const classifyDay = ({
@@ -141,6 +146,7 @@ export const classifyDay = ({
   selection,
   timeZone,
   windowDays,
+  isNotCollectableToday,
 }) => {
   const time = day.getTime();
 
@@ -152,6 +158,14 @@ export const classifyDay = ({
   }
   if (!isDayFree(day, allTimeSlots, timeZone)) {
     return DAY_BOOKED;
+  }
+  // FREE, BUT NOT COLLECTABLE TODAY. Availability now covers today, so without this the strip
+  // would call today "Available" on a garment the picker above it refuses - the same two-
+  // calendars-disagreeing complaint DAY_NO_ROOM was introduced for, in the one cell a reader
+  // looks at first. NO_ROOM is the honest label: nobody has the garment, a rental just cannot
+  // start here.
+  if (isNotCollectableToday) {
+    return DAY_NO_ROOM;
   }
 
   // Free, and then asked the picker's question: does a whole rental fit from here. Checked
@@ -240,6 +254,10 @@ export const isWindowFree = (day, windowDays, allTimeSlots, cleaningGaps, timeZo
  * @param {number} [params.firstDayOfWeek] - the marketplace's configured first weekday, so the
  *   columns line up with every other calendar in the app rather than assuming Sunday
  * @param {number} [params.weeks]
+ * @param {boolean} [params.canStartToday] - may this garment be handed over TODAY? From
+ *   util/cleaningFloor.js `canBeCollectedToday`, supplied by the form, which is where the
+ *   custody flag and the cleaning floors are already resolved. Defaults to true so a caller
+ *   that does not know does not invent a restriction; the picker always passes it.
  * @returns {Array<{date: Date, status: string, isPast: boolean}>}
  */
 export const buildCalendarDays = ({
@@ -252,6 +270,7 @@ export const buildCalendarDays = ({
   firstDayOfWeek,
   weeks = CALENDAR_WEEKS,
   windowDays,
+  canStartToday = true,
 }) => {
   const startOfToday = getStartOf(today, 'day', timeZone);
   const firstDay = getStartOfWeek(startOfToday, timeZone, firstDayOfWeek);
@@ -259,6 +278,7 @@ export const buildCalendarDays = ({
 
   return Array.from({ length: weeks * 7 }, (_, index) => {
     const date = getStartOf(firstDay, 'day', timeZone, index, 'days');
+    const isToday = date.getTime() === startOfToday.getTime();
     const status = classifyDay({
       day: date,
       allTimeSlots,
@@ -266,13 +286,12 @@ export const buildCalendarDays = ({
       selection,
       timeZone,
       windowDays,
+      isNotCollectableToday: isToday && !canStartToday,
     });
 
-    // Gone by, or gone by for booking purposes. Today counts when availability no longer
-    // offers it - which for a day-unit rental is from the moment today begins. See DAY_PAST.
-    const isPast =
-      date.getTime() < startOfToday.getTime() ||
-      (date.getTime() === startOfToday.getTime() && status === DAY_BOOKED);
+    // Gone by. Today is NOT past any more - availability covers it and it can be booked; see
+    // DAY_PAST for the belief that used to put it here.
+    const isPast = date.getTime() < startOfToday.getTime();
 
     return { date, isPast, status: isPast ? DAY_PAST : status };
   });

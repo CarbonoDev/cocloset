@@ -330,8 +330,34 @@ const fetchMonthlyTimeSlots = (dispatch, listing) => {
         : null;
     };
 
+    // ── WHY A DAY-UNIT LISTING IS ASKED ABOUT FROM THE START OF TODAY ──────────
+    //
+    //   > "el día de hoy esté habilitado para seleccionarlo y que la fecha de reserva sea hoy"
+    //   >   (Jonathan, 2026-09-28)
+    //
+    // `nextBoundary` is TOMORROW's midnight for a day-unit listing, so this query used to
+    // begin after today had ended. Availability for today never reached the browser, and every
+    // surface built on it agreed that today was unbookable: the picker disabled it, and the
+    // five-week strip painted it "No longer available". That looked like a platform rule and
+    // was documented as one twice - it is not. `/timeslots/query` returns availability from
+    // wherever the query starts, so asking from the start of today returns today; and
+    // Sharetribe accepts a booking that starts at today's midnight. Both measured against Dev
+    // on 2026-09-28; see isWindowAvailableFn in BookingRentalPeriodForm for the figures.
+    //
+    // ONLY FOR WHOLE-DAY UNITS. An hour- or fixed-duration listing is booked at a time of day,
+    // and for those `nextBoundary` is doing real work: it is what stops the picker offering a
+    // slot that began this morning. Whether a DAY may be booked once it has started is a
+    // question about the garment, not the clock, and it is answered by `canBeCollectedToday`
+    // in the picker - which is also what keeps today off the calendar for a garment that is
+    // not at its studio.
+    //
+    // The month arithmetic above still runs off `nextBoundary` deliberately: it decides WHICH
+    // two months are fetched, and moving it would change that on the last day of a month.
+    const isWholeDayUnit = timeUnit === 'day' && !isFixed;
+    const rangeStart = isWholeDayUnit ? startOfToday : nextBoundary;
+
     return Promise.all([
-      dispatch(fetchTimeSlots(listing.id, nextBoundary, nextMonthEnd, tz, options(startOfToday))),
+      dispatch(fetchTimeSlots(listing.id, rangeStart, nextMonthEnd, tz, options(startOfToday))),
       dispatch(fetchTimeSlots(listing.id, nextMonth, followingMonthEnd, tz, options(nextMonth))),
     ]);
   }
@@ -420,6 +446,58 @@ export const fetchInitialCleaningDaysThunk = createAsyncThunk(
   fetchInitialCleaningDaysPayloadCreator
 );
 
+/////////////////////////////////////////
+// Fetch the assigned studio's hours   //
+/////////////////////////////////////////
+//
+//   > "se puede reservar aunque laundry haya cerrado, solo aseguremonos que se muestren los
+//   >  horarios de la laundry en la listing page, o en el checkout o en transaction page"
+//   >   (Jonathan, 2026-09-28)
+//
+// WHY THIS IS NOW WORTH A REQUEST. A rental can start the day it is booked, at any hour -
+// the client was explicit that a closed studio is not a reason to refuse the booking ("sea
+// cual sea la hora"). That makes the studio's opening hours the one piece of information a
+// customer needs and could not work out: booking a same-day collection at 23:50 is allowed,
+// and the page has to be honest that the counter is shut until the morning.
+//
+// A PLAIN MARKETPLACE API CALL, NOT A SERVER ENDPOINT, which is the whole reason this is
+// cheap. The hours live in the laundry user's `publicData.laundryProfile.businessHoursByDay`
+// (see util/businessHours.js) - public, so the browser may read them with its own
+// possibly-anonymous session. Contrast fetchInitialCleaningDaysThunk above, which needs a
+// server endpoint precisely because the turnaround lives in `privateData`. Verified against
+// Dev with an anonymous SDK: `users.show` on an assigned studio returns the hours.
+//
+// FAILURE IS NOT AN ERROR STATE, like its neighbour: any failure leaves `assignedLaundryHours`
+// null and the pickup card simply omits the hours. There is no version of this worth failing
+// a listing page over.
+const fetchAssignedLaundryHoursPayloadCreator = ({ laundryId }, thunkAPI) => {
+  const { extra: sdk } = thunkAPI;
+
+  return sdk.users
+    .show({ id: new UUID(laundryId) })
+    .then(response => {
+      const byDay =
+        response?.data?.data?.attributes?.profile?.publicData?.laundryProfile
+          ?.businessHoursByDay;
+      // An object with at least one day, or null. A studio that has never saved the per-day
+      // grid has only the old free-text summary, which is a sentence rather than data and is
+      // deliberately not shown here - see util/businessHours.js on the two fields.
+      return {
+        assignedLaundryHours:
+          byDay && typeof byDay === 'object' && Object.keys(byDay).length > 0 ? byDay : null,
+      };
+    })
+    .catch(e => {
+      log.error(e, 'fetching-assigned-laundry-hours-failed', { laundryId });
+      return { assignedLaundryHours: null };
+    });
+};
+
+export const fetchAssignedLaundryHoursThunk = createAsyncThunk(
+  'ListingPage/fetchAssignedLaundryHours',
+  fetchAssignedLaundryHoursPayloadCreator
+);
+
 //////////////////////////////////
 // Fetch Transaction Line Items //
 //////////////////////////////////
@@ -494,6 +572,10 @@ const initialState = {
   // any failure, so the page can leave the line out rather than state a wrong number.
   cleaningTurnaroundDays: null,
   completedRentals: null,
+  // Cocloset: the assigned studio's opening hours, one entry per open day, for the pickup
+  // card. null until the read answers and on any failure - the card then omits the hours
+  // rather than implying a studio is open when nobody asked it.
+  assignedLaundryHours: null,
 };
 
 const listingPageSlice = createSlice({
@@ -622,6 +704,10 @@ const listingPageSlice = createSlice({
         state.cleaningGaps = action.payload?.cleaningGaps ?? null;
         state.cleaningTurnaroundDays = action.payload?.cleaningTurnaroundDays ?? null;
         state.completedRentals = action.payload?.completedRentals ?? null;
+      })
+      // Same contract as above: fulfilled only, null for "no answer".
+      .addCase(fetchAssignedLaundryHoursThunk.fulfilled, (state, action) => {
+        state.assignedLaundryHours = action.payload?.assignedLaundryHours ?? null;
       });
   },
 });
@@ -703,9 +789,15 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
       //
       // Awaited as little as the time slots are: not part of the returned promise, because a
       // slow or failing lookup must not hold up (or fail) the listing page.
-      const hasAssignedLaundry = !!listing?.attributes?.metadata?.assignedLaundryId;
+      const assignedLaundryId = listing?.attributes?.metadata?.assignedLaundryId;
+      const hasAssignedLaundry = !!assignedLaundryId;
       if (typeof window !== 'undefined' && listing?.id && hasAssignedLaundry) {
         dispatch(fetchInitialCleaningDaysThunk({ listingId: listing.id }));
+
+        // The studio's opening hours, for the pickup card. A separate request rather than a
+        // field on the one above because it needs no server endpoint at all: the hours are
+        // public on the studio's own profile. See fetchAssignedLaundryHoursThunk.
+        dispatch(fetchAssignedLaundryHoursThunk({ laundryId: assignedLaundryId }));
 
         // GIVE BACK THE DAYS A FINISHED BOOKING IS STILL BLOCKING.
         //

@@ -83,6 +83,34 @@ export const isDamaged = row => row?.damageReported?.flag === true;
  */
 export const isLate = row => isOverdue(row) || wasReturnedLate(row);
 
+// The states a garment is in BEFORE the customer walks out with it. Named as its
+// own list because "has it gone out yet" is asked from more than one angle and
+// the answer is the boundary between `ready-for-pickup` and `picked-up`.
+const STATES_BEFORE_PICKUP = ['accepted', 'initial-cleaning', 'ready-for-pickup'];
+
+/**
+ * Does this garment have to go out to its renter TODAY?
+ *
+ *   > "Debe ver 'Entregar hoy'" (Jonathan, 2026-09-28)
+ *
+ * Asked because a rental can now START on the day it is booked - a garment already at its
+ * studio with its cleaning finished can be collected the same day (see canBeCollectedToday in
+ * util/cleaningFloor.js). Before that, every booking an operator saw had been placed at least
+ * a day ahead, so a date column was enough to plan the day from. Now the row an operator has
+ * to act on FIRST can appear at any hour, and a date that happens to read as today is easy to
+ * scan past.
+ *
+ * Bounded by state, not only by date: after `picked-up` the garment is with the renter, and
+ * "Deliver today" on an order that was handed over this morning is an instruction to do
+ * something that is already done.
+ *
+ * @param {Object} row - a row from the /api/laundry-orders response
+ * @param {Date} [now]
+ * @returns {boolean}
+ */
+export const isDeliverToday = (row, now = new Date()) =>
+  isSameDayAs(row?.bookingStart, now) && STATES_BEFORE_PICKUP.includes(opsStatus(row));
+
 // The cleaning sub-phases plus the `returned` hand-off that feeds them
 // (design doc §9: all of these map to the single customer-facing "Cleaning"
 // step, and mockup 05.jpg shows them on the Cleaning screen).
