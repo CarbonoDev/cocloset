@@ -200,6 +200,17 @@ describe('LaundryOpsPage.helpers', () => {
       ).toEqual(['r']);
     });
 
+    it('cleaning also shows a garment on its first-ever wash', () => {
+      // A first-time drop-off's status badge already said "In cleaning"
+      // (2026-09-21); the Cleaning screen itself didn't agree (Jonathan,
+      // 2026-09-29).
+      expect(
+        filterByView([row({ id: 'first-wash', state: 'initial-cleaning' })], 'cleaning').map(
+          r => r.id
+        )
+      ).toEqual(['first-wash']);
+    });
+
     it('all is a pass-through', () => {
       expect(filterByView(rows, 'all')).toHaveLength(rows.length);
     });

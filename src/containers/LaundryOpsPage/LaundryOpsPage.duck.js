@@ -44,16 +44,18 @@ export const fetchOrdersThunk = createAsyncThunk(
 // here means the row was stale. Refetching the whole payload on success keeps
 // every screen consistent and picks up any concurrent change by another
 // terminal in the studio.
-// RECEPTION IS NOT A TRANSITION, so it is not the same POST.
+// RECEPTION GOES THROUGH ITS OWN ENDPOINT, so it is not the same POST.
 //
 //   > "cuando el provider va a entregar una prenda a la laundry, la laundry debe ingresar un
 //   >  ticket y luego iniciar el proceso de lavado" (Jonathan, 2026-09-08)
 //
 // Both screens advance the studio through one vocabulary of statuses, and this one step is
 // answered by a different endpoint: it records that the garment is now on the studio's rack
-// (a listing write) and fires nothing on the transaction, which stays `accepted` for the
-// length of the wash. Branching HERE rather than in the components keeps that a fact about
-// the endpoint rather than something every button has to know.
+// (a listing write) AND - since 2026-09-21 - fires transition/laundry-receive-from-provider,
+// moving the transaction from `accepted` to its own `initial-cleaning` state for the length of
+// the first wash (see the EDN and server/api/laundry-receive-garment.js). Branching HERE rather
+// than in the components keeps that a fact about the endpoint rather than something every
+// button has to know.
 const RECEPTION_STATUS = 'garment-received';
 
 const postStatus = ({ transactionId, status, damaged, damageNote, cleaningDays, laundryCode }) =>
