@@ -23,6 +23,7 @@ import PanelHeading from './PanelHeading';
 
 import HandoverQrMaybe from './HandoverQrMaybe';
 import DamageReportedMaybe from './DamageReportedMaybe';
+import CloseListingGuidanceMaybe from './CloseListingGuidanceMaybe';
 
 import css from './TransactionPanel.module.css';
 
@@ -312,6 +313,15 @@ export class TransactionPanelComponent extends Component {
               processName={stateData.processName}
               transactionRole={transactionRole}
               metadata={metadata}
+            />
+
+            {/* Provider-only: the steps to close a listing, and the rule that a garment
+                still at the laundry partner needs to be collected first. Only ever
+                rendered for the provider - see CloseListingGuidanceMaybe. */}
+            <CloseListingGuidanceMaybe
+              processName={stateData.processName}
+              transactionRole={transactionRole}
+              isAtLaundry={listing?.attributes?.metadata?.onLaundry === true}
             />
 
             {fileAttachments}

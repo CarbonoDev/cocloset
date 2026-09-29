@@ -111,6 +111,7 @@ export const ManageListingsPageComponent = props => {
   const [listingMenuOpen, setListingMenuOpen] = useState(null);
   const [discardDraftModalOpen, setDiscardDraftModalOpen] = useState(null);
   const [discardDraftModalId, setDiscardDraftModalId] = useState(null);
+  const [closeBlockedListingId, setCloseBlockedListingId] = useState(null);
   const history = useHistory();
   const routeConfiguration = useRouteConfiguration();
   const config = useConfiguration();
@@ -154,6 +155,23 @@ export const ManageListingsPageComponent = props => {
 
   const onToggleMenu = listing => {
     setListingMenuOpen(listing);
+    setCloseBlockedListingId(null);
+  };
+
+  // A listing whose garment is still at the laundry partner (onLaundry) can't be
+  // closed yet - the provider needs to collect it first, otherwise it's stranded
+  // with no active transaction pointing at it and no listing to release it from.
+  const handleCloseListing = listingId => {
+    const targetListing = listings.find(l => l.id.uuid === listingId.uuid);
+    const isOnLaundry = targetListing?.attributes?.metadata?.onLaundry === true;
+
+    if (isOnLaundry) {
+      setCloseBlockedListingId(listingId);
+      return;
+    }
+
+    setCloseBlockedListingId(null);
+    onCloseListing(listingId);
   };
 
   const handleOpenListing = listingId => {
@@ -237,6 +255,23 @@ export const ManageListingsPageComponent = props => {
         <div className={css.listingPanel}>
           <Heading listingsAreLoaded={listingsAreLoaded} pagination={pagination} />
 
+          {listingsAreLoaded && listings.length > 0 ? (
+            <div className={css.closeListingGuidance}>
+              <FormattedMessage id="ManageListingsPage.closeListingGuidance.title" />
+              <ol className={css.closeListingGuidanceSteps}>
+                <li>
+                  <FormattedMessage id="ManageListingsPage.closeListingGuidance.step1" />
+                </li>
+                <li>
+                  <FormattedMessage id="ManageListingsPage.closeListingGuidance.step2" />
+                </li>
+                <li>
+                  <FormattedMessage id="ManageListingsPage.closeListingGuidance.step3" />
+                </li>
+              </ol>
+            </div>
+          ) : null}
+
           <ul className={css.listingCards}>
             {listings.map(l => (
               <li key={l.id.uuid} className={css.listingCard}>
@@ -245,12 +280,15 @@ export const ManageListingsPageComponent = props => {
                   isMenuOpen={!!listingMenuOpen && listingMenuOpen.id.uuid === l.id.uuid}
                   actionsInProgressListingId={openingListing || closingListing || discardingDraft}
                   onToggleMenu={onToggleMenu}
-                  onCloseListing={onCloseListing}
+                  onCloseListing={handleCloseListing}
                   onOpenListing={handleOpenListing}
                   onDiscardDraft={openDiscardDraftModal}
                   hasOpeningError={openingErrorListingId.uuid === l.id.uuid}
                   hasClosingError={closingErrorListingId.uuid === l.id.uuid}
                   hasDiscardingError={discardingErrorListingId.uuid === l.id.uuid}
+                  isCloseBlockedOnLaundry={
+                    !!closeBlockedListingId && closeBlockedListingId.uuid === l.id.uuid
+                  }
                   renderSizes={renderSizes}
                 />
               </li>
