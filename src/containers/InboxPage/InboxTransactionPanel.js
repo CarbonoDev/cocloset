@@ -175,9 +175,6 @@ const InboxTransactionPanel = props => {
   // template, so a rental that has not reached the studio yet reads as one line rather than
   // as a row of empty separators.
   const identifiers = [
-    metadata.ticketCode
-      ? intl.formatMessage({ id: 'InboxPage.panel.ticket' }, { code: metadata.ticketCode })
-      : null,
     metadata.laundryCode
       ? intl.formatMessage({ id: 'InboxPage.panel.laundryCode' }, { code: metadata.laundryCode })
       : null,
