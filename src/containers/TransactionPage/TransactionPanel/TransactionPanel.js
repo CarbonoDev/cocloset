@@ -26,6 +26,8 @@ import DamageReportedMaybe from './DamageReportedMaybe';
 
 import css from './TransactionPanel.module.css';
 
+const DATE_FORMAT_NO_YEAR = { month: 'short', day: 'numeric' };
+
 // Helper function to get display names for different roles
 const displayNames = (currentUser, provider, customer, intl) => {
   const authorDisplayName = <UserDisplayName user={provider} intl={intl} />;
@@ -167,24 +169,23 @@ export class TransactionPanelComponent extends Component {
     // WHEN THE OWNER NEEDS TO HAVE DROPPED THE GARMENT OFF.
     //
     //   > "si debo ir a entregar una prenda, la fecha que se debe mostrar tanto en el inbox
-    //   >  page como en transaction page es dos horas antes de la fecha de inicio del
+    //   >  page como en transaction page es 48 horas antes de la fecha de inicio del
     //   >  booking" (Jonathan, 2026-09-11)
     //
     // The listing's own timezone, same as InboxTransactionPanel's identical computation for
     // this exact deadline - a day booking is midnight-to-midnight in the marketplace's zone,
     // and formatting it in the reader's own zone would move it to the previous day for anyone
     // east of it.
-    const bookingTimeZone = listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC';
-    const bookingStartForDropOff = booking?.attributes?.displayStart || booking?.attributes?.start;
-    const dropOffBy = bookingStartForDropOff
-      ? intl.formatDate(subtractTime(bookingStartForDropOff, 2, 'hours', bookingTimeZone), {
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: 'numeric',
-          timeZone: bookingTimeZone,
-        })
+    const timeZone = listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC';
+    const bookingStart = booking?.attributes?.displayStart || booking?.attributes?.start;
+    const recommendedDropTime = bookingStart
+      ? subtractTime(bookingStart, 48, 'hours', timeZone)
       : null;
+
+    const formatDateNoYear = date =>
+      date ? intl.formatDate(new Date(date), { ...DATE_FORMAT_NO_YEAR, timeZone }) : null;
+
+    const dropOffBy = formatDateNoYear(recommendedDropTime);
 
     const { authorDisplayName, customerDisplayName, otherUserDisplayNameString } = displayNames(
       currentUser,
