@@ -7,6 +7,7 @@ import { propTypes } from '../../util/types';
 import {
   HANDOVER_COUNTERPARTY_CUSTOMER,
   HANDOVER_COUNTERPARTY_PROVIDER,
+  HANDOVER_STEP_DROP_OFF,
   handoverStepMessageId,
 } from '../../util/handoverSteps';
 import { MAX_LAUNDRY_CODE_LENGTH } from '../../util/laundryStatuses';
@@ -252,6 +253,10 @@ export const HandoverPageComponent = props => {
       bookingEnd,
     } = handover;
 
+    const isDropOffStepLaundry =
+      step?.state === 'accepted' &&
+      step?.status === 'garment-received' &&
+      viewerRole === 'laundry';
     const daysOverdue = getBookingOverdueDays(bookingEnd);
 
     return (
@@ -320,7 +325,7 @@ export const HandoverPageComponent = props => {
             <H3 as="h2" className={css.stepTitle}>
               <FormattedMessage id={stepTitleMessageId(step, viewerRole, intl)} />
             </H3>
-            <CounterpartyLine step={step} />
+            {!isDropOffStepLaundry && <CounterpartyLine step={step} />}
             {step.isLate ? (
               <p className={css.late}>
                 <FormattedMessage id="HandoverPage.lateReturn" />
@@ -416,9 +421,6 @@ export const HandoverPageComponent = props => {
                     value={codeInput}
                     onChange={e => setCodeInput(e.target.value)}
                   />
-                  <p className={css.cleaningDaysHelp}>
-                    <FormattedMessage id="HandoverPage.laundryCode.help" />
-                  </p>
                 </div>
               </div>
             ) : null}

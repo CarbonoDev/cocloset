@@ -649,7 +649,7 @@
   "HandoverPage.role.customer": "the renter",
   "HandoverPage.role.laundry": "the laundry",
   "HandoverPage.role.provider": "the garment owner",
-  "HandoverPage.status.accepted": "Accepted — the owner has to bring the garment to the laundry",
+  "HandoverPage.status.accepted": "Accepted",
   "HandoverPage.status.canceled": "This rental was cancelled",
   "HandoverPage.status.cleaning": "Being cleaned at the laundry",
   "HandoverPage.status.declined": "The owner declined this booking",
