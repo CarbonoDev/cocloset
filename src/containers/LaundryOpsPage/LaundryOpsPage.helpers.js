@@ -120,8 +120,16 @@ export const isDeliverToday = (row, now = new Date()) =>
 // this list decides what the Cleaning SCREEN shows, not what a studio is
 // offered. A garment parked in that phase when the change shipped has to stay
 // visible, or there is no screen from which to finish it.
+//
+// `initial-cleaning` (2026-09-21) belongs here too - it is the same activity,
+// the studio washing a garment, just for the first time rather than between
+// rentals. Missed when the state was added: the row's own status badge already
+// read "In cleaning" (`util/laundryStatuses.js`'s `LAUNDRY_STATES`), but the
+// garment was invisible on the one screen named for exactly that (Jonathan,
+// 2026-09-29 - "el status debe cambiar... para todas las pantallas").
 export const CLEANING_STATUSES = [
   'returned',
+  'initial-cleaning',
   'pending-cleaning',
   'cleaning-in-progress',
   'quality-inspection',
