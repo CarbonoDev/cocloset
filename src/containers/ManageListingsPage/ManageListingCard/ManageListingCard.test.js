@@ -542,6 +542,49 @@ describe('ManageListingCard', () => {
     expect(tree.getByText('ManageListingCard.manageStock')).toBeInTheDocument();
   });
 
+  it('Booking (day): close blocked while the garment is at the laundry', () => {
+    // The click is intercepted one level up in ManageListingsPage.js (it knows
+    // every listing's onLaundry flag; this card only knows its own). This test
+    // covers the card's half of the contract: given the blocked flag, show the
+    // guidance instead of silently doing nothing.
+    const listing = createOwnListing('garment-1', {
+      title: 'the garment',
+      description: 'Lorem ipsum',
+      price: new Money(1000, 'USD'),
+      metadata: { onLaundry: true },
+      availabilityPlan: {
+        type: 'availability-plan/time',
+        timezone: 'Etc/UTC',
+        entries: [
+          { dayOfWeek: 'mon', startTime: '00:00', endTime: '00:00', seats: 1 },
+        ],
+      },
+      publicData: {
+        listingType: 'rent-bicycles-daily',
+        transactionProcessAlias: 'default-booking/release-1',
+        unitType: 'hour',
+      },
+    });
+
+    const tree = render(
+      <ManageListingCard
+        history={{ push: noop }}
+        listing={listing}
+        intl={fakeIntl}
+        isMenuOpen={false}
+        onCloseListing={noop}
+        onOpenListing={noop}
+        onToggleMenu={noop}
+        hasClosingError={false}
+        hasOpeningError={false}
+        isCloseBlockedOnLaundry={true}
+        availabilityEnabled={true}
+      />
+    );
+
+    expect(tree.getByText('ManageListingCard.closeBlockedOnLaundry')).toBeInTheDocument();
+  });
+
   it('Purchase (item): normal out-of-stock', () => {
     const listing = createOwnListing(
       'listing-day',
