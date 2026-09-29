@@ -1,0 +1,51 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  margin: 24px 0 0 0;
+  padding: 18px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurfaceRaised);
+
+  @media (--viewportMedium) {
+    margin: 32px 0 0 0;
+    padding: 24px;
+  }
+}
+
+.heading {
+  margin: 0 0 8px 0;
+  padding: 0;
+
+  @media (--viewportMedium) {
+    margin: 0 0 10px 0;
+    padding: 0;
+  }
+}
+
+.steps {
+  margin: 0;
+  padding: 0 0 0 20px;
+  color: var(--coclosetInkMuted);
+
+  & li {
+    margin: 0 0 4px 0;
+  }
+}
+
+/* Same critical tone DamageReportedMaybe uses - this is the one step in the
+   list that can strand a garment if skipped, so it reads as a warning rather
+   than another list item. */
+.laundryWarning {
+  margin: 14px 0 0 0;
+  padding: 12px 14px;
+  border-left: 4px solid #E3C68E;
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: #FEF9F3;
+  color: #644935;
+  font-weight: var(--fontWeightSemiBold);
+
+  @media (--viewportMedium) {
+    margin: 18px 0 0 0;
+  }
+}

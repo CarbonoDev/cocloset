@@ -187,6 +187,8 @@ const LinkToStockOrAvailabilityTab = props => {
  * @param {function} props.onOpenListing - The function to open the listing
  * @param {function} props.onDiscardDraft - The function to discard the draft
  * @param {function} props.onToggleMenu - The function to toggle the menu
+ * @param {boolean} [props.isCloseBlockedOnLaundry] - Whether closing was blocked because the
+ *   garment is still at the laundry partner (listing.attributes.metadata.onLaundry === true)
  * @returns {JSX.Element} Manage listing card component
  */
 export const ManageListingCard = props => {
@@ -206,6 +208,7 @@ export const ManageListingCard = props => {
     onOpenListing,
     onDiscardDraft,
     onToggleMenu,
+    isCloseBlockedOnLaundry,
   } = props;
   const classes = classNames(rootClassName || css.root, className);
   const currentListing = ensureOwnListing(listing);
@@ -254,6 +257,10 @@ export const ManageListingCard = props => {
           </Overlay>
         ) : hasError ? (
           <Overlay errorMessage={intl.formatMessage({ id: 'ManageListingCard.actionFailed' })} />
+        ) : isCloseBlockedOnLaundry ? (
+          <Overlay
+            errorMessage={intl.formatMessage({ id: 'ManageListingCard.closeBlockedOnLaundry' })}
+          />
         ) : null}
       </div>
 
