@@ -278,6 +278,7 @@
   "EditListingDeliveryForm.updateFailed": "Failed to update listing. Please try again.",
   "EditListingDeliveryPanel.createListingTitle": "Delivery options",
   "EditListingDeliveryPanel.title": "Edit the delivery options of {listingTitle}",
+  "EditListingDetailsForm.categoryAccessoriesNote": "Note: We do not currently accept accessories (belts, handbags, etc.)",
   "EditListingDetailsForm.brand": "Brand*",
   "EditListingDetailsForm.brandHelp": "Pick a brand from the list, or type a new one.",
   "EditListingDetailsForm.brandPlaceholder": "e.g. Reformation",

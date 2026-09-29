@@ -168,51 +168,59 @@ const CategoryField = props => {
   return (
     <>
       {currentCategoryOptions ? (
-        <FieldSelect
-          key={currentCategoryKey}
-          id={currentCategoryKey}
-          name={currentCategoryKey}
-          className={css.listingTypeSelect}
-          onChange={event => handleCategoryChange(event, level, currentCategoryOptions)}
-          label={intl.formatMessage(
-            {
-              id: isRequired
-                ? 'EditListingDetailsForm.categoryLabel'
-                : 'EditListingDetailsForm.categoryLabelOptional',
-            },
-            { categoryLevel: currentCategoryKey }
-          )}
-          validate={
-            isRequired
-              ? required(
-                  intl.formatMessage(
-                    { id: 'EditListingDetailsForm.categoryRequired' },
-                    { categoryLevel: currentCategoryKey }
+        <>
+          <FieldSelect
+            key={currentCategoryKey}
+            id={currentCategoryKey}
+            name={currentCategoryKey}
+            className={level === 1 ? css.categoryListingSelect : css.listingTypeSelect}
+            onChange={event => handleCategoryChange(event, level, currentCategoryOptions)}
+            label={intl.formatMessage(
+              {
+                id: isRequired
+                  ? 'EditListingDetailsForm.categoryLabel'
+                  : 'EditListingDetailsForm.categoryLabelOptional',
+              },
+              { categoryLevel: currentCategoryKey }
+            )}
+            validate={
+              isRequired
+                ? required(
+                    intl.formatMessage(
+                      { id: 'EditListingDetailsForm.categoryRequired' },
+                      { categoryLevel: currentCategoryKey }
+                    )
                   )
-                )
-              : undefined
-          }
-        >
-          {/* THE PLACEHOLDER IS A REAL CHOICE ON AN OPTIONAL LEVEL.
+                : undefined
+            }
+          >
+            {/* THE PLACEHOLDER IS A REAL CHOICE ON AN OPTIONAL LEVEL.
                 > "ese select no permite regresar al placeholder si selecciono una opción"
 
               It was `disabled` on every level, which is correct for a required field - there
               is nothing to go back TO - and a dead end on an optional one: having picked a
               subcategory the owner could never un-pick it, only pick a different wrong one.
               So the option is disabled exactly when the field is required. */}
-          <option disabled={isRequired} value="">
-            {intl.formatMessage(
-              { id: 'EditListingDetailsForm.categoryPlaceholder' },
-              { categoryLevel: currentCategoryKey }
-            )}
-          </option>
-
-          {currentCategoryOptions.map(option => (
-            <option key={option.id} value={option.id}>
-              {option.name}
+            <option disabled={isRequired} value="">
+              {intl.formatMessage(
+                { id: 'EditListingDetailsForm.categoryPlaceholder' },
+                { categoryLevel: currentCategoryKey }
+              )}
             </option>
-          ))}
-        </FieldSelect>
+
+            {currentCategoryOptions.map(option => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+          </FieldSelect>
+
+          {level === 1 ? (
+            <p className={css.categoryNote}>
+              <FormattedMessage id="EditListingDetailsForm.categoryAccessoriesNote" />
+            </p>
+          ) : null}
+        </>
       ) : null}
 
       {categoryConfig?.subcategories?.length > 0 ? (

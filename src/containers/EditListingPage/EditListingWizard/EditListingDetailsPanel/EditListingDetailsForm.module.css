@@ -79,6 +79,10 @@
   }
 }
 
+.categoryListingSelect {
+
+}
+
 .selectedLabel {
   composes: label from global;
 }
@@ -155,4 +159,14 @@
    EditListingWizard.module.css so the four panels cannot drift apart. */
 .formActions {
   composes: formActions from '../EditListingWizard.module.css';
+}
+
+.categoryNote {
+  margin: 11px 0 24px 0;
+  font-size: 14px;
+  color: var(--colorGrey600);
+
+  @media (--viewportMedium) {
+    margin: 16px 0 32px 0;
+  }
 }
