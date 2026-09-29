@@ -20,7 +20,7 @@
 }
 
 .headline {
-  font-family: var(--fontFamilyDisplay);
+  font-family: 'Trocchi', serif;
   color: var(--coclosetPartnerTeal);
   font-size: 36px;
   line-height: 1.1;
@@ -32,7 +32,7 @@
   }
 
   @media (--viewportLarge) {
-    font-size: 64px;
+    font-size: 68px;
   }
 }
 
@@ -44,11 +44,12 @@
 }
 
 .body > p {
+  font-family: 'DM Sans', sans-serif;
   margin: 0 0 16px 0;
   font-size: 16px;
 
   @media (--viewportMedium) {
-    font-size: 20px;
+    font-size: 24px;
   }
 }
 

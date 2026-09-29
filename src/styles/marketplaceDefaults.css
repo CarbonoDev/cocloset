@@ -86,6 +86,30 @@
   --fontFamily: -apple-system, BlinkMacSystemFont, 'Inter', Helvetica, Arial, sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
 
+  @font-face {
+    font-family: 'DM Sans';
+    src: url('../assets/fonts/DMSans-VariableFont_opsz,wght.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 100 1000;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'DM Sans';
+    src: url('../assets/fonts/DMSans-Italic-VariableFont_opsz,wght.ttf') format('truetype');
+    font-style: italic;
+    font-weight: 100 1000;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'Trocchi';
+    src: url('../assets/fonts/Trocchi-Regular.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+  }
+
   /**
    * COCLOSET'S DISPLAY FACE.
    *

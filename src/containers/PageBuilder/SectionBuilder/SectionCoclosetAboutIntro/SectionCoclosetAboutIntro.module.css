@@ -24,7 +24,7 @@
 
   @media (--viewportMedium) {
     padding: 64px 36px 0 36px;
-    font-size: 56px;
+    font-size: 60px;
   }
 }
 
@@ -61,7 +61,7 @@
 }
 
 .headline {
-  font-family: var(--fontFamilyDisplay);
+  font-family: 'Trocchi', serif;
   color: var(--coclosetPartnerTeal);
   font-size: 36px;
   line-height: 1.1;
@@ -73,7 +73,7 @@
   }
 
   @media (--viewportLarge) {
-    font-size: 64px;
+    font-size: 68px;
   }
 }
 
@@ -87,9 +87,10 @@
 .body > p {
   margin: 0 0 16px 0;
   font-size: 16px;
+  font-family: 'DM Sans', sans-serif;
 
   @media (--viewportMedium) {
-    font-size: 20px;
+    font-size: 24px;
   }
 }
 
