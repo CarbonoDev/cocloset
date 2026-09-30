@@ -77,6 +77,12 @@
   margin-top: 10px;
 }
 
+.viewPickupQrLink {
+  composes: a textSmall from global;
+  display: inline-block;
+  margin-top: 6px;
+}
+
 .alternativeActionText {
   composes: h5 from global;
   margin: 0px 24px;

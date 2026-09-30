@@ -90,17 +90,11 @@
   }
 }
 
-.closeListingGuidance {
+.pickupNotice {
   margin: 0 24px 24px 24px;
-  padding: 16px 18px;
-  border: 1px solid var(--coclosetBorder);
-  border-radius: var(--coclosetRadiusSmall);
-  background-color: var(--coclosetSurfaceRaised);
-  color: var(--coclosetInkMuted);
 
   @media (--viewportMedium) {
     margin: 0 24px 32px 24px;
-    padding: 20px 24px;
   }
 
   @media (--viewportLarge) {
@@ -108,14 +102,6 @@
   }
 }
 
-.closeListingGuidanceSteps {
-  margin: 8px 0 0 0;
-  padding: 0 0 0 20px;
-
-  & li {
-    margin: 0 0 4px 0;
-  }
-}
 
 .listingCards {
   list-style: none;

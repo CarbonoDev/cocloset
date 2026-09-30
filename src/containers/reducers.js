@@ -9,6 +9,7 @@ import EditListingPage from './EditListingPage/EditListingPage.duck';
 import FavoritesPage from './FavoritesPage/FavoritesPage.duck';
 import InboxPage from './InboxPage/InboxPage.duck';
 import HandoverPage from './HandoverPage/HandoverPage.duck';
+import PickupPage from './PickupPage/PickupPage.duck';
 import LaundryOpsPage from './LaundryOpsPage/LaundryOpsPage.duck';
 import LaundryProfilePage from './LaundryProfilePage/LaundryProfilePage.duck';
 import ListingPage from './ListingPage/ListingPage.duck';
@@ -35,6 +36,7 @@ export {
   FavoritesPage,
   InboxPage,
   HandoverPage,
+  PickupPage,
   LaundryOpsPage,
   LaundryProfilePage,
   ListingPage,

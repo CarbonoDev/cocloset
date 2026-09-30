@@ -11,6 +11,7 @@ import { loadData as EmailVerificationPageLoader } from './EmailVerificationPage
 import { loadData as FavoritesPageLoader } from './FavoritesPage/FavoritesPage.duck';
 import { loadData as InboxPageLoader } from './InboxPage/InboxPage.duck';
 import { loadData as HandoverPageLoader } from './HandoverPage/HandoverPage.duck';
+import { loadData as PickupPageLoader } from './PickupPage/PickupPage.duck';
 import { loadData as LaundryOpsPageLoader } from './LaundryOpsPage/LaundryOpsPage.duck';
 import { loadData as ListingPageLoader } from './ListingPage/ListingPage.duck';
 import { loadData as MakeOfferPageLoader } from './MakeOfferPage/MakeOfferPage.duck';
@@ -58,6 +59,9 @@ const getPageDataLoadingAPI = () => {
     },
     HandoverPage: {
       loadData: HandoverPageLoader,
+    },
+    PickupPage: {
+      loadData: PickupPageLoader,
     },
     LaundryOpsPage: {
       loadData: LaundryOpsPageLoader,

@@ -161,7 +161,7 @@ const DraftOverlay = props => {
 };
 
 const ClosedOverlay = props => {
-  const { title, listingId, intl, inProgressListingId, onOpenListing } = props;
+  const { title, listingId, slug, intl, inProgressListingId, onOpenListing, onLaundry } = props;
   return (
     <Overlay
       message={intl.formatMessage(
@@ -182,6 +182,20 @@ const ClosedOverlay = props => {
       >
         {intl.formatMessage({ id: 'ManageListingCard.openListing' })}
       </PrimaryButtonInline>
+      {/* A small card overlay is no place for a 180px scannable code - it lives full-size on
+          the listing's own page (LaundryPickupNotice), which already renders it automatically
+          once the listing is paused and onLaundry. This is the direct path there, matching
+          step 4 of the guidance copy without cramming a QR into a thumbnail. */}
+      {onLaundry ? (
+        <NamedLink
+          className={css.viewPickupQrLink}
+          name="ListingPage"
+          params={{ id: listingId.uuid, slug }}
+          onClick={event => event.stopPropagation()}
+        >
+          {intl.formatMessage({ id: 'ManageListingCard.viewPickupQr' })}
+        </NamedLink>
+      ) : null}
     </Overlay>
   );
 };
@@ -378,6 +392,9 @@ const CardThumbnail = props => {
     onOpenListing,
     onCloseListing,
     hasStockManagementInUse,
+    // A paused (closed) listing whose garment is still at the laundry gets its pickup QR
+    // right where the provider just paused it from - see ClosedOverlay.
+    onLaundry: listing.attributes?.metadata?.onLaundry === true,
   };
 
   return (
