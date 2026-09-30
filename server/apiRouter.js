@@ -34,6 +34,9 @@ const laundryAddress = require('./api/laundry-address');
 const laundryOrders = require('./api/laundry-orders');
 const transactionQr = require('./api/transaction-qr');
 const handoverStatus = require('./api/handover-status');
+const listingPickupQr = require('./api/listing-pickup-qr');
+const listingPickupStatus = require('./api/listing-pickup-status');
+const listingPickupConfirm = require('./api/listing-pickup-confirm');
 const autoAcceptBooking = require('./api/auto-accept-booking');
 const initUserRole = require('./api/init-user-role');
 
@@ -136,6 +139,20 @@ router.get('/transaction-qr', transactionQr);
 // read it through the Marketplace API at all; see the header of
 // server/api/handover-status.js.
 router.get('/handover-status', handoverStatus);
+
+// The pickup QR: a provider pauses a listing to collect a garment sitting at the laundry
+// with no active rental. Owner-only (mints a real credential, the pickup token - see the
+// header of server/api/listing-pickup-qr.js for why that differs from the transaction QR
+// above, which is deliberately unauthenticated).
+router.get('/listing-pickup-qr', listingPickupQr);
+// What a scanned pickup QR resolves to - both the owner and the assigned laundry may read
+// it, only the laundry ever gets canConfirm. See server/api/listing-pickup-status.js.
+router.get('/listing-pickup-status', listingPickupStatus);
+// The confirm action a scanned pickup QR's page fires. A second, token-gated door onto the
+// SAME hand-back write listing-custody-status.js performs - see
+// server/api/listing-pickup-confirm.js for why both doors exist rather than one replacing
+// the other.
+router.post('/listing-pickup-confirm', listingPickupConfirm);
 
 // Accept a paid booking on the operator's behalf when the garment is already at its laundry -
 // there is nobody to wait for. Uses `transition/operator-accept`, which the process has always

@@ -354,6 +354,8 @@ export const ListingPageComponent = props => {
                 collapsible
                 id={`laundryPickupNotice-${currentListing.id.uuid}`}
                 className={css.laundryPickupNotice}
+                listingId={currentListing.id.uuid}
+                isPaused={currentListing.attributes.state === LISTING_STATE_CLOSED}
               />
             ) : null}
             <SectionRentalTimeline />

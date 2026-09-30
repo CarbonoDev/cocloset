@@ -43,3 +43,26 @@ describe('LaundryPickupNotice', () => {
     expect(screen.queryByText('LaundryPickupNotice.heading')).not.toBeInTheDocument();
   });
 });
+
+describe('LaundryPickupNotice: the QR', () => {
+  const LISTING_ID = '6aa26840-16da-44df-8a74-ff4ece1da4eb';
+
+  it('renders the QR once the listing is actually paused', () => {
+    render(<LaundryPickupNotice listingId={LISTING_ID} isPaused />);
+
+    expect(screen.getByRole('img')).toHaveAttribute(
+      'src',
+      `/api/listing-pickup-qr?id=${LISTING_ID}`
+    );
+  });
+
+  it('does not render a QR before the listing is paused - there is nothing to scan yet', () => {
+    render(<LaundryPickupNotice listingId={LISTING_ID} isPaused={false} />);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('does not render a QR without a listingId, even if told the listing is paused', () => {
+    render(<LaundryPickupNotice isPaused />);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+});

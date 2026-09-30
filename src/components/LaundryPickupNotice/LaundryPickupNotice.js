@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../util/reactIntl';
-import { Heading } from '..';
+import { Heading, PickupQrCode } from '..';
 import { InlineTextButton } from '../Button/Button';
 
 import css from './LaundryPickupNotice.module.css';
@@ -19,16 +19,33 @@ import css from './LaundryPickupNotice.module.css';
  * booking calendar and rental timeline; ManageListingsPage renders it as an
  * always-expanded banner instead.
  *
+ * THE QR ONLY APPEARS ONCE THE LISTING IS ACTUALLY PAUSED. Step 4 says "present the
+ * generated QR code", but there is nothing to generate until the provider has done steps
+ * 1-3 - /api/listing-pickup-qr refuses with 409 for a listing that is not onLaundry, and a
+ * listing that is still published was never paused in the first place. `isPaused` is passed
+ * in by the caller (both ManageListingsPage and ListingPage already know the listing's own
+ * `attributes.state`) rather than re-derived here, so this component stays a pure function
+ * of what it is told, like every other `*Maybe` component in this codebase.
+ *
  * @component
  * @param {Object} props
  * @param {string} [props.className]
  * @param {string} [props.rootClassName]
  * @param {boolean} [props.collapsible] - start collapsed, behind a toggle
  * @param {string} [props.id] - unique id for the collapsible region, for aria-controls
+ * @param {string} [props.listingId] - required to render the QR; omit to show guidance only
+ * @param {boolean} [props.isPaused] - listing.attributes.state === 'closed'
  * @returns {JSX.Element}
  */
 const LaundryPickupNotice = props => {
-  const { className, rootClassName, collapsible = false, id = 'laundryPickupNotice' } = props;
+  const {
+    className,
+    rootClassName,
+    collapsible = false,
+    id = 'laundryPickupNotice',
+    listingId,
+    isPaused = false,
+  } = props;
   const [isOpen, setIsOpen] = useState(!collapsible);
 
   const classes = classNames(rootClassName || css.root, className);
@@ -59,6 +76,9 @@ const LaundryPickupNotice = props => {
           <FormattedMessage id="LaundryPickupNotice.step4" />
         </li>
       </ol>
+      {isPaused && listingId ? (
+        <PickupQrCode listingId={listingId} className={css.qr} />
+      ) : null}
     </div>
   );
 

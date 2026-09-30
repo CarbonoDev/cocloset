@@ -53,6 +53,7 @@ export { default as HandBackToOwnerButton } from './HandBackToOwnerButton/HandBa
 export { default as LaundryPickupNotice } from './LaundryPickupNotice/LaundryPickupNotice';
 export { default as ShareButton } from './ShareButton/ShareButton';
 export { default as HandoverQrCode } from './HandoverQrCode/HandoverQrCode';
+export { default as PickupQrCode } from './PickupQrCode/PickupQrCode';
 
 export { default as Form } from './Form/Form';
 export { default as KeyboardListener } from './KeyboardListener/KeyboardListener';
