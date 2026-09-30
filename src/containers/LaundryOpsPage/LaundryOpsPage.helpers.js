@@ -135,12 +135,36 @@ export const CLEANING_STATUSES = [
   'quality-inspection',
 ];
 
-// A garment is "at the studio waiting to go out" either because its
-// transaction says so, or - for a garment with no transaction at all - because
-// its listing readiness says so (design doc §8's union).
-export const isAwaitingPickup = row =>
+// Out with the customer, on time or already late - the boundary the "Drop
+// Offs" screen and the "Returns today" filter both have to respect. Shared so
+// the two can't drift the way "returns-today" once did (it forgot this
+// entirely and matched on date alone - see filterByTab below).
+export const STATES_OUT_WITH_RENTER = ['picked-up', 'overdue'];
+
+/**
+ * Is this garment "pending pickup" the way the Dashboard's own tile counts it?
+ *
+ * Two ways in, matching `dashboardCounts.pendingPickups48h` exactly:
+ *
+ *   1. It is at the studio waiting to go out - either because its transaction
+ *      says so, or (a garment with no transaction at all) because its listing
+ *      readiness says so (design doc §8's union).
+ *   2. It hasn't reached `ready-for-pickup` yet, but its booking starts within
+ *      the next 48h - a garment still `accepted` or `initial-cleaning` with a
+ *      near start date is exactly what an operator needs to be preparing for.
+ *
+ * Bug (Jonathan, 2026-09-30): the Pickups screen only ever implemented (1), so
+ * clicking the Dashboard's "Pending pickups (next 48h)" card - which counts
+ * both - landed on a list showing FEWER rows than the number just promised.
+ *
+ * @param {Object} row - a row from the /api/laundry-orders response
+ * @param {Date} [now]
+ * @returns {boolean}
+ */
+export const isAwaitingPickup = (row, now = new Date()) =>
   opsStatus(row) === 'ready-for-pickup' ||
-  (!opsStatus(row) && ['incoming', 'stored'].includes(row?.readinessStatus));
+  (!opsStatus(row) && ['incoming', 'stored'].includes(row?.readinessStatus)) ||
+  (opsStatus(row) !== 'ready-for-pickup' && isWithinNextHours(row?.bookingStart, now, 48));
 
 /**
  * Filter rows for one of the Orders filter tabs.
@@ -152,9 +176,20 @@ export const isAwaitingPickup = row =>
 export const filterByTab = (rows, tab, now = new Date()) => {
   switch (tab) {
     case 'pickup-today':
-      return rows.filter(r => isSameDayAs(r.bookingStart, now));
+      // Bounded by state, not only by date - see isDeliverToday, which this reuses rather
+      // than re-deriving. A booking that starts today but has already gone out (or hasn't
+      // even reached the studio yet) isn't "deliver today" any more/yet.
+      return rows.filter(r => isDeliverToday(r, now));
     case 'returns-today':
-      return rows.filter(r => isSameDayAs(r.bookingEnd, now));
+      // Bug (Jonathan, 2026-09-30): this used to match on `bookingEnd` alone, so a booking
+      // ending today but still `ready-for-pickup` (the renter hasn't even collected it yet)
+      // showed up as "returning today" - the same class of bug isDeliverToday already
+      // guards against on the other end of the rental. Bounded to STATES_OUT_WITH_RENTER,
+      // the same list the "Drop Offs" screen (filterByView's 'returns' case) uses, so the
+      // two can't disagree about what "out with the customer" means.
+      return rows.filter(
+        r => isSameDayAs(r.bookingEnd, now) && STATES_OUT_WITH_RENTER.includes(opsStatus(r))
+      );
     case 'pending-cleaning':
       return rows.filter(r => opsStatus(r) === 'pending-cleaning');
     case 'ready-for-pickup':
@@ -179,13 +214,18 @@ export const filterByTab = (rows, tab, now = new Date()) => {
  * @param {Array} rows
  * @param {string} view - a value of ORDERS_VIEWS
  */
-export const filterByView = (rows, view) => {
+export const filterByView = (rows, view, now = new Date()) => {
   switch (view) {
     case 'pickups':
-      return rows.filter(isAwaitingPickup);
+      // NOT `rows.filter(isAwaitingPickup)`: Array#filter calls its callback with
+      // `(element, index, array)`, and `isAwaitingPickup`'s second parameter is `now` - passed
+      // bare, every row's "current time" would have been its own array index, and
+      // `isWithinNextHours` would crash calling `.getTime()` on a plain number.
+      return rows.filter(r => isAwaitingPickup(r, now));
     case 'returns':
-      // Out with the customer - on time or already late.
-      return rows.filter(r => ['picked-up', 'overdue'].includes(opsStatus(r)));
+      // Out with the customer - on time or already late. Same list "returns-today" (see
+      // filterByTab) uses, so the two can't disagree about what that means.
+      return rows.filter(r => STATES_OUT_WITH_RENTER.includes(opsStatus(r)));
     case 'cleaning':
       return rows.filter(r => CLEANING_STATUSES.includes(opsStatus(r)));
     case 'all':
