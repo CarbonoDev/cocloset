@@ -50,6 +50,7 @@ export { default as ExternalLink } from './ExternalLink/ExternalLink';
 export { default as ExpandingTextarea } from './ExpandingTextarea/ExpandingTextarea';
 export { default as FileName } from './FileName/FileName';
 export { default as HandBackToOwnerButton } from './HandBackToOwnerButton/HandBackToOwnerButton';
+export { default as LaundryPickupNotice } from './LaundryPickupNotice/LaundryPickupNotice';
 export { default as ShareButton } from './ShareButton/ShareButton';
 export { default as HandoverQrCode } from './HandoverQrCode/HandoverQrCode';
 

@@ -24,6 +24,7 @@ import {
   OrderPanel,
   LayoutSingleColumn,
   SectionText,
+  LaundryPickupNotice,
 } from '../../components';
 
 // Related components and modules
@@ -345,6 +346,16 @@ export const ListingPageComponent = props => {
               cleaningTurnaroundDays={cleaningTurnaroundDays}
               laundryName={publicData?.assignedLaundryName}
             />
+            {/* Owner-only: collapsible since it competes for space with the sections
+                above/below it, unlike ManageListingsPage's always-open banner. Only
+                worth showing while the garment is actually at the laundry. */}
+            {isOwnListing && metadata?.onLaundry === true ? (
+              <LaundryPickupNotice
+                collapsible
+                id={`laundryPickupNotice-${currentListing.id.uuid}`}
+                className={css.laundryPickupNotice}
+              />
+            ) : null}
             <SectionRentalTimeline />
             <SectionReviews reviews={reviews} fetchReviewsError={fetchReviewsError} />
             <SectionAuthorMaybe

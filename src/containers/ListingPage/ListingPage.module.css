@@ -228,6 +228,14 @@
   gap: 24px;
 }
 
+.laundryPickupNotice {
+  margin: 24px 0 0 0;
+
+  @media (--viewportMedium) {
+    margin: 32px 0 0 0;
+  }
+}
+
 .editIcon {
   margin: -6px 7px 0 0;
 }

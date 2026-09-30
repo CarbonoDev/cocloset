@@ -113,24 +113,26 @@ describe('ManageListingsPageComponent - close listing guard', () => {
     expect(onCloseListing).toHaveBeenCalledWith(freeListing.id);
   });
 
-  it('shows the close-listing guidance banner once listings have loaded', () => {
+  it('shows the pickup notice when a listing is at the laundry', () => {
+    const listing = bookableListing('garment-on-laundry', { onLaundry: true });
+
+    renderPage({ listings: [listing], pagination: { totalItems: 1, totalPages: 1 } });
+
+    expect(screen.getByText('LaundryPickupNotice.heading')).toBeInTheDocument();
+    expect(screen.getByText('LaundryPickupNotice.step4')).toBeInTheDocument();
+  });
+
+  it('does not show the pickup notice when nothing is at the laundry', () => {
     const listing = bookableListing('garment-free', { onLaundry: false });
 
     renderPage({ listings: [listing], pagination: { totalItems: 1, totalPages: 1 } });
 
-    expect(
-      screen.getByText('ManageListingsPage.closeListingGuidance.title')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('ManageListingsPage.closeListingGuidance.step3')
-    ).toBeInTheDocument();
+    expect(screen.queryByText('LaundryPickupNotice.heading')).not.toBeInTheDocument();
   });
 
-  it('does not show the guidance banner before any listing has loaded', () => {
+  it('does not show the pickup notice before any listing has loaded', () => {
     renderPage({ listings: [], pagination: { totalItems: 0, totalPages: 1 } });
 
-    expect(
-      screen.queryByText('ManageListingsPage.closeListingGuidance.title')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('LaundryPickupNotice.heading')).not.toBeInTheDocument();
   });
 });
