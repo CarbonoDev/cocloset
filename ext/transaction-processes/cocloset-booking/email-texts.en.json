@@ -144,6 +144,7 @@
   "BookingReadyForPickup.StepVisit": "Head to {laundryName} during regular business hours.",
   "BookingReadyForPickup.StepVisitNoLaundry": "Head to the laundry during regular business hours.",
   "BookingReadyForPickup.StepsTitle": "How to pick it up:",
+  "BookingReadyForPickup.StepPickupInstructions": "When you arrive at the dry cleaner, click View Order Details to reveal your QR code and show it at the counter to pick up your item.",
   "BookingReadyForPickup.Subject": "Ready for pickup: Your {listingTitle} rental",
   "BookingReadyForPickup.Title": "Ready for pickup: Your {listingTitle} rental",
   "BookingReturnCompleted.CoclosetUpdate": "CoCloset Update: We're reviewing a condition note from the dry cleaner regarding this garment. Rest assured, if any significant damage occurred, CoCloset covers the cost to make it right. We'll update you shortly.",

@@ -21,6 +21,7 @@ const EmailVerificationPage = loadable(() => import(/* webpackChunkName: "EmailV
 const FavoritesPage = loadable(() => import(/* webpackChunkName: "FavoritesPage" */ '../containers/FavoritesPage/FavoritesPage'));
 const InboxPage = loadable(() => import(/* webpackChunkName: "InboxPage" */ '../containers/InboxPage/InboxPage'));
 const HandoverPage = loadable(() => import(/* webpackChunkName: "HandoverPage" */ '../containers/HandoverPage/HandoverPage'));
+const PickupPage = loadable(() => import(/* webpackChunkName: "PickupPage" */ '../containers/PickupPage/PickupPage'));
 const LaundryOpsPage = loadable(() => import(/* webpackChunkName: "LaundryOpsPage" */ '../containers/LaundryOpsPage/LaundryOpsPage'));
 const LaundryProfilePage = loadable(() => import(/* webpackChunkName: "LaundryProfilePage" */ '../containers/LaundryProfilePage/LaundryProfilePage'));
 const MakeOfferPage = loadable(() => import(/* webpackChunkName: "MakeOfferPage" */ '../containers/MakeOfferPage/MakeOfferPage'));
@@ -434,6 +435,22 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       authPage: 'LoginPage',
       component: HandoverPage,
       loadData: pageDataLoadingAPI.HandoverPage.loadData,
+    },
+    {
+      // Where a scanned PICKUP QR lands - a provider collecting a paused garment, not a
+      // rental handover. The path is half of a contract - the other half is PICKUP_PATH in
+      // server/api-util/listingPickupQr.js - and the token lives in the query string, never
+      // in the path itself. See listingPickupQrUrlAgreement.test.js.
+      //
+      // `auth: true` for the same reason HandoverPage needs it: the page has to know who is
+      // reading (owner vs. the assigned laundry) before it can decide what to show, which
+      // /api/listing-pickup-status - not this route - actually decides.
+      path: '/pickup/:listingId',
+      name: 'PickupPage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: PickupPage,
+      loadData: pageDataLoadingAPI.PickupPage.loadData,
     },
     {
       // Laundry-only studio profile settings. Gated inside LaundryProfilePage

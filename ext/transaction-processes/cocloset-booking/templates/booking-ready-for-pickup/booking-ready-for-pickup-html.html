@@ -31,10 +31,17 @@
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReadyForPickup.ContentNoLaundry" "Great news—your {listingTitle} rental is ready for pickup at the laundry." listingTitle=listing.title}}</p>
                 {{/if}}
                 <p style="font-size:16px;line-height:1.4;margin:24px 0 8px;color:#484848;font-weight:700">{{t "BookingReadyForPickup.StepsTitle" "How to pick it up:"}}</p>
+                <p style="font-size:16px;line-height:1.5;margin:0 0 16px;color:#484848">
+                  {{t "BookingReadyForPickup.StepPickupInstructions"
+                      "When you arrive at the dry cleaner, click View Order Details to reveal your QR code and show it at the counter to pick up your item."}}
+                </p>
+                <!--
                 <ul style="font-size:16px;line-height:1.5;margin:0 0 16px;padding-left:22px;color:#484848">
                   <li style="margin:0 0 8px">{{#if listing.public-data.assignedLaundryName}}{{t "BookingReadyForPickup.StepVisit" "Head to {laundryName} during regular business hours." laundryName=listing.public-data.assignedLaundryName}}{{else}}{{t "BookingReadyForPickup.StepVisitNoLaundry" "Head to the laundry during regular business hours."}}{{/if}}</li>
                   <li style="margin:0">{{t "BookingReadyForPickup.StepQr" "Show your pickup QR code at the counter."}}</li>
+
                 </ul>
+                -->
                 <table style="margin:24px 0 0;background-color:#FAF7F2;border-radius:8px" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
                     <tr>

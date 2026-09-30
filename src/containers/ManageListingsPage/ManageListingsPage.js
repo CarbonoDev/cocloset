@@ -25,6 +25,7 @@ import {
   LayoutSingleColumn,
   NamedLink,
   Modal,
+  LaundryPickupNotice,
 } from '../../components';
 
 import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer';
@@ -200,6 +201,10 @@ export const ManageListingsPageComponent = props => {
 
   const hasPaginationInfo = !!pagination && pagination.totalItems != null;
   const listingsAreLoaded = !queryInProgress && hasPaginationInfo;
+  // Only worth nagging a provider about pickup steps when something of theirs is
+  // actually sitting at a laundry partner right now.
+  const hasListingAtLaundry =
+    listingsAreLoaded && listings.some(l => l?.attributes?.metadata?.onLaundry === true);
 
   const loadingResults = (
     <div className={css.messagePanel}>
@@ -255,21 +260,8 @@ export const ManageListingsPageComponent = props => {
         <div className={css.listingPanel}>
           <Heading listingsAreLoaded={listingsAreLoaded} pagination={pagination} />
 
-          {listingsAreLoaded && listings.length > 0 ? (
-            <div className={css.closeListingGuidance}>
-              <FormattedMessage id="ManageListingsPage.closeListingGuidance.title" />
-              <ol className={css.closeListingGuidanceSteps}>
-                <li>
-                  <FormattedMessage id="ManageListingsPage.closeListingGuidance.step1" />
-                </li>
-                <li>
-                  <FormattedMessage id="ManageListingsPage.closeListingGuidance.step2" />
-                </li>
-                <li>
-                  <FormattedMessage id="ManageListingsPage.closeListingGuidance.step3" />
-                </li>
-              </ol>
-            </div>
+          {hasListingAtLaundry ? (
+            <LaundryPickupNotice className={css.pickupNotice} />
           ) : null}
 
           <ul className={css.listingCards}>

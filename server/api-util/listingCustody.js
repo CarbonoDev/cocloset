@@ -321,6 +321,13 @@ const writeCustodyMetadata = ({
   const metadata = {
     onLaundry,
     handedBackAt: onLaundry === false ? handedBackAt.toISOString() : null,
+    // A pickup QR/PIN (api-util/listingPickupQr.js) is scoped to ONE hand-back. Whichever
+    // door completes it - this write, or the token-gated one the QR drives - the credential
+    // is spent and must not still validate against a garment that has already changed hands.
+    // Clearing it here, in the one function every hand-back path funnels through, means a
+    // stray token cannot outlive the event that consumed it, however custody was actually
+    // flipped.
+    ...(onLaundry === false ? { pickupToken: null } : {}),
     ...(readyAt ? { readyAt: readyAt.toISOString() } : {}),
   };
 

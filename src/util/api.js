@@ -345,6 +345,27 @@ export const updateListingCustodyStatus = body => {
   return post('/api/listing-custody-status', body);
 };
 
+// What a scanned pickup QR resolves to: whose garment it is, and whether THIS caller may
+// confirm the hand-back. Mirrors fetchHandoverStatus, with a token added - a pickup has no
+// transaction to authorize against, so the token carried in the QR itself is part of the
+// answer. See `server/api/listing-pickup-status.js`.
+//
+// Returns `{ data: { listingId, listingTitle, ownerName, onLaundry, viewerRole, tokenValid,
+//   canConfirm } }`.
+export const fetchListingPickupStatus = ({ listingId, token }) => {
+  const params = new URLSearchParams({ id: listingId, token });
+  return request(`/api/listing-pickup-status?${params.toString()}`, { method: methods.GET });
+};
+
+// The confirm action a scanned pickup QR's page fires. A second, token-gated door onto the
+// same hand-back write updateListingCustodyStatus performs - see
+// `server/api/listing-pickup-confirm.js` for why both doors exist.
+//
+// Body: { listingId, token }
+export const confirmListingPickup = body => {
+  return post('/api/listing-pickup-confirm', body);
+};
+
 // Assign a laundry to a listing. THIS IS THE WRITE, not a precondition check.
 //
 // `assignedLaundryId` lives in the listing's `metadata`, which the Marketplace API

@@ -275,7 +275,15 @@ describe('listing-custody-status', () => {
 
       const params = update.mock.calls[0][0];
       expect(Object.keys(params).sort()).toEqual(['id', 'metadata']);
-      expect(Object.keys(params.metadata).sort()).toEqual(['handedBackAt', 'onLaundry']);
+      // `pickupToken` is cleared here too (not just from the QR-gated confirm endpoint): a
+      // hand-back through THIS door still has to spend any outstanding pickup credential, or
+      // a QR the provider already has would keep validating for a garment that already went
+      // home - see api-util/listingCustody.js `writeCustodyMetadata`.
+      expect(Object.keys(params.metadata).sort()).toEqual([
+        'handedBackAt',
+        'onLaundry',
+        'pickupToken',
+      ]);
     });
 
     it('surfaces a failed write as an error rather than a false 200', async () => {

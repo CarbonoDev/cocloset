@@ -32,6 +32,8 @@ const DEFAULT_GREETING_NAME = 'there';
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+const MARKETPLACE_ROOT_URL = process.env.REACT_APP_MARKETPLACE_ROOT_URL;
+const MARKETPLACE_NAME = process.env.REACT_APP_MARKETPLACE_NAME;
 /**
  * Escape a value for interpolation into the HTML body.
  *
@@ -116,6 +118,12 @@ const renderEmail = ({ subject, greetingName, intro, rows, outro, marketplaceNam
     .join('');
 
   const html = [
+    `<img
+    src="${MARKETPLACE_ROOT_URL}/static/images/cocloset-banner.jpg"
+    alt="${MARKETPLACE_NAME}"
+    width="600"
+    style="width:100%;max-width:600px;height:auto;display:block;margin:0 0 24px;border:0;border-radius:8px;"
+    />`,
     `<p>${escapeHtml(greeting)}</p>`,
     `<p>${escapeHtml(intro)}</p>`,
     htmlRows ? `<ul>${htmlRows}</ul>` : '',

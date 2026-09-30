@@ -26,6 +26,9 @@
 const log = require('../log');
 const { sendMail } = require('./mailgun');
 
+const MARKETPLACE_ROOT_URL = process.env.REACT_APP_MARKETPLACE_ROOT_URL;
+const MARKETPLACE_NAME = process.env.REACT_APP_MARKETPLACE_NAME;
+
 // Max days a laundry could plausibly claim as turnaround. A month is already
 // implausible; beyond it the number is a typo, not a service.
 const MAX_TURNAROUND_DAYS = 30;
@@ -213,6 +216,12 @@ const buildApplicationEmail = application => {
   // EMAIL_FIELD_LABELS, which covers the whole of FIELD_SPECS plus turnaround, so adding a
   // field to the form and forgetting it here is the one way a value could go missing.
   const html = [
+    `<img
+    src="${MARKETPLACE_ROOT_URL}/static/images/cocloset-banner.jpg"
+    alt="${MARKETPLACE_NAME}"
+    width="600"
+    style="width:100%;max-width:600px;height:auto;display:block;margin:0 0 24px;border:0;border-radius:8px;"
+    />`,
     '<p>A new laundry partner application was submitted.</p>',
     `<table role="presentation" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">`,
     '<tbody>',

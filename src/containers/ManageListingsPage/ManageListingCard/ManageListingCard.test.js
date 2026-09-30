@@ -312,6 +312,47 @@ describe('ManageListingCard', () => {
 
     expect(tree.getByText('ManageListingCard.closedListing')).toBeInTheDocument();
     expect(tree.getByText('ManageListingCard.openListing')).toBeInTheDocument();
+    // No garment at the laundry - nothing to collect, so no link to a pickup QR.
+    expect(tree.queryByText('ManageListingCard.viewPickupQr')).not.toBeInTheDocument();
+  });
+
+  it('Booking (day): closed, garment still at the laundry', () => {
+    const listing = createOwnListing('garment-1', {
+      title: 'the garment',
+      description: 'Lorem ipsum',
+      price: new Money(1000, 'USD'),
+      state: 'closed',
+      metadata: { onLaundry: true },
+      availabilityPlan: {
+        type: 'availability-plan/time',
+        timezone: 'Etc/UTC',
+        entries: [{ dayOfWeek: 'mon', startTime: '00:00', endTime: '00:00', seats: 1 }],
+      },
+      publicData: {
+        listingType: 'rent-bicycles-daily',
+        transactionProcessAlias: 'default-booking/release-1',
+        unitType: 'hour',
+      },
+    });
+
+    const tree = render(
+      <ManageListingCard
+        history={{ push: noop }}
+        listing={listing}
+        intl={fakeIntl}
+        isMenuOpen={false}
+        onCloseListing={noop}
+        onOpenListing={noop}
+        onToggleMenu={noop}
+        hasClosingError={false}
+        hasOpeningError={false}
+        availabilityEnabled={true}
+      />
+    );
+
+    // A card overlay is too small for a scannable QR - this links to the listing's own page,
+    // which renders the real one (LaundryPickupNotice) at full size.
+    expect(tree.getByText('ManageListingCard.viewPickupQr')).toBeInTheDocument();
   });
 
   it('Booking (day): pendingApproval', () => {

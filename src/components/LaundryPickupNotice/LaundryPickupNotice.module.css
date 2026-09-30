@@ -1,15 +1,18 @@
 .root {
   display: flex;
   flex-direction: column;
-  margin: 24px 0 0 0;
-  padding: 18px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px;
   border: 1px solid var(--coclosetBorder);
   border-radius: var(--coclosetRadiusSmall);
   background-color: var(--coclosetSurfaceRaised);
 
   @media (--viewportMedium) {
-    margin: 32px 0 0 0;
-    padding: 24px;
+    padding: 20px 24px;
   }
 }
 
@@ -23,6 +26,17 @@
   }
 }
 
+.body {
+  margin: 0 0 12px 0;
+  color: var(--coclosetInkMuted);
+}
+
+.stepsHeading {
+  margin: 0 0 4px 0;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
+}
+
 .steps {
   margin: 0;
   padding: 0 0 0 20px;
@@ -33,17 +47,13 @@
   }
 }
 
-/* Same critical tone DamageReportedMaybe uses - this is the one step in the
-   list that can strand a garment if skipped, so it reads as a warning rather
-   than another list item. */
-.laundryWarning {
+.toggle {
+  align-self: flex-start;
+  margin: 0 0 8px 0;
+}
+
+.qr {
   margin: 14px 0 0 0;
-  padding: 12px 14px;
-  border-left: 4px solid #E3C68E;
-  border-radius: var(--coclosetRadiusSmall);
-  background-color: #FEF9F3;
-  color: #644935;
-  font-weight: var(--fontWeightSemiBold);
 
   @media (--viewportMedium) {
     margin: 18px 0 0 0;

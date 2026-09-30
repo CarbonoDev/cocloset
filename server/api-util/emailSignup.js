@@ -23,6 +23,9 @@
 const log = require('../log');
 const { sendMail } = require('./mailgun');
 
+const MARKETPLACE_ROOT_URL = process.env.REACT_APP_MARKETPLACE_ROOT_URL;
+const MARKETPLACE_NAME = process.env.REACT_APP_MARKETPLACE_NAME;
+
 // Deliberately loose: this is a spam/length guard, not an address book. Real
 // verification happens when a human (or the mailing-list tool on the other end of the
 // webhook) reads the signup.
@@ -147,6 +150,12 @@ const buildSignupEmail = signup => {
   ].join('\n');
 
   const html = [
+    `<img
+    src="${MARKETPLACE_ROOT_URL}/static/images/cocloset-banner.jpg"
+    alt="${MARKETPLACE_NAME}"
+    width="600"
+    style="width:100%;max-width:600px;height:auto;display:block;margin:0 0 24px;border:0;border-radius:8px;"
+    />`,
     '<p>A new landing page email-list signup was submitted.</p>',
     `<table role="presentation" cellpadding="0" cellspacing="0" style="${TABLE_STYLE}">`,
     '<tbody>',

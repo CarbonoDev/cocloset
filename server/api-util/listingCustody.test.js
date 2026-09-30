@@ -314,6 +314,7 @@ describe('writeCustodyMetadata', () => {
     expect(update.mock.calls[0][0].metadata).toEqual({
       onLaundry: false,
       handedBackAt: '2026-09-08T04:00:00.000Z',
+      pickupToken: null,
     });
   });
 

@@ -1,0 +1,16 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Same treatment as HandoverQrCode's .image, for the same reasons: a crisp square that scans
+   reliably regardless of device pixel ratio or the surface it sits on. */
+.image {
+  display: block;
+  width: 180px;
+  height: 180px;
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: #ffffff;
+  image-rendering: pixelated;
+}
