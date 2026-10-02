@@ -1,8 +1,8 @@
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { handleError } = require('../api-util/sdk');
 const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
-const { readAssignedLaundryId } = require('../api-util/laundryAssignment');
-const { writeCustodyMetadata } = require('../api-util/listingCustody');
+const { readAssignedLaundryId, resolveInitialCleaningDays } = require('../api-util/laundryAssignment');
+const { writeCustodyMetadata, computeReadiness } = require('../api-util/listingCustody');
 const {
   LISTING_CODE_KEY,
   TRANSACTION_CODE_KEY,
@@ -69,6 +69,43 @@ const log = require('../log');
 // a decision - and its transaction is by definition active (`accepted`). It is also monotone:
 // it only ever sets `true`. Handing the garment back stays with the gated endpoint.
 //
+// ---------------------------------------------------------------------------
+// WHY THIS ALSO WRITES `readyAt` NOW - THE "PICKUP TODAY" BUG
+// ---------------------------------------------------------------------------
+//   > "el UX debe permitirnos hacer el booking a partir del día de hoy... solo en aquellos
+//   >  listings que (...) hayan terminado su proceso de lavado" (Jonathan, 2026-09-28)
+//   > "hay que asegurarnos de que un listing no muestre pickup today si la laundry no ha
+//   >  terminado de finalizar el lavado" (Jonathan, 2026-10-02)
+//
+// `resolveInitialCleaningDays` (util/cleaningFloor.js) returns NO floor at all - null, same
+// as a listing nobody has ever assigned - the instant `onLaundry` is true. That rule predates
+// same-day booking and is correct for its own question ("can tomorrow be offered"): a garment
+// that has physically reached its studio will always have had a full day by tomorrow. It
+// answers the WRONG question for "can TODAY be offered": a garment received five minutes ago,
+// mid FIRST wash, also reads `onLaundry: true` with no floor, so `canBeCollectedToday` saw
+// nothing to block it and showed the badge before the wash had even started.
+//
+// The fix reuses the exact mechanism already built for the OTHER side of a rental
+// (api-util/listingCustody.js `computeReadiness`, fired on `laundry-confirm-return` with
+// "wash starts tomorrow, not today") rather than inventing a second one: on reception, this
+// garment's custody clock starts now exactly the way a return's does, so it gets the same
+// `readyAt` estimate - today's reception plus this studio's resolved turnaround, washing days
+// starting tomorrow. `earliestBookableStart` already prefers `readyAt` over the (now-null)
+// initial-cleaning floor, so the badge and the booking picker both start blocking today
+// immediately, with no client change needed.
+//
+// NOT A GUARANTEE EITHER, and said so rather than hidden: this is an ESTIMATE made at
+// reception, the same status every other turnaround number in this codebase already has (the
+// pre-arrival lead time it replaces was exactly as approximate, and the RETURN flow's own
+// `readyAt` - api-util/listingCustody.js `writeReadiness`, fired on `laundry-confirm-return` -
+// has lived with the identical trade-off since it shipped: nothing re-opens or re-closes the
+// floor if the actual wash finishes earlier or later than the number it was computed from).
+// Over-blocking is recoverable by nobody noticing a badge that could have shown a day sooner;
+// a studio that runs long opens the floor before the real wash finishes, same residual risk
+// `writeReadiness` already carries. Tightening that for BOTH flows - reacting to the actual
+// `ready-for-pickup`/`laundry-mark-ready` moment rather than an estimate made in advance - is
+// a larger change than this fix and left for later.
+//
 // Success response (200): { data: { onLaundry: true, laundryCode } }
 // Failure responses:
 //   400 - missing transactionId, or an invalid laundryCode
@@ -117,7 +154,7 @@ module.exports = (req, res) => {
         throw httpError(422, 'This transaction has no listing.');
       }
 
-      return authorizeLaundryCaller(req, res, readAssignedLaundryId(listing)).then(() => {
+      return authorizeLaundryCaller(req, res, readAssignedLaundryId(listing)).then(currentUser => {
         const state = stateFromLastTransition(transaction?.attributes?.lastTransition);
         // Reception only happens at the start of the rental. Later states have their own
         // steps, and a studio pressing this from a stale screen must not silently claim
@@ -135,10 +172,10 @@ module.exports = (req, res) => {
           throw httpError(409, 'This garment is already at the studio.');
         }
 
-        return { listing };
+        return { listing, currentUser };
       });
     })
-    .then(({ listing }) =>
+    .then(({ listing, currentUser }) =>
       // THE TRANSITION FIRST (2026-09-21), because Sharetribe's own legality check is the
       // authoritative one - the state check above can be stale by the time this runs, exactly
       // like every other endpoint that fires a real transition (laundry-transaction-status.js,
@@ -149,17 +186,32 @@ module.exports = (req, res) => {
           { id: transactionId, transition: TRANSITIONS.LAUNDRY_RECEIVE_FROM_PROVIDER, params: {} },
           { expand: true }
         )
-        .then(() => listing)
+        .then(() => ({ listing, currentUser }))
     )
-    .then(listing =>
+    .then(({ listing, currentUser }) => {
+      // The estimated `readyAt`, computed the same way a return's is - see the header comment
+      // on why reception needs one at all now. Resolved from THIS studio's own configured
+      // turnaround for the garment's category, same chain `/api/laundry-orders` already uses
+      // to show it on the ops table.
+      const cleaningDays = resolveInitialCleaningDays({
+        laundryPrivateData: currentUser?.attributes?.profile?.privateData,
+        listingPublicData: listing?.attributes?.publicData,
+        envDefaultBufferDays: process.env.DEFAULT_LAUNDRY_BUFFER_DAYS,
+      });
+      const timeZone = listing?.attributes?.availabilityPlan?.timezone;
+      const { readyAt } = computeReadiness({ returnedAt: new Date(), cleaningDays, timeZone });
+
       // The custody flag NEXT, because it is what the ops screens read to decide which step
       // to offer next. The code writes below are useful but not load-bearing: if one of them
       // fails the studio can type the code again, whereas a lost custody write leaves the
       // step it just completed still on offer.
-      writeCustodyMetadata({ integrationSdk, listingId: listing.id, onLaundry: true }).then(
-        () => listing
-      )
-    )
+      return writeCustodyMetadata({
+        integrationSdk,
+        listingId: listing.id,
+        onLaundry: true,
+        readyAt,
+      }).then(() => listing);
+    })
     .then(listing => {
       // The code goes on the TRANSACTION (what this rental was given) and on the LISTING
       // (what this garment currently carries, stamped with the studio that issued it - see
