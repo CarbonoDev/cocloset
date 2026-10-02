@@ -1,4 +1,10 @@
-import { LAUNDRY_STATES, opsStatus, isOverdue, wasReturnedLate } from '../../util/laundryStatuses';
+import {
+  LAUNDRY_STATES,
+  CUSTODY_ACTIVE_STATES,
+  opsStatus,
+  isOverdue,
+  wasReturnedLate,
+} from '../../util/laundryStatuses';
 
 // Pure row-filtering / counting logic shared by every laundry ops screen.
 // Kept out of the components so the filter definitions have exactly one home
@@ -10,6 +16,7 @@ import { LAUNDRY_STATES, opsStatus, isOverdue, wasReturnedLate } from '../../uti
 // Filter tabs on the Orders screen (mockup 08.jpg), in the order shown there.
 export const ORDER_TABS = [
   'all',
+  'active-orders',
   'pickup-today',
   'returns-today',
   'pending-cleaning',
@@ -175,6 +182,22 @@ export const isAwaitingPickup = (row, now = new Date()) =>
  */
 export const filterByTab = (rows, tab, now = new Date()) => {
   switch (tab) {
+    case 'active-orders':
+      // "Items que un renter ha pedido" (Jonathan, 2026-10-02): a garment currently
+      // committed to a live rental, from the moment the provider/operator accepts it
+      // through to the studio marking it available again - the same boundary
+      // `canHandBackToOwner` (util/laundryStatuses.js) uses to decide a garment is still
+      // spoken for. Deliberately excludes `delivered`/`reviewed` (the rental is over) and
+      // anything before `accept` (nothing has been committed to yet - `/api/laundry-orders`
+      // already drops pre-accept transactions, see OPS_LAST_TRANSITIONS).
+      //
+      // `row.state` ON PURPOSE, NOT `opsStatus(row)`: the latter substitutes a cleaning
+      // sub-phase ('pending-cleaning', 'cleaning-in-progress', ...) for the real state once a
+      // garment reaches `cleaning` - exactly right for a status BADGE, wrong for this check,
+      // since none of those sub-phase strings appear in CUSTODY_ACTIVE_STATES and every
+      // cleaning row would silently fail to match. `canHandBackToOwner` makes the same choice
+      // for the same reason.
+      return rows.filter(r => CUSTODY_ACTIVE_STATES.includes(r?.state));
     case 'pickup-today':
       // Bounded by state, not only by date - see isDeliverToday, which this reuses rather
       // than re-deriving. A booking that starts today but has already gone out (or hasn't
