@@ -25,17 +25,7 @@
               <td>
                 <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingLateReturn.Title" "Your rental is overdue" listingTitle=listing.title}}</h1>
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingLateReturn.Content" "Your rental of {listingTitle} ended on {dateEnd, date, ::YYYYMMMd} and the garment has not been returned yet. Please bring it back to the laundry as soon as you can." listingTitle=listing.title dateStart=booking.start dateEnd=(date-transform booking.end days=-1)}}</p>
-                <table style="margin:24px 0 0;background-color:#FAF7F2;border-radius:8px" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
-                  <tbody>
-                    <tr>
-                      <td align="center" style="padding:20px 16px">
-                        <img src="{{marketplace.url}}/api/transaction-qr?id={{url-encode id}}" width="180" height="180" alt="{{t "TransactionEmails.HandoverQrAlt" "Your pickup and return QR code"}}" style="display:block;margin:0 auto;border:0;width:180px;height:180px;max-width:100%" />
-                        <p style="font-size:14px;line-height:1.5;margin:12px 0 0;color:#484848">{{t "TransactionEmails.HandoverQrCaption" "Show this code at the counter. The same code works for the pickup and for the return."}}</p>
-                        <p style="font-size:13px;line-height:1.5;margin:8px 0 0;color:#767676">{{t "TransactionEmails.HandoverQrFallback" "No image above? Your email app is blocking pictures. Open your order page for the code, or read this reference out at the counter:"}} <span style="font-family:monospace;color:#484848">{{id}}</span></p>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                <p style="font-size:16px;line-height:1.5;margin:24px 0 0;color:#484848">{{t "TransactionEmails.HandoverQrOnOrderPage" "Your pickup and return QR code is on your order page. Open it with the button below and show the code at the counter."}}</p>
                 <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
                     <tr>
