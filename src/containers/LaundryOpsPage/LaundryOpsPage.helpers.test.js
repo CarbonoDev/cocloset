@@ -144,8 +144,8 @@ describe('LaundryOpsPage.helpers', () => {
       row({ id: 'c', state: 'delivered' }),
       row({ id: 'd', state: 'overdue' }),
       row({ id: 'e', state: 'returned', damageReported: { flag: true, note: 'n' } }),
-      row({ id: 'f', bookingStart: '2026-07-31T09:00:00.000Z' }),
-      row({ id: 'g', bookingEnd: '2026-07-31T18:00:00.000Z' }),
+      row({ id: 'f', bookingStart: '2026-07-31T09:00:00.000Z', state: 'accepted' }),
+      row({ id: 'g', bookingEnd: '2026-07-31T18:00:00.000Z', state: 'picked-up' }),
     ];
 
     it('has a filter for every declared tab', () => {
@@ -169,6 +169,40 @@ describe('LaundryOpsPage.helpers', () => {
     ])('%s selects the right rows', (tab, expectedIds) => {
       expect(filterByTab(rows, tab, NOW).map(r => r.id)).toEqual(expectedIds);
     });
+
+    // Bug (Jonathan, 2026-09-30): "Returns today" matched on `bookingEnd` alone, so a
+    // booking ending today that the renter hasn't even collected yet ('ready-for-pickup')
+    // showed up as due back today.
+    it('returns-today excludes a booking ending today that has not even gone out yet', () => {
+      const notYetPickedUp = row({
+        id: 'not-out-yet',
+        bookingEnd: '2026-07-31T18:00:00.000Z',
+        state: 'ready-for-pickup',
+      });
+      expect(filterByTab([notYetPickedUp], 'returns-today', NOW)).toHaveLength(0);
+    });
+
+    it('returns-today still includes an overdue booking whose end date was today', () => {
+      const overdueToday = row({
+        id: 'overdue-today',
+        bookingEnd: '2026-07-31T18:00:00.000Z',
+        state: 'overdue',
+      });
+      expect(filterByTab([overdueToday], 'returns-today', NOW).map(r => r.id)).toEqual([
+        'overdue-today',
+      ]);
+    });
+
+    // Same class of bug, the other end of the rental: a booking starting today that
+    // already went out (or hasn't reached the studio) isn't "deliver today" any more/yet.
+    it('pickup-today excludes a booking starting today that has already gone out', () => {
+      const alreadyOut = row({
+        id: 'already-out',
+        bookingStart: '2026-07-31T09:00:00.000Z',
+        state: 'picked-up',
+      });
+      expect(filterByTab([alreadyOut], 'pickup-today', NOW)).toHaveLength(0);
+    });
   });
 
   describe('filterByView', () => {
@@ -182,6 +216,41 @@ describe('LaundryOpsPage.helpers', () => {
 
     it('pickups shows garments at the studio waiting to go out', () => {
       expect(filterByView(rows, 'pickups').map(r => r.id)).toEqual(['a', 'e']);
+    });
+
+    // Bug (Jonathan, 2026-09-30): the Dashboard's "Pending pickups (next 48h)" tile counts
+    // upcoming bookings that haven't reached ready-for-pickup yet (dashboardCounts,
+    // isWithinNextHours(bookingStart, 48)); this screen - what that card drills into -
+    // never showed them, so clicking the card landed on fewer rows than it promised.
+    it('pickups ALSO shows a booking starting within 48h that has not reached ready-for-pickup yet', () => {
+      const startingSoon = row({
+        id: 'starting-soon',
+        state: 'accepted',
+        bookingStart: '2026-08-02T00:00:00.000Z',
+      });
+      expect(filterByView([startingSoon], 'pickups', NOW).map(r => r.id)).toEqual([
+        'starting-soon',
+      ]);
+    });
+
+    it('pickups does not reach past the 48h window', () => {
+      const startingLater = row({
+        id: 'starting-later',
+        state: 'accepted',
+        bookingStart: '2026-08-05T00:00:00.000Z',
+      });
+      expect(filterByView([startingLater], 'pickups', NOW)).toHaveLength(0);
+    });
+
+    it("pickups doesn't double-count a booking already ready-for-pickup, even if its start is 48h out", () => {
+      // Not a real scenario (ready-for-pickup implies the start date matters less), but
+      // guards the OR from ever producing a row twice.
+      const readySoon = row({
+        id: 'ready-soon',
+        state: 'ready-for-pickup',
+        bookingStart: '2026-08-02T00:00:00.000Z',
+      });
+      expect(filterByView([readySoon], 'pickups', NOW).map(r => r.id)).toEqual(['ready-soon']);
     });
 
     it('returns shows garments currently out with the customer, late or not', () => {
