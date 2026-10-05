@@ -16,7 +16,9 @@ jest.mock('../api-util/laundryMailer', () => ({
 }));
 
 jest.mock('../api-util/availabilityBuffer', () => ({
+  BUFFER_EXCEPTION_IDS_KEY: 'bufferExceptionIds',
   reconcileBufferWindow: jest.fn(),
+  writeBufferExceptionIds: jest.fn(() => Promise.resolve([])),
 }));
 
 // Several cases here deliberately break a post-transition side effect (the
@@ -30,7 +32,11 @@ const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { authorizeLaundryCaller } = require('../api-util/laundryAuth');
 const { handleError } = require('../api-util/sdk');
 const { notifyReturnScheduled, notifyCleaningRequired } = require('../api-util/laundryMailer');
-const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
+const {
+  BUFFER_EXCEPTION_IDS_KEY,
+  reconcileBufferWindow,
+  writeBufferExceptionIds,
+} = require('../api-util/availabilityBuffer');
 
 const laundryTransactionStatus = require('./laundry-transaction-status');
 
@@ -118,7 +124,13 @@ const transactionEntity = (lastTransition, metadata = {}) => ({
 // custody (`metadata.onLaundry`) and the readiness moment (`metadata.readyAt`)
 // onto the LISTING - transaction metadata cannot answer "where is this garment",
 // which outlives any one booking.
-const setupSdk = ({ lastTransition, metadata = {}, transitionImpl, listingsUpdateImpl } = {}) => {
+const setupSdk = ({
+  lastTransition,
+  metadata = {},
+  transitionImpl,
+  listingsUpdateImpl,
+  exceptionDeleteImpl,
+} = {}) => {
   const show = jest.fn(() =>
     Promise.resolve({
       data: {
@@ -145,11 +157,16 @@ const setupSdk = ({ lastTransition, metadata = {}, transitionImpl, listingsUpdat
   const listingsUpdate =
     listingsUpdateImpl || jest.fn(() => Promise.resolve({ data: { data: listing } }));
 
+  // The early-finish release deletes the availability exceptions the wash reserved, so the
+  // mock SDK needs that endpoint too. See releaseCleaningHold in api-util/listingCustody.js.
+  const exceptionDelete = exceptionDeleteImpl || jest.fn(() => Promise.resolve({ data: {} }));
+
   getIntegrationSdk.mockReturnValue({
     transactions: { show, transition },
     listings: { update: listingsUpdate },
+    availabilityExceptions: { delete: exceptionDelete },
   });
-  return { show, transition, listingsUpdate };
+  return { show, transition, listingsUpdate, exceptionDelete };
 };
 
 // Sharetribe's real answer to an illegal transition, verified against the Dev
@@ -815,5 +832,178 @@ describe('laundry-transaction-status: the codes a rental has been given', () => 
 
     expect(metadataSent(transition)).not.toHaveProperty('laundryCodes');
     expect(metadataSent(transition).laundryCode).toBe('A-04');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE WASH FINISHING EARLY GIVES THE DAYS BACK.
+//
+// `readyAt` and the availability block beside it are ESTIMATES, written when the work is
+// scheduled - at `laundry-start-cleaning` for a return, at reception for a first-time
+// drop-off. Nothing reacted to the moment the studio said it was actually finished, so a
+// studio that beat its own configured turnaround kept the garment off the market until the
+// estimate ran out, on a garment physically on the rack.
+//
+// Two transitions state "the work is done", one per cleaning flow, and both release.
+// ---------------------------------------------------------------------------
+describe('laundry-transaction-status: releasing the cleaning hold', () => {
+  // A sibling describe, so it does not inherit the main suite's beforeEach - and the shared
+  // jest config sets `resetMocks: true`, which wipes the module-level implementations too.
+  beforeEach(() => {
+    authorizeLaundryCaller.mockResolvedValue(laundryUser);
+    handleError.mockImplementation((res, e) => {
+      res.status(e.status || 500);
+      res.json({ error: e.statusText || 'error' });
+      res.end();
+    });
+    reconcileBufferWindow.mockResolvedValue({
+      exceptionIds: ['exc-1'],
+      segmentsCreated: 1,
+      alreadyBlocked: false,
+      unblockedOverlaps: [],
+    });
+    writeBufferExceptionIds.mockResolvedValue([]);
+  });
+
+  const HELD = {
+    readyAt: '2026-10-09T00:00:00.000Z',
+    bufferExceptionIds: ['exc-1', 'exc-2'],
+  };
+
+  // A listing carrying a pending wash, which is what makes the release observable: the
+  // endpoint skips the `readyAt` clear entirely when there is nothing stored.
+  const heldListing = {
+    ...listing,
+    attributes: {
+      ...listing.attributes,
+      metadata: { ...listing.attributes.metadata, readyAt: HELD.readyAt },
+    },
+  };
+
+  const setupHeld = ({ lastTransition, metadata = {}, ...rest } = {}) => {
+    const sdk = setupSdk({ lastTransition, metadata, ...rest });
+    // The transaction's listing, as `transactions.show` includes it.
+    sdk.show.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          data: transactionEntity(lastTransition, metadata),
+          included: [heldListing, booking, customer],
+        },
+      })
+    );
+    return sdk;
+  };
+
+  const readyAtClears = listingsUpdate =>
+    listingsUpdate.mock.calls.filter(call => call[0]?.metadata?.readyAt === null);
+
+  it('clears readyAt and deletes the reserved days when the post-rental wash is marked done', async () => {
+    const { listingsUpdate, exceptionDelete } = setupHeld({
+      lastTransition: 'transition/laundry-start-cleaning',
+      metadata: { [BUFFER_EXCEPTION_IDS_KEY]: HELD.bufferExceptionIds },
+    });
+
+    const res = await run({ transactionId: TX_ID, status: 'available-for-booking' });
+
+    expect(res.statusCode).toBe(200);
+    // null, not a date: the field means "when the wash it is in RIGHT NOW finishes", and
+    // there is no longer such a wash. Absent lets the floor fall back to today.
+    expect(readyAtClears(listingsUpdate)).toHaveLength(1);
+    expect(exceptionDelete.mock.calls.map(call => call[0].id)).toEqual(['exc-1', 'exc-2']);
+  });
+
+  it('does the same for the FIRST wash, which is the other half of the gap', async () => {
+    // Estimated at reception (api/laundry-receive-garment.js) rather than at start-cleaning,
+    // and previously left to expire on its own. Fixing only one flow is the asymmetry this
+    // change exists to avoid.
+    const { listingsUpdate } = setupHeld({ lastTransition: 'transition/laundry-receive-from-provider' });
+
+    const res = await run({ transactionId: TX_ID, status: 'ready-for-pickup' });
+
+    expect(res.statusCode).toBe(200);
+    expect(readyAtClears(listingsUpdate)).toHaveLength(1);
+  });
+
+  it('releases nothing on a step that is not the end of a wash', async () => {
+    // `laundry-mark-ready` (the plain one) sends a garment out to its renter after an
+    // ordinary return - its wash ended at mark-available, which has already released.
+    const { listingsUpdate, exceptionDelete } = setupHeld({
+      lastTransition: 'transition/accept',
+      metadata: { [BUFFER_EXCEPTION_IDS_KEY]: HELD.bufferExceptionIds },
+    });
+
+    await run({ transactionId: TX_ID, status: 'ready-for-pickup' });
+
+    expect(readyAtClears(listingsUpdate)).toHaveLength(0);
+    expect(exceptionDelete).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when the garment was not holding a wash', async () => {
+    // No stored readyAt and no recorded exceptions: a completion on a garment whose hold was
+    // already released, or that never had one (`cleaningDays: 0`). It must not cost a write.
+    const { listingsUpdate, exceptionDelete } = setupSdk({
+      lastTransition: 'transition/laundry-start-cleaning',
+    });
+
+    const res = await run({ transactionId: TX_ID, status: 'available-for-booking' });
+
+    expect(res.statusCode).toBe(200);
+    expect(readyAtClears(listingsUpdate)).toHaveLength(0);
+    expect(exceptionDelete).not.toHaveBeenCalled();
+  });
+
+  it('still answers 200, and still frees the rest, when one exception will not delete', async () => {
+    // Already deleted by hand, say. The transition has happened; a block that survives is a
+    // garment bookable a few days later than it could be, which is not worth a 500 over a
+    // step the studio would then have to repeat.
+    const exceptionDeleteImpl = jest.fn(({ id }) =>
+      id === 'exc-1' ? Promise.reject(new Error('gone')) : Promise.resolve({ data: {} })
+    );
+    const { exceptionDelete } = setupHeld({
+      lastTransition: 'transition/laundry-start-cleaning',
+      metadata: { [BUFFER_EXCEPTION_IDS_KEY]: HELD.bufferExceptionIds },
+      exceptionDeleteImpl,
+    });
+
+    const res = await run({ transactionId: TX_ID, status: 'available-for-booking' });
+
+    expect(res.statusCode).toBe(200);
+    expect(exceptionDelete).toHaveBeenCalledTimes(2);
+    expect(res.body.data.released).toEqual({
+      readyAtCleared: true,
+      released: ['exc-2'],
+      failed: ['exc-1'],
+    });
+  });
+
+  it('still answers 200 when the readyAt clear itself fails', async () => {
+    const { exceptionDelete } = setupHeld({
+      lastTransition: 'transition/laundry-start-cleaning',
+      metadata: { [BUFFER_EXCEPTION_IDS_KEY]: HELD.bufferExceptionIds },
+      listingsUpdateImpl: jest.fn(() => Promise.reject(new Error('boom'))),
+    });
+
+    const res = await run({ transactionId: TX_ID, status: 'available-for-booking' });
+
+    expect(res.statusCode).toBe(200);
+    // The days still come back: one failed write must not abandon the other half.
+    expect(exceptionDelete).toHaveBeenCalledTimes(2);
+  });
+
+  // THE RECORD THAT MAKES THE RELEASE POSSIBLE AT ALL. The cleaning block used to create its
+  // exceptions and throw the ids away, so nothing could safely delete those days again - an
+  // owner's own `seats: 0` exception is indistinguishable from ours to the API.
+  it('records the ids of the days the wash reserved', async () => {
+    reconcileBufferWindow.mockResolvedValue({ exceptionIds: ['exc-9'], segmentsCreated: 1 });
+    setupSdk({ lastTransition: 'transition/laundry-confirm-return' });
+
+    await run({ transactionId: TX_ID, status: 'cleaning-in-progress', cleaningDays: 2 });
+
+    expect(writeBufferExceptionIds).toHaveBeenCalledTimes(1);
+    expect(writeBufferExceptionIds.mock.calls[0][0].exceptionIds).toEqual(['exc-9']);
+    // The TRANSACTION ENTITY, not a bare id: writeBufferExceptionIds merges with what is
+    // already recorded, and a stub without metadata would silently drop the accept-time
+    // buffer's own ids and make that block unsweepable.
+    expect(writeBufferExceptionIds.mock.calls[0][0].transaction?.attributes).toBeDefined();
   });
 });

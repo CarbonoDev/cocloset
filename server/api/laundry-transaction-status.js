@@ -13,7 +13,11 @@ const {
 } = require('../api-util/coclosetBookingProcess');
 const { buildTicketCode } = require('../api-util/ticketCodeHelpers');
 const { resolveTurnaroundDays } = require('../api-util/availabilityHelpers');
-const { reconcileBufferWindow } = require('../api-util/availabilityBuffer');
+const {
+  BUFFER_EXCEPTION_IDS_KEY,
+  reconcileBufferWindow,
+  writeBufferExceptionIds,
+} = require('../api-util/availabilityBuffer');
 const {
   LISTING_CODE_KEY,
   MAX_CODE_LENGTH,
@@ -33,6 +37,7 @@ const {
   maxCleaningDaysBeforeNextBooking,
   computeReadiness,
   writeCustodyMetadata,
+  releaseCleaningHold,
 } = require('../api-util/listingCustody');
 const { notifyReturnScheduled, notifyCleaningRequired } = require('../api-util/laundryMailer');
 const log = require('../log');
@@ -301,6 +306,10 @@ const handleRealReturn = ({
   turnaroundSource,
   requestedCleaningDays,
   transactionId,
+  // The transaction entity as the transition left it. Needed only so the exception-id record
+  // below MERGES with whatever the accept-time buffer already put there rather than replacing
+  // it - dropping those ids would make the booking's own block unattributed and unsweepable.
+  transaction,
   txIdForLog,
 }) => {
   if (!listing) {
@@ -380,6 +389,7 @@ const handleRealReturn = ({
         maxCleaningDays,
         cappedByNextBooking,
         uncappedCleaningDays,
+        transaction,
         txIdForLog,
       });
     });
@@ -399,6 +409,7 @@ const writeReadiness = ({
   maxCleaningDays,
   cappedByNextBooking,
   uncappedCleaningDays,
+  transaction,
   txIdForLog,
 }) => {
   const { readyAt, blockWindow } = computeReadiness({ returnedAt, cleaningDays, timeZone });
@@ -435,6 +446,30 @@ const writeReadiness = ({
             end: blockWindow.end,
             txIdForLog,
           })
+        )
+        .then(bufferResult =>
+          // REMEMBER WHAT WE BLOCKED, so it can be given back.
+          //
+          // These ids were created and discarded. That is the same mistake the accept-time
+          // buffer made and already fixed for itself (see the comment on writeBufferExceptionIds
+          // in api-util/availabilityBuffer.js): an owner's own `seats: 0` exception is
+          // indistinguishable from ours to the API, so without this record nothing can safely
+          // delete these days again - not listing-availability-sweep, and not the early-finish
+          // release this record exists for (releaseCleaningHold in api-util/listingCustody.js).
+          //
+          // Same key, so the sweep picks these up too and a cancelled rental stops leaving its
+          // wash days blocked as well.
+          //
+          // Fire-and-continue like its sibling: the window IS blocked, which is the part that
+          // protects the garment. Losing the record costs the release, not the block.
+          writeBufferExceptionIds({
+            integrationSdk,
+            transaction,
+            exceptionIds: bufferResult?.exceptionIds,
+            txIdForLog,
+          })
+            .catch(() => null)
+            .then(() => bufferResult)
         )
         .catch(e => {
           log.error(e, 'laundry-return-buffer-failed', { txId: txIdForLog });
@@ -737,6 +772,43 @@ module.exports = (req, res) => {
             turnaroundSource: laundry.turnaroundSource,
             requestedCleaningDays: cleaningDaysCheck.value,
             transactionId: txIdForLog,
+            transaction: updated,
+            txIdForLog,
+          })
+        : Promise.resolve(null);
+
+      // ...AND THE WASH IS OVER WHEN THE STUDIO SAYS IT IS OVER.
+      //
+      // `readyAt` and the block above are estimates, computed from the studio's configured
+      // turnaround at the moment the work is SCHEDULED. Until now nothing reacted to the
+      // moment it actually finished, so a studio that beat its own turnaround kept the garment
+      // off the market until the estimate ran out. These are the two transitions where the
+      // studio states the work is done, and they are the two ends of the same gap:
+      //
+      //   - LAUNDRY_MARK_AVAILABLE              - the post-rental wash, estimated at
+      //                                           LAUNDRY_START_CLEANING just above.
+      //   - LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING - the FIRST wash, estimated at reception
+      //                                           (api/laundry-receive-garment.js).
+      //
+      // Deliberately both, in one change: fixing only one would leave the two cleaning flows
+      // behaving differently for the same reason, which is the asymmetry this was held back
+      // for last round.
+      //
+      // NOT LAUNDRY_MARK_READY (the plain one). That is a garment going out to the renter who
+      // booked it after an ordinary return - its wash finished at mark-available, which has
+      // already run and already released. Releasing again would be a second write that finds
+      // nothing, but naming it here would also imply it is a cleaning-completion step, and it
+      // is not.
+      const isCleaningDone =
+        transition === TRANSITIONS.LAUNDRY_MARK_AVAILABLE ||
+        transition === TRANSITIONS.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING;
+
+      const releasePromise = isCleaningDone
+        ? releaseCleaningHold({
+            integrationSdk,
+            listing,
+            exceptionIds: storedMetadata?.[BUFFER_EXCEPTION_IDS_KEY],
+            log,
             txIdForLog,
           })
         : Promise.resolve(null);
@@ -744,7 +816,7 @@ module.exports = (req, res) => {
       // The custody/readiness work IS awaited (unlike the mail) so its result can
       // be reported, but handleRealReturn swallows its own failures - a calendar
       // or listing write must not fail a transition that already happened.
-      return returnPromise.then(returnResult => {
+      return Promise.all([returnPromise, releasePromise]).then(([returnResult, releaseResult]) => {
         res
           .status(200)
           .set('Content-Type', 'application/json')
@@ -764,6 +836,10 @@ module.exports = (req, res) => {
                 ? { damageReported: storedMetadata.damageReported }
                 : {}),
               ...(returnResult ? { custody: returnResult } : {}),
+              // What the completion actually gave back, for the same reason `custody` is
+              // reported: a studio that finishes early is told the garment is free again,
+              // rather than having to notice it on the calendar later.
+              ...(releaseResult ? { released: releaseResult } : {}),
             },
           })
           .end();

@@ -336,6 +336,98 @@ const writeCustodyMetadata = ({
     .then(() => metadata);
 };
 
+/**
+ * THE WASH IS ACTUALLY FINISHED: drop the hold that was reserved for it.
+ *
+ * `readyAt` and the availability block beside it are both ESTIMATES, written when the work
+ * is scheduled - at `laundry-start-cleaning` for a return (see writeReadiness in
+ * api/laundry-transaction-status.js) and at reception for a first-time drop-off (see
+ * api/laundry-receive-garment.js). Both are computed from the studio's configured turnaround,
+ * which is how long it USUALLY takes. Nothing has ever reacted to the moment it actually
+ * finishes, so a studio that beats its own turnaround kept the garment off the market until
+ * the estimate ran out - by days, on a garment physically sitting on the rack.
+ *
+ * WHY THE FIELD IS DELETED RATHER THAN MOVED. `readyAt` means "when the wash this garment is
+ * in RIGHT NOW finishes, if any" (see resolveReadyAt in src/util/cleaningFloor.js). Once the
+ * studio says it is done there is no such wash, so the honest value is no value: the floor
+ * then falls back to the initial-cleaning rule, which is already spent for a garment at its
+ * studio, and the garment is bookable today. Writing "today" instead would be a date that
+ * claims to be a wash deadline and is not.
+ *
+ * AND TODAY, NOT TOMORROW. The "+1 day" in the estimate exists because a wash booked now
+ * cannot also be done now - it is a rule about work not yet started. This runs at the opposite
+ * end: the work is finished and the garment is on the rack, which is exactly the case
+ * same-day booking was built for.
+ *
+ * ONLY EXCEPTIONS THIS PLATFORM RECORDED ARE DELETED, via the ids kept on the transaction. An
+ * owner's own `seats: 0` exception is indistinguishable from ours to the API - same listing,
+ * same shape - so "delete the blocks over these dates" is not something that can be done
+ * safely without the record. Same rule, and the same key, as api/listing-availability-sweep.js.
+ * A transaction with no recorded ids simply has nothing to release: either its hold predates
+ * the record being kept, or there was no hold (`cleaningDays: 0`).
+ *
+ * NOTHING HERE MAY FAIL THE CALLER. It runs after a transition that has already succeeded, so
+ * every failure is logged and swallowed - the same contract writeReadiness has. A hold that
+ * survives is a garment bookable a few days later than it could be; a 500 is a step the studio
+ * has to do again.
+ *
+ * @param {Object} params
+ * @param {Object} params.integrationSdk
+ * @param {Object} params.listing - the listing entity
+ * @param {Array<string>} [params.exceptionIds] - from transaction.metadata, see
+ *   BUFFER_EXCEPTION_IDS_KEY in api-util/availabilityBuffer.js
+ * @param {Object} params.log
+ * @param {string} [params.txIdForLog]
+ * @returns {Promise<{readyAtCleared: boolean, released: Array<string>, failed: Array<string>}>}
+ */
+const releaseCleaningHold = ({ integrationSdk, listing, exceptionIds, log, txIdForLog }) => {
+  const listingId = listing?.id;
+  const hadReadyAt = !!listing?.attributes?.metadata?.readyAt;
+  const ids = Array.isArray(exceptionIds) ? exceptionIds.filter(id => typeof id === 'string') : [];
+
+  // `null` DELETES an extended-data key rather than storing null - the property this relies on,
+  // verified against Dev and already load-bearing in writeCustodyMetadata's `handedBackAt` and
+  // `pickupToken` clears. Skipped entirely when there is nothing stored, so a garment that
+  // never had a hold does not take a write on every completion.
+  const clearReadyAt = hadReadyAt
+    ? Promise.resolve()
+        .then(() =>
+          integrationSdk.listings.update({ id: listingId, metadata: { readyAt: null } })
+        )
+        .then(() => true)
+        .catch(e => {
+          log.error(e, 'release-cleaning-hold-ready-at-failed', { txId: txIdForLog });
+          return false;
+        })
+    : Promise.resolve(false);
+
+  return clearReadyAt.then(readyAtCleared => {
+    const released = [];
+    const failed = [];
+
+    // Sequential, and each delete caught on its own: one exception that will not go (already
+    // deleted by hand, say) must not abandon the rest of the window.
+    return ids
+      .reduce(
+        (chain, id) =>
+          chain.then(() =>
+            integrationSdk.availabilityExceptions
+              .delete({ id }, { expand: false })
+              .then(() => released.push(id))
+              .catch(e => {
+                log.error(e, 'release-cleaning-hold-exception-delete-failed', {
+                  txId: txIdForLog,
+                  exceptionId: id,
+                });
+                failed.push(id);
+              })
+          ),
+        Promise.resolve()
+      )
+      .then(() => ({ readyAtCleared, released, failed }));
+  });
+};
+
 // Whole days, for the one subtraction above. Both operands are midnights in the same zone by
 // construction, so this cannot drift across a DST boundary the way adding hours would.
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
@@ -349,4 +441,5 @@ module.exports = {
   findActiveTransactions,
   assertNoActiveTransaction,
   writeCustodyMetadata,
+  releaseCleaningHold,
 };
