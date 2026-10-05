@@ -196,7 +196,9 @@
   "BookingReviewReminder.Subject": "A quick reminder: review your {listingTitle} rental",
   "BookingReviewReminder.Title": "How did everything go?",
   "TransactionEmails.AccessibleLinkText": "Can't click the button? Here's a link for your convenience:",
-  "TransactionEmails.HandoverQrOnOrderPage": "Your pickup and return QR code is on your order page. Open it with the button below and show the code at the counter.",
+  "TransactionEmails.HandoverQrAlt": "Your pickup and return QR code",
+  "TransactionEmails.HandoverQrCaption": "Show this code at the counter. The same code works for the pickup and for the return.",
+  "TransactionEmails.HandoverQrFallback": "No image above? Your email app is blocking pictures. Open your order page for the code, or read this reference out at the counter:",
   "TransactionEmails.MembershipParagraph": "You're a member of {marketplaceName}. If you no longer want to receive these emails, please contact {marketplaceName} team.",
   "TransactionEmails.SignOff": "Warmly,",
   "TransactionEmails.SignOffTeam": "The {marketplaceName} Team"

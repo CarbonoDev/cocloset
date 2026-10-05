@@ -1376,37 +1376,29 @@ describe('cocloset-booking email templates', () => {
   });
 
   // -----------------------------------------------------------------------
-  // THE QR LEFT THE EMAILS (Jonathan, 2026-10-05: "Quita el QR").
+  // The handover QR, in the mail itself (Jonathan, 2026-09-02).
   //
-  // It used to be embedded as `<img src=".../api/transaction-qr?id=...">` in the
-  // four mails that send the renter to a counter (2026-09-02). What ended that
-  // was the ready-for-pickup rewrite: its new copy says "click View Order
-  // Details to reveal your QR code" and its button says "View Order Details &
-  // QR Code", while the mail went on printing the code right underneath - it
-  // sent the renter to fetch something it had already handed them. Asked which
-  // way to resolve it, the client chose to take the code out.
+  // `<img src="{{marketplace.url}}/api/transaction-qr?id=...">`. That endpoint
+  // renders PNG bytes and takes no authentication by design (server/api/
+  // transaction-qr.js: it encodes the handover URL for an id the caller already
+  // supplied, so there is nothing for an auth check to protect) - which is what
+  // makes it renderable from a mail client at all.
   //
-  // So the code now lives in exactly one place, the order page
-  // (HandoverQrMaybe), and every mail that needs it points there. That is also
-  // the stricter position: `server/api/transaction-qr.js` takes no
-  // authentication by design, so an embedded code travelled through mail
-  // relays and sat in inboxes; behind the order page it is at least reached
-  // through a session.
-  //
-  // These four templates are still the ones that mention the code at all - the
+  // WHICH TEMPLATES, AND WHY NOT ALL OF THEM. The QR belongs in the mails that
+  // send the renter to a counter, and only while the code is still live: the
   // customer's window is accepted -> ready-for-pickup -> picked-up -> overdue
-  // (HANDOVER_QR_CUSTOMER_VISIBLE_STATES) - they now name it instead of drawing
-  // it.
+  // (HANDOVER_QR_CUSTOMER_VISIBLE_STATES). A code printed in the owner's mail,
+  // or in one that arrives after the garment is back, is at best noise.
   // -----------------------------------------------------------------------
-  describe('the QR is not in any email, and the mails that need it say where it is', () => {
-    const COUNTER_TEMPLATES = [
+  describe('the QR is in the mails that send the renter to a counter', () => {
+    const QR_TEMPLATES = [
       'booking-ready-for-pickup',
       'booking-pickup-reminder',
       'booking-return-reminder',
       'booking-late-return',
     ];
 
-    const hasQr = name => read(name, 'html.html').includes('/api/transaction-qr');
+    const hasQr = name => read(name, 'html.html').includes('/api/transaction-qr?id=');
 
     // Every :notifications entry that sends a given template, as { role }.
     // Comments are stripped first - this section is mostly prose, and a
@@ -1426,42 +1418,30 @@ describe('cocloset-booking email templates', () => {
         .map(chunk => ({ role: chunk.match(/:to :actor\.role\/([a-z]+)/)[1] }));
     };
 
-    it('is embedded in no template at all', () => {
-      // Whole directory, not a list: the point of removing it is that it does
-      // not come back in a template written later either.
-      expect(fs.readdirSync(TEMPLATES_DIR).filter(hasQr)).toEqual([]);
-    });
-
-    it('leaves behind none of the keys the embedded card used', () => {
-      // A key still referenced with no entry in email-texts.en.json renders
-      // Console's absence as a raw default; one left in the file with no
-      // template is copy nobody can reach. The keys-and-defaults test catches
-      // both in general - this names the three that went with the card.
-      const all = fs
-        .readdirSync(TEMPLATES_DIR)
-        .map(name => read(name, 'html.html'))
-        .join('\n');
-
-      ['HandoverQrAlt', 'HandoverQrCaption', 'HandoverQrFallback'].forEach(suffix =>
-        expect(all).not.toContain(`TransactionEmails.${suffix}`)
-      );
-    });
-
-    it.each(COUNTER_TEMPLATES)('%s still tells the renter where the code is', name => {
-      // Removing the picture without saying where it went would leave the three
-      // reminders with no mention of the code at all - and "the laundry will
-      // scan it back in" is not an instruction anyone can follow without one.
+    it.each(QR_TEMPLATES)('%s renders the code', name => {
       const html = read(name, 'html.html');
 
-      expect(html).toMatch(/HandoverQrOnOrderPage|StepPickupInstructions/);
-      // ...and the button that gets them there.
-      expect(html).toContain('{{marketplace.url}}/order/{{url-encode id}}/');
+      expect(hasQr(name)).toEqual(true);
+      // The id has to be url-encoded like every other use of it in these
+      // templates, and the image needs an alt - a QR is a picture of a string,
+      // so an empty alt tells a screen reader nothing at all.
+      expect(html).toContain('/api/transaction-qr?id={{url-encode id}}');
+      expect(html).toContain('TransactionEmails.HandoverQrAlt');
+      // Mail clients block remote images by default, so the code cannot be the
+      // only way through: the reference is printed as text underneath.
+      expect(html).toContain('TransactionEmails.HandoverQrFallback');
+    });
+
+    it('is in no other template', () => {
+      const others = fs.readdirSync(TEMPLATES_DIR).filter(name => !QR_TEMPLATES.includes(name));
+
+      expect(others.filter(hasQr)).toEqual([]);
     });
 
     it('goes only to the customer, and only while the code is still live', () => {
       // The states those four mails are sent in, read off the process rather
       // than asserted from memory.
-      COUNTER_TEMPLATES.forEach(template => {
+      QR_TEMPLATES.forEach(template => {
         const entries = notificationEntriesForTemplate(template);
         expect(entries.length).toBeGreaterThan(0);
         entries.forEach(entry => expect(entry.role).toEqual('customer'));
