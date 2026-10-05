@@ -891,6 +891,7 @@
   "LaundryOpsPage.status.ready-for-pickup": "Ready for renter pickup",
   "LaundryOpsPage.status.returned": "Returned",
   "LaundryOpsPage.status.reviewed": "Completed",
+  "LaundryOpsPage.tab.active-orders": "Active orders",
   "LaundryOpsPage.tab.all": "All",
   "LaundryOpsPage.tab.completed": "Completed",
   "LaundryOpsPage.tab.damaged": "Damaged",

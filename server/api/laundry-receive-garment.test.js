@@ -112,6 +112,25 @@ describe('laundry-receive-garment', () => {
     expect(custodyCall.metadata.handedBackAt).toBeNull();
   });
 
+  // THE "PICKUP TODAY" BUG (Jonathan, 2026-10-02): before this, reception left `readyAt`
+  // untouched and `onLaundry: true` with no other floor, so a garment received five minutes
+  // earlier read as collectable immediately - nothing distinguished "just walked in" from
+  // "clean and sitting on the rack". See the header comment on why this estimate, made now,
+  // is what closes that gap.
+  it('writes an estimated readyAt, so the garment does not read as collectable before its wash even starts', async () => {
+    const before = new Date();
+    const { listingsUpdate } = setup();
+    await run();
+
+    const custodyCall = listingsUpdate.mock.calls[0][0];
+    const readyAt = new Date(custodyCall.metadata.readyAt);
+
+    expect(Number.isNaN(readyAt.getTime())).toBe(false);
+    // "The wash starts tomorrow, not today" (computeReadiness) - even with the shortest
+    // possible turnaround, readyAt can never land on the reception instant itself.
+    expect(readyAt.getTime()).toBeGreaterThan(before.getTime());
+  });
+
   it('fires transition/laundry-receive-from-provider, moving the rental into initial-cleaning (2026-09-21)', async () => {
     // This used to fire no transition at all, to avoid the cost of a flex-cli process push for
     // a first pass - see the comment at the top of laundry-receive-garment.js for why that

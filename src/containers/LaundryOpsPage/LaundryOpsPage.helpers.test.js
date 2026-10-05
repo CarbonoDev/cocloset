@@ -166,8 +166,44 @@ describe('LaundryOpsPage.helpers', () => {
       ['damaged', ['e']],
       ['pickup-today', ['f']],
       ['returns-today', ['g']],
+      ['active-orders', ['a', 'b', 'd', 'e', 'f', 'g']],
     ])('%s selects the right rows', (tab, expectedIds) => {
       expect(filterByTab(rows, tab, NOW).map(r => r.id)).toEqual(expectedIds);
+    });
+
+    describe('active-orders', () => {
+      // "Items que un renter ha pedido" (Jonathan, 2026-10-02) - a garment committed to a
+      // live rental, from acceptance through to the studio marking it available again.
+      it.each([
+        'accepted',
+        'initial-cleaning',
+        'ready-for-pickup',
+        'picked-up',
+        'overdue',
+        'returned',
+        'cleaning',
+      ])('includes a garment in state %s', state => {
+        expect(filterByTab([row({ id: 'x', state })], 'active-orders', NOW)).toHaveLength(1);
+      });
+
+      it('excludes a rental that has already finished', () => {
+        expect(filterByTab([row({ id: 'x', state: 'delivered' })], 'active-orders', NOW)).toHaveLength(
+          0
+        );
+      });
+
+      it('excludes a row with no committed transaction at all', () => {
+        // `/api/laundry-orders` already drops pre-accept transactions (OPS_LAST_TRANSITIONS),
+        // so a null state here means a pure-inventory row (design §8) - nothing a renter has
+        // ordered.
+        expect(
+          filterByTab(
+            [row({ id: 'x', rowType: 'listing', readinessStatus: 'stored' })],
+            'active-orders',
+            NOW
+          )
+        ).toHaveLength(0);
+      });
     });
 
     // Bug (Jonathan, 2026-09-30): "Returns today" matched on `bookingEnd` alone, so a
