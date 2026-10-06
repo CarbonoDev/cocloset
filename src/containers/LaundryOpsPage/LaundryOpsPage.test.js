@@ -122,7 +122,7 @@ describe('LaundryOpsPage', () => {
       expect(screen.queryByText('LaundryOpsPage.table.qr')).not.toBeInTheDocument();
 
       // Nor in the expanded detail panel, which used to carry a large one.
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       expect(
         screen.queryByRole('img', { name: 'HandoverQrCode.imageAlt' })
       ).not.toBeInTheDocument();
@@ -163,7 +163,7 @@ describe('LaundryOpsPage', () => {
         />
       );
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       await user.click(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1'));
 
       expect(screen.getByText('LaundryOpsPage.detail.transactionId')).toBeInTheDocument();
@@ -175,11 +175,31 @@ describe('LaundryOpsPage', () => {
       const user = userEvent.setup();
       render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       expect(screen.getByText('LaundryOpsPage.detail.transactionId')).toBeInTheDocument();
 
-      await user.click(screen.getByText('LaundryOpsPage.table.close'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.close' }));
       expect(screen.queryByText('LaundryOpsPage.detail.transactionId')).not.toBeInTheDocument();
+    });
+
+    // Jonathan, 2026-10-06: replace the "Open"/"Close" words with chevron icons. The words
+    // still have to exist SOMEWHERE - aria-label, not visible text - or the control loses its
+    // accessible name for anyone not reading it visually.
+    it('shows a chevron icon instead of the words, and flips it with the row', async () => {
+      const user = userEvent.setup();
+      render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
+
+      const toggle = screen.getByRole('button', { name: 'LaundryOpsPage.table.open' });
+      expect(toggle.querySelector('svg')).toBeInTheDocument();
+      expect(screen.queryByText('LaundryOpsPage.table.open')).not.toBeInTheDocument();
+      expect(screen.queryByText('LaundryOpsPage.table.close')).not.toBeInTheDocument();
+
+      await user.click(toggle);
+
+      const closeToggle = screen.getByRole('button', { name: 'LaundryOpsPage.table.close' });
+      expect(closeToggle.querySelector('svg')).toBeInTheDocument();
+      expect(screen.queryByText('LaundryOpsPage.table.open')).not.toBeInTheDocument();
+      expect(screen.queryByText('LaundryOpsPage.table.close')).not.toBeInTheDocument();
     });
 
     // ---------------------------------------------------------------------------
@@ -204,7 +224,7 @@ describe('LaundryOpsPage', () => {
         />
       );
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       const input = document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1');
       expect(input).toBeInTheDocument();
@@ -232,7 +252,7 @@ describe('LaundryOpsPage', () => {
         />
       );
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1')).toHaveValue('RACK 12');
     });
@@ -251,7 +271,7 @@ describe('LaundryOpsPage', () => {
         />
       );
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(document.getElementById('LaundryOrderRow.laundryCode.tx:tx-1')).toBeNull();
       expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).toBeNull();
@@ -272,7 +292,7 @@ describe('LaundryOpsPage', () => {
         />
       );
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       // The days moved one step later (Jonathan, 2026-09-08) - "Process for Cleaning" is the
       // garment joining the queue, and the next button is the work starting.
@@ -297,7 +317,7 @@ describe('LaundryOpsPage', () => {
         />
       );
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(screen.getByText('LaundryOpsPage.action.cleaning-in-progress')).toBeInTheDocument();
       expect(document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1')).toBeInTheDocument();
@@ -318,7 +338,7 @@ describe('LaundryOpsPage', () => {
         />
       );
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       await user.click(screen.getByText('LaundryOpsPage.action.garment-received'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
@@ -330,7 +350,7 @@ describe('LaundryOpsPage', () => {
       const user = userEvent.setup();
       render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       expect(screen.getByText('LaundryOpsPage.detail.transactionId')).toBeInTheDocument();
     });
 
@@ -350,7 +370,7 @@ describe('LaundryOpsPage', () => {
         />
       );
 
-      await user.click(screen.getByText('LaundryOpsPage.table.open'));
+      await user.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       const input = document.getElementById('LaundryOrderRow.cleaningDays.tx:tx-1');
 
       expect(input).toHaveValue(3);
@@ -454,7 +474,7 @@ describe('LaundryOpsPage', () => {
   describe('status advance', () => {
     it('offers only the action that is legal from the current state', async () => {
       render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       // State is 'picked-up', so the only legal laundry move is confirming
       // the return.
@@ -469,7 +489,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
       );
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(
@@ -490,7 +510,7 @@ describe('LaundryOpsPage', () => {
           onAdvanceStatus={onAdvanceStatus}
         />
       );
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       await userEvent.click(screen.getByText('LaundryOpsPage.action.returned'));
 
       expect(onAdvanceStatus).toHaveBeenCalledWith(expect.objectContaining({ status: 'returned' }));
@@ -501,7 +521,7 @@ describe('LaundryOpsPage', () => {
       render(
         <LaundryOpsPageComponent {...baseProps} tab="orders" onAdvanceStatus={onAdvanceStatus} />
       );
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       const checkbox = screen.getByRole('checkbox');
       await userEvent.click(checkbox);
@@ -522,7 +542,7 @@ describe('LaundryOpsPage', () => {
     it('does not offer a damage report at a non-returned step', async () => {
       const rows = [orderRow({ state: 'cleaning', cleaningPhase: 'pending-cleaning' })];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
@@ -540,7 +560,7 @@ describe('LaundryOpsPage', () => {
           onAdvanceStatus={onAdvanceStatus}
         />
       );
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       // Cleared first: the box now arrives pre-filled with the studio's configured
       // turnaround, so typing into it would append rather than replace.
       await userEvent.clear(screen.getByRole('spinbutton'));
@@ -566,7 +586,7 @@ describe('LaundryOpsPage', () => {
           onAdvanceStatus={onAdvanceStatus}
         />
       );
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.click(screen.getByText('LaundryOpsPage.action.cleaning-in-progress'));
 
@@ -583,7 +603,7 @@ describe('LaundryOpsPage', () => {
           onAdvanceStatus={onAdvanceStatus}
         />
       );
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       await userEvent.clear(screen.getByRole('spinbutton'));
       await userEvent.type(screen.getByRole('spinbutton'), '0');
       await userEvent.click(screen.getByText('LaundryOpsPage.action.cleaning-in-progress'));
@@ -594,7 +614,7 @@ describe('LaundryOpsPage', () => {
     it('does not offer the cleaning-days field outside the cleaning step', async () => {
       const rows = [orderRow({ state: 'accepted' })];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
     });
@@ -605,7 +625,7 @@ describe('LaundryOpsPage', () => {
       // offer "start cleaning" as its own step - and warn that it pays out.
       const rows = [orderRow({ state: 'returned' })];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(screen.getByText('LaundryOpsPage.action.pending-cleaning')).toBeInTheDocument();
       expect(screen.getByText('LaundryOpsPage.detail.payoutWarning')).toBeInTheDocument();
@@ -613,7 +633,7 @@ describe('LaundryOpsPage', () => {
 
     it('does not warn about payout on steps that do not pay out', async () => {
       render(<LaundryOpsPageComponent {...baseProps} tab="orders" />);
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(screen.queryByText('LaundryOpsPage.detail.payoutWarning')).not.toBeInTheDocument();
     });
@@ -621,7 +641,7 @@ describe('LaundryOpsPage', () => {
     it('offers no advance action once the chain is finished', async () => {
       const rows = [orderRow({ state: 'delivered' })];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(screen.getByText('LaundryOpsPage.detail.noAdvance')).toBeInTheDocument();
       expect(screen.queryByText('LaundryOpsPage.action.returned')).not.toBeInTheDocument();
@@ -638,7 +658,7 @@ describe('LaundryOpsPage', () => {
         }),
       ];
       render(<LaundryOpsPageComponent {...baseProps} orders={rows} tab="orders" />);
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(screen.getByText('LaundryOpsPage.detail.noAdvance')).toBeInTheDocument();
     });
@@ -867,7 +887,7 @@ describe('LaundryOpsPage', () => {
         { withPortals: true }
       );
 
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
       await handBack();
 
       expect(onHandBackToOwner).toHaveBeenCalledWith({ listingId: 'listing-1' });
@@ -883,7 +903,7 @@ describe('LaundryOpsPage', () => {
         />
       );
 
-      await userEvent.click(screen.getByText('LaundryOpsPage.table.open'));
+      await userEvent.click(screen.getByRole('button', { name: 'LaundryOpsPage.table.open' }));
 
       expect(screen.queryByText('HandBackToOwnerButton.trigger')).not.toBeInTheDocument();
     });
