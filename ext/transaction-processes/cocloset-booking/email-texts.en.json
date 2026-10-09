@@ -21,6 +21,7 @@
   "BookingAcceptedRequest.Title": "Your booking for the {listingTitle} rental from {providerDisplayName} is confirmed.",
   "BookingAcceptedRequest.QrInfo": "Show the order QR code at the counter to retrieve your rental–clean and ready for you!",
   "BookingAcceptedRequest.TotalPrice": "Total price",
+  "BookingAcceptedRequest.Greeting": "Hi {firstName},",
   "BookingCancelled.Content": "Your rental of {listingTitle} from {dateStart, date, ::YYYYMMMd} to {dateEnd, date, ::YYYYMMMd} has been cancelled, and you have been refunded in full.",
   "BookingCancelled.Cta": "View order details",
   "BookingCancelled.NextSteps": "This email is about the money, not the garment: it does not tell you where the garment is or what happens to it next. The order page has the latest status the laundry recorded. If anything about this rental is unclear, contact {marketplaceName}.",
