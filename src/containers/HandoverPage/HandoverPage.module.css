@@ -56,6 +56,7 @@
 .instruction {
   composes: marketplaceDefaultFontStyles from global;
   color: var(--coclosetInkMuted);
+  white-space: pre-line;
   margin: 0 0 24px 0;
 }
 
