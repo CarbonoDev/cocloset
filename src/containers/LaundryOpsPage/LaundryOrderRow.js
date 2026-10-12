@@ -10,7 +10,12 @@ import {
 } from '../../util/laundryStatuses';
 import { isDeliverToday, isLate } from './LaundryOpsPage.helpers';
 import { getBookingOverdueDays } from '../../util/dates';
-import { HandBackToOwnerButton, InlineTextButton, PrimaryButton } from '../../components';
+import {
+  HandBackToOwnerButton,
+  IconArrowHead,
+  InlineTextButton,
+  PrimaryButton,
+} from '../../components';
 
 import { statusTone } from './LaundryOpsPage.helpers';
 import css from './LaundryOpsPage.module.css';
@@ -268,14 +273,18 @@ const LaundryOrderRow = props => {
             type="button"
             aria-expanded={isOpen}
             aria-controls={detailRowId}
+            // The words moved to aria-label rather than disappearing: there is no visible text
+            // left for a screen reader to read once the icon replaces it, and the accessible
+            // name still has to say what the control does, not just that it exists.
+            aria-label={intl.formatMessage({
+              id: isOpen ? 'LaundryOpsPage.table.close' : 'LaundryOpsPage.table.open',
+            })}
             onClick={e => {
               e.stopPropagation();
               toggleOpen();
             }}
           >
-            <FormattedMessage
-              id={isOpen ? 'LaundryOpsPage.table.close' : 'LaundryOpsPage.table.open'}
-            />
+            <IconArrowHead direction={isOpen ? 'up' : 'down'} size="small" />
           </InlineTextButton>
         </td>
       </tr>
