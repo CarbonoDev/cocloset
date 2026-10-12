@@ -30,18 +30,31 @@
             </tr>
             <tr style="width:100%">
               <td>
-                <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingAcceptedRequest.Title" "Your booking request was accepted"}}</h1>
+                <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingAcceptedRequest.Title" "Your booking for the {listingTitle} rental from {providerDisplayName} is confirmed." listingTitle=listing.title providerDisplayName=provider.display-name}}</h1>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.Greeting" "Hi {firstName}," firstName=customer.first-name}}</p>
                 {{#each tx-line-items}}{{#eq "line-item/hour" code}}
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionHourly" "{providerDisplayName} has accepted your booking request for the {listingTitle} from {dateStart,date,::jmmYYYYMMMd} to {dateEnd,date,::jmmYYYYMMMd}." dateStart=booking.start dateEnd=booking.end listingTitle=listing.title providerDisplayName=provider.display-name}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionHourly" "The item is available for pickup on {dateStart,date,::YYYYMMMd} at {laundryName}, {laundryAddress}." dateStart=booking.start laundryName=listing.public-data.assignedLaundryName laundryAddress=listing.public-data.pickupNeighborhood}}</p>
                 {{/eq}}{{#eq "line-item/day" code}}
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionDaily" "{providerDisplayName} has accepted your booking request for the {listingTitle} from {dateStart,date,::YYYYMMMd} to {dateEnd,date,::YYYYMMMd}." dateStart=booking.start dateEnd=(date-transform booking.end days=-1) listingTitle=listing.title providerDisplayName=provider.display-name}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionDaily" "The item is available for pickup on {dateStart,date,::YYYYMMMd} at {laundryName}, {laundryAddress}." dateStart=booking.start laundryName=listing.public-data.assignedLaundryName laundryAddress=listing.public-data.pickupNeighborhood}}</p>
                 {{/eq}}{{#eq "line-item/night" code}}
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionDaily" "{providerDisplayName} has accepted your booking request for the {listingTitle} from {dateStart,date,::YYYYMMMd} to {dateEnd,date,::YYYYMMMd}." dateStart=booking.start dateEnd=booking.end listingTitle=listing.title providerDisplayName=provider.display-name}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionDaily" "The item is available for pickup on {dateStart,date,::YYYYMMMd} at {laundryName}, {laundryAddress}." dateStart=booking.start laundryName=listing.public-data.assignedLaundryName laundryAddress=listing.public-data.pickupNeighborhood}}</p>
                 {{/eq}}
                 {{#eq "line-item/fixed" code}}
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionFixed" "{providerDisplayName} has accepted your booking request for the {listingTitle} from {dateStart,date,::jmmYYYYMMMd} to {dateEnd,date,::jmmYYYYMMMd}." dateStart=booking.start dateEnd=booking.end listingTitle=listing.title providerDisplayName=provider.display-name}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionFixed" "The item is available for pickup on {dateStart,date,::YYYYMMMd} at {laundryName}, {laundryAddress}." dateStart=booking.start laundryName=listing.public-data.assignedLaundryName laundryAddress=listing.public-data.pickupNeighborhood}}</p>
                 {{/eq}}{{/each}}
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.BookingBreakdown" "Your card has been charged for ${amount,number,::.00}. Here's the booking breakdown." amount=payin-total.amount currency=payin-total.currency}}</p>
+                {{#if listing.metadata.onLaundry}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.QrInfo" "Show the order QR code at the counter to retrieve your rental–clean and ready for you!"}}</p>
+                <table style="margin:24px 0 0;background-color:#FAF7F2;border-radius:8px" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                  <tbody>
+                    <tr>
+                      <td align="center" style="padding:20px 16px">
+                        <img src="{{marketplace.url}}/api/transaction-qr?id={{url-encode id}}" width="180" height="180" alt="{{t "TransactionEmails.HandoverQrAlt" "Your pickup and return QR code"}}" style="display:block;margin:0 auto;border:0;width:180px;height:180px;max-width:100%" />
+                        <p style="font-size:13px;line-height:1.5;margin:8px 0 0;color:#767676">{{t "TransactionEmails.HandoverQrFallback" "No image above? Your email app is blocking pictures. Open your order page for the code, or read this reference out at the counter:"}} <span style="font-family:monospace;color:#484848">{{id}}</span></p>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                {{/if}}
                 <table style="color:#484848;font-size:16px;line-height:1.4;background-color:#FFF;padding:8px 24px;border-radius:8px;border:1px solid;border-color:#E1E1E1;margin:24px 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
                     <tr>

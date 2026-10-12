@@ -537,11 +537,7 @@
    :from :state/delivered,
    :to :state/reviewed}],
  :notifications
- [{:name :notification/booking-new-request,
-   :on :transition/confirm-payment,
-   :to :actor.role/provider,
-   :template :booking-new-request}
-  {:name :notification/booking-accepted-request,
+ [{:name :notification/booking-accepted-request,
    :on :transition/accept,
    :to :actor.role/customer,
    :template :booking-accepted-request}

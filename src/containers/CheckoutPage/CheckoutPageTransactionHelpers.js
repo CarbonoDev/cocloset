@@ -4,7 +4,7 @@ import { ensureStripeCustomer, ensureTransaction } from '../../util/data';
 import { minutesBetween } from '../../util/dates';
 import { formatMoney } from '../../util/currency';
 import { NEGOTIATION_PROCESS_NAME, resolveLatestProcessName } from '../../transactions/transaction';
-import { autoAcceptBooking } from '../../util/api';
+import { autoAcceptBooking, lenderNewRequest } from '../../util/api';
 import { storeData } from './CheckoutPageSessionHelpers';
 
 /**
@@ -387,6 +387,11 @@ export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
             // nothing a customer could do about this one. Swallowing is also what keeps the
             // await above safe - a slow or broken acceptance must never turn into a failed
             // payment on screen.
+          })
+          .then(() => {
+            // After auto-accept has settled, so the server reads the final state. Not awaited.
+            lenderNewRequest({ transactionId: order?.id?.uuid }).catch(() => {});
+            return order;
           })
           // Whatever happened to the acceptance, the caller gets the ORDER back. The redirect is
           // built from its id, and the accepted entity is not what the next page reads anyway -

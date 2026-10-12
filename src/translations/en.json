@@ -783,6 +783,7 @@
   "InboxPage.panel.deletedBorrower": "a deleted user",
   "InboxPage.panel.laundryCode": "Ticket #{code}",
   "InboxPage.panel.openFull": "Open the full rental →",
+  "InboxPage.panel.takeAction": "Accept or Decline Request →",
   "InboxPage.panel.openQr": "Open the handover code, larger",
   "InboxPage.panel.pickupBody": "Show your handover code at the counter to collect the garment.",
   "InboxPage.panel.pickupBodyLender": "Show your handover code at the counter when you drop off your item at the cleaners.",

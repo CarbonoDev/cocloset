@@ -30,6 +30,7 @@ const listingAvailabilitySweep = require('./api/listing-availability-sweep');
 const laundryListingsRefresh = require('./api/laundry-listings-refresh');
 const listingLaundryAssignment = require('./api/listing-laundry-assignment');
 const listingInitialCleaning = require('./api/listing-initial-cleaning');
+const lenderNewRequest = require('./api/lender-new-request');
 const laundryAddress = require('./api/laundry-address');
 const laundryOrders = require('./api/laundry-orders');
 const transactionQr = require('./api/transaction-qr');
@@ -153,6 +154,9 @@ router.get('/listing-pickup-status', listingPickupStatus);
 // server/api/listing-pickup-confirm.js for why both doors exist rather than one replacing
 // the other.
 router.post('/listing-pickup-confirm', listingPickupConfirm);
+
+//
+router.post('/lender-new-request', lenderNewRequest);
 
 // Accept a paid booking on the operator's behalf when the garment is already at its laundry -
 // there is nobody to wait for. Uses `transition/operator-accept`, which the process has always

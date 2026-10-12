@@ -346,7 +346,7 @@ const InboxTransactionPanel = props => {
         name={transactionRole === 'customer' ? 'OrderDetailsPage' : 'SaleDetailsPage'}
         params={{ id: transaction.id?.uuid }}
       >
-        <FormattedMessage id="InboxPage.panel.openFull" />
+        <FormattedMessage id={transactionRole === 'provider' && stateData?.processState === "preauthorized" && !isAtLaundry ? "InboxPage.panel.takeAction" : "InboxPage.panel.openFull" } />
       </NamedLink>
 
       {/* GATED TOO, NOT JUST THE BUTTON.

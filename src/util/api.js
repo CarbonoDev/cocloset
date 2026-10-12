@@ -468,3 +468,14 @@ export const fetchLaundryOrders = () => {
 export const updateLaundryAddress = body => {
   return post('/api/laundry-address', body);
 };
+
+// Tell the lender a customer has requested their garment, but only when the garment is NOT
+// at a laundry (the server decides; when it is, auto-accept already handles the booking).
+// A trigger, not an instruction: the body carries only the transaction id, and the server
+// reads the recipient, garment, dates and amounts itself. Idempotent, so a retry costs nothing.
+//
+// Returns `{ data: { notified, reason? } }`. Callers must treat failures as non-fatal.
+// See `server/api/lender-new-request.js`.
+export const lenderNewRequest = body => {
+  return post('/api/lender-new-request', body);
+};
