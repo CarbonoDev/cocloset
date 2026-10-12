@@ -2,11 +2,12 @@ import React from 'react';
 import '@testing-library/jest-dom';
 
 import { types as sdkTypes } from '../../util/sdkLoader';
-import { renderWithProviders as render, testingLibrary } from '../../util/testHelpers';
+import { renderWithProviders, testingLibrary } from '../../util/testHelpers';
 import { createOwnListing, fakeIntl } from '../../util/testData';
 
 import { ManageListingsPageComponent } from './ManageListingsPage';
 
+const render = ui => renderWithProviders(ui);
 const { screen, fireEvent } = testingLibrary;
 const { Money } = sdkTypes;
 const noop = () => null;
@@ -17,7 +18,7 @@ const dayAvailabilityPlan = {
   entries: [{ dayOfWeek: 'mon', startTime: '00:00', endTime: '00:00', seats: 1 }],
 };
 
-const bookableListing = (id, metadataOverrides = {}) =>
+const bookableListing = (id, metadataOverrides = {}, otherOverrides = {}) =>
   createOwnListing(id, {
     title: `${id} title`,
     price: new Money(1000, 'USD'),
@@ -28,6 +29,7 @@ const bookableListing = (id, metadataOverrides = {}) =>
       transactionProcessAlias: 'default-booking/release-1',
       unitType: 'hour',
     },
+    ...otherOverrides,
   });
 
 // WHY THIS FILE EXISTS
@@ -39,8 +41,8 @@ const bookableListing = (id, metadataOverrides = {}) =>
 // listing left to release it from. Jonathan (2026-09-29): block the close in that case,
 // don't just warn after the fact. These tests are about the block actually firing -
 // handleCloseListing intercepts the click before it ever reaches onCloseListing.
-const renderPage = (props = {}) =>
-  render(
+const renderPage = (props = {}, renderFn = render) =>
+  renderFn(
     <ManageListingsPageComponent
       listings={[]}
       pagination={{ totalItems: 0, totalPages: 1 }}
@@ -54,6 +56,10 @@ const renderPage = (props = {}) =>
       {...props}
     />
   );
+
+// PickupQrModal renders through #portal-root (usePortal on Modal) - without withPortals
+// it mounts to nothing and the assertions below would pass or fail for the wrong reason.
+const renderPageWithPortals = props => renderPage(props, ui => renderWithProviders(ui, { withPortals: true }));
 
 describe('ManageListingsPageComponent - close listing guard', () => {
   it('closes a listing normally when the garment is not at the laundry', () => {
@@ -134,5 +140,40 @@ describe('ManageListingsPageComponent - close listing guard', () => {
     renderPage({ listings: [], pagination: { totalItems: 0, totalPages: 1 } });
 
     expect(screen.queryByText('LaundryPickupNotice.heading')).not.toBeInTheDocument();
+  });
+
+  it('drops the "go to Your listings" step on its own pickup notice - the provider is already there', () => {
+    const listing = bookableListing('garment-on-laundry', { onLaundry: true });
+
+    renderPage({ listings: [listing], pagination: { totalItems: 1, totalPages: 1 } });
+
+    expect(screen.getByText('LaundryPickupNotice.heading')).toBeInTheDocument();
+    expect(screen.queryByText('LaundryPickupNotice.step1')).not.toBeInTheDocument();
+  });
+});
+
+describe('ManageListingsPageComponent - pickup QR modal', () => {
+  it('opens the pickup QR modal for the clicked listing, and closes it again', () => {
+    const listing = bookableListing(
+      'garment-on-laundry',
+      { onLaundry: true },
+      { state: 'closed' }
+    );
+
+    renderPageWithPortals({ listings: [listing], pagination: { totalItems: 1, totalPages: 1 } });
+
+    expect(screen.queryByText('PickupQrModal.title')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('ManageListingCard.viewPickupQr'));
+
+    expect(screen.getByText('PickupQrModal.title')).toBeInTheDocument();
+    expect(screen.getByAltText('PickupQrCode.imageAlt')).toHaveAttribute(
+      'src',
+      `/api/listing-pickup-qr?id=${listing.id.uuid}`
+    );
+
+    fireEvent.click(screen.getByText('PickupQrModal.close'));
+
+    expect(screen.queryByText('PickupQrModal.title')).not.toBeInTheDocument();
   });
 });

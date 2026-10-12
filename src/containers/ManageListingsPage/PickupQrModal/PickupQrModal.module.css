@@ -1,0 +1,29 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  composes: marketplaceModalBaseStyles from global;
+  padding-top: 70px;
+
+  @media (--viewportMedium) {
+    flex-basis: 567px;
+  }
+}
+
+.modalContent {
+  flex-grow: 1;
+  text-align: center;
+}
+
+.modalTitle {
+  composes: marketplaceModalTitleStyles from global;
+}
+
+.modalMessage {
+  composes: marketplaceModalParagraphStyles from global;
+}
+
+.qr {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
