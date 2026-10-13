@@ -15,6 +15,7 @@ import {
 import { NO_ACCESS_PAGE_POST_LISTINGS } from '../../util/urlHelpers';
 import { propTypes } from '../../util/types';
 import { isErrorNoPermissionToPostListings } from '../../util/errors';
+import { checkListingPauseEligibility } from '../../util/api';
 import { isScrollingDisabled, manageDisableScrolling } from '../../ducks/ui.duck';
 
 import {
@@ -161,20 +162,22 @@ export const ManageListingsPageComponent = props => {
     setCloseBlockedListingId(null);
   };
 
-  // A listing whose garment is still at the laundry partner (onLaundry) can't be
-  // closed yet - the provider needs to collect it first, otherwise it's stranded
-  // with no active transaction pointing at it and no listing to release it from.
+  // A listing whose garment is part of a still-active transaction can't be paused
+  // yet - it would be stranded with no listing to release it from. `onLaundry`
+  // alone is NOT that signal (per listingCustody.js, a garment is onLaundry for
+  // every idle period between rentals, not just mid-transaction), so the real
+  // question - is a transaction actually active - is asked server-side, where
+  // the Integration API can answer it. Any failure here (a real 409, or anything
+  // else going wrong) is treated as "don't pause" - see checkListingPauseEligibility.
   const handleCloseListing = listingId => {
-    const targetListing = listings.find(l => l.id.uuid === listingId.uuid);
-    const isOnLaundry = targetListing?.attributes?.metadata?.onLaundry === true;
-
-    if (isOnLaundry) {
-      setCloseBlockedListingId(listingId);
-      return;
-    }
-
-    setCloseBlockedListingId(null);
-    onCloseListing(listingId);
+    checkListingPauseEligibility({ listingId: listingId.uuid })
+      .then(() => {
+        setCloseBlockedListingId(null);
+        onCloseListing(listingId);
+      })
+      .catch(() => {
+        setCloseBlockedListingId(listingId);
+      });
   };
 
   const handleOpenListing = listingId => {

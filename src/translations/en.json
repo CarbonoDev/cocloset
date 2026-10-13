@@ -1117,7 +1117,7 @@
   "ManageAccountPage.heading": "Manage account",
   "ManageAccountPage.title": "Manage account",
   "ManageListingCard.actionFailed": "Oops, something went wrong. Please refresh the page and try again.",
-  "ManageListingCard.closeBlockedOnLaundry": "This garment is still at your laundry partner. Collect it before you can pause this listing.",
+  "ManageListingCard.closeBlockedOnLaundry": "This garment is part of an active rental right now. Wait for it to finish before pausing this listing.",
   "ManageListingCard.closeListing": "Pause Listing",
   "ManageListingCard.closeListingText": "Pause Listing",
   "ManageListingCard.closeListingTextOr": "{closeListingLink}",

@@ -29,6 +29,7 @@ const laundryReceiveGarment = require('./api/laundry-receive-garment');
 const listingAvailabilitySweep = require('./api/listing-availability-sweep');
 const laundryListingsRefresh = require('./api/laundry-listings-refresh');
 const listingLaundryAssignment = require('./api/listing-laundry-assignment');
+const listingPauseEligibility = require('./api/listing-pause-eligibility');
 const listingInitialCleaning = require('./api/listing-initial-cleaning');
 const lenderNewRequest = require('./api/lender-new-request');
 const laundryAddress = require('./api/laundry-address');
@@ -112,6 +113,10 @@ router.post('/listing-custody-status', listingCustodyStatus);
 // now? Read the header of server/api/listing-laundry-assignment.js before relying
 // on it - it is a server-side DECISION, not a write gate.
 router.post('/listing-laundry-assignment', listingLaundryAssignment);
+// May this listing be paused right now? See server/api/listing-pause-eligibility.js -
+// the only question worth asking server-side is whether a transaction is still
+// active, not whether the garment happens to be at the laundry.
+router.post('/listing-pause-eligibility', listingPauseEligibility);
 router.get('/laundry-orders', laundryOrders);
 
 // A laundry's OWN address, and only the address - the rest of the studio profile

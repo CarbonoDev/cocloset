@@ -390,6 +390,24 @@ export const assignListingLaundry = body => {
   return post('/api/listing-laundry-assignment', body);
 };
 
+// May a listing be paused right now? Session-gated (owner only), Integration-API-
+// backed - see server/api/listing-pause-eligibility.js for why: the only thing
+// worth checking (an active transaction) is a field the browser cannot read
+// itself. `metadata.onLaundry` is NOT the right signal - it is true for most idle
+// garments, since "stored at the laundry between rentals" is this marketplace's
+// resting state.
+//
+// Rejects with 409 when a transaction is still active for this listing (or
+// could not be verified) - callers should treat ANY rejection as "do not pause".
+// On success, the actual pause still goes through the ordinary
+// `sdk.ownListings.close()` call - this endpoint only answers the question, it
+// does not perform the write.
+//
+// Body: { listingId }
+export const checkListingPauseEligibility = body => {
+  return post('/api/listing-pause-eligibility', body);
+};
+
 // How many days must pass before this garment can be rented, according to its
 // assigned laundry's CURRENT turnaround.
 //
