@@ -189,6 +189,9 @@ const LinkToStockOrAvailabilityTab = props => {
  * @param {function} props.onToggleMenu - The function to toggle the menu
  * @param {boolean} [props.isCloseBlockedOnLaundry] - Whether closing was blocked because the
  *   garment is still at the laundry partner (listing.attributes.metadata.onLaundry === true)
+ * @param {function} [props.onShowPickupQr] - Opens the pickup QR modal for this listing
+ * @param {boolean} [props.hasActiveTransaction] - Shows the active-rental badge and hides
+ *   "Pause Listing" - see ManageListingsPage.js's bulk eligibility read
  * @returns {JSX.Element} Manage listing card component
  */
 export const ManageListingCard = props => {
@@ -209,6 +212,8 @@ export const ManageListingCard = props => {
     onDiscardDraft,
     onToggleMenu,
     isCloseBlockedOnLaundry,
+    onShowPickupQr,
+    hasActiveTransaction,
   } = props;
   const classes = classNames(rootClassName || css.root, className);
   const currentListing = ensureOwnListing(listing);
@@ -241,6 +246,8 @@ export const ManageListingCard = props => {
           onCloseListing={onCloseListing}
           onOpenListing={onOpenListing}
           onDiscardDraft={onDiscardDraft}
+          onShowPickupQr={onShowPickupQr}
+          hasActiveTransaction={hasActiveTransaction}
         />
 
         <CardMenu
@@ -249,6 +256,7 @@ export const ManageListingCard = props => {
           inProgressListingId={actionsInProgressListingId}
           onToggleMenu={onToggleMenu}
           onCloseListing={onCloseListing}
+          hasActiveTransaction={hasActiveTransaction}
         />
 
         {thisListingInProgress ? (
