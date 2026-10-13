@@ -30,6 +30,7 @@ const listingAvailabilitySweep = require('./api/listing-availability-sweep');
 const laundryListingsRefresh = require('./api/laundry-listings-refresh');
 const listingLaundryAssignment = require('./api/listing-laundry-assignment');
 const listingPauseEligibility = require('./api/listing-pause-eligibility');
+const listingsActiveTransactions = require('./api/listings-active-transactions');
 const listingInitialCleaning = require('./api/listing-initial-cleaning');
 const lenderNewRequest = require('./api/lender-new-request');
 const laundryAddress = require('./api/laundry-address');
@@ -117,6 +118,10 @@ router.post('/listing-laundry-assignment', listingLaundryAssignment);
 // the only question worth asking server-side is whether a transaction is still
 // active, not whether the garment happens to be at the laundry.
 router.post('/listing-pause-eligibility', listingPauseEligibility);
+// Bulk, UI-only read for the same question, across every listing on a page load at
+// once - see server/api/listings-active-transactions.js. Not authoritative; the
+// eligibility check above is still what the actual pause click is gated on.
+router.get('/listings-active-transactions', listingsActiveTransactions);
 router.get('/laundry-orders', laundryOrders);
 
 // A laundry's OWN address, and only the address - the rest of the studio profile

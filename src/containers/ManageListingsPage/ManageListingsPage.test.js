@@ -4,12 +4,13 @@ import '@testing-library/jest-dom';
 jest.mock('../../util/api', () => ({
   ...jest.requireActual('../../util/api'),
   checkListingPauseEligibility: jest.fn(),
+  fetchListingsActiveTransactions: jest.fn(),
 }));
 
 import { types as sdkTypes } from '../../util/sdkLoader';
 import { renderWithProviders, testingLibrary } from '../../util/testHelpers';
 import { createOwnListing, fakeIntl } from '../../util/testData';
-import { checkListingPauseEligibility } from '../../util/api';
+import { checkListingPauseEligibility, fetchListingsActiveTransactions } from '../../util/api';
 
 import { ManageListingsPageComponent } from './ManageListingsPage';
 
@@ -37,6 +38,12 @@ const bookableListing = (id, metadataOverrides = {}, otherOverrides = {}) =>
     },
     ...otherOverrides,
   });
+
+beforeEach(() => {
+  // Safe default for every test that isn't specifically about the active-transaction
+  // badge - an empty map means no badge and no hidden menu item anywhere.
+  fetchListingsActiveTransactions.mockResolvedValue({ data: { active: {} } });
+});
 
 // WHY THIS FILE EXISTS
 //
@@ -177,6 +184,64 @@ describe('ManageListingsPageComponent - close listing guard', () => {
 
     expect(screen.getByText('LaundryPickupNotice.heading')).toBeInTheDocument();
     expect(screen.queryByText('LaundryPickupNotice.step1')).not.toBeInTheDocument();
+  });
+});
+
+// Jonathan (2026-10-13), as a follow-up to the guard above: rather than let a provider
+// click "Pause" and find out from an error, show it up front - a badge on the card, and
+// no "Pause Listing" option to click at all. This reads from the bulk, UI-only
+// fetchListingsActiveTransactions, which is advisory: the actual authority for whether a
+// pause is allowed stays checkListingPauseEligibility, checked again at click time.
+describe('ManageListingsPageComponent - active rental badge', () => {
+  it('shows the badge and hides "Pause Listing" for a listing the bulk read reports active', async () => {
+    const listing = bookableListing('garment-renting', { onLaundry: true });
+    fetchListingsActiveTransactions.mockResolvedValue({
+      data: { active: { [listing.id.uuid]: true } },
+    });
+
+    renderPage({ listings: [listing], pagination: { totalItems: 1, totalPages: 1 } });
+
+    expect(
+      await screen.findByText('ManageListingCard.activeRentalBadge')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('ManageListingCard.closeListing')).not.toBeInTheDocument();
+  });
+
+  it('shows no badge and offers "Pause Listing" normally for a listing the bulk read reports idle', async () => {
+    const listing = bookableListing('garment-idle', { onLaundry: true });
+    fetchListingsActiveTransactions.mockResolvedValue({
+      data: { active: { [listing.id.uuid]: false } },
+    });
+
+    renderPage({ listings: [listing], pagination: { totalItems: 1, totalPages: 1 } });
+
+    await waitFor(() => expect(fetchListingsActiveTransactions).toHaveBeenCalled());
+    expect(screen.queryByText('ManageListingCard.activeRentalBadge')).not.toBeInTheDocument();
+    expect(screen.getByText('ManageListingCard.closeListing')).toBeInTheDocument();
+  });
+
+  it('asks about published listings only, not drafts or already-paused ones', () => {
+    const published = bookableListing('garment-published', {}, { state: 'published' });
+    const closed = bookableListing('garment-closed', {}, { state: 'closed' });
+    const draft = bookableListing('garment-draft', {}, { state: 'draft' });
+
+    renderPage({
+      listings: [published, closed, draft],
+      pagination: { totalItems: 3, totalPages: 1 },
+    });
+
+    expect(fetchListingsActiveTransactions).toHaveBeenCalledWith([published.id.uuid]);
+  });
+
+  it('defaults to no badge and a normal menu when the bulk read fails - the click-time check is still the real gate', async () => {
+    const listing = bookableListing('garment-unknown', { onLaundry: true });
+    fetchListingsActiveTransactions.mockRejectedValue(new Error('network error'));
+
+    renderPage({ listings: [listing], pagination: { totalItems: 1, totalPages: 1 } });
+
+    await waitFor(() => expect(fetchListingsActiveTransactions).toHaveBeenCalled());
+    expect(screen.queryByText('ManageListingCard.activeRentalBadge')).not.toBeInTheDocument();
+    expect(screen.getByText('ManageListingCard.closeListing')).toBeInTheDocument();
   });
 });
 

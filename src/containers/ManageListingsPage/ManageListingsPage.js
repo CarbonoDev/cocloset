@@ -13,9 +13,9 @@ import {
   isLaundryUser,
 } from '../../util/userHelpers';
 import { NO_ACCESS_PAGE_POST_LISTINGS } from '../../util/urlHelpers';
-import { propTypes } from '../../util/types';
+import { propTypes, LISTING_STATE_PUBLISHED } from '../../util/types';
 import { isErrorNoPermissionToPostListings } from '../../util/errors';
-import { checkListingPauseEligibility } from '../../util/api';
+import { checkListingPauseEligibility, fetchListingsActiveTransactions } from '../../util/api';
 import { isScrollingDisabled, manageDisableScrolling } from '../../ducks/ui.duck';
 
 import {
@@ -116,6 +116,7 @@ export const ManageListingsPageComponent = props => {
   const [discardDraftModalId, setDiscardDraftModalId] = useState(null);
   const [closeBlockedListingId, setCloseBlockedListingId] = useState(null);
   const [pickupQrListing, setPickupQrListing] = useState(null);
+  const [activeTransactionByListingId, setActiveTransactionByListingId] = useState({});
   const history = useHistory();
   const routeConfiguration = useRouteConfiguration();
   const config = useConfiguration();
@@ -213,6 +214,40 @@ export const ManageListingsPageComponent = props => {
   const hasListingAtLaundry =
     listingsAreLoaded && listings.some(l => l?.attributes?.metadata?.onLaundry === true);
 
+  // Published listings only - a draft/closed/pendingApproval/outOfStock card never
+  // offers "Pause Listing" in the first place (see CardMenu's own getMenuItems), so
+  // there is nothing for this badge to inform there either.
+  const pausableListingIds = listingsAreLoaded
+    ? listings
+        .filter(l => l?.attributes?.state === LISTING_STATE_PUBLISHED)
+        .map(l => l.id.uuid)
+    : [];
+  // Joined to a stable string so the effect only re-fires when the actual set of ids
+  // changes, not on every render (a new array from the same ids would otherwise be a
+  // "different" dependency every time).
+  const pausableListingIdsKey = pausableListingIds.join(',');
+
+  useEffect(() => {
+    if (pausableListingIds.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    fetchListingsActiveTransactions(pausableListingIds)
+      .then(response => {
+        if (!cancelled) {
+          setActiveTransactionByListingId(prev => ({ ...prev, ...response.data.active }));
+        }
+      })
+      .catch(() => {
+        // UI-only read: leave the previous (or absent) badge state rather than block
+        // anything the page otherwise rendered successfully.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pausableListingIdsKey]);
+
   const loadingResults = (
     <div className={css.messagePanel}>
       <H3 as="h2" className={css.heading}>
@@ -292,6 +327,7 @@ export const ManageListingsPageComponent = props => {
                     !!closeBlockedListingId && closeBlockedListingId.uuid === l.id.uuid
                   }
                   onShowPickupQr={setPickupQrListing}
+                  hasActiveTransaction={activeTransactionByListingId[l.id.uuid] === true}
                   renderSizes={renderSizes}
                 />
               </li>

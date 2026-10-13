@@ -408,6 +408,23 @@ export const checkListingPauseEligibility = body => {
   return post('/api/listing-pause-eligibility', body);
 };
 
+// Which of these listings have a genuinely active transaction right now? The bulk,
+// UI-only twin of checkListingPauseEligibility above - for showing an "Active rental"
+// badge (and hiding "Pause Listing") on every card on ManageListingsPage at once,
+// rather than only finding out from a 409 after the provider clicks.
+//
+// NOT authoritative: a missing key in the response means "could not determine", not
+// "not active" - treat both as "don't show the badge". The real gate a pause click is
+// checked against is still checkListingPauseEligibility, every time.
+//
+// Returns `{ data: { active: { [listingId]: boolean } } }`.
+export const fetchListingsActiveTransactions = listingIds => {
+  const params = new URLSearchParams({ ids: listingIds.join(',') });
+  return request(`/api/listings-active-transactions?${params.toString()}`, {
+    method: methods.GET,
+  });
+};
+
 // How many days must pass before this garment can be rented, according to its
 // assigned laundry's CURRENT turnaround.
 //
