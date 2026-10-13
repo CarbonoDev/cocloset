@@ -541,6 +541,21 @@
    :on :transition/accept,
    :to :actor.role/customer,
    :template :booking-accepted-request}
+  ;; DELIBERATELY :on :transition/accept, NOT :transition/operator-accept. A garment that is
+  ;; already at its studio (the operator-accept / auto-accept path) has nothing to drop off, so
+  ;; this reminder must never reach that provider - keying it to the manual-accept transition
+  ;; gets that for free, the same way the laundry-mark-ready / -from-initial-cleaning split
+  ;; already uses :on to separate two paths that share a :to state. 3 days before booking-start
+  ;; is 1 day before the 48h drop-off deadline shown in the inbox (InboxTransactionPanel's
+  ;; `recommendedDropTime`) - a scheduled notification is cancelled once the transaction leaves
+  ;; :state/accepted, so a provider who already dropped the garment off never gets this.
+  {:name :notification/booking-dropoff-reminder,
+   :on :transition/accept,
+   :at
+   {:fn/minus
+    [{:fn/timepoint [:time/booking-start]} {:fn/period ["P3D"]}]},
+   :to :actor.role/provider,
+   :template :booking-dropoff-reminder}
   {:name :notification/booking-operator-accepted-request-to-customer,
    :on :transition/operator-accept,
    :to :actor.role/customer,

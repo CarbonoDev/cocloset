@@ -1187,24 +1187,48 @@ describe('cocloset-booking email templates', () => {
       // renders "ready for pickup at ." to the renter.
       expect(withStudio).toContain('laundryName=listing.public-data.assignedLaundryName');
       expect(withStudio).toContain('BookingReadyForPickup.Content"');
-      expect(withStudio).toContain('BookingReadyForPickup.StepVisit"');
 
       expect(withoutStudio).toContain('BookingReadyForPickup.ContentNoLaundry');
-      expect(withoutStudio).toContain('BookingReadyForPickup.StepVisitNoLaundry');
       // The fallback arm must not carry a placeholder it is never given.
       expect(withoutStudio).not.toContain('{laundryName}');
     });
 
-    it('gives the two pickup steps and a CTA that says the QR is behind it', () => {
+    // THE TWO BULLETS BECAME ONE PARAGRAPH (`3fdcdc9db`, 2026-09-29): "head to the studio
+    // during business hours" + "show your QR at the counter" are now a single instruction
+    // that sends the renter to the order page for the code. The bullets' three keys
+    // (StepVisit / StepVisitNoLaundry / StepQr) are gone from the template AND from
+    // email-texts.en.json, so the branch above no longer splits on them either.
+    it('gives one pickup instruction and a CTA that says the QR is behind it', () => {
       const copy = copyOf('booking-ready-for-pickup');
 
       expect(html()).toContain('BookingReadyForPickup.StepsTitle');
+      expect(html()).toContain('BookingReadyForPickup.StepPickupInstructions');
       expect(copy).toMatch(/How to pick it up:/);
-      expect(copy).toMatch(/during regular business hours/i);
+      expect(copy).toMatch(/click View Order Details to reveal your QR code/i);
       // The QR lives on the order page (HandoverQrMaybe), which is where the
       // button goes - so the button is allowed to promise it.
-      expect(copy).toMatch(/QR code at the counter/i);
       expect(html()).toMatch(/BookingReadyForPickup\.Cta" "View Order Details & QR Code"/);
+    });
+
+    // The retired bullets must not come back by halves: a key left in the template with no
+    // entry in email-texts.en.json renders Console's absence as the raw default, and a key
+    // left in the json with no template is copy nobody can reach. The keys-and-defaults test
+    // above catches both directions in general; this names the three that were just removed,
+    // because a revert of the commented-out block would otherwise look harmless.
+    it('no longer carries the bullet-list keys, in the template or in the texts file', () => {
+      ['StepVisit', 'StepVisitNoLaundry', 'StepQr'].forEach(suffix => {
+        expect(html()).not.toContain(`BookingReadyForPickup.${suffix}"`);
+      });
+    });
+
+    // Handlebars does not know what an HTML comment is: `{{t ...}}` inside `<!-- -->` is still
+    // evaluated, and the result is still delivered - so commenting copy out ships it to the
+    // renter as a hidden comment rather than removing it. The bullets spent a week in exactly
+    // that state (`3fdcdc9db` commented them rather than deleting).
+    it('ships no copy inside an HTML comment', () => {
+      const comments = html().match(/<!--[\s\S]*?-->/g) || [];
+
+      comments.forEach(comment => expect(comment).not.toContain('{{'));
     });
 
     it('routes every string through {{t}} with its own key prefix', () => {
@@ -1371,6 +1395,7 @@ describe('cocloset-booking email templates', () => {
       'booking-ready-for-pickup',
       'booking-pickup-reminder',
       'booking-return-reminder',
+      'booking-return-due-today',
       'booking-late-return',
     ];
 
