@@ -13,6 +13,7 @@ import {
   filterBySearch,
   dashboardCounts,
   sortRows,
+  statusTone,
 } from './LaundryOpsPage.helpers';
 
 const NOW = new Date('2026-07-31T12:00:00.000Z');
@@ -426,6 +427,29 @@ describe('LaundryOpsPage.helpers', () => {
       const snapshot = rows.map(r => r.id);
       sortRows(rows);
       expect(rows.map(r => r.id)).toEqual(snapshot);
+    });
+  });
+
+  describe('statusTone', () => {
+    // Regression: statusTone used to key off `row.laundryStatus`, a field
+    // /api/laundry-orders stopped sending once the server-side
+    // `laundryStatus` metadata field was removed - every transaction row's
+    // tone silently fell through to 'Neutral' no matter its real state.
+    it('colours every stage of the Jonathan 5-point flow', () => {
+      expect(statusTone(row({ state: 'accepted' }))).toBe('Amber'); // Pending Drop Off
+      expect(statusTone(row({ state: 'initial-cleaning' }))).toBe('Blue'); // Cleaning in Progress
+      expect(statusTone(row({ state: 'ready-for-pickup' }))).toBe('Green'); // Ready for Pickup
+      expect(statusTone(row({ state: 'picked-up' }))).toBe('Violet'); // Rental in Progress
+    });
+
+    it('still colours cleaning sub-phases and readiness-only rows', () => {
+      expect(statusTone(cleaningRow('pending-cleaning'))).toBe('Blue');
+      expect(statusTone(cleaningRow('cleaning-in-progress'))).toBe('Blue');
+      expect(statusTone(row({ state: null, readinessStatus: 'incoming' }))).toBe('Amber');
+    });
+
+    it('falls back to Neutral for a freshly-assigned, statusless listing', () => {
+      expect(statusTone(row({ state: null, readinessStatus: null }))).toBe('Neutral');
     });
   });
 });

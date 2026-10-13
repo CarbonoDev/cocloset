@@ -42,6 +42,15 @@ describe('LaundryPickupNotice', () => {
     expect(screen.getByText('LaundryPickupNotice.toggleShow')).toBeInTheDocument();
     expect(screen.queryByText('LaundryPickupNotice.heading')).not.toBeInTheDocument();
   });
+
+  it('drops the "go to Your listings" step when includeNavigationStep is false - ManageListingsPage is already there', () => {
+    render(<LaundryPickupNotice includeNavigationStep={false} />);
+
+    expect(screen.queryByText('LaundryPickupNotice.step1')).not.toBeInTheDocument();
+    expect(screen.getByText('LaundryPickupNotice.step2')).toBeInTheDocument();
+    expect(screen.getByText('LaundryPickupNotice.step3')).toBeInTheDocument();
+    expect(screen.getByText('LaundryPickupNotice.step4')).toBeInTheDocument();
+  });
 });
 
 describe('LaundryPickupNotice: the QR', () => {

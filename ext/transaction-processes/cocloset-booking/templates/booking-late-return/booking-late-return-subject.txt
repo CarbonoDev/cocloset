@@ -1,1 +1,1 @@
-{{set-translations (asset "content/email-texts.json")}}{{t "BookingLateReturn.Subject" "{listingTitle} is overdue" listingTitle=transaction.listing.title}}
+{{set-translations (asset "content/email-texts.json")}}{{t "BookingLateReturn.Subject" "Action Required: Your rental of {listingTitle} is overdue" listingTitle=transaction.listing.title}}

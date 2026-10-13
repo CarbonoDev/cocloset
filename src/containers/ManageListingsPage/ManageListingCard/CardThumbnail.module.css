@@ -13,6 +13,29 @@
   width: 100%;
 }
 
+/* CardMenu's own three-dot menu sits top-left (see CardMenu.module.css), so this sits
+   top-right - same corner PickupTodayBadge uses on the public ListingCard. */
+.activeRentalBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+
+  background-color: var(--coclosetToneBlueFg);
+  color: var(--colorWhite);
+
+  font-weight: var(--fontWeightSemiBold);
+  font-size: 12px;
+  line-height: 1;
+
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
 /* Root element for Thumbnail (button or div) – reset when button, fill space */
 .thumbnailTrigger {
   display: block;
