@@ -319,6 +319,7 @@ const PendingApprovalOverlay = props => {
  * @param {function} props.onOpenListing - Open listing handler
  * @param {function} props.onDiscardDraft - Discard draft handler
  * @param {function} [props.onShowPickupQr] - Opens the pickup QR modal for this listing
+ * @param {boolean} [props.hasActiveTransaction] - Shows the "Active rental" badge
  * @returns {JSX.Element}
  */
 const CardThumbnail = props => {
@@ -333,6 +334,7 @@ const CardThumbnail = props => {
     onOpenListing,
     onDiscardDraft,
     onShowPickupQr,
+    hasActiveTransaction,
   } = props;
 
   const listingId = listing.id;
@@ -412,6 +414,12 @@ const CardThumbnail = props => {
   return (
     <div className={css.thumbnailWrapper}>
       <Thumbnail {...thumbnailProps} as={isLinked ? NamedLink : 'div'} linkProps={linkProps} />
+
+      {hasActiveTransaction ? (
+        <span className={css.activeRentalBadge}>
+          <FormattedMessage id="ManageListingCard.activeRentalBadge" />
+        </span>
+      ) : null}
 
       {overlayType === 'draft' ? (
         <DraftOverlay {...overlayProps} />

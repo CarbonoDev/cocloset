@@ -145,6 +145,44 @@ describe('ManageListingCard', () => {
     expect(tree.queryByText('ManageListingCard.manageStock')).not.toBeInTheDocument();
   });
 
+  // Jonathan (2026-10-13): show this up front rather than let the provider click
+  // "Pause" and find out from an error (see listing-pause-eligibility.js).
+  it('hides "Pause Listing" and shows the active-rental badge when hasActiveTransaction is true', () => {
+    const listing = createOwnListing('listing-renting', {
+      title: 'the listing',
+      price: new Money(1000, 'USD'),
+      availabilityPlan: {
+        type: 'availability-plan/time',
+        timezone: 'Etc/UTC',
+        entries: [{ dayOfWeek: 'mon', startTime: '00:00', endTime: '00:00', seats: 1 }],
+      },
+      publicData: {
+        listingType: 'rent-bicycles-daily',
+        transactionProcessAlias: 'default-booking/release-1',
+        unitType: 'hour',
+      },
+    });
+
+    const tree = render(
+      <ManageListingCard
+        history={{ push: noop }}
+        listing={listing}
+        intl={fakeIntl}
+        isMenuOpen={false}
+        onCloseListing={noop}
+        onOpenListing={noop}
+        onToggleMenu={noop}
+        hasClosingError={false}
+        hasOpeningError={false}
+        availabilityEnabled={true}
+        hasActiveTransaction
+      />
+    );
+
+    expect(tree.getByText('ManageListingCard.activeRentalBadge')).toBeInTheDocument();
+    expect(tree.queryByText('ManageListingCard.closeListing')).not.toBeInTheDocument();
+  });
+
   it('Booking (day): normal', () => {
     const listing = createOwnListing('listing-day', {
       title: 'the listing',

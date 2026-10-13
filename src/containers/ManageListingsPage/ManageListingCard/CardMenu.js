@@ -30,17 +30,29 @@ const isOutOfStock = listing => {
  * Returns an array of menu item keys that are relevant for the given listing state.
  * If the array is empty, the menu should not be shown.
  *
+ * Jonathan (2026-10-13): if a transaction is genuinely active, don't offer "Pause
+ * Listing" at all - the ActiveRentalBadge on the thumbnail already says why, and
+ * clicking would just be refused server-side (listing-pause-eligibility.js).
+ *
  * @param {Object} listing - Listing entity (ownListing)
+ * @param {boolean} [hasActiveTransaction] - from ManageListingsPage's bulk read
  * @returns {string[]} relevant menu item keys
  */
-const getMenuItems = listing => {
+const getMenuItems = (listing, hasActiveTransaction) => {
   const state = listing?.attributes?.state;
   const isClosed = state === LISTING_STATE_CLOSED;
   const isDraft = state === LISTING_STATE_DRAFT;
   const isPendingApproval = state === LISTING_STATE_PENDING_APPROVAL;
 
   // Currently, we only show "close listing" for active listings
-  if (!listing || isDraft || isClosed || isPendingApproval || isOutOfStock(listing)) {
+  if (
+    !listing ||
+    isDraft ||
+    isClosed ||
+    isPendingApproval ||
+    isOutOfStock(listing) ||
+    hasActiveTransaction
+  ) {
     return [];
   }
 
@@ -57,12 +69,20 @@ const getMenuItems = listing => {
  * @param {Object} [props.inProgressListingId] - The actions in progress for the listing
  * @param {function} props.onToggleMenu - The function to toggle the menu
  * @param {function} props.onCloseListing - The function to close the listing
+ * @param {boolean} [props.hasActiveTransaction] - Hides "Pause Listing" while true
  * @returns {JSX.Element|null}
  */
 const CardMenu = props => {
-  const { isMenuOpen, listing, inProgressListingId, onToggleMenu, onCloseListing } = props;
+  const {
+    isMenuOpen,
+    listing,
+    inProgressListingId,
+    onToggleMenu,
+    onCloseListing,
+    hasActiveTransaction,
+  } = props;
   const intl = useIntl();
-  const menuItems = getMenuItems(listing);
+  const menuItems = getMenuItems(listing, hasActiveTransaction);
 
   if (menuItems.length === 0) {
     return null;
