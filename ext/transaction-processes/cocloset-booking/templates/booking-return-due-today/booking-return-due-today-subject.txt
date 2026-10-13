@@ -1,0 +1,1 @@
+{{set-translations (asset "content/email-texts.json")}}{{t "BookingReturnDueToday.Subject" "Your {listingTitle} rental ends today" listingTitle=transaction.listing.title}}
