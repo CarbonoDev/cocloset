@@ -1395,6 +1395,7 @@ describe('cocloset-booking email templates', () => {
       'booking-ready-for-pickup',
       'booking-pickup-reminder',
       'booking-return-reminder',
+      'booking-return-due-today',
       'booking-late-return',
     ];
 
