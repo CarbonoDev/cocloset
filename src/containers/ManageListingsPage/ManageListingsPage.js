@@ -42,6 +42,7 @@ import {
 } from './ManageListingsPage.duck';
 import css from './ManageListingsPage.module.css';
 import DiscardDraftModal from './DiscardDraftModal/DiscardDraftModal';
+import PickupQrModal from './PickupQrModal/PickupQrModal';
 
 const Heading = props => {
   const { listingsAreLoaded, pagination } = props;
@@ -113,6 +114,7 @@ export const ManageListingsPageComponent = props => {
   const [discardDraftModalOpen, setDiscardDraftModalOpen] = useState(null);
   const [discardDraftModalId, setDiscardDraftModalId] = useState(null);
   const [closeBlockedListingId, setCloseBlockedListingId] = useState(null);
+  const [pickupQrListing, setPickupQrListing] = useState(null);
   const history = useHistory();
   const routeConfiguration = useRouteConfiguration();
   const config = useConfiguration();
@@ -199,6 +201,8 @@ export const ManageListingsPageComponent = props => {
     setDiscardDraftModalId(null);
   };
 
+  const closePickupQrModal = () => setPickupQrListing(null);
+
   const hasPaginationInfo = !!pagination && pagination.totalItems != null;
   const listingsAreLoaded = !queryInProgress && hasPaginationInfo;
   // Only worth nagging a provider about pickup steps when something of theirs is
@@ -261,7 +265,10 @@ export const ManageListingsPageComponent = props => {
           <Heading listingsAreLoaded={listingsAreLoaded} pagination={pagination} />
 
           {hasListingAtLaundry ? (
-            <LaundryPickupNotice className={css.pickupNotice} />
+            <LaundryPickupNotice
+              className={css.pickupNotice}
+              includeNavigationStep={false}
+            />
           ) : null}
 
           <ul className={css.listingCards}>
@@ -281,6 +288,7 @@ export const ManageListingsPageComponent = props => {
                   isCloseBlockedOnLaundry={
                     !!closeBlockedListingId && closeBlockedListingId.uuid === l.id.uuid
                   }
+                  onShowPickupQr={setPickupQrListing}
                   renderSizes={renderSizes}
                 />
               </li>
@@ -296,6 +304,17 @@ export const ManageListingsPageComponent = props => {
               focusElementId={
                 discardDraftModalId ? `discardButton_${discardDraftModalId.uuid}` : null
               }
+            />
+          ) : null}
+
+          {onManageDisableScrolling && pickupQrListing ? (
+            <PickupQrModal
+              id="ManageListingsPage"
+              isOpen={!!pickupQrListing}
+              onManageDisableScrolling={onManageDisableScrolling}
+              onCloseModal={closePickupQrModal}
+              listingId={pickupQrListing.id.uuid}
+              listingTitle={pickupQrListing.title}
             />
           ) : null}
 

@@ -27,6 +27,12 @@ import css from './LaundryPickupNotice.module.css';
  * `attributes.state`) rather than re-derived here, so this component stays a pure function
  * of what it is told, like every other `*Maybe` component in this codebase.
  *
+ * `includeNavigationStep` drops step1 ("Open your profile menu and choose 'Your
+ * listings'"). Jonathan (2026-10-12): on ManageListingsPage the provider is already on
+ * "Your listings" when they see this notice, so telling them to go there is backwards.
+ * ListingPage (a single listing's own page) still needs it, since that's not where the
+ * pause control lives - so it stays the default there.
+ *
  * @component
  * @param {Object} props
  * @param {string} [props.className]
@@ -35,6 +41,7 @@ import css from './LaundryPickupNotice.module.css';
  * @param {string} [props.id] - unique id for the collapsible region, for aria-controls
  * @param {string} [props.listingId] - required to render the QR; omit to show guidance only
  * @param {boolean} [props.isPaused] - listing.attributes.state === 'closed'
+ * @param {boolean} [props.includeNavigationStep] - show the "go to Your listings" step
  * @returns {JSX.Element}
  */
 const LaundryPickupNotice = props => {
@@ -45,6 +52,7 @@ const LaundryPickupNotice = props => {
     id = 'laundryPickupNotice',
     listingId,
     isPaused = false,
+    includeNavigationStep = true,
   } = props;
   const [isOpen, setIsOpen] = useState(!collapsible);
 
@@ -63,9 +71,11 @@ const LaundryPickupNotice = props => {
         <FormattedMessage id="LaundryPickupNotice.stepsHeading" />
       </p>
       <ol className={css.steps}>
-        <li>
-          <FormattedMessage id="LaundryPickupNotice.step1" />
-        </li>
+        {includeNavigationStep ? (
+          <li>
+            <FormattedMessage id="LaundryPickupNotice.step1" />
+          </li>
+        ) : null}
         <li>
           <FormattedMessage id="LaundryPickupNotice.step2" />
         </li>

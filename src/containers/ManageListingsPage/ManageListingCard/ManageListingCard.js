@@ -189,6 +189,7 @@ const LinkToStockOrAvailabilityTab = props => {
  * @param {function} props.onToggleMenu - The function to toggle the menu
  * @param {boolean} [props.isCloseBlockedOnLaundry] - Whether closing was blocked because the
  *   garment is still at the laundry partner (listing.attributes.metadata.onLaundry === true)
+ * @param {function} [props.onShowPickupQr] - Opens the pickup QR modal for this listing
  * @returns {JSX.Element} Manage listing card component
  */
 export const ManageListingCard = props => {
@@ -209,6 +210,7 @@ export const ManageListingCard = props => {
     onDiscardDraft,
     onToggleMenu,
     isCloseBlockedOnLaundry,
+    onShowPickupQr,
   } = props;
   const classes = classNames(rootClassName || css.root, className);
   const currentListing = ensureOwnListing(listing);
@@ -241,6 +243,7 @@ export const ManageListingCard = props => {
           onCloseListing={onCloseListing}
           onOpenListing={onOpenListing}
           onDiscardDraft={onDiscardDraft}
+          onShowPickupQr={onShowPickupQr}
         />
 
         <CardMenu

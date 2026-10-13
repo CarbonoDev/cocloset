@@ -11,7 +11,7 @@ import { createOwnListing, createStock, fakeIntl } from '../../../util/testData'
 
 import { ManageListingCard } from './ManageListingCard';
 
-const { screen, waitFor } = testingLibrary;
+const { screen, waitFor, fireEvent } = testingLibrary;
 
 const { Money } = sdkTypes;
 const noop = () => null;
@@ -335,6 +335,7 @@ describe('ManageListingCard', () => {
       },
     });
 
+    const onShowPickupQr = jest.fn();
     const tree = render(
       <ManageListingCard
         history={{ push: noop }}
@@ -344,15 +345,21 @@ describe('ManageListingCard', () => {
         onCloseListing={noop}
         onOpenListing={noop}
         onToggleMenu={noop}
+        onShowPickupQr={onShowPickupQr}
         hasClosingError={false}
         hasOpeningError={false}
         availabilityEnabled={true}
       />
     );
 
-    // A card overlay is too small for a scannable QR - this links to the listing's own page,
-    // which renders the real one (LaundryPickupNotice) at full size.
-    expect(tree.getByText('ManageListingCard.viewPickupQr')).toBeInTheDocument();
+    // The card overlay links out to open the pickup QR modal rather than cramming a
+    // scannable code into the thumbnail itself.
+    const viewPickupQrButton = tree.getByText('ManageListingCard.viewPickupQr');
+    expect(viewPickupQrButton).toBeInTheDocument();
+
+    fireEvent.click(viewPickupQrButton);
+    expect(onShowPickupQr).toHaveBeenCalledTimes(1);
+    expect(onShowPickupQr).toHaveBeenCalledWith({ id: listing.id, title: 'the garment' });
   });
 
   it('Booking (day): pendingApproval', () => {
