@@ -590,6 +590,21 @@
    :on :transition/accept,
    :to :actor.role/customer,
    :template :booking-accepted-request}
+  ;; DELIBERATELY :on :transition/accept, NOT :transition/operator-accept. A garment that is
+  ;; already at its studio (the operator-accept / auto-accept path) has nothing to drop off, so
+  ;; this reminder must never reach that provider - keying it to the manual-accept transition
+  ;; gets that for free, the same way the laundry-mark-ready / -from-initial-cleaning split
+  ;; already uses :on to separate two paths that share a :to state. 3 days before booking-start
+  ;; is 1 day before the 48h drop-off deadline shown in the inbox (InboxTransactionPanel's
+  ;; `recommendedDropTime`) - a scheduled notification is cancelled once the transaction leaves
+  ;; :state/accepted, so a provider who already dropped the garment off never gets this.
+  {:name :notification/booking-dropoff-reminder,
+   :on :transition/accept,
+   :at
+   {:fn/minus
+    [{:fn/timepoint [:time/booking-start]} {:fn/period ["P3D"]}]},
+   :to :actor.role/provider,
+   :template :booking-dropoff-reminder}
   {:name :notification/booking-operator-accepted-request-to-customer,
    :on :transition/operator-accept,
    :to :actor.role/customer,
@@ -778,6 +793,14 @@
    :on :transition/laundry-mark-available,
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
+  {:name :notification/review-period-resend-customer-laundry-mark-available,
+   :on :transition/laundry-mark-available,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P1D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
 
   ;; -------------------------------------------------------------------
   ;; Every remaining transition into :state/delivered. Each one has to
@@ -793,12 +816,28 @@
    :on :transition/complete,
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
+  {:name :notification/review-period-resend-customer-complete,
+   :on :transition/complete,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P1D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
   {:name :notification/booking-money-paid-operator-complete,
    :on :transition/operator-complete,
    :to :actor.role/provider,
    :template :booking-money-paid}
   {:name :notification/review-period-start-customer-operator-complete,
    :on :transition/operator-complete,
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
+  {:name :notification/review-period-resend-customer-operator-complete,
+   :on :transition/operator-complete,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P1D"]}]},
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
   ;; NEW (2026-09-21), alongside :transition/auto-complete-from-initial-cleaning itself - same
@@ -811,12 +850,28 @@
    :on :transition/auto-complete-from-initial-cleaning,
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
+  {:name :notification/review-period-resend-customer-auto-complete-from-initial-cleaning,
+   :on :transition/auto-complete-from-initial-cleaning,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P1D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
   {:name :notification/booking-money-paid-auto-complete-from-ready,
    :on :transition/auto-complete-from-ready,
    :to :actor.role/provider,
    :template :booking-money-paid}
   {:name :notification/review-period-start-customer-auto-complete-from-ready,
    :on :transition/auto-complete-from-ready,
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
+  {:name :notification/review-period-resend-customer-auto-complete-from-ready,
+   :on :transition/auto-complete-from-ready,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P1D"]}]},
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
   {:name :notification/booking-money-paid-auto-complete-from-picked-up,
@@ -828,6 +883,14 @@
    :on :transition/auto-complete-from-picked-up,
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
+  {:name :notification/review-period-resend-customer-auto-complete-from-picked-up,
+   :on :transition/auto-complete-from-picked-up,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P1D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
   {:name :notification/booking-money-paid-auto-complete-from-overdue,
    :on :transition/auto-complete-from-overdue,
    :to :actor.role/provider,
@@ -835,6 +898,14 @@
   {:name
    :notification/review-period-start-customer-auto-complete-from-overdue,
    :on :transition/auto-complete-from-overdue,
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
+  {:name :notification/review-period-resend-customer-auto-complete-from-overdue,
+   :on :transition/auto-complete-from-overdue,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P1D"]}]},
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
   {:name :notification/booking-money-paid-auto-complete-from-returned,
@@ -848,9 +919,25 @@
    :on :transition/auto-complete-from-returned,
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
+  {:name :notification/review-period-resend-customer-auto-complete-from-returned,
+   :on :transition/auto-complete-from-returned,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P1D"]}]},
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
   {:name
    :notification/review-period-start-customer-auto-complete-from-cleaning,
    :on :transition/auto-complete-from-cleaning,
+   :to :actor.role/customer,
+   :template :booking-review-by-customer-wanted}
+  {:name :notification/review-period-resend-customer-auto-complete-from-cleaning,
+   :on :transition/auto-complete-from-cleaning,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/delivered]}
+     {:fn/period ["P1D"]}]},
    :to :actor.role/customer,
    :template :booking-review-by-customer-wanted}
 
