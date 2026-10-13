@@ -18,9 +18,14 @@ jest.mock('../api-util/handoverQr', () => ({
   ensureHandoverQr: jest.fn(),
 }));
 
+jest.mock('../api-util/paymentIntentLedger', () => ({
+  capturePaymentIntentIdMaybe: jest.fn(),
+}));
+
 const { getSdk, getTrustedSdk, fetchCommission, handleError } = require('../api-util/sdk');
 const { buildLineItemsForListing } = require('../api-util/lineItems');
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
+const { capturePaymentIntentIdMaybe } = require('../api-util/paymentIntentLedger');
 
 const initiatePrivileged = require('./initiate-privileged');
 
@@ -853,5 +858,42 @@ describe('initiate-privileged: the week count the emails print', () => {
     await run({ isSpeculative: true, days: 7, priceVariantName: '7-days' });
 
     expect(initiateSpeculative.mock.calls[0][0].params.protectedData.bookingWeeks).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The PaymentIntent-id capture (prerequisite for the separately-tracked
+// partial-refund feature): Sharetribe only exposes a transaction's Stripe
+// PaymentIntent id in protectedData between stripe-create-payment-intent and
+// stripe-confirm-payment-intent, so it has to be stashed into metadata right
+// here, in the same fire-and-continue slot as the handover QR. These tests
+// assert the WIRING - that the capture fires on a real booking-creation call
+// and not on a speculative preview - mirroring how generateHandoverQrMaybe's
+// own gating would be tested (this repo had no dedicated test for that one;
+// this is the minimal coverage for the new behavior instead of none).
+// ---------------------------------------------------------------------------
+describe('initiate-privileged: the PaymentIntent-id capture', () => {
+  it('fires on a real (non-speculative) booking-creation call', async () => {
+    const { initiate } = setup({ priceVariants: PERIODS });
+    initiate.mockResolvedValue({
+      data: { data: { id: { uuid: 'tx-1' }, attributes: { protectedData: {} } } },
+    });
+
+    await run({ isSpeculative: false, days: 7, priceVariantName: '7-days' });
+
+    expect(capturePaymentIntentIdMaybe).toHaveBeenCalledTimes(1);
+    const call = capturePaymentIntentIdMaybe.mock.calls[0][0];
+    expect(call.transaction).toEqual({ id: { uuid: 'tx-1' }, attributes: { protectedData: {} } });
+    expect(call.log).toBeDefined();
+    // getIntegrationSdk() is called fresh for this step, same as the handover-QR step above.
+    expect(getIntegrationSdk).toHaveBeenCalled();
+  });
+
+  it('does NOT fire on a speculative call - nothing was created, nothing reached Stripe', async () => {
+    setup({ priceVariants: PERIODS });
+
+    await run({ isSpeculative: true, days: 7, priceVariantName: '7-days' });
+
+    expect(capturePaymentIntentIdMaybe).not.toHaveBeenCalled();
   });
 });

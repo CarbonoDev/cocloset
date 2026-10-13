@@ -30,7 +30,7 @@ import {
  * @param {*} processInfo details about the process
  */
 export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
-  const { transaction, transactionRole, nextTransitions } = txInfo;
+  const { transaction, transactionRole, nextTransitions, onOpenCancelBookingModal } = txInfo;
   const isProviderBanned = transaction?.provider?.attributes?.banned;
   const isCustomerBanned = transaction?.provider?.attributes?.banned;
   const _ = CONDITIONAL_RESOLVER_WILDCARD;
@@ -155,6 +155,31 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
       // wherever the customer is the one who has to physically do something
       // (collect the garment, bring it back), so the page can carry a line of
       // guidance under the title.
+      //
+      // CUSTOMER SELF-CANCEL (2026-10-13): ACCEPTED is deliberately the only state with a
+      // customer-facing cancel button. It covers BOTH scenarios the client asked for - the
+      // provider has not yet dropped the garment off, or it was already at the laundry from a
+      // previous cycle but the laundry has not yet run its ready-for-pickup prep - because
+      // both collapse onto "nothing laundry-side has happened yet", which IS "still accepted"
+      // (see the EDN's :transition/customer-cancel comment). Every later laundry state stays
+      // operator-only pending a partial-refund design, so this cond must come BEFORE the
+      // wildcard one below - ConditionalResolver takes the first match.
+      //
+      // `onAction` is overridden to OPEN A CONFIRMATION MODAL rather than transition
+      // immediately (see actionButtonProps/getActionButtonPropsMaybe in TransactionPage.
+      // stateData.js: `extra.onAction` replaces the default "transition now" behaviour). This
+      // moves real money - a full refund - and must not fire on a single accidental click.
+      // The real transition only fires from CancelBookingModal's onConfirm, in TransactionPage.js.
+      .cond([states.ACCEPTED, CUSTOMER], () => {
+        return {
+          ...shared,
+          showDetailCardHeadings: true,
+          showActionButtons: true,
+          primaryButtonProps: actionButtonProps(transitions.CUSTOMER_CANCEL, CUSTOMER, {
+            onAction: onOpenCancelBookingModal,
+          }),
+        };
+      })
       .cond([states.ACCEPTED, _], () => {
         return { ...shared, showDetailCardHeadings: true };
       })

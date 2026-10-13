@@ -25,7 +25,7 @@ const transaction = lastTransition => ({
   provider: { id: { uuid: 'provider-1' }, attributes: { banned: false } },
 });
 
-const stateDataFor = (lastTransition, transactionRole) =>
+const stateDataFor = (lastTransition, transactionRole, extra = {}) =>
   getStateData(
     {
       transaction: transaction(lastTransition),
@@ -38,6 +38,7 @@ const stateDataFor = (lastTransition, transactionRole) =>
       sendReviewError: null,
       onOpenReviewModal: () => null,
       nextTransitions: [],
+      ...extra,
     },
     process
   );
@@ -193,6 +194,57 @@ describe('TransactionPage state data for cocloset-booking', () => {
     expect(stateData.showActionButtons).toBe(true);
     expect(messages[stateData.primaryButtonProps.buttonText]).toBeDefined();
     expect(messages[stateData.secondaryButtonProps.buttonText]).toBeDefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // Customer self-cancel (2026-10-13). ACCEPTED is deliberately the only
+  // state with a customer-facing cancel button - see the EDN's
+  // :transition/customer-cancel comment and this file's own comment on the
+  // [states.ACCEPTED, CUSTOMER] cond for why.
+  // -------------------------------------------------------------------------
+  describe('customer self-cancel button, accepted only', () => {
+    it('shows a cancel action for the CUSTOMER at accepted, wired to open the confirm modal', () => {
+      const onOpenCancelBookingModal = () => null;
+      const stateData = stateDataFor(transitions.ACCEPT, 'customer', { onOpenCancelBookingModal });
+
+      expect(stateData.showActionButtons).toBe(true);
+      expect(stateData.primaryButtonProps).toBeDefined();
+      // The button must OPEN THE CONFIRM MODAL, not transition immediately - this moves a
+      // real refund and must survive one accidental click.
+      expect(stateData.primaryButtonProps.onAction).toBe(onOpenCancelBookingModal);
+      expect(messages[stateData.primaryButtonProps.buttonText]).toBeDefined();
+    });
+
+    it('also offers the button after an operator-accept, since both land in accepted', () => {
+      const onOpenCancelBookingModal = () => null;
+      const stateData = stateDataFor(transitions.OPERATOR_ACCEPT, 'customer', {
+        onOpenCancelBookingModal,
+      });
+
+      expect(stateData.showActionButtons).toBe(true);
+      expect(stateData.primaryButtonProps.onAction).toBe(onOpenCancelBookingModal);
+    });
+
+    it('gives the PROVIDER no action button at accepted - the door is customer-only', () => {
+      const stateData = stateDataFor(transitions.ACCEPT, 'provider', {
+        onOpenCancelBookingModal: () => null,
+      });
+
+      expect(stateData.showActionButtons).toBeFalsy();
+    });
+
+    it('hides the button everywhere past accepted, for both roles', () => {
+      ['initial-cleaning', 'ready-for-pickup', 'picked-up', 'overdue', 'returned', 'cleaning'].forEach(
+        state => {
+          ROLES.forEach(role => {
+            const stateData = stateDataFor(TRANSITION_PER_STATE[state], role, {
+              onOpenCancelBookingModal: () => null,
+            });
+            expect(stateData.showActionButtons).toBeFalsy();
+          });
+        }
+      );
+    });
   });
 
   it('opens the review window at delivered, as default-booking does', () => {

@@ -13,6 +13,7 @@ import {
 import { isTransactionsTransitionInvalidTransition, storableError } from '../../util/errors';
 import {
   createAvailabilityBuffer,
+  customerCancelNotifyLaundry,
   transactionLineItems,
   transitionPrivileged,
 } from '../../util/api';
@@ -29,6 +30,10 @@ import {
   isNegotiationProcess,
 } from '../../transactions/transaction';
 import { transitions as bookingProcessTransitions } from '../../transactions/transactionProcessBooking';
+// CUSTOMER_CANCEL only exists on the cocloset-booking graph (the stock default-booking
+// process this file otherwise borrows transition constants from has no such transition), so
+// it needs its own import rather than living on bookingProcessTransitions above.
+import { transitions as coclosetBookingProcessTransitions } from '../../transactions/transactionProcessCoclosetBooking';
 import { messageHasPendingFiles, executeFileUpload } from '../../util/fileHelpers';
 
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -421,6 +426,21 @@ const makeTransitionPayloadCreator = (
       });
   };
 
+  // Customer self-cancellation (2026-10-13) -> tell the assigned LAUNDRY, which is not a
+  // Sharetribe transaction party and so can never be reached by the EDN's own notifications
+  // (see that transition's comment in process.edn). Mirrors maybeCreateAvailabilityBuffer
+  // above EXACTLY: fire-and-continue, never blocks or fails the transition above (which has
+  // already succeeded by the time this runs), failures are logged only. See
+  // server/api/customer-cancel-notify-laundry.js and util/api.js's customerCancelNotifyLaundry.
+  const maybeNotifyLaundryOfCustomerCancel = () => {
+    if (transitionName !== coclosetBookingProcessTransitions.CUSTOMER_CANCEL) {
+      return;
+    }
+    customerCancelNotifyLaundry({ transactionId: txId }).catch(e => {
+      log.error(e, 'customer-cancel-notify-laundry-failed', { txId, transition: transitionName });
+    });
+  };
+
   return makeCall()
     .then(response => {
       dispatch(addMarketplaceEntities(response));
@@ -433,6 +453,7 @@ const makeTransitionPayloadCreator = (
       refreshTransactionEntity(sdk, txId, dispatch);
 
       maybeCreateAvailabilityBuffer();
+      maybeNotifyLaundryOfCustomerCancel();
 
       return response;
     })

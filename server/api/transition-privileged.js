@@ -28,6 +28,7 @@ const {
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
 const { TRANSITIONS, isCoclosetBookingListing } = require('../api-util/coclosetBookingProcess');
 const { ensureHandoverQr } = require('../api-util/handoverQr');
+const { capturePaymentIntentIdMaybe } = require('../api-util/paymentIntentLedger');
 const log = require('../log');
 
 const { Money } = sharetribeSdk.types;
@@ -64,6 +65,47 @@ const generateHandoverQrMaybe = (transitionName, listing, transaction) => {
     });
   } catch (e) {
     log.error(e, 'handover-qr-write-failed', { txId: transaction.id?.uuid || 'unknown' });
+  }
+};
+
+// The prerequisite for a later, separately-tracked feature (partial refunds via
+// direct Stripe calls): Sharetribe exposes a transaction's Stripe PaymentIntent
+// id in `protectedData.stripePaymentIntents.default.stripePaymentIntentId`
+// ONLY between `:action/stripe-create-payment-intent` running and
+// `:action/stripe-confirm-payment-intent` running - it deletes the key once the
+// PaymentIntent is confirmed, and after that there is no way to retrieve it
+// through either API. This is that one moment, so it is captured into
+// `metadata` (which Sharetribe never clears) right here. See
+// api-util/paymentIntentLedger.js for the full write contract.
+//
+// Gated exactly like `generateHandoverQrMaybe` above and for the same reason:
+// this endpoint also carries every default-negotiation offer transition
+// (making/updating/revoking an offer never creates a PaymentIntent), so only
+// `request-payment-after-inquiry` - the transition that actually creates the
+// reservation and its PaymentIntent - may fire this.
+//
+// Called after the response is sent, so it must never throw: getIntegrationSdk()
+// throws on missing env vars, and an escaping throw here would reach the
+// trailing .catch() and try to respond twice. capturePaymentIntentIdMaybe itself
+// never rejects; this try/catch only guards the synchronous getIntegrationSdk()
+// call, mirroring generateHandoverQrMaybe's own guard above.
+const capturePaymentIntentLedgerMaybe = (transitionName, listing, transaction) => {
+  const isReservationCreation = transitionName === TRANSITIONS.REQUEST_PAYMENT_AFTER_INQUIRY;
+
+  if (!isReservationCreation || !isCoclosetBookingListing(listing) || !transaction?.id) {
+    return;
+  }
+
+  try {
+    capturePaymentIntentIdMaybe({
+      integrationSdk: getIntegrationSdk(),
+      transaction,
+      log,
+    });
+  } catch (e) {
+    log.error(e, 'payment-intent-ledger-capture-failed', {
+      txId: transaction.id?.uuid || 'unknown',
+    });
   }
 };
 
@@ -325,9 +367,11 @@ module.exports = (req, res) => {
         )
         .end();
 
-      // A speculative transition builds a breakdown only; nothing was created.
+      // A speculative transition builds a breakdown only; nothing was created,
+      // and nothing reached Stripe.
       if (!isSpeculative) {
         generateHandoverQrMaybe(transitionName, listingEntity, data?.data);
+        capturePaymentIntentLedgerMaybe(transitionName, listingEntity, data?.data);
       }
     })
     .catch(e => {

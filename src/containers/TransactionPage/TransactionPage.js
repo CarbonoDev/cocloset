@@ -75,6 +75,7 @@ import ReportModal from './ReportModal/ReportModal';
 import ReviewModal from './ReviewModal/ReviewModal';
 import RequestChangesModal from './RequestChangesModal/RequestChangesModal';
 import MakeCounterOfferModal from './MakeCounterOfferModal/MakeCounterOfferModal';
+import CancelBookingModal from './CancelBookingModal/CancelBookingModal';
 import SendMessageForm from './SendMessageForm/SendMessageForm';
 import TransactionPanel from './TransactionPanel/TransactionPanel';
 
@@ -95,6 +96,24 @@ import css from './TransactionPage.module.css';
 
 const MAX_MOBILE_SCREEN_WIDTH = 1023;
 const SEND_MESSAGE_FORM_ID = 'TransactionPanel.SendMessageForm';
+
+// Confirm the customer's self-cancellation (transition/customer-cancel, cocloset-booking
+// only) and close the confirm modal. No form values, unlike onDisputeOrder/onReportOrder
+// above - CancelBookingModal is a plain "are you sure", not a form - so the modal is closed
+// immediately rather than waiting on the transition: the confirmation already happened, and
+// ActionButtons already surfaces transitionInProgress/transitionError for what follows.
+const onConfirmCancelBooking = (
+  currentTransactionId,
+  transitionName,
+  onTransition,
+  setCancelBookingModalOpen
+) => () => {
+  setCancelBookingModalOpen(false);
+  onTransition(currentTransactionId, transitionName, {}).catch(e => {
+    // Do nothing - already logged inside the transition thunk, and surfaced to the user via
+    // the action button's own error state.
+  });
+};
 
 // Submit dispute and close the review modal
 const onDisputeOrder = (
@@ -335,6 +354,9 @@ export const TransactionPageComponent = props => {
   const [changeRequestSubmitted, setChangeRequestSubmitted] = useState(false);
   const [isMakeCounterOfferModalOpen, setMakeCounterOfferModalOpen] = useState(false);
   const [counterOfferSubmitted, setCounterOfferSubmitted] = useState(false);
+  // Customer self-cancel (2026-10-13, cocloset-booking only). See CancelBookingModal's header
+  // for why this reuses the DiscardDraftModal "are you sure" pattern rather than a new one.
+  const [isCancelBookingModalOpen, setCancelBookingModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -631,6 +653,14 @@ export const TransactionPageComponent = props => {
     setReportModalOpen(true);
   };
 
+  // Open the cancel-booking confirm modal. Passed down as `primaryButtonProps.onAction` for
+  // the customer-cancel button (TransactionPage.stateDataCoclosetBooking.js) INSTEAD OF the
+  // default "transition now" behaviour - this moves a real refund and must survive one
+  // accidental click.
+  const onOpenCancelBookingModal = () => {
+    setCancelBookingModalOpen(true);
+  };
+
   const deletedListingTitle = intl.formatMessage({
     id: 'TransactionPage.deletedListing',
   });
@@ -810,6 +840,7 @@ export const TransactionPageComponent = props => {
           onOpenReviewModal,
           onOpenRequestChangesModal,
           onOpenMakeCounterOfferModal,
+          onOpenCancelBookingModal,
           onCheckoutRedirect: handleSubmitOrderRequest,
           onMakeOfferRedirect: onMakeOffer,
           intl,
@@ -1198,6 +1229,22 @@ export const TransactionPageComponent = props => {
             counterOfferInProgress={counterOffers.includes(transitionInProgress)}
             counterOfferError={transitionError}
             currencyConfig={currencyConfig}
+          />
+        ) : null}
+        {process?.transitions?.CUSTOMER_CANCEL ? (
+          <CancelBookingModal
+            id="CancelBookingModal"
+            isOpen={isCancelBookingModalOpen}
+            focusElementId={`${actionButtonContainer}_${ACTION_BUTTON_1_ID}`}
+            onCloseModal={() => setCancelBookingModalOpen(false)}
+            onManageDisableScrolling={onManageDisableScrolling}
+            onConfirm={onConfirmCancelBooking(
+              transaction?.id,
+              process.transitions.CUSTOMER_CANCEL,
+              onTransition,
+              setCancelBookingModalOpen
+            )}
+            inProgress={transitionInProgress === process.transitions.CUSTOMER_CANCEL}
           />
         ) : null}
       </LayoutSingleColumn>
