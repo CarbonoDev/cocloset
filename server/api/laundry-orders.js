@@ -9,6 +9,7 @@ const {
   OPS_LAST_TRANSITIONS,
   stateFromLastTransition,
 } = require('../api-util/coclosetBookingProcess');
+const { mapWithConcurrency } = require('../api-util/concurrency');
 
 // Read endpoint backing the laundry ops dashboard (design doc §8).
 //
@@ -132,27 +133,6 @@ const MAX_LISTING_PAGES = 20;
 const TRANSACTION_QUERY_CONCURRENCY = 5;
 
 const IMAGE_VARIANTS = ['variants.square-small', 'variants.square-small2x'];
-
-// Run `worker` over `items` with at most `limit` promises in flight.
-const mapWithConcurrency = (items, limit, worker) => {
-  const results = new Array(items.length);
-  let nextIndex = 0;
-
-  const runner = () => {
-    const index = nextIndex;
-    nextIndex += 1;
-    if (index >= items.length) {
-      return Promise.resolve();
-    }
-    return Promise.resolve(worker(items[index], index)).then(result => {
-      results[index] = result;
-      return runner();
-    });
-  };
-
-  const runnerCount = Math.min(limit, items.length);
-  return Promise.all(Array.from({ length: runnerCount }, runner)).then(() => results);
-};
 
 // Fetch every listing page (up to MAX_LISTING_PAGES), keeping the `included`
 // entities alongside each page so images/authors can be resolved per page.

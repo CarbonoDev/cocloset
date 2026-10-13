@@ -385,8 +385,10 @@ export const sortRows = rows =>
  */
 export const STATUS_TONES = {
   // Transaction laundry statuses
+  accepted: 'Amber',
+  'initial-cleaning': 'Blue',
   'ready-for-pickup': 'Green',
-  'picked-up': 'Rose',
+  'picked-up': 'Violet',
   returned: 'Amber',
   'pending-cleaning': 'Blue',
   'cleaning-in-progress': 'Blue',
@@ -402,11 +404,17 @@ export const STATUS_TONES = {
  * (transaction status wins over readiness) so the badge's colour and its text
  * can never describe different things.
  *
+ * `opsStatus(row)` - not `row.laundryStatus`, which `/api/laundry-orders`
+ * stopped sending back when the server-side `laundryStatus` metadata field
+ * was removed (see server/api/laundry-orders.js) - is the same lookup
+ * `statusLabelKey` uses, so every transaction row's badge actually gets a
+ * tone instead of silently falling through to Neutral.
+ *
  * @param {Object} row - a row from the /api/laundry-orders response
  * @returns {string} one of the tone suffixes used by LaundryOpsPage.module.css
  */
 export const statusTone = row =>
-  STATUS_TONES[(row?.laundryStatus)] || STATUS_TONES[(row?.readinessStatus)] || 'Neutral';
+  STATUS_TONES[opsStatus(row)] || STATUS_TONES[(row?.readinessStatus)] || 'Neutral';
 
 /**
  * Tones for the dashboard stat tile values (mockup 09.jpg): work-in-progress

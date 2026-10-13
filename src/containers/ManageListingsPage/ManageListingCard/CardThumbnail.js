@@ -161,7 +161,15 @@ const DraftOverlay = props => {
 };
 
 const ClosedOverlay = props => {
-  const { title, listingId, slug, intl, inProgressListingId, onOpenListing, onLaundry } = props;
+  const {
+    title,
+    listingId,
+    intl,
+    inProgressListingId,
+    onOpenListing,
+    onLaundry,
+    onShowPickupQr,
+  } = props;
   return (
     <Overlay
       message={intl.formatMessage(
@@ -182,19 +190,20 @@ const ClosedOverlay = props => {
       >
         {intl.formatMessage({ id: 'ManageListingCard.openListing' })}
       </PrimaryButtonInline>
-      {/* A small card overlay is no place for a 180px scannable code - it lives full-size on
-          the listing's own page (LaundryPickupNotice), which already renders it automatically
-          once the listing is paused and onLaundry. This is the direct path there, matching
-          step 4 of the guidance copy without cramming a QR into a thumbnail. */}
+      {/* Jonathan (2026-10-12): show the QR right here in a modal rather than sending the
+          provider to the listing's own page to find it (LaundryPickupNotice there still
+          renders it inline for anyone who lands on that page directly). */}
       {onLaundry ? (
-        <NamedLink
-          className={css.viewPickupQrLink}
-          name="ListingPage"
-          params={{ id: listingId.uuid, slug }}
-          onClick={event => event.stopPropagation()}
+        <InlineTextButton
+          rootClassName={css.viewPickupQrLink}
+          onClick={event => {
+            event.preventDefault();
+            event.stopPropagation();
+            onShowPickupQr({ id: listingId, title });
+          }}
         >
           {intl.formatMessage({ id: 'ManageListingCard.viewPickupQr' })}
-        </NamedLink>
+        </InlineTextButton>
       ) : null}
     </Overlay>
   );
@@ -309,6 +318,8 @@ const PendingApprovalOverlay = props => {
  * @param {function} props.onCloseListing - Close listing handler
  * @param {function} props.onOpenListing - Open listing handler
  * @param {function} props.onDiscardDraft - Discard draft handler
+ * @param {function} [props.onShowPickupQr] - Opens the pickup QR modal for this listing
+ * @param {boolean} [props.hasActiveTransaction] - Shows the "Active rental" badge
  * @returns {JSX.Element}
  */
 const CardThumbnail = props => {
@@ -322,6 +333,8 @@ const CardThumbnail = props => {
     onCloseListing,
     onOpenListing,
     onDiscardDraft,
+    onShowPickupQr,
+    hasActiveTransaction,
   } = props;
 
   const listingId = listing.id;
@@ -395,11 +408,18 @@ const CardThumbnail = props => {
     // A paused (closed) listing whose garment is still at the laundry gets its pickup QR
     // right where the provider just paused it from - see ClosedOverlay.
     onLaundry: listing.attributes?.metadata?.onLaundry === true,
+    onShowPickupQr,
   };
 
   return (
     <div className={css.thumbnailWrapper}>
       <Thumbnail {...thumbnailProps} as={isLinked ? NamedLink : 'div'} linkProps={linkProps} />
+
+      {hasActiveTransaction ? (
+        <span className={css.activeRentalBadge}>
+          <FormattedMessage id="ManageListingCard.activeRentalBadge" />
+        </span>
+      ) : null}
 
       {overlayType === 'draft' ? (
         <DraftOverlay {...overlayProps} />

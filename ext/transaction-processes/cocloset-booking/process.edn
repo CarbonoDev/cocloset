@@ -640,18 +640,23 @@
     [{:fn/timepoint [:time/booking-end]} {:fn/period ["P1D"]}]},
    :to :actor.role/customer,
    :template :booking-return-reminder}
-  ;; THE GAP BETWEEN "ends tomorrow" (above, booking-end minus P1D) AND "overdue" (below, via
-  ;; mark-overdue, booking-end plus P1D - and only if still not returned). Neither one fires ON
-  ;; booking-end itself. Same :on as the reminder above for the same reason: cancelled the
-  ;; moment the renter actually returns the garment, so nobody still holding it near the end of
-  ;; the window gets skipped either.
-  {:name :notification/booking-return-due-today,
+  {:name :notification/booking-return-reminder-same-day,
    :on :transition/laundry-confirm-pickup,
-   :at {:fn/timepoint [:time/booking-end]},
-   :to :actor.role/customer,
-   :template :booking-return-due-today}
+   :at
+   {:fn/minus
+    [{:fn/timepoint [:time/booking-end]} {:fn/period ["PT8H"]}]},
+  :to :actor.role/customer,
+  :template :booking-return-reminder-same-day}
   {:name :notification/booking-late-return-to-customer,
    :on :transition/mark-overdue,
+   :to :actor.role/customer,
+   :template :booking-late-return}
+  {:name :notification/booking-late-return-48h-to-customer,
+   :on :transition/mark-overdue,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/overdue]}
+     {:fn/period ["P1D"]}]},
    :to :actor.role/customer,
    :template :booking-late-return}
   {:name :notification/booking-late-return-to-provider,

@@ -1,0 +1,1 @@
+{{set-translations (asset "content/email-texts.json")}}{{t "BookingReturnReminderSameDay.Subject" "Reminder: Your rental item is due back today! 👗"}}
