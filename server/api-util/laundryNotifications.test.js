@@ -3,6 +3,7 @@ const {
   pickupScheduledNotification,
   returnScheduledNotification,
   cleaningRequiredNotification,
+  bookingCancelledNotification,
   escapeHtml,
   formatDateTime,
 } = require('./laundryNotifications');
@@ -23,6 +24,7 @@ const ALL_BUILDERS = [
   ['pickupScheduledNotification', pickupScheduledNotification],
   ['returnScheduledNotification', returnScheduledNotification],
   ['cleaningRequiredNotification', cleaningRequiredNotification],
+  ['bookingCancelledNotification', bookingCancelledNotification],
 ];
 
 describe('escapeHtml()', () => {
@@ -262,5 +264,49 @@ describe('cleaningRequiredNotification()', () => {
       damageReported: true,
     });
     expect(damaged.text).toContain('Damage reported: Yes — no details given');
+  });
+});
+
+describe('bookingCancelledNotification()', () => {
+  const email = bookingCancelledNotification({
+    laundryName: 'Studio Pigalle',
+    garmentTitle: 'Blue Silk Dress',
+    ticketCode: 'PIG-2032',
+    customerName: 'Alex R.',
+    transactionId: 'tx-1',
+    marketplaceName: 'Cocloset',
+  });
+
+  it('puts the garment and ticket code in the subject', () => {
+    expect(email.subject).toBe('Cocloset: booking cancelled — Blue Silk Dress (PIG-2032)');
+  });
+
+  it('names the renter and says there is no handover to expect', () => {
+    expect(email.text).toContain('Alex R. cancelled this booking for Blue Silk Dress');
+    expect(email.text).toMatch(/no garment to expect/i);
+    expect(email.text).toMatch(/nothing further is needed/i);
+  });
+
+  it('lists ticket, garment, customer and transaction', () => {
+    expect(email.text).toContain('Ticket: PIG-2032');
+    expect(email.text).toContain('Garment: Blue Silk Dress');
+    expect(email.text).toContain('Customer: Alex R.');
+    expect(email.text).toContain('Transaction: tx-1');
+  });
+
+  it('drops the ticket suffix from the subject when no ticket was ever issued', () => {
+    // A customer-cancel fires from :state/accepted - before the laundry has necessarily
+    // opened a ticket for this booking at all.
+    const noTicket = bookingCancelledNotification({
+      garmentTitle: 'Blue Silk Dress',
+      marketplaceName: 'Cocloset',
+    });
+    expect(noTicket.subject).toBe('Cocloset: booking cancelled — Blue Silk Dress');
+    expect(noTicket.text).not.toContain('Ticket:');
+  });
+
+  it('greets generically and names no renter when the customer name is missing', () => {
+    const anonymous = bookingCancelledNotification({ garmentTitle: 'Blue Silk Dress' });
+    expect(anonymous.text).toContain('The renter cancelled this booking for Blue Silk Dress');
   });
 });

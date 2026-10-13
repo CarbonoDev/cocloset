@@ -298,6 +298,17 @@ export const autoAcceptBooking = body => {
   return post('/api/auto-accept-booking', body);
 };
 
+// The laundry-side effect of a customer's self-cancellation (`transition/customer-cancel`).
+// That transition is not privileged and is already fired directly through the SDK by the
+// generic transition thunk - this call is ONLY the Mailgun notification the EDN cannot send
+// (Sharetribe's own notifications can address the customer or the provider, never a laundry).
+// Fire-and-continue: see the call site in TransactionPage.duck.js, which never lets a failure
+// here affect the cancellation that has already succeeded.
+// See `server/api/customer-cancel-notify-laundry.js`.
+export const customerCancelNotifyLaundry = body => {
+  return post('/api/customer-cancel-notify-laundry', body);
+};
+
 // What a scanned handover QR resolves to: the next step at the laundry counter, who it is
 // with, and whether THIS caller may confirm it.
 //

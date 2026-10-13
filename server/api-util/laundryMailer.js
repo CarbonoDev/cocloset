@@ -5,6 +5,7 @@ const {
   returnScheduledNotification,
   cleaningRequiredNotification,
   garmentHandedBackNotification,
+  bookingCancelledNotification,
 } = require('./laundryNotifications');
 const log = require('../log');
 
@@ -165,10 +166,29 @@ const notifyGarmentHandedBack = ({ to, ...data }) =>
     logContext: { listingId: data.listingId },
   });
 
+/**
+ * Customer self-cancellation (2026-10-13) - tells the assigned laundry that this booking is
+ * off, so it does not keep expecting a drop-off or a pickup for it. Triggered from
+ * server/api/customer-cancel-notify-laundry.js, the side-effect endpoint the browser calls
+ * right after a successful `transition/customer-cancel` (that transition is not privileged,
+ * so Mailgun - which does not run on the EDN - needs this separate hook).
+ *
+ * @param {Object} params - `to` plus the fields of bookingCancelledNotification
+ * @returns {Promise<Object>} never rejects
+ */
+const notifyBookingCancelled = ({ to, ...data }) =>
+  send({
+    name: 'booking-cancelled',
+    to,
+    compose: () => bookingCancelledNotification(data),
+    logContext: { txId: data.transactionId },
+  });
+
 module.exports = {
   notifyGarmentHandedBack,
   notifyNewIncomingGarment,
   notifyPickupScheduled,
   notifyReturnScheduled,
   notifyCleaningRequired,
+  notifyBookingCancelled,
 };

@@ -115,7 +115,8 @@ describe('the JS graph matches ext/transaction-processes/cocloset-booking/proces
     // laundry-mark-ready-from-initial-cleaning, cancel-from-initial-cleaning,
     // auto-complete-from-initial-cleaning), -5 for the removed provider-review diamond
     // (review-1/-2-by-provider, review-2-by-customer, expire-customer/-provider-review-period).
-    expect(ednTransitions.length).toEqual(37);
+    // 2026-10-13: +1 for transition/customer-cancel (the customer's own 'accepted' cancel door).
+    expect(ednTransitions.length).toEqual(38);
   });
 
   it('declares exactly the transitions the EDN declares', () => {
@@ -291,6 +292,7 @@ describe('cocloset-booking payout and cancel topology', () => {
         transitions.OPERATOR_DECLINE,
         transitions.EXPIRE,
         transitions.CANCEL,
+        transitions.CUSTOMER_CANCEL,
         transitions.CANCEL_FROM_INITIAL_CLEANING,
         transitions.CANCEL_FROM_READY_FOR_PICKUP,
         transitions.CANCEL_FROM_PICKED_UP,
@@ -350,6 +352,30 @@ describe('cocloset-booking payout and cancel topology', () => {
     const cleaningEdges = Object.values(graph.states[states.CLEANING].on);
     expect(cleaningEdges).not.toContain(states.CANCELED);
   });
+
+  // 2026-10-13: 'accepted' now has a SECOND door, for the customer - see the EDN's
+  // :transition/customer-cancel comment. It is deliberately the ONLY state with a
+  // customer-actor cancel; every later state stays operator-only pending a partial-refund
+  // design that does not exist yet.
+  it('also offers the customer a self-cancel from accepted, as a distinct transition', () => {
+    expect(graph.states[states.ACCEPTED].on[transitions.CUSTOMER_CANCEL]).toEqual(
+      states.CANCELED
+    );
+    expect(transitions.CUSTOMER_CANCEL).not.toEqual(transitions.CANCEL);
+  });
+
+  it('gives the customer no self-cancel anywhere past accepted', () => {
+    [
+      states.INITIAL_CLEANING,
+      states.READY_FOR_PICKUP,
+      states.PICKED_UP,
+      states.OVERDUE,
+      states.RETURNED,
+      states.CLEANING,
+    ].forEach(state => {
+      expect(Object.keys(graph.states[state].on)).not.toContain(transitions.CUSTOMER_CANCEL);
+    });
+  });
 });
 
 describe('cocloset-booking predicates', () => {
@@ -389,6 +415,7 @@ describe('cocloset-booking predicates', () => {
       transitions.EXPIRE_PAYMENT,
       transitions.EXPIRE,
       transitions.CANCEL,
+      transitions.CUSTOMER_CANCEL,
       transitions.CANCEL_FROM_INITIAL_CLEANING,
       transitions.CANCEL_FROM_READY_FOR_PICKUP,
       transitions.CANCEL_FROM_PICKED_UP,
@@ -668,6 +695,14 @@ describe('cocloset-booking owner notifications', () => {
   // write-off path. `:on` and `:to` are both single-valued, so "tell both
   // parties on all five" is exactly ten entries - there is no shorter
   // spelling, and a missing one is a silent refund all over again.
+  //
+  // CUSTOMER_CANCEL (2026-10-13) is deliberately EXCLUDED from this list, even
+  // though it also reaches :state/cancelled with the same three actions as
+  // every transition below. It is tested separately, just past this block:
+  // unlike the five here, it is customer-actor rather than operator-actor, and
+  // it does NOT share booking-cancelled/-owner - those templates say "was
+  // cancelled by {marketplaceName}", which would misattribute a customer's own
+  // cancellation to the marketplace. See the EDN's notification comment.
   // -----------------------------------------------------------------------
   const CANCEL_TRANSITIONS = [
     transitions.CANCEL,
@@ -678,11 +713,13 @@ describe('cocloset-booking owner notifications', () => {
     transitions.CANCEL_FROM_RETURNED,
   ];
 
-  it('covers every cancel transition the process has, not a list of our own', () => {
-    // If a sixth cancel is ever added, this fails rather than leaving the new
-    // one silently unnotified.
+  it('covers every OPERATOR cancel transition the process has, not a list of our own', () => {
+    // If a seventh operator cancel is ever added, this fails rather than
+    // leaving the new one silently unnotified. CUSTOMER_CANCEL is filtered
+    // out here on purpose - see the comment above and the dedicated block below.
     const ednCancels = readEdnTransitions()
       .filter(t => toJsState(t.to) === states.CANCELED)
+      .filter(t => t.transition !== transitions.CUSTOMER_CANCEL)
       .map(t => t.transition);
     expect(ednCancels.slice().sort()).toEqual(CANCEL_TRANSITIONS.slice().sort());
   });
@@ -719,6 +756,47 @@ describe('cocloset-booking owner notifications', () => {
     const names = CANCEL_TRANSITIONS.flatMap(notificationsOn);
     expect(names).toHaveLength(12);
     expect(new Set(names).size).toEqual(12);
+  });
+
+  // -----------------------------------------------------------------------
+  // transition/customer-cancel (2026-10-13) - the renter's own cancel door,
+  // kept apart from CANCEL_TRANSITIONS above (see the comment on that list).
+  // -----------------------------------------------------------------------
+  describe('transition/customer-cancel', () => {
+    it('is wired exactly like the EDN describes: customer actor, accepted -> cancelled', () => {
+      const ednCancels = readEdnTransitions().filter(t => toJsState(t.to) === states.CANCELED);
+      const entry = ednCancels.find(t => t.transition === transitions.CUSTOMER_CANCEL);
+
+      expect(entry).toBeDefined();
+      expect(toJsState(entry.from)).toEqual(states.ACCEPTED);
+      // Same three actions, same order, as the operator's :transition/cancel.
+      expect(entry.actions).toEqual([
+        'calculate-full-refund',
+        'stripe-refund-payment',
+        'cancel-booking',
+      ]);
+
+      // Every EDN cancel is now accounted for: the six operator ones plus this one.
+      expect(ednCancels.map(t => t.transition).sort()).toEqual(
+        [...CANCEL_TRANSITIONS, transitions.CUSTOMER_CANCEL].sort()
+      );
+    });
+
+    it('notifies the same two parties as every other cancel, with its OWN template pair', () => {
+      expect(notificationEntriesOn(transitions.CUSTOMER_CANCEL)).toHaveLength(2);
+      expect(
+        notificationRolesOn(transitions.CUSTOMER_CANCEL)
+          .slice()
+          .sort()
+      ).toEqual(['customer', 'provider']);
+
+      // NOT booking-cancelled/-owner - those say "was cancelled by
+      // {marketplaceName}", a false attribution for a customer-initiated cancel.
+      expect(templatesByRoleOn(transitions.CUSTOMER_CANCEL)).toEqual({
+        customer: 'booking-customer-cancelled',
+        provider: 'booking-customer-cancelled-owner',
+      });
+    });
   });
 });
 
@@ -1138,6 +1216,81 @@ describe('cocloset-booking email templates', () => {
     const payoutSentences = copy.split(/(?<=[.!?])\s+/).filter(s => /payout/i.test(s));
     expect(payoutSentences.length).toBeGreaterThan(1);
     payoutSentences.forEach(sentence => expect(sentence).toMatch(/\b(no|not|never)\b/i));
+  });
+
+  // -----------------------------------------------------------------------
+  // The two customer-cancellation templates (2026-10-13).
+  //
+  // Unlike booking-cancelled/-owner above, these serve exactly ONE transition
+  // (transition/customer-cancel), so they are allowed - required, even - to
+  // say what that shared pair deliberately does not: that the RENTER cancelled,
+  // not the marketplace. These assertions protect that attribution rather than
+  // the situation-neutrality the shared pair needs.
+  // -----------------------------------------------------------------------
+  it('routes every string through {{t}} with its own key prefix', () => {
+    [
+      ['booking-customer-cancelled', 'BookingCustomerCancelled'],
+      ['booking-customer-cancelled-owner', 'BookingCustomerCancelledOwner'],
+    ].forEach(([template, keyPrefix]) => {
+      const html = read(template, 'html.html');
+      expect(html).toContain('{{set-translations (asset "content/email-texts.json")}}');
+      expect(read(template, 'subject.txt')).toContain(
+        '{{set-translations (asset "content/email-texts.json")}}'
+      );
+
+      const keys = (html.match(/\{\{t "([A-Za-z.]+)"/g) || []).map(m =>
+        m.replace(/\{\{t "/, '').replace(/"$/, '')
+      );
+      expect(keys.length).toBeGreaterThan(0);
+      keys
+        .filter(key => !key.startsWith('TransactionEmails.'))
+        .forEach(key => expect(key.startsWith(`${keyPrefix}.`)).toEqual(true));
+    });
+  });
+
+  it('tells the customer, without hedging, that they have their money back - same as booking-cancelled', () => {
+    const copy = copyOf('booking-customer-cancelled');
+    expect(read('booking-customer-cancelled', 'html.html')).toContain(
+      'BookingCustomerCancelled.Content'
+    );
+    expect(copy).toMatch(/refunded in full/i);
+    expect(copy).not.toMatch(/will be refunded/i);
+    expect(copy).not.toMatch(/payout/i);
+  });
+
+  it('tells the owner the RENTER cancelled, never the marketplace', () => {
+    const html = read('booking-customer-cancelled-owner', 'html.html');
+    const subject = read('booking-customer-cancelled-owner', 'subject.txt');
+    const copy = copyOf('booking-customer-cancelled-owner');
+
+    // The whole reason this template exists rather than reusing
+    // booking-cancelled-owner: that one says "was cancelled by
+    // {marketplaceName}", a false attribution here.
+    expect(copy).toMatch(/cancelled by \{customerDisplayName\}/i);
+    expect(html + subject).not.toMatch(/cancelled by \{marketplaceName\}/i);
+    expect(html + subject).not.toMatch(/was cancelled by the marketplace/i);
+
+    expect(html).toContain('BookingCustomerCancelledOwner.NoPayout');
+    expect(copy).toMatch(/no payout for this rental/i);
+    expect(subject).toMatch(/no payout/i);
+    expect(html + subject).not.toMatch(/(have|has) been (paid|released)/i);
+
+    const payoutSentences = copy.split(/(?<=[.!?])\s+/).filter(s => /payout/i.test(s));
+    expect(payoutSentences.length).toBeGreaterThan(1);
+    payoutSentences.forEach(sentence => expect(sentence).toMatch(/\b(no|not|never)\b/i));
+  });
+
+  it('CTAs point at the right party s own page', () => {
+    // Customer -> /order/, provider -> /sale/, same split as every other pair
+    // in this process (e.g. booking-cancelled vs booking-cancelled-owner).
+    expect(read('booking-customer-cancelled', 'html.html')).toContain('/order/{{url-encode id}}/');
+    expect(read('booking-customer-cancelled', 'html.html')).not.toContain('/sale/{{url-encode id}}/');
+    expect(read('booking-customer-cancelled-owner', 'html.html')).toContain(
+      '/sale/{{url-encode id}}/'
+    );
+    expect(read('booking-customer-cancelled-owner', 'html.html')).not.toContain(
+      '/order/{{url-encode id}}/'
+    );
   });
 
   // -----------------------------------------------------------------------

@@ -41,7 +41,7 @@ jest.mock('../../util/api', () => ({
 }));
 
 const { Money, UUID } = sdkTypes;
-const { screen, waitFor, within } = testingLibrary;
+const { screen, waitFor, within, fireEvent } = testingLibrary;
 const noop = () => null;
 
 const bookingTransitions = getProcess('default-booking')?.transitions;
@@ -1732,6 +1732,131 @@ describe('TransactionPage', () => {
       });
 
       expect(autoAcceptBooking).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Customer self-cancel (2026-10-13). ACCEPTED is deliberately the only state with a
+  // customer-facing cancel button - see TransactionPage.stateDataCoclosetBooking.js's own
+  // comment on the [states.ACCEPTED, CUSTOMER] cond. This covers the whole click-through:
+  // button visible only for the right role+state, clicking it opens the confirm modal rather
+  // than transitioning immediately, and only the modal's own confirm button dispatches.
+  // -------------------------------------------------------------------------
+  describe('cocloset-booking: customer self-cancel button', () => {
+    const processName = 'cocloset-booking';
+
+    const makeAcceptedTx = () =>
+      createTransaction({
+        id: 'id-cocloset-accepted-for-cancel',
+        customer,
+        provider,
+        listing: createListing('listing-item', {
+          publicData: {
+            listingType: 'rent-clothes',
+            transactionProcessAlias: 'cocloset-booking/release-1',
+            unitType: 'day',
+          },
+        }),
+        booking: createBooking('booking-id', {
+          start: new Date(Date.UTC(2022, 5, 14)),
+          end: new Date(Date.UTC(2022, 5, 21)),
+        }),
+        processName,
+        lastTransition: coclosetBookingTransitions.ACCEPT,
+        lastTransitionedAt: new Date(Date.UTC(2022, 0, 15)),
+        lineItems: [lineItemProviderCommission],
+      });
+
+    const cancelButtonLabel =
+      'TransactionPage.cocloset-booking.customer.transition-customer-cancel.actionButton';
+
+    test('shows the cancel button to the customer at accepted', async () => {
+      const props = {
+        ...panelBaseProps,
+        currentUser: createCurrentUser(customerId),
+        transaction: makeAcceptedTx(),
+        transactionRole: TX_TRANSITION_ACTOR_CUSTOMER,
+        onTransition: jest.fn(() => Promise.resolve()),
+        params: { id: 'id-cocloset-accepted-for-cancel' },
+      };
+
+      await act(async () => {
+        render(<TransactionPageComponent {...props} />);
+      });
+
+      expect(screen.getAllByText(cancelButtonLabel).length).toBeGreaterThan(0);
+    });
+
+    test('hides the cancel button from the provider at accepted', async () => {
+      const props = {
+        ...panelBaseProps,
+        currentUser: createCurrentUser(providerId),
+        transaction: makeAcceptedTx(),
+        transactionRole: TX_TRANSITION_ACTOR_PROVIDER,
+        onTransition: jest.fn(() => Promise.resolve()),
+        params: { id: 'id-cocloset-accepted-for-cancel' },
+      };
+
+      await act(async () => {
+        render(<TransactionPageComponent {...props} />);
+      });
+
+      expect(screen.queryByText(cancelButtonLabel)).toBeNull();
+    });
+
+    test('clicking the button opens a confirm modal rather than transitioning immediately', async () => {
+      const onTransition = jest.fn(() => Promise.resolve());
+      const props = {
+        ...panelBaseProps,
+        currentUser: createCurrentUser(customerId),
+        transaction: makeAcceptedTx(),
+        transactionRole: TX_TRANSITION_ACTOR_CUSTOMER,
+        onTransition,
+        params: { id: 'id-cocloset-accepted-for-cancel' },
+      };
+
+      await act(async () => {
+        render(<TransactionPageComponent {...props} />, { withPortals: true });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByText(cancelButtonLabel)[0]);
+      });
+
+      // Still nothing dispatched: the click only opened the confirm modal.
+      expect(onTransition).not.toHaveBeenCalled();
+      expect(screen.getAllByText('CancelBookingModal.title').length).toBeGreaterThan(0);
+    });
+
+    test('confirming inside the modal dispatches transition/customer-cancel, and only that', async () => {
+      const onTransition = jest.fn(() => Promise.resolve());
+      const props = {
+        ...panelBaseProps,
+        currentUser: createCurrentUser(customerId),
+        transaction: makeAcceptedTx(),
+        transactionRole: TX_TRANSITION_ACTOR_CUSTOMER,
+        onTransition,
+        params: { id: 'id-cocloset-accepted-for-cancel' },
+      };
+
+      await act(async () => {
+        render(<TransactionPageComponent {...props} />, { withPortals: true });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByText(cancelButtonLabel)[0]);
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByText('CancelBookingModal.submit')[0]);
+      });
+
+      expect(onTransition).toHaveBeenCalledTimes(1);
+      expect(onTransition).toHaveBeenCalledWith(
+        expect.anything(),
+        coclosetBookingTransitions.CUSTOMER_CANCEL,
+        {}
+      );
     });
   });
 });

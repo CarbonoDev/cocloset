@@ -16,17 +16,20 @@ const {
   notifyPickupScheduled,
   notifyReturnScheduled,
   notifyCleaningRequired,
+  notifyBookingCancelled,
 } = require('./laundryMailer');
 
 // Every laundry-facing notification, so the never-fail / always-log contracts are
 // asserted for all of them rather than for whichever ones were remembered.
 // `new-incoming-garment` joined the list when it was finally wired up (2026-08-10,
-// from server/api/listing-laundry-assignment.js).
+// from server/api/listing-laundry-assignment.js). `booking-cancelled` joined on
+// 2026-10-13, from server/api/customer-cancel-notify-laundry.js.
 const ALL = [
   ['new-incoming-garment', notifyNewIncomingGarment],
   ['pickup-scheduled', notifyPickupScheduled],
   ['return-scheduled', notifyReturnScheduled],
   ['cleaning-required', notifyCleaningRequired],
+  ['booking-cancelled', notifyBookingCancelled],
 ];
 
 describe('laundryMailer', () => {
@@ -126,6 +129,21 @@ describe('laundryMailer', () => {
       const call = sendMail.mock.calls[0][0];
       expect(call.text).toContain('Small pull at left cuff.');
       expect(call.text).toContain('inspect the garment before cleaning');
+    });
+
+    it('sends Booking Cancelled naming the renter and the garment', async () => {
+      await notifyBookingCancelled({
+        to: 'studio@example.com',
+        laundryName: 'Studio Pigalle',
+        garmentTitle: 'Draped jersey gown',
+        customerName: 'Jane Doe',
+        transactionId: 'tx-1',
+      });
+
+      const call = sendMail.mock.calls[0][0];
+      expect(call.to).toBe('studio@example.com');
+      expect(call.subject).toContain('booking cancelled');
+      expect(call.text).toContain('Jane Doe cancelled this booking for Draped jersey gown');
     });
 
     it('omits the damage section when nothing was reported', async () => {

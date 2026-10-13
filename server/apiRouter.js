@@ -41,6 +41,7 @@ const listingPickupQr = require('./api/listing-pickup-qr');
 const listingPickupStatus = require('./api/listing-pickup-status');
 const listingPickupConfirm = require('./api/listing-pickup-confirm');
 const autoAcceptBooking = require('./api/auto-accept-booking');
+const customerCancelNotifyLaundry = require('./api/customer-cancel-notify-laundry');
 const initUserRole = require('./api/init-user-role');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
@@ -173,6 +174,12 @@ router.post('/lender-new-request', lenderNewRequest);
 // had; no EDN change was needed. Does nothing, loudly, for a garment that is not at its studio.
 // See the header of server/api/auto-accept-booking.js.
 router.post('/auto-accept-booking', autoAcceptBooking);
+
+// The laundry-side effect of a customer's self-cancellation (transition/customer-cancel).
+// That transition is not privileged and is fired straight from the browser, so this is only
+// the Mailgun notification half - it never re-runs or second-guesses the cancellation itself.
+// See the header of server/api/customer-cancel-notify-laundry.js.
+router.post('/customer-cancel-notify-laundry', customerCancelNotifyLaundry);
 
 // Applies the `metadata.isLaundry = false` default to the CALLING user, right
 // after signup. Takes no request parameters at all - the target is the

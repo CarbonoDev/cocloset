@@ -120,6 +120,11 @@ export const transitions = {
   // 'returned' (into 'cleaning'), and Sharetribe has no post-payout refund
   // action, so 'cleaning' is the first state with no cancel.
   CANCEL: 'transition/cancel',
+  // THE CUSTOMER'S OWN DOOR (2026-10-13), 'accepted' only. Full refund, same actions as
+  // CANCEL above - see the EDN's :transition/customer-cancel comment for why this is the
+  // only state with a customer-actor cancel: every later laundry state still needs an
+  // operator and a partial-refund design that does not exist yet.
+  CUSTOMER_CANCEL: 'transition/customer-cancel',
   CANCEL_FROM_READY_FOR_PICKUP: 'transition/cancel-from-ready-for-pickup',
   CANCEL_FROM_PICKED_UP: 'transition/cancel-from-picked-up',
   CANCEL_FROM_OVERDUE: 'transition/cancel-from-overdue',
@@ -239,6 +244,7 @@ export const graph = {
         // Garment coming from its owner for the first time: it gets a wash first.
         [transitions.LAUNDRY_RECEIVE_FROM_PROVIDER]: states.INITIAL_CLEANING,
         [transitions.CANCEL]: states.CANCELED,
+        [transitions.CUSTOMER_CANCEL]: states.CANCELED,
         [transitions.COMPLETE]: states.DELIVERED,
         [transitions.OPERATOR_COMPLETE]: states.DELIVERED,
       },
@@ -317,6 +323,7 @@ export const isRelevantPastTransition = transition => {
     transitions.ACCEPT,
     transitions.OPERATOR_ACCEPT,
     transitions.CANCEL,
+    transitions.CUSTOMER_CANCEL,
     transitions.CANCEL_FROM_INITIAL_CLEANING,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,
@@ -410,6 +417,7 @@ export const isRefunded = transition => {
     transitions.EXPIRE_PAYMENT,
     transitions.EXPIRE,
     transitions.CANCEL,
+    transitions.CUSTOMER_CANCEL,
     transitions.CANCEL_FROM_INITIAL_CLEANING,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,

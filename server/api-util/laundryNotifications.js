@@ -372,12 +372,65 @@ const garmentHandedBackNotification = ({
   });
 };
 
+/**
+ * Customer self-cancellation (2026-10-13) - the laundry side.
+ *
+ * Fires on `transition/customer-cancel`: the renter cancelled while the booking was still
+ * sitting in `:state/accepted`, i.e. before ANY laundry-side transition fired for this
+ * booking (see that transition's comment in process.edn - that is deliberately the only
+ * condition under which a customer can self-cancel). Two physical situations both land here:
+ * the provider never dropped the garment off, or it was already at the laundry from a
+ * previous cycle but the laundry had not yet run its ready-for-pickup prep. Either way there
+ * is no new handover to expect FOR THIS BOOKING, and that is the whole message.
+ *
+ * Mirrors returnScheduledNotification's exact shape: a plain subject/text/html via the shared
+ * renderEmail() helper above, same optional-ticket-code suffix convention.
+ *
+ * @param {Object} data
+ * @param {string} [data.laundryName]
+ * @param {string} [data.garmentTitle]
+ * @param {string} [data.ticketCode] - cosmetic display code; may not exist yet if the laundry
+ *   never issued one for this booking (see design §11 - a ticket is only opened once the
+ *   garment is actually received)
+ * @param {string} [data.customerName]
+ * @param {string} [data.transactionId]
+ * @param {string} [data.marketplaceName]
+ * @returns {{subject: string, text: string, html: string}}
+ */
+const bookingCancelledNotification = ({
+  laundryName,
+  garmentTitle,
+  ticketCode,
+  customerName,
+  transactionId,
+  marketplaceName,
+} = {}) => {
+  const name = resolveMarketplaceName(marketplaceName);
+  const garment = garmentTitle || UNKNOWN_GARMENT;
+  const renter = customerName || 'The renter';
+  const ticketSuffix = ticketCode ? ` (${ticketCode})` : '';
+  return renderEmail({
+    subject: `${name}: booking cancelled — ${garment}${ticketSuffix}`,
+    greetingName: laundryName,
+    intro: `${renter} cancelled this booking for ${garment} before any handover took place. There is no garment to expect for this booking, and nothing further is needed from you.`,
+    rows: [
+      ['Ticket', ticketCode],
+      ['Garment', garmentTitle],
+      ['Customer', customerName],
+      ['Transaction', transactionId],
+    ],
+    outro: 'If you were already expecting a drop-off or a pickup for this booking, you can stand down - it will not happen.',
+    marketplaceName: name,
+  });
+};
+
 module.exports = {
   garmentHandedBackNotification,
   newIncomingGarmentNotification,
   pickupScheduledNotification,
   returnScheduledNotification,
   cleaningRequiredNotification,
+  bookingCancelledNotification,
   // Exported for tests and for reuse by any future laundry-facing email.
   escapeHtml,
   formatDateTime,

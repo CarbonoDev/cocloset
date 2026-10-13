@@ -383,6 +383,41 @@
   ;;
   ;; and :state/cleaning deliberately has none, because a refund there is
   ;; not expressible.
+  ;;
+  ;; :STATE/ACCEPTED NOW HAS A SECOND DOOR, FOR THE CUSTOMER (2026-10-13).
+  ;;
+  ;; The client asked for a self-service cancellation, but only for as long as
+  ;; nothing laundry-side has happened yet for THIS booking. Two scenarios were
+  ;; described and both collapse onto the SAME EDN condition:
+  ;;
+  ;;   1. the provider has not yet dropped the garment off at the laundry for
+  ;;      the first time (:transition/laundry-receive-from-provider has not
+  ;;      fired), or
+  ;;   2. the garment was already at the laundry from a previous cycle (the
+  ;;      "fast path"), but the laundry has not yet run its ready-for-pickup
+  ;;      prep step either (:transition/laundry-mark-ready has not fired).
+  ;;
+  ;; In BOTH cases the transaction is simply still sitting in :state/accepted -
+  ;; every laundry-side transition out of it (laundry-receive-from-provider,
+  ;; laundry-mark-ready) leaves :state/accepted for good, so "nothing
+  ;; laundry-side has happened yet" IS "still in :state/accepted". That is why
+  ;; this is one new transition, not two: :transition/customer-cancel, actor
+  ;; :actor.role/customer, :from :state/accepted, :to :state/cancelled - same
+  ;; three actions as :transition/cancel above (full refund, never
+  ;; privileged - see that transition's own actions for why neither
+  ;; calculate-full-refund, stripe-refund-payment nor cancel-booking needs
+  ;; :privileged? true).
+  ;;
+  ;; :state/accepted is DELIBERATELY the only state with a customer-actor
+  ;; cancel. Every later laundry state (initial-cleaning onward) stays
+  ;; operator-only, full refund, completely unchanged by this: a partial
+  ;; refund for a booking that has already cost the laundry real handling
+  ;; needs a direct Stripe integration the client has not finished specifying,
+  ;; and is explicitly out of scope here.
+  ;;
+  ;; NOT SHARING :transition/cancel's NOTIFICATIONS. See the notification
+  ;; block below for why booking-cancelled/-owner are the wrong templates for
+  ;; this door even though the actions are identical.
   ;; ---------------------------------------------------------------------
 
   {:name :transition/complete,
@@ -401,6 +436,20 @@
    :to :state/delivered}
   {:name :transition/cancel,
    :actor :actor.role/operator,
+   :actions
+   [{:name :action/calculate-full-refund}
+    {:name :action/stripe-refund-payment}
+    ;; Keep this action last in the list of actions for
+    ;; the transition
+    {:name :action/cancel-booking}],
+   :from :state/accepted,
+   :to :state/cancelled}
+  {:name :transition/customer-cancel,
+   :actor :actor.role/customer,
+   ;; THE CUSTOMER'S OWN DOOR OUT OF :state/accepted (2026-10-13). Same
+   ;; actions, same refund, same target state as :transition/cancel above -
+   ;; see the "PAYOUT AND CANCELLATION" note for why this is the only state
+   ;; that gets one of these and why it is deliberately not two transitions.
    :actions
    [{:name :action/calculate-full-refund}
     {:name :action/stripe-refund-payment}
@@ -956,6 +1005,22 @@
    :on :transition/cancel,
    :to :actor.role/provider,
    :template :booking-cancelled-owner}
+  ;; NEW (2026-10-13), alongside :transition/customer-cancel itself. SAME TWO ROLES as every
+  ;; other cancel above, but DELIBERATELY NOT the same two templates. booking-cancelled-owner
+  ;; says plainly "was cancelled by {marketplaceName}" - true for every operator cancel, and a
+  ;; FALSE attribution here: the renter cancelled, the marketplace did not act. So this pair
+  ;; gets its own templates (booking-customer-cancelled / booking-customer-cancelled-owner)
+  ;; rather than reusing booking-cancelled/-owner, even though the three actions on
+  ;; :transition/customer-cancel are byte-identical to :transition/cancel's. Money and attribution
+  ;; are different facts, and only one of them is shared.
+  {:name :notification/booking-customer-cancelled-to-customer,
+   :on :transition/customer-cancel,
+   :to :actor.role/customer,
+   :template :booking-customer-cancelled}
+  {:name :notification/booking-customer-cancelled-to-provider,
+   :on :transition/customer-cancel,
+   :to :actor.role/provider,
+   :template :booking-customer-cancelled-owner}
   ;; NEW (2026-09-21), alongside :transition/cancel-from-initial-cleaning itself - same
   ;; two-notification pattern as every other cancel-from-* below.
   {:name :notification/booking-cancelled-from-initial-cleaning-to-customer,
