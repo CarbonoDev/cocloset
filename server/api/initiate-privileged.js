@@ -21,6 +21,7 @@ const {
 } = require('../api-util/listingCleaningGaps');
 const { assertRentalPeriodBooking } = require('../api-util/rentalPeriods');
 const { ensureHandoverQr } = require('../api-util/handoverQr');
+const { capturePaymentIntentIdMaybe } = require('../api-util/paymentIntentLedger');
 const log = require('../log');
 
 const { Money } = sharetribeSdk.types;
@@ -55,6 +56,41 @@ const generateHandoverQrMaybe = (listing, transaction) => {
     });
   } catch (e) {
     log.error(e, 'handover-qr-write-failed', { txId: transaction.id?.uuid || 'unknown' });
+  }
+};
+
+// The prerequisite for a later, separately-tracked feature (partial refunds via
+// direct Stripe calls): Sharetribe exposes a transaction's Stripe PaymentIntent
+// id in `protectedData.stripePaymentIntents.default.stripePaymentIntentId`
+// ONLY between `:action/stripe-create-payment-intent` running and
+// `:action/stripe-confirm-payment-intent` running - it deletes the key once the
+// PaymentIntent is confirmed, and after that there is no way to retrieve it
+// through either API. This is that one moment, so it is captured into
+// `metadata` (which Sharetribe never clears) right here - same fire-and-continue
+// slot as `generateHandoverQrMaybe` above, and the same gating (Cocloset
+// listing only; this is Cocloset-specific infrastructure). See
+// api-util/paymentIntentLedger.js for the full write contract.
+//
+// Called after the response is sent, so it must never throw: getIntegrationSdk()
+// throws on missing env vars, and an escaping throw here would reach the
+// trailing .catch() and try to respond twice. capturePaymentIntentIdMaybe itself
+// never rejects; this try/catch only guards the synchronous getIntegrationSdk()
+// call, mirroring generateHandoverQrMaybe's own guard above.
+const capturePaymentIntentLedgerMaybe = (listing, transaction) => {
+  if (!isCoclosetBookingListing(listing) || !transaction?.id) {
+    return;
+  }
+
+  try {
+    capturePaymentIntentIdMaybe({
+      integrationSdk: getIntegrationSdk(),
+      transaction,
+      log,
+    });
+  } catch (e) {
+    log.error(e, 'payment-intent-ledger-capture-failed', {
+      txId: transaction.id?.uuid || 'unknown',
+    });
   }
 };
 
@@ -277,9 +313,11 @@ module.exports = (req, res) => {
         .end();
 
       // A speculative call builds a breakdown for the CheckoutPage and creates
-      // no transaction, so there is nothing to attach a QR to.
+      // no transaction, so there is nothing to attach a QR to (or a
+      // PaymentIntent id to capture - a speculative call never reaches Stripe).
       if (!isSpeculative) {
         generateHandoverQrMaybe(listingEntity, data?.data);
+        capturePaymentIntentLedgerMaybe(listingEntity, data?.data);
       }
     })
     .catch(e => {

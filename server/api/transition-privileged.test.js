@@ -18,9 +18,14 @@ jest.mock('../api-util/handoverQr', () => ({
   ensureHandoverQr: jest.fn(),
 }));
 
+jest.mock('../api-util/paymentIntentLedger', () => ({
+  capturePaymentIntentIdMaybe: jest.fn(),
+}));
+
 const { getSdk, getTrustedSdk, fetchCommission, handleError } = require('../api-util/sdk');
 const { buildLineItemsForListing } = require('../api-util/lineItems');
 const { getIntegrationSdk } = require('../api-util/integrationSdk');
+const { capturePaymentIntentIdMaybe } = require('../api-util/paymentIntentLedger');
 
 const transitionPrivileged = require('./transition-privileged');
 
@@ -98,16 +103,23 @@ const mockRes = () => ({
 
 // See the note in initiate-privileged.test.js: the real client path puts
 // `priceVariantName` in `bodyParams.params`, not in `orderData`. Default to that shape.
-const req = ({ days, startsInDays = 0, priceVariantName = '7-days', variantIn = 'params' }) => ({
+const req = ({
+  days,
+  startsInDays = 0,
+  priceVariantName = '7-days',
+  variantIn = 'params',
+  isSpeculative = false,
+  transitionName = 'transition/request-payment-after-inquiry',
+}) => ({
   body: {
-    isSpeculative: false,
+    isSpeculative,
     orderData: {
       currency: 'EUR',
       ...(variantIn === 'orderData' ? { priceVariantName } : {}),
     },
     bodyParams: {
       id: TX_ID,
-      transition: 'transition/request-payment-after-inquiry',
+      transition: transitionName,
       params: {
         listingId: LISTING_ID,
         bookingStart: daysFromToday(startsInDays),
@@ -303,5 +315,58 @@ describe('transition-privileged: the booking gates are reached on this door too'
       expect(handleError.mock.calls[0][1].data.initialCleaningDays).toBe(3);
       expect(transition).not.toHaveBeenCalled();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The PaymentIntent-id capture (prerequisite for the separately-tracked
+// partial-refund feature). This endpoint is shared by every default-negotiation
+// offer transition as well as `request-payment-after-inquiry`, so the capture
+// must be gated on the transition name exactly like `generateHandoverQrMaybe`
+// is - only the transition that actually creates the reservation (and its
+// PaymentIntent) may fire it. These tests assert that WIRING (this repo had no
+// dedicated test of generateHandoverQrMaybe's own gating either; this is the
+// minimal coverage for the new behavior instead of none).
+// ---------------------------------------------------------------------------
+describe('transition-privileged: the PaymentIntent-id capture', () => {
+  it('fires on a real request-payment-after-inquiry call (reservation creation)', async () => {
+    const { transition } = setup({ priceVariants: PERIODS, initialCleaningDays: 3 });
+    transition.mockResolvedValue({
+      data: { data: { id: TX_ID, attributes: { protectedData: {} } } },
+    });
+
+    await run({ days: 7, startsInDays: 4, priceVariantName: '7-days' });
+
+    expect(capturePaymentIntentIdMaybe).toHaveBeenCalledTimes(1);
+    const call = capturePaymentIntentIdMaybe.mock.calls[0][0];
+    expect(call.transaction).toEqual({ id: TX_ID, attributes: { protectedData: {} } });
+    expect(call.log).toBeDefined();
+    expect(getIntegrationSdk).toHaveBeenCalled();
+  });
+
+  it('does NOT fire on a speculative call - nothing was created, nothing reached Stripe', async () => {
+    setup({ priceVariants: PERIODS, initialCleaningDays: 3 });
+
+    await run({
+      days: 7,
+      startsInDays: 4,
+      priceVariantName: '7-days',
+      isSpeculative: true,
+    });
+
+    expect(capturePaymentIntentIdMaybe).not.toHaveBeenCalled();
+  });
+
+  it('does NOT fire on a negotiation offer transition - this endpoint also carries those', async () => {
+    setup({ priceVariants: PERIODS, initialCleaningDays: 3 });
+
+    await run({
+      days: 7,
+      startsInDays: 4,
+      priceVariantName: '7-days',
+      transitionName: 'transition/make-offer',
+    });
+
+    expect(capturePaymentIntentIdMaybe).not.toHaveBeenCalled();
   });
 });
