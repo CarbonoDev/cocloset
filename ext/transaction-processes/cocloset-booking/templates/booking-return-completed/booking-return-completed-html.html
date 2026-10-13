@@ -38,10 +38,13 @@
                 </table>
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700">{{t "BookingReturnCompleted.CoclosetUpdate" "CoCloset Update: We're reviewing a condition note from the dry cleaner regarding this garment. Rest assured, if any significant damage occurred, CoCloset covers the cost to make it right. We'll update you shortly."}}</p>
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompleted.DamageNextSteps" "{marketplaceName} has been notified and the renter has been told a report was filed. Nothing has been charged to anyone and no decision has been made yet. Review the note, and reply on the order page if you disagree with it or want to add photos." marketplaceName=marketplace.name}}</p>
-                {{else}}
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompleted.Content" "The laundry has received {listingTitle} back from {customerDisplayName} and recorded its condition. They reported no damage. Cleaning starts next." listingTitle=listing.title dateStart=booking.start dateEnd=(date-transform booking.end days=-1) customerDisplayName=customer.display-name}}</p>
-                {{/if}}
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompleted.PayoutPending" "Your payout has not been released yet. It is sent once the laundry opens the cleaning ticket for this garment, and you will get a separate email when it goes out."}}</p>
+                {{else}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompleted.Greeting" "Hi {lenderName}," lenderName=provider.display-name}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{#if metadata.laundryName}}{{t "BookingReturnCompleted.Content" "We wanted to let you know that your {listingTitle} has been successfully dropped off by the renter at your designated partner location, {laundryName}." listingTitle=listing.title laundryName=listing.public-data.assignedLaundryName}}{{else}}{{t "BookingReturnCompleted.ContentNoLaundry" "We wanted to let you know that your {listingTitle} has been successfully dropped off by the renter at your designated partner location." listingTitle=listing.title}}{{/if}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompleted.Cleaning" "The dry cleaning team has logged the return and is cleaning the item to prepare it for the next rental."}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompleted.ViewDetails" "You can view the full details and earnings of this rental anytime in your CoCloset Inbox."}}</p>
+                {{/if}}
                 <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
                   <tbody>
                     <tr>
@@ -54,7 +57,8 @@
                   </tbody>
                 </table>
                 {{/with}}
-                <p style="font-size:16px;line-height:1.4;margin:24px 0 0;color:#484848">{{t "TransactionEmails.SignOff" "Warmly,"}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingReturnCompleted.ThankYou" "Thank you for sharing your closet and helping keep fashion circular!"}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:24px 0 0;color:#484848">{{t "BookingReturnCompleted.SignOff" "Best,"}}</p>
                 <p style="font-size:16px;line-height:1.4;margin:4px 0 0;color:#484848">{{t "TransactionEmails.SignOffTeam" "The {marketplaceName} Team" marketplaceName=marketplace.name}}</p>
                 <div>
                   <hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#E1E1E1;margin:20px 0" />

@@ -31,7 +31,7 @@
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPickupReminder.Greeting" "Hi {firstName}," firstName=customer.first-name}}</p>
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700">{{t "BookingPickupReminder.Tagline" "Make room in your closet!"}}</p>
                 {{#if listing.public-data.assignedLaundryName}}
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPickupReminder.Content" "Your {listingTitle} rental starts tomorrow on {dateStart, date, ::YYYYMMMd}. The garment will be ready for pick up at {laundryName}." listingTitle=listing.title dateStart=booking.start laundryName=listing.public-data.assignedLaundryName}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPickupReminder.Content" "Your {listingTitle} rental starts tomorrow on {dateStart, date, ::YYYYMMMd}. The garment will be ready for pick up at {laundryName} ({pickupNeighborhood}, {pickupAddress})." listingTitle=listing.title dateStart=booking.start laundryName=listing.public-data.assignedLaundryName pickupNeighborhood=listing.public-data.pickupNeighborhood pickupAddress=listing.public-data.pickupAddress}}</p>
                 {{else}}
                 <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPickupReminder.ContentNoLaundry" "Your {listingTitle} rental starts tomorrow on {dateStart, date, ::YYYYMMMd}. The garment will be ready for pick up at the laundry." listingTitle=listing.title dateStart=booking.start}}</p>
                 {{/if}}

@@ -625,8 +625,23 @@
     [{:fn/timepoint [:time/booking-end]} {:fn/period ["P1D"]}]},
    :to :actor.role/customer,
    :template :booking-return-reminder}
+  {:name :notification/booking-return-reminder-same-day,
+   :on :transition/laundry-confirm-pickup,
+   :at
+   {:fn/minus
+    [{:fn/timepoint [:time/booking-end]} {:fn/period ["PT8H"]}]},
+  :to :actor.role/customer,
+  :template :booking-return-reminder-same-day}
   {:name :notification/booking-late-return-to-customer,
    :on :transition/mark-overdue,
+   :to :actor.role/customer,
+   :template :booking-late-return}
+  {:name :notification/booking-late-return-48h-to-customer,
+   :on :transition/mark-overdue,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/overdue]}
+     {:fn/period ["P1D"]}]},
    :to :actor.role/customer,
    :template :booking-late-return}
   {:name :notification/booking-late-return-to-provider,
