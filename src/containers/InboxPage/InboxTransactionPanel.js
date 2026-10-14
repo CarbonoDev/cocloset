@@ -182,6 +182,9 @@ const InboxTransactionPanel = props => {
 
   const firstImage = listing?.images?.[0];
 
+  const needsProviderAction =
+  transactionRole === 'provider' && stateData?.processState === 'preauthorized';
+
   return (
     <section className={css.panel}>
       <header className={css.panelHeader}>
@@ -346,7 +349,7 @@ const InboxTransactionPanel = props => {
         name={transactionRole === 'customer' ? 'OrderDetailsPage' : 'SaleDetailsPage'}
         params={{ id: transaction.id?.uuid }}
       >
-        <FormattedMessage id={transactionRole === 'provider' && stateData?.processState === "preauthorized" && !isAtLaundry ? "InboxPage.panel.takeAction" : "InboxPage.panel.openFull" } />
+        <FormattedMessage id={needsProviderAction ? "InboxPage.panel.takeAction" : "InboxPage.panel.openFull" } />
       </NamedLink>
 
       {/* GATED TOO, NOT JUST THE BUTTON.
