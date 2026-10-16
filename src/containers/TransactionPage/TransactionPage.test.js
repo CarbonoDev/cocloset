@@ -1859,4 +1859,94 @@ describe('TransactionPage', () => {
       );
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Customer self-cancel from accepted-on-laundry (2026-10-15) - the SAME click-through as
+  // above, but for a booking that auto-accepted because the garment was already at the
+  // laundry. This is the end-to-end proof that CancelBookingModal's onConfirm fires the
+  // TRANSITION THE STATE ACTUALLY NEEDS (read off stateData.primaryButtonProps.transition in
+  // TransactionPage.js) rather than a hardcoded CUSTOMER_CANCEL, which this state does not
+  // accept - Sharetribe would answer that with a 409 at the counter.
+  // -------------------------------------------------------------------------
+  describe('cocloset-booking: customer self-cancel button, accepted-on-laundry', () => {
+    const processName = 'cocloset-booking';
+
+    const makeAcceptedOnLaundryTx = () =>
+      createTransaction({
+        id: 'id-cocloset-accepted-on-laundry-for-cancel',
+        customer,
+        provider,
+        listing: createListing('listing-item', {
+          publicData: {
+            listingType: 'rent-clothes',
+            transactionProcessAlias: 'cocloset-booking/release-1',
+            unitType: 'day',
+          },
+        }),
+        booking: createBooking('booking-id', {
+          start: new Date(Date.UTC(2022, 5, 14)),
+          end: new Date(Date.UTC(2022, 5, 21)),
+        }),
+        processName,
+        lastTransition: coclosetBookingTransitions.OPERATOR_ACCEPT,
+        lastTransitionedAt: new Date(Date.UTC(2022, 0, 15)),
+        lineItems: [lineItemProviderCommission],
+      });
+
+    const cancelButtonLabel =
+      'TransactionPage.cocloset-booking.customer.transition-customer-cancel-from-accepted-on-laundry.actionButton';
+
+    test('shows the cancel button to the customer at accepted-on-laundry', async () => {
+      const props = {
+        ...panelBaseProps,
+        currentUser: createCurrentUser(customerId),
+        transaction: makeAcceptedOnLaundryTx(),
+        transactionRole: TX_TRANSITION_ACTOR_CUSTOMER,
+        onTransition: jest.fn(() => Promise.resolve()),
+        params: { id: 'id-cocloset-accepted-on-laundry-for-cancel' },
+      };
+
+      await act(async () => {
+        render(<TransactionPageComponent {...props} />);
+      });
+
+      expect(screen.getAllByText(cancelButtonLabel).length).toBeGreaterThan(0);
+    });
+
+    test('confirming inside the modal dispatches customer-cancel-from-accepted-on-laundry, NOT the plain customer-cancel', async () => {
+      const onTransition = jest.fn(() => Promise.resolve());
+      const props = {
+        ...panelBaseProps,
+        currentUser: createCurrentUser(customerId),
+        transaction: makeAcceptedOnLaundryTx(),
+        transactionRole: TX_TRANSITION_ACTOR_CUSTOMER,
+        onTransition,
+        params: { id: 'id-cocloset-accepted-on-laundry-for-cancel' },
+      };
+
+      await act(async () => {
+        render(<TransactionPageComponent {...props} />, { withPortals: true });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByText(cancelButtonLabel)[0]);
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByText('CancelBookingModal.submit')[0]);
+      });
+
+      expect(onTransition).toHaveBeenCalledTimes(1);
+      expect(onTransition).toHaveBeenCalledWith(
+        expect.anything(),
+        coclosetBookingTransitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
+        {}
+      );
+      expect(onTransition).not.toHaveBeenCalledWith(
+        expect.anything(),
+        coclosetBookingTransitions.CUSTOMER_CANCEL,
+        {}
+      );
+    });
+  });
 });

@@ -76,11 +76,13 @@ import ReviewModal from './ReviewModal/ReviewModal';
 import RequestChangesModal from './RequestChangesModal/RequestChangesModal';
 import MakeCounterOfferModal from './MakeCounterOfferModal/MakeCounterOfferModal';
 import CancelBookingModal from './CancelBookingModal/CancelBookingModal';
+import PartialRefundCancelModal from './PartialRefundCancelModal/PartialRefundCancelModal';
 import SendMessageForm from './SendMessageForm/SendMessageForm';
 import TransactionPanel from './TransactionPanel/TransactionPanel';
 
 import {
   makeTransition,
+  partialRefundCancel,
   sendMessage,
   sendReview,
   fetchMoreMessages,
@@ -357,6 +359,10 @@ export const TransactionPageComponent = props => {
   // Customer self-cancel (2026-10-13, cocloset-booking only). See CancelBookingModal's header
   // for why this reuses the DiscardDraftModal "are you sure" pattern rather than a new one.
   const [isCancelBookingModalOpen, setCancelBookingModalOpen] = useState(false);
+  // Customer partial-refund self-cancel (2026-10-13, cocloset-booking's initial-cleaning
+  // state only). Separate open/close state from every modal above because this one has its
+  // own non-dismissible loading sub-state - see PartialRefundCancelModal's own header.
+  const [isPartialRefundCancelModalOpen, setPartialRefundCancelModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -398,6 +404,10 @@ export const TransactionPageComponent = props => {
     onTransition,
     onRefetchTransaction = () => {},
     nextTransitions,
+    partialRefundCancelInProgress,
+    partialRefundCancelError,
+    partialRefundCancelResult,
+    onPartialRefundCancel,
     callSetInitialValues,
     onInitializeCardPaymentData,
     onUploadFile,
@@ -661,6 +671,52 @@ export const TransactionPageComponent = props => {
     setCancelBookingModalOpen(true);
   };
 
+  // Open the customer partial-refund self-cancel confirm modal. Passed down as
+  // `primaryButtonProps.onAction` for the INITIAL_CLEANING + customer action button
+  // (TransactionPage.stateDataCoclosetBooking.js), INSTEAD OF the default "transition now"
+  // behaviour - this moves real money through a Stripe refund and must survive one accidental
+  // click, same reasoning as the other confirm modals above.
+  const onOpenPartialRefundCancelModal = () => {
+    setPartialRefundCancelModalOpen(true);
+  };
+
+  // Fire the real call. UNLIKE onDisputeOrder/onReportOrder above, this does NOT close the
+  // modal immediately: the modal's own `inProgress` sub-state IS the point (the client's
+  // "invasive loader" requirement) - it has to stay open and non-dismissible until
+  // onPartialRefundCancel's promise settles. The effect below closes it automatically only on
+  // a clean, full success; every error and the manual-follow-up case stay open so the
+  // customer can read the specific reason before dismissing it themselves.
+  const onConfirmPartialRefundCancel = () => {
+    if (!transaction?.id) {
+      return;
+    }
+    onPartialRefundCancel(transaction.id).catch(() => {
+      // Do nothing - already logged inside the thunk, and surfaced to the user via
+      // PartialRefundCancelModal's own error prop.
+    });
+  };
+
+  // Auto-close on a clean, full success ONLY - "on success, close and let the existing
+  // transaction-refresh show the new cancelled state" (the client's own UX spec). A result
+  // with requiresManualFollowUp true is NOT this kind of success: the modal has to stay open
+  // so PartialRefundCancelModal can show that distinct message instead of silently vanishing
+  // on a booking that is not actually marked cancelled yet.
+  useEffect(() => {
+    if (
+      isPartialRefundCancelModalOpen &&
+      !partialRefundCancelInProgress &&
+      !partialRefundCancelError &&
+      partialRefundCancelResult?.cancelled === true
+    ) {
+      setPartialRefundCancelModalOpen(false);
+    }
+  }, [
+    isPartialRefundCancelModalOpen,
+    partialRefundCancelInProgress,
+    partialRefundCancelError,
+    partialRefundCancelResult,
+  ]);
+
   const deletedListingTitle = intl.formatMessage({
     id: 'TransactionPage.deletedListing',
   });
@@ -841,6 +897,9 @@ export const TransactionPageComponent = props => {
           onOpenRequestChangesModal,
           onOpenMakeCounterOfferModal,
           onOpenCancelBookingModal,
+          onOpenPartialRefundCancelModal,
+          partialRefundCancelInProgress,
+          partialRefundCancelError,
           onCheckoutRedirect: handleSubmitOrderRequest,
           onMakeOfferRedirect: onMakeOffer,
           intl,
@@ -854,6 +913,14 @@ export const TransactionPageComponent = props => {
     ? transaction.attributes?.lineItems?.find(
         item => LISTING_UNIT_TYPES.includes(item.code) && !item.reversal
       )
+    : null;
+
+  // For PartialRefundCancelModal's confirm step, so it can name the exact amount being
+  // withheld rather than speaking generically. `undefined` (not found) is a legitimate case -
+  // see server/api/customer-partial-refund-cancel.js's own fallback for a transaction with no
+  // cleaning-fee line item - and the modal reads fine either way.
+  const cleaningFeeLineItem = hasLineItems
+    ? transaction.attributes?.lineItems?.find(item => item.code === 'line-item/cleaning-fee')
     : null;
 
   const formatLineItemUnitType = (transaction, listing) => {
@@ -1240,11 +1307,37 @@ export const TransactionPageComponent = props => {
             onManageDisableScrolling={onManageDisableScrolling}
             onConfirm={onConfirmCancelBooking(
               transaction?.id,
-              process.transitions.CUSTOMER_CANCEL,
+              // READ FROM stateData, NOT HARDCODED (2026-10-15). There are now TWO
+              // customer-cancel doors - CUSTOMER_CANCEL from 'accepted' and
+              // CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY from 'accepted-on-laundry' - and
+              // TransactionPage.stateDataCoclosetBooking.js's own cond for each state is what
+              // decides which one actually applies, via the `transition` field it carries on
+              // `primaryButtonProps` (see actionButtonProps's `extra.transition` there). A
+              // transaction in the wrong state for a hardcoded CUSTOMER_CANCEL would get a
+              // clean Sharetribe 409 instead of a cancellation. Falls back to CUSTOMER_CANCEL
+              // for safety if stateData has not set one.
+              stateData?.primaryButtonProps?.transition || process.transitions.CUSTOMER_CANCEL,
               onTransition,
               setCancelBookingModalOpen
             )}
-            inProgress={transitionInProgress === process.transitions.CUSTOMER_CANCEL}
+            inProgress={
+              transitionInProgress ===
+              (stateData?.primaryButtonProps?.transition || process.transitions.CUSTOMER_CANCEL)
+            }
+          />
+        ) : null}
+        {process?.transitions?.PARTIAL_REFUND_CANCEL_FROM_INITIAL_CLEANING ? (
+          <PartialRefundCancelModal
+            id="PartialRefundCancelModal"
+            isOpen={isPartialRefundCancelModalOpen}
+            focusElementId={`${actionButtonContainer}_${ACTION_BUTTON_1_ID}`}
+            onCloseModal={() => setPartialRefundCancelModalOpen(false)}
+            onManageDisableScrolling={onManageDisableScrolling}
+            onConfirm={onConfirmPartialRefundCancel}
+            inProgress={partialRefundCancelInProgress}
+            error={partialRefundCancelError}
+            result={partialRefundCancelResult}
+            cleaningFeeLineItem={cleaningFeeLineItem}
           />
         ) : null}
       </LayoutSingleColumn>
@@ -1288,6 +1381,9 @@ const TransactionPage = props => {
     fetchLineItemsError,
     fileUploadsDisabled,
     fileDownloads,
+    partialRefundCancelInProgress,
+    partialRefundCancelError,
+    partialRefundCancelResult,
   } = useSelector(state => state.TransactionPage, shallowEqual);
 
   const currentUser = useSelector(state => state.user?.currentUser);
@@ -1309,6 +1405,13 @@ const TransactionPage = props => {
     (txId, txRole, config) => dispatch(fetchTransaction(txId, txRole, config)),
     [dispatch]
   );
+  // Mirrors onTransition's own shape exactly (dispatch the backward-compatible wrapper, same
+  // as makeTransition above) - see onConfirmPartialRefundCancel's own comment for why no
+  // `.catch()` here needs to do anything: the real success/failure state this page reacts to
+  // is partialRefundCancelInProgress/-Error/-Result in Redux, not this promise.
+  const onPartialRefundCancel = useCallback(txId => dispatch(partialRefundCancel(txId)), [
+    dispatch,
+  ]);
   const onShowMoreMessages = useCallback(
     (txId, config) => dispatch(fetchMoreMessages(txId, config)),
     [dispatch]
@@ -1383,6 +1486,10 @@ const TransactionPage = props => {
       fetchLineItemsError={fetchLineItemsError}
       fileUploads={fileUploads}
       fileUploadsDisabled={fileUploadsDisabled}
+      partialRefundCancelInProgress={partialRefundCancelInProgress}
+      partialRefundCancelError={partialRefundCancelError}
+      partialRefundCancelResult={partialRefundCancelResult}
+      onPartialRefundCancel={onPartialRefundCancel}
       onTransition={onTransition}
       onShowMoreMessages={onShowMoreMessages}
       onSendMessage={onSendMessage}

@@ -80,6 +80,15 @@ export const transitions = {
   // operator cancel" invariant) - INITIAL_CLEANING needs both for the same reason: it is
   // pre-payout, and the laundry might never mark it ready.
   CANCEL_FROM_INITIAL_CLEANING: 'transition/cancel-from-initial-cleaning',
+  // THE CUSTOMER-INITIATED partial-refund door (2026-10-13), a SECOND way out of
+  // INITIAL_CLEANING alongside CANCEL_FROM_INITIAL_CLEANING above (the operator's full-refund
+  // override - unchanged). Fired server-side, by our own server, only after it has
+  // independently verified the caller and already settled a direct Stripe refund for
+  // total-minus-cleaning-fee - see the EDN's own comment on this transition for the full
+  // argument (Sharetribe's refund actions are always 100%-or-nothing, so this one carries
+  // neither calculate-full-refund nor stripe-refund-payment). Never dispatched through the
+  // generic transition thunk - see TransactionPage.duck.js's partialRefundCancelThunk.
+  PARTIAL_REFUND_CANCEL_FROM_INITIAL_CLEANING: 'transition/partial-refund-cancel-from-initial-cleaning',
   AUTO_COMPLETE_FROM_INITIAL_CLEANING: 'transition/auto-complete-from-initial-cleaning',
   // ONE STEP, TWO NAMES. "Mark ready" from a garment already at the studio (ACCEPTED) and
   // "mark ready" from a garment that just finished its first wash (INITIAL_CLEANING) are the
@@ -120,20 +129,43 @@ export const transitions = {
   // 'returned' (into 'cleaning'), and Sharetribe has no post-payout refund
   // action, so 'cleaning' is the first state with no cancel.
   CANCEL: 'transition/cancel',
+  // NEW (2026-10-15), alongside ACCEPTED_ON_LAUNDRY itself - the admin manual override,
+  // mirroring CANCEL. See the state-split comment on ACCEPTED_ON_LAUNDRY below.
+  CANCEL_FROM_ACCEPTED_ON_LAUNDRY: 'transition/cancel-from-accepted-on-laundry',
   // THE CUSTOMER'S OWN DOOR (2026-10-13), 'accepted' only. Full refund, same actions as
   // CANCEL above - see the EDN's :transition/customer-cancel comment for why this is the
   // only state with a customer-actor cancel: every later laundry state still needs an
   // operator and a partial-refund design that does not exist yet.
   CUSTOMER_CANCEL: 'transition/customer-cancel',
+  // NEW (2026-10-15), alongside ACCEPTED_ON_LAUNDRY itself. Without this, splitting ACCEPTED
+  // would have silently removed the customer's self-cancel for the
+  // still-on-laundry-awaiting-ready scenario - see the EDN's own comment on this transition,
+  // and the state-split comment on ACCEPTED_ON_LAUNDRY below, for the full argument (this was
+  // PR #107's scenario 2).
+  CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY: 'transition/customer-cancel-from-accepted-on-laundry',
   CANCEL_FROM_READY_FOR_PICKUP: 'transition/cancel-from-ready-for-pickup',
   CANCEL_FROM_PICKED_UP: 'transition/cancel-from-picked-up',
   CANCEL_FROM_OVERDUE: 'transition/cancel-from-overdue',
   CANCEL_FROM_RETURNED: 'transition/cancel-from-returned',
+  // THE ACTUAL NEW FEATURE (2026-10-15): "si el provider no lleva la prenda a la laundry para
+  // la fecha de reserva, se cancela la transacción y se le hace el refund completo al
+  // customer" - full refund, cancelled automatically at exactly booking-start, for a provider
+  // who never dropped the garment off. Reachable only from ACCEPTED (the manual path) -
+  // see the state-split comment on ACCEPTED_ON_LAUNDRY below for why that is now a real
+  // guarantee rather than a hope, and the EDN's own comment on this transition for the rest of
+  // the reasoning.
+  CANCEL_FOR_MISSED_DROPOFF: 'transition/cancel-for-missed-dropoff',
 
   // The backend will mark the transaction completed.
   // Reachable only from 'accepted', i.e. the laundry never prepared the garment.
   COMPLETE: 'transition/complete',
   OPERATOR_COMPLETE: 'transition/operator-complete',
+  // NEW (2026-10-15), alongside ACCEPTED_ON_LAUNDRY itself - mirrors OPERATOR_COMPLETE.
+  OPERATOR_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY: 'transition/operator-complete-from-accepted-on-laundry',
+  // NEW (2026-10-15), alongside ACCEPTED_ON_LAUNDRY itself - the catastrophe backstop for "the
+  // laundry never marked it ready". Same P30D period as AUTO_COMPLETE_FROM_READY; see the
+  // EDN's own comment on this transition.
+  AUTO_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY: 'transition/auto-complete-from-accepted-on-laundry',
 
   // ONE-SIDED REVIEWS (2026-09-21).
   //
@@ -167,6 +199,27 @@ export const states = {
   PREAUTHORIZED: 'preauthorized',
   DECLINED: 'declined',
   ACCEPTED: 'accepted',
+  // THE AUTO-ACCEPT / ALREADY-ON-LAUNDRY STATE (2026-10-15).
+  //
+  //   > "si el provider no lleva la prenda a la laundry para la fecha de reserva, se cancela
+  //   >  la transacción (...) asegúrate de que solo es cuando la prenda NO esté en laundry"
+  //
+  // Before this split, BOTH ACCEPT (provider manually accepts, a drop-off is still owed) and
+  // OPERATOR_ACCEPT (system auto-accepts because the garment is already on a laundry's rack -
+  // see server/api/auto-accept-booking.js) landed in the same ACCEPTED state. A transition can
+  // only ask "what state is this transaction in now", never "which prior transition got it
+  // here", so a generic auto-cancel scheduled off ACCEPTED could not tell those two paths
+  // apart - and the client's rule above requires that it must. Splitting the destination state
+  // is the only EDN-native way to make that a structural guarantee: ACCEPTED is now reachable
+  // ONLY via ACCEPT, and ACCEPTED_ON_LAUNDRY ONLY via OPERATOR_ACCEPT, so
+  // CANCEL_FOR_MISSED_DROPOFF (which stays `:from ACCEPTED`) can never fire for a booking that
+  // never needed a drop-off in the first place.
+  //
+  // Gets its own mirrors of every backstop and cancel ACCEPTED already had -
+  // OPERATOR_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY, AUTO_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
+  // CANCEL_FROM_ACCEPTED_ON_LAUNDRY, CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY - so the split
+  // closes no door that was open before it (see each transition's own comment above).
+  ACCEPTED_ON_LAUNDRY: 'accepted-on-laundry',
   // The first-time drop-off's own "in cleaning" state (2026-09-21) - see
   // LAUNDRY_RECEIVE_FROM_PROVIDER above. The return leg's equivalent moment already has one
   // (CLEANING); this is the same idea for the leg that used to have none.
@@ -230,7 +283,9 @@ export const graph = {
         [transitions.OPERATOR_DECLINE]: states.DECLINED,
         [transitions.EXPIRE]: states.EXPIRED,
         [transitions.ACCEPT]: states.ACCEPTED,
-        [transitions.OPERATOR_ACCEPT]: states.ACCEPTED,
+        // :to CHANGED (2026-10-15) from states.ACCEPTED to states.ACCEPTED_ON_LAUNDRY - see
+        // the state-split comment on states.ACCEPTED_ON_LAUNDRY above.
+        [transitions.OPERATOR_ACCEPT]: states.ACCEPTED_ON_LAUNDRY,
       },
     },
 
@@ -238,15 +293,30 @@ export const graph = {
     [states.EXPIRED]: {},
     [states.ACCEPTED]: {
       on: {
-        // Garment already at the studio (onLaundry was true): straight to READY_FOR_PICKUP,
-        // no wash needed. See LAUNDRY_MARK_READY's comment above.
-        [transitions.LAUNDRY_MARK_READY]: states.READY_FOR_PICKUP,
         // Garment coming from its owner for the first time: it gets a wash first.
         [transitions.LAUNDRY_RECEIVE_FROM_PROVIDER]: states.INITIAL_CLEANING,
         [transitions.CANCEL]: states.CANCELED,
         [transitions.CUSTOMER_CANCEL]: states.CANCELED,
+        // NEW (2026-10-15): the auto-cancel for a missed drop-off, safe here only because this
+        // state is now reachable solely via ACCEPT - see the state-split comment on
+        // states.ACCEPTED_ON_LAUNDRY above.
+        [transitions.CANCEL_FOR_MISSED_DROPOFF]: states.CANCELED,
         [transitions.COMPLETE]: states.DELIVERED,
         [transitions.OPERATOR_COMPLETE]: states.DELIVERED,
+      },
+    },
+
+    // THE AUTO-ACCEPT / ALREADY-ON-LAUNDRY STATE (2026-10-15) - see states.ACCEPTED_ON_LAUNDRY's
+    // own comment above. LAUNDRY_MARK_READY's :from moved here from ACCEPTED (it was already
+    // exclusively this path's transition in practice), and the rest mirror ACCEPTED's own
+    // backstops/cancels under their "-from-accepted-on-laundry" names.
+    [states.ACCEPTED_ON_LAUNDRY]: {
+      on: {
+        [transitions.LAUNDRY_MARK_READY]: states.READY_FOR_PICKUP,
+        [transitions.OPERATOR_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY]: states.DELIVERED,
+        [transitions.AUTO_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY]: states.DELIVERED,
+        [transitions.CANCEL_FROM_ACCEPTED_ON_LAUNDRY]: states.CANCELED,
+        [transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY]: states.CANCELED,
       },
     },
 
@@ -256,6 +326,7 @@ export const graph = {
       on: {
         [transitions.LAUNDRY_MARK_READY_FROM_INITIAL_CLEANING]: states.READY_FOR_PICKUP,
         [transitions.CANCEL_FROM_INITIAL_CLEANING]: states.CANCELED,
+        [transitions.PARTIAL_REFUND_CANCEL_FROM_INITIAL_CLEANING]: states.CANCELED,
         [transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING]: states.DELIVERED,
       },
     },
@@ -323,14 +394,19 @@ export const isRelevantPastTransition = transition => {
     transitions.ACCEPT,
     transitions.OPERATOR_ACCEPT,
     transitions.CANCEL,
+    transitions.CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
     transitions.CUSTOMER_CANCEL,
+    transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
+    transitions.CANCEL_FOR_MISSED_DROPOFF,
     transitions.CANCEL_FROM_INITIAL_CLEANING,
+    transitions.PARTIAL_REFUND_CANCEL_FROM_INITIAL_CLEANING,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,
     transitions.CANCEL_FROM_OVERDUE,
     transitions.CANCEL_FROM_RETURNED,
     transitions.COMPLETE,
     transitions.OPERATOR_COMPLETE,
+    transitions.OPERATOR_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
     transitions.CONFIRM_PAYMENT,
     transitions.DECLINE,
     transitions.OPERATOR_DECLINE,
@@ -350,6 +426,7 @@ export const isRelevantPastTransition = transition => {
     transitions.MARK_OVERDUE,
     // The backstops move money and end the rental, so they are shown too.
     transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
+    transitions.AUTO_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
     transitions.AUTO_COMPLETE_FROM_READY,
     transitions.AUTO_COMPLETE_FROM_PICKED_UP,
     transitions.AUTO_COMPLETE_FROM_OVERDUE,
@@ -392,6 +469,7 @@ export const isCompleted = transition => {
   const txCompletedTransitions = [
     transitions.LAUNDRY_MARK_AVAILABLE,
     transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
+    transitions.AUTO_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
     transitions.AUTO_COMPLETE_FROM_READY,
     transitions.AUTO_COMPLETE_FROM_PICKED_UP,
     transitions.AUTO_COMPLETE_FROM_OVERDUE,
@@ -399,6 +477,7 @@ export const isCompleted = transition => {
     transitions.AUTO_COMPLETE_FROM_CLEANING,
     transitions.COMPLETE,
     transitions.OPERATOR_COMPLETE,
+    transitions.OPERATOR_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
     transitions.REVIEW_1_BY_CUSTOMER,
     transitions.EXPIRE_REVIEW_PERIOD,
   ];
@@ -417,7 +496,10 @@ export const isRefunded = transition => {
     transitions.EXPIRE_PAYMENT,
     transitions.EXPIRE,
     transitions.CANCEL,
+    transitions.CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
     transitions.CUSTOMER_CANCEL,
+    transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
+    transitions.CANCEL_FOR_MISSED_DROPOFF,
     transitions.CANCEL_FROM_INITIAL_CLEANING,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,
@@ -481,12 +563,14 @@ export const HANDOVER_QR_TRANSITIONS = [
 export const PAYOUT_TRANSITIONS = [
   transitions.LAUNDRY_MARK_PENDING_CLEANING,
   transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
+  transitions.AUTO_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
   transitions.AUTO_COMPLETE_FROM_READY,
   transitions.AUTO_COMPLETE_FROM_PICKED_UP,
   transitions.AUTO_COMPLETE_FROM_OVERDUE,
   transitions.AUTO_COMPLETE_FROM_RETURNED,
   transitions.COMPLETE,
   transitions.OPERATOR_COMPLETE,
+  transitions.OPERATOR_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
 ];
 
 /**
@@ -528,8 +612,17 @@ export const hasPaidOut = (txTransitions = []) =>
 // renter ever collects it. The code does not change while it is there - leaving it out would
 // make the customer's own code vanish the moment the studio received the garment and reappear
 // at READY_FOR_PICKUP, for no reason a renter could see.
+//
+// ACCEPTED_ON_LAUNDRY belongs here too (2026-10-15), for exactly the same reason, and missing
+// it would be a real regression rather than a new gap: before the 2026-10-15 state split, the
+// auto-accept path landed in ACCEPTED itself, so this list already covered it. Now that
+// OPERATOR_ACCEPT lands in ACCEPTED_ON_LAUNDRY instead (see that state's own comment in the
+// `states` export above), leaving it out of this list would make the customer's QR vanish for
+// every auto-accepted booking the moment it is accepted - the opposite of "que acepte o que se
+// autoacepte la transacción" below, which is the quote this list exists to satisfy.
 const HANDOVER_QR_STATES_AFTER_ACCEPT = [
   states.ACCEPTED,
+  states.ACCEPTED_ON_LAUNDRY,
   states.INITIAL_CLEANING,
   states.READY_FOR_PICKUP,
   states.PICKED_UP,

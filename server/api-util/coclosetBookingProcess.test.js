@@ -128,11 +128,20 @@ describe('coclosetBookingProcess', () => {
       expect(bogus).toEqual([]);
     });
 
-    it('ACCEPT_TRANSITIONS are the transitions that actually reach `accepted`', () => {
-      const reachesAccepted = ednTransitions
-        .filter(t => normaliseEdnState(t.to) === STATES.ACCEPTED)
+    // UPDATED (2026-10-15): before the accepted/accepted-on-laundry state split (see
+    // STATES.ACCEPTED_ON_LAUNDRY's own comment above), both ACCEPT and OPERATOR_ACCEPT
+    // reached :state/accepted, so this test's name was literally true. OPERATOR_ACCEPT's
+    // `:to` moved to STATES.ACCEPTED_ON_LAUNDRY with the split; ACCEPT_TRANSITIONS itself did
+    // NOT change (create-availability-buffer.js still needs "was this transaction just
+    // accepted, by either path" regardless of which resulting state), so the assertion now
+    // has to ask the broader question the constant's own callers actually ask.
+    it('ACCEPT_TRANSITIONS are the transitions that reach accepted OR accepted-on-laundry', () => {
+      const reachesAcceptance = ednTransitions
+        .filter(t =>
+          [STATES.ACCEPTED, STATES.ACCEPTED_ON_LAUNDRY].includes(normaliseEdnState(t.to))
+        )
         .map(t => t.transition);
-      expect(ACCEPT_TRANSITIONS.sort()).toEqual(reachesAccepted.sort());
+      expect(ACCEPT_TRANSITIONS.sort()).toEqual(reachesAcceptance.sort());
     });
   });
 
@@ -259,6 +268,10 @@ describe('coclosetBookingProcess', () => {
       expect(ACTIVE_STATES.slice().sort()).toEqual(
         [
           'accepted',
+          // NEW (2026-10-15): the auto-accept/already-on-laundry state split - just as
+          // committed to a real booking as 'accepted' itself. See STATES.ACCEPTED_ON_LAUNDRY's
+          // own comment.
+          'accepted-on-laundry',
           'initial-cleaning',
           'cleaning',
           'overdue',

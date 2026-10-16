@@ -6,6 +6,7 @@ const {
   cleaningRequiredNotification,
   garmentHandedBackNotification,
   bookingCancelledNotification,
+  partialRefundBookingCancelledNotification,
 } = require('./laundryNotifications');
 const log = require('../log');
 
@@ -184,6 +185,23 @@ const notifyBookingCancelled = ({ to, ...data }) =>
     logContext: { txId: data.transactionId },
   });
 
+// Customer partial-refund self-cancellation (2026-10-13) - tells the assigned laundry that a
+// booking it has ALREADY RECEIVED THE GARMENT FOR is off. Triggered from
+// server/api/customer-partial-refund-cancel.js, the same way notifyCleaningRequired etc. are
+// triggered from their own endpoints: a fire-and-continue side effect of a transition that has
+// already succeeded (here, after the Stripe refund has already settled too - see that
+// endpoint's own ordering comment).
+//
+// @param {Object} params - `to` plus the fields of partialRefundBookingCancelledNotification
+// @returns {Promise<Object>} never rejects
+const notifyPartialRefundBookingCancelled = ({ to, ...data }) =>
+  send({
+    name: 'partial-refund-booking-cancelled',
+    to,
+    compose: () => partialRefundBookingCancelledNotification(data),
+    logContext: { txId: data.transactionId },
+  });
+
 module.exports = {
   notifyGarmentHandedBack,
   notifyNewIncomingGarment,
@@ -191,4 +209,5 @@ module.exports = {
   notifyReturnScheduled,
   notifyCleaningRequired,
   notifyBookingCancelled,
+  notifyPartialRefundBookingCancelled,
 };

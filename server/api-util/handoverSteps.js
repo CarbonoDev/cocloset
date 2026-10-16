@@ -36,6 +36,17 @@ const STEPS = {
     counterparty: HANDOVER_COUNTERPARTY_PROVIDER,
     direction: HANDOVER_DIRECTION_IN,
   },
+  // NEW (2026-10-15), alongside STATES.ACCEPTED_ON_LAUNDRY itself. Identical entry to
+  // STATES.ACCEPTED above - this is the same "already on the rack, nothing to receive, next
+  // step is ready" counter position that ACCEPTED fell into whenever onLaundry was already
+  // true before the state split (see handoverStepFor's `options.onLaundry` branch below,
+  // unchanged for the manual path).
+  [STATES.ACCEPTED_ON_LAUNDRY]: {
+    state: STATES.ACCEPTED_ON_LAUNDRY,
+    status: 'ready-for-pickup',
+    counterparty: HANDOVER_COUNTERPARTY_PROVIDER,
+    direction: HANDOVER_DIRECTION_IN,
+  },
   [STATES.READY_FOR_PICKUP]: {
     state: STATES.READY_FOR_PICKUP,
     status: 'picked-up',

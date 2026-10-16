@@ -14,6 +14,7 @@ import { isTransactionsTransitionInvalidTransition, storableError } from '../../
 import {
   createAvailabilityBuffer,
   customerCancelNotifyLaundry,
+  customerPartialRefundCancel,
   transactionLineItems,
   transitionPrivileged,
 } from '../../util/api';
@@ -433,7 +434,18 @@ const makeTransitionPayloadCreator = (
   // already succeeded by the time this runs), failures are logged only. See
   // server/api/customer-cancel-notify-laundry.js and util/api.js's customerCancelNotifyLaundry.
   const maybeNotifyLaundryOfCustomerCancel = () => {
-    if (transitionName !== coclosetBookingProcessTransitions.CUSTOMER_CANCEL) {
+    // BOTH CUSTOMER-CANCEL DOORS (2026-10-15): CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY is the
+    // same self-cancel event as CUSTOMER_CANCEL, just reachable from the second state the
+    // accepted/accepted-on-laundry split created (see that transition's comment in
+    // transactionProcessCoclosetBooking.js). Checking only CUSTOMER_CANCEL here would have
+    // silently stopped notifying the laundry for exactly the booking shape this split
+    // introduced - a real regression on the already-shipped feature below, not a new gap.
+    if (
+      ![
+        coclosetBookingProcessTransitions.CUSTOMER_CANCEL,
+        coclosetBookingProcessTransitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
+      ].includes(transitionName)
+    ) {
       return;
     }
     customerCancelNotifyLaundry({ transactionId: txId }).catch(e => {
@@ -746,6 +758,95 @@ export const downloadFileThunk = createAsyncThunk(
 export const downloadFile = (fileAttachmentId, isOwnFile = false) => dispatch => {
   return dispatch(downloadFileThunk({ fileAttachmentId, isOwnFile })).unwrap();
 };
+
+//////////////////////////////
+// partialRefundCancel      //
+//////////////////////////////
+//
+// Customer self-cancellation AFTER the garment has reached the laundry for its first wash
+// (cocloset-booking's :state/initial-cleaning only). DELIBERATELY NOT makeTransitionThunk:
+// that thunk dispatches a transition name straight through the SDK (or the privileged
+// endpoint for a privileged one), and this is not a transition dispatch at all from the
+// browser's point of view - it is one custom, multi-step server call
+// (server/api/customer-partial-refund-cancel.js) that verifies eligibility, computes the
+// withheld cleaning fee, refunds directly against Stripe, writes an audit record, and only
+// THEN fires the real `transition/partial-refund-cancel-from-initial-cleaning` server-side,
+// as the operator. The browser never sees or dispatches that transition name itself.
+//
+// Every response from the endpoint is a DEFINITIVE answer (never a generic "ok" - see
+// util/api.js's customerPartialRefundCancel for the full shape), because the client shows a
+// non-dismissible loading state while this is in flight and has to resolve it one way or
+// the other - there is no fire-and-continue half here, unlike e.g.
+// maybeCreateAvailabilityBuffer above.
+const partialRefundCancelPayloadCreator = (
+  { txId },
+  { dispatch, rejectWithValue, extra: sdk }
+) => {
+  return customerPartialRefundCancel({ transactionId: txId })
+    .then(response => {
+      const result = response?.data || {};
+
+      // Refresh the transaction ENTITY, not a locally patched guess - same reasoning as
+      // makeTransitionPayloadCreator's own refreshTransactionEntity/addMarketplaceEntities
+      // calls above. This matters even on the `requiresManualFollowUp` half-success (refund
+      // moved, transition did not fire): re-fetching shows the transaction exactly as
+      // Sharetribe currently has it, which is the honest picture either way.
+      return sdk.transactions
+        .show({ id: txId }, { expand: true })
+        .then(txResponse => {
+          dispatch(addMarketplaceEntities(txResponse));
+          return result;
+        })
+        .catch(() => {
+          // A failed refresh must not hide the real result of the call above - the refund/
+          // cancellation already happened (or didn't) regardless of whether this re-fetch
+          // worked. The page will simply show stale data until the next natural reload.
+          return result;
+        });
+    })
+    .catch(e => {
+      log.error(e, 'customer-partial-refund-cancel-failed', { txId });
+      // DELIBERATELY NOT storableError(e). That helper keeps only
+      // {type, name, message, status, statusText, apiErrors} - the shape every OTHER error in
+      // this duck uses - and silently drops any other own-enumerable property, including the
+      // `error`/`reason` codes server/api/customer-partial-refund-cancel.js attaches directly
+      // onto the thrown error (see util/api.js's post(): `Object.assign(e, data)` on a 4xx/5xx
+      // body). Those codes are the WHOLE POINT here - they are what lets
+      // PartialRefundCancelModal tell "not eligible any more" apart from "refund failed,
+      // nothing was charged" apart from an unrecognised failure - so this builds its own
+      // plain, serialisable object that keeps them instead.
+      return rejectWithValue({
+        name: e?.name,
+        message: e?.message,
+        status: e?.status,
+        statusText: e?.statusText,
+        error: e?.error,
+        reason: e?.reason,
+      });
+    });
+};
+
+export const partialRefundCancelThunk = createAsyncThunk(
+  'TransactionPage/partialRefundCancel',
+  partialRefundCancelPayloadCreator,
+  {
+    condition: ({ txId }, { getState }) => {
+      // Mirrors makeTransitionThunk's own condition: refuse to start a second call while one
+      // is already in flight. This one is more important than that one - a double-click here
+      // could only ever be a retry of money-moving code, not a second idle dispatch.
+      if (getState().TransactionPage.partialRefundCancelInProgress) {
+        return false;
+      }
+      return true;
+    },
+  }
+);
+
+// Convenience wrapper so container code can call this the same way it calls makeTransition.
+export const partialRefundCancel = txId => dispatch => {
+  return dispatch(partialRefundCancelThunk({ txId }));
+};
+
 /////////////////
 // sendMessage //
 /////////////////
@@ -896,6 +997,17 @@ const initialState = {
   transactionRef: null,
   transitionInProgress: null,
   transitionError: null,
+  // Customer partial-refund self-cancellation (cocloset-booking's :state/initial-cleaning
+  // only) - tracked separately from transitionInProgress/transitionError above because this
+  // is not a transition dispatch, it is a custom multi-step server call. See
+  // partialRefundCancelThunk.
+  partialRefundCancelInProgress: false,
+  partialRefundCancelError: null,
+  // The last successful response from the endpoint - { refunded, cancelled,
+  // requiresManualFollowUp, refundAmount, refundCurrency, ... }. The UI needs this shape, not
+  // just a boolean, to tell apart a clean success from the rare
+  // refunded-but-not-yet-cancelled case.
+  partialRefundCancelResult: null,
   fetchMessagesInProgress: false,
   fetchMessagesError: null,
   totalMessages: 0,
@@ -1038,6 +1150,19 @@ const transactionPageSlice = createSlice({
       .addCase(makeTransitionThunk.rejected, (state, action) => {
         state.transitionInProgress = null;
         state.transitionError = action.payload;
+      })
+      // partialRefundCancel cases
+      .addCase(partialRefundCancelThunk.pending, state => {
+        state.partialRefundCancelInProgress = true;
+        state.partialRefundCancelError = null;
+      })
+      .addCase(partialRefundCancelThunk.fulfilled, (state, action) => {
+        state.partialRefundCancelInProgress = false;
+        state.partialRefundCancelResult = action.payload;
+      })
+      .addCase(partialRefundCancelThunk.rejected, (state, action) => {
+        state.partialRefundCancelInProgress = false;
+        state.partialRefundCancelError = action.payload;
       })
       // fetchMessages cases
       .addCase(fetchMessagesThunk.pending, state => {

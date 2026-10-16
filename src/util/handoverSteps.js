@@ -88,6 +88,16 @@ const STEPS = {
     counterparty: HANDOVER_COUNTERPARTY_PROVIDER,
     direction: HANDOVER_DIRECTION_IN,
   },
+  // NEW (2026-10-15), alongside states.ACCEPTED_ON_LAUNDRY itself (see the state-split
+  // reasoning in transactionProcessCoclosetBooking.js). Identical entry to states.ACCEPTED
+  // above - the same "already on the rack, next step is ready" counter position - mirrors the
+  // server copy in server/api-util/handoverSteps.js.
+  [states.ACCEPTED_ON_LAUNDRY]: {
+    state: states.ACCEPTED_ON_LAUNDRY,
+    status: 'ready-for-pickup',
+    counterparty: HANDOVER_COUNTERPARTY_PROVIDER,
+    direction: HANDOVER_DIRECTION_IN,
+  },
   [states.READY_FOR_PICKUP]: {
     state: states.READY_FOR_PICKUP,
     status: 'picked-up',

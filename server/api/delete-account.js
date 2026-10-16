@@ -14,6 +14,10 @@ const stripeRelatedStatesForCoclosetBookings = [
   'state/pending-payment',
   'state/preauthorized',
   'state/accepted',
+  // NEW (2026-10-15): the auto-accept/already-on-laundry state split - same window as
+  // 'state/accepted', just reached by the other path. See STATES.ACCEPTED_ON_LAUNDRY's own
+  // comment in server/api-util/coclosetBookingProcess.js.
+  'state/accepted-on-laundry',
   'state/ready-for-pickup',
   'state/picked-up',
   'state/overdue',

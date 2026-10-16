@@ -71,6 +71,10 @@ const STATES_AWAITING_CLEANING = [
   STATES.PENDING_PAYMENT,
   STATES.PREAUTHORIZED,
   STATES.ACCEPTED,
+  // NEW (2026-10-15): the auto-accept/already-on-laundry state split. A booking sitting here
+  // has just as much cleaning ahead of it as one sitting in ACCEPTED - the garment is simply
+  // waiting on the laundry's own ready-for-pickup prep instead of a provider drop-off.
+  STATES.ACCEPTED_ON_LAUNDRY,
   STATES.READY_FOR_PICKUP,
   STATES.PICKED_UP,
   STATES.OVERDUE,

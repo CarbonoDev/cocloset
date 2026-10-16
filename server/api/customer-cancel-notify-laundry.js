@@ -141,7 +141,17 @@ module.exports = (req, res) => {
 
       // DO NOT TRUST THE CLIENT'S SAY-SO. Verified server-side, off the stored transaction,
       // exactly as auto-accept-booking.js verifies its own precondition.
-      if (transaction.attributes?.lastTransition !== TRANSITIONS.CUSTOMER_CANCEL) {
+      //
+      // BOTH CUSTOMER-CANCEL DOORS (2026-10-15): CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY is
+      // the same self-cancel event as CUSTOMER_CANCEL, reachable from the second state the
+      // accepted/accepted-on-laundry split added - see that transition's comment in
+      // process.edn. Checking only CUSTOMER_CANCEL here would have silently stopped notifying
+      // the laundry for that booking shape the moment the split shipped.
+      if (
+        ![TRANSITIONS.CUSTOMER_CANCEL, TRANSITIONS.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY].includes(
+          transaction.attributes?.lastTransition
+        )
+      ) {
         return nothingToDo(res, 'not-a-customer-cancel');
       }
 

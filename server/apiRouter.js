@@ -42,6 +42,7 @@ const listingPickupStatus = require('./api/listing-pickup-status');
 const listingPickupConfirm = require('./api/listing-pickup-confirm');
 const autoAcceptBooking = require('./api/auto-accept-booking');
 const customerCancelNotifyLaundry = require('./api/customer-cancel-notify-laundry');
+const customerPartialRefundCancel = require('./api/customer-partial-refund-cancel');
 const initUserRole = require('./api/init-user-role');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
@@ -180,6 +181,13 @@ router.post('/auto-accept-booking', autoAcceptBooking);
 // the Mailgun notification half - it never re-runs or second-guesses the cancellation itself.
 // See the header of server/api/customer-cancel-notify-laundry.js.
 router.post('/customer-cancel-notify-laundry', customerCancelNotifyLaundry);
+
+// Customer self-cancellation AFTER the garment has reached the laundry for its first wash
+// (state/initial-cleaning) - a PARTIAL refund (total minus the cleaning fee), settled directly
+// against Stripe because Sharetribe's own refund actions are always 100%-or-nothing. This is
+// the primary action, not a side effect - see the header of
+// server/api/customer-partial-refund-cancel.js.
+router.post('/customer-partial-refund-cancel', customerPartialRefundCancel);
 
 // Applies the `metadata.isLaundry = false` default to the CALLING user, right
 // after signup. Takes no request parameters at all - the target is the

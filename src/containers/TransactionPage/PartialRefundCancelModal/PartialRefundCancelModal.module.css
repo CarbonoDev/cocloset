@@ -1,0 +1,67 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  composes: marketplaceModalBaseStyles from global;
+  padding-top: 70px;
+
+  @media (--viewportMedium) {
+    flex-basis: 567px;
+  }
+}
+
+.modalContent {
+  flex-grow: 1;
+}
+
+/* Icon of the modal */
+.modalIcon {
+  composes: marketplaceModalIconStyles from global;
+}
+
+/* Title of the modal */
+.modalTitle {
+  composes: marketplaceModalTitleStyles from global;
+}
+
+/* Paragraph for the Modal */
+.modalMessage {
+  composes: marketplaceModalParagraphStyles from global;
+}
+
+.submitButton {
+  margin-top: auto;
+  margin-bottom: 96px;
+  flex-shrink: 0;
+  background-color: var(--colorFail);
+
+  &:focus,
+  &:hover {
+    background-color: var(--colorFailDark);
+  }
+
+  @media (--viewportMedium) {
+    display: inline-block;
+    width: 100%;
+    margin-top: 36px;
+    margin-bottom: 0;
+  }
+}
+
+/* The non-dismissible "invasive loader" sub-state. Centered, full-height within the modal's
+   own content area so it reads as the whole dialog rather than a corner of it - there is
+   nothing else to look at while this is showing. */
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-grow: 1;
+  text-align: center;
+}
+
+.loadingSpinner {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 24px;
+  stroke: var(--marketplaceColor);
+}

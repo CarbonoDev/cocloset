@@ -52,14 +52,18 @@ describe('the client and server handover step tables agree', () => {
 });
 
 describe('the step table names counter events only', () => {
-  it('covers exactly the four states where somebody is at the counter', () => {
+  it('covers exactly the five states where somebody is at the counter', () => {
     // Restated as a set so widening it (to a cleaning sub-phase, say) is a deliberate edit.
     // The cleaning phases are studio-internal: offering a "confirm" there would advance an
     // internal step with nobody handing anything over.
+    //
+    // 'accepted-on-laundry' ADDED (2026-10-15): the auto-accept/already-on-laundry state
+    // split. It mirrors 'accepted' (onLaundry: true)'s own step exactly - see STEPS in
+    // src/util/handoverSteps.js - since that was already this state's step before the split.
     const withStep = ALL_STATES.filter(state => !!handoverStepFor(state, { onLaundry: true }));
 
     expect(withStep.sort()).toEqual(
-      ['accepted', 'overdue', 'picked-up', 'ready-for-pickup'].sort()
+      ['accepted', 'accepted-on-laundry', 'overdue', 'picked-up', 'ready-for-pickup'].sort()
     );
   });
 

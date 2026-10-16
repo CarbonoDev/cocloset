@@ -30,9 +30,17 @@ import {
  * @param {*} processInfo details about the process
  */
 export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
-  const { transaction, transactionRole, nextTransitions, onOpenCancelBookingModal } = txInfo;
+  const {
+    transaction,
+    transactionRole,
+    nextTransitions,
+    onOpenCancelBookingModal,
+    onOpenPartialRefundCancelModal,
+    partialRefundCancelInProgress,
+    partialRefundCancelError,
+  } = txInfo;
   const isProviderBanned = transaction?.provider?.attributes?.banned;
-  const isCustomerBanned = transaction?.provider?.attributes?.banned;
+  const isCustomerBanned = transaction?.customer?.attributes?.banned;
   const _ = CONDITIONAL_RESOLVER_WILDCARD;
 
   const {
@@ -177,14 +185,82 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
           showActionButtons: true,
           primaryButtonProps: actionButtonProps(transitions.CUSTOMER_CANCEL, CUSTOMER, {
             onAction: onOpenCancelBookingModal,
+            // Carried through so TransactionPage.js's CancelBookingModal fires the TRANSITION
+            // THIS STATE actually needs, rather than a hardcoded one - see the sibling cond
+            // below for why that matters now that there are two.
+            transition: transitions.CUSTOMER_CANCEL,
           }),
+        };
+      })
+      // NEW (2026-10-15), alongside states.ACCEPTED_ON_LAUNDRY itself. Wired to the NEW
+      // customer-cancel-from-accepted-on-laundry transition (not CUSTOMER_CANCEL, which only
+      // Sharetribe will accept from states.ACCEPTED) - see the EDN's own comment on that
+      // transition for why omitting this cond would have been a silent regression on the
+      // already-shipped self-cancel feature, not just a missing new one.
+      //
+      // MUST COME BEFORE the states.ACCEPTED_ON_LAUNDRY wildcard cond below - ConditionalResolver
+      // takes the first match, same ordering requirement as the ACCEPTED/CUSTOMER cond above.
+      .cond([states.ACCEPTED_ON_LAUNDRY, CUSTOMER], () => {
+        return {
+          ...shared,
+          showDetailCardHeadings: true,
+          showActionButtons: true,
+          primaryButtonProps: actionButtonProps(
+            transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
+            CUSTOMER,
+            {
+              onAction: onOpenCancelBookingModal,
+              transition: transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
+            }
+          ),
         };
       })
       .cond([states.ACCEPTED, _], () => {
         return { ...shared, showDetailCardHeadings: true };
       })
+      // Informational wildcard for ACCEPTED_ON_LAUNDRY (provider, or any other role): nobody
+      // but the laundry acts here, same shape as ACCEPTED's own wildcard above.
+      .cond([states.ACCEPTED_ON_LAUNDRY, _], () => {
+        return { ...shared, showDetailCardHeadings: true };
+      })
+      // CUSTOMER PARTIAL-REFUND SELF-CANCEL (2026-10-13). The garment has already reached the
+      // laundry for its first wash, so unlike the ACCEPTED-state full-refund self-cancel
+      // above, this one can only ever be a PARTIAL refund (total minus the cleaning fee) -
+      // see server/api/customer-partial-refund-cancel.js and the EDN's own comment on
+      // :transition/partial-refund-cancel-from-initial-cleaning for the full argument. This
+      // cond MUST come before the wildcard INITIAL_CLEANING one below - ConditionalResolver
+      // takes the first match - so the provider keeps falling through to the informational,
+      // no-button branch.
+      //
+      // `onAction` opens a confirm modal (TransactionPage.js's onOpenPartialRefundCancelModal)
+      // rather than firing anything immediately - this moves real money and must not fire on
+      // a single accidental click, same reasoning as the ACCEPTED-state cancel. The real call
+      // only fires from that modal's onConfirm, which dispatches partialRefundCancelThunk -
+      // NOT the generic onTransition/makeTransitionThunk path, because this is a custom
+      // multi-step server call, not a plain SDK transition dispatch. `inProgress`/`error` are
+      // therefore read from this thunk's OWN state keys
+      // (partialRefundCancelInProgress/-Error), not the generic transitionInProgress/
+      // transitionError that `actionButtonProps` would otherwise wire in - a double-click
+      // here could only ever be a retry of money-moving code.
+      .cond([states.INITIAL_CLEANING, CUSTOMER], () => {
+        return {
+          ...shared,
+          showDetailCardHeadings: true,
+          showActionButtons: true,
+          primaryButtonProps: actionButtonProps(
+            transitions.PARTIAL_REFUND_CANCEL_FROM_INITIAL_CLEANING,
+            CUSTOMER,
+            {
+              onAction: onOpenPartialRefundCancelModal,
+              inProgress: partialRefundCancelInProgress,
+              transitionError: partialRefundCancelError,
+            }
+          ),
+        };
+      })
       // The first-time drop-off's own "in cleaning" moment (2026-09-21). Same shape as
-      // ACCEPTED/RETURNED/CLEANING: nobody but the laundry acts here.
+      // ACCEPTED/RETURNED/CLEANING: nobody but the laundry acts here. (PROVIDER falls through
+      // to here too, since the cond above is CUSTOMER-only.)
       .cond([states.INITIAL_CLEANING, _], () => {
         return { ...shared, showDetailCardHeadings: true };
       })

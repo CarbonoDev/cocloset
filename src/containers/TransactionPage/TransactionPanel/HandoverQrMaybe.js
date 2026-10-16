@@ -112,7 +112,14 @@ const HandoverQrMaybe = props => {
   // studio to clean it. An owner was reading it about their own garment, which they are the
   // one holding. The owner now has exactly two errands (see HANDOVER_QR_PROVIDER_*_STATES)
   // and each gets the sentence for the walk they are about to make.
-  const isWaitingForGarment = [states.PREAUTHORIZED, states.ACCEPTED].includes(processState);
+  // ACCEPTED_ON_LAUNDRY included (2026-10-15): the garment is already on the studio's rack,
+  // but the renter still cannot collect it until the laundry runs its own ready-for-pickup
+  // prep step - the same "waiting" position as ACCEPTED, just for a different reason (nothing
+  // to drop off vs. nothing prepared yet). See the state-split comment in
+  // transactionProcessCoclosetBooking.js.
+  const isWaitingForGarment = [states.PREAUTHORIZED, states.ACCEPTED, states.ACCEPTED_ON_LAUNDRY].includes(
+    processState
+  );
   const descriptionId = isCustomer
     ? isWaitingForGarment
       ? 'TransactionPanel.handoverQr.descriptionWaiting'

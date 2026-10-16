@@ -389,6 +389,24 @@ describe('laundry-transaction-status', () => {
       expect(transition.mock.calls[0][0].params.metadata.damageReported).toBeUndefined();
     });
 
+    // NEW (2026-10-15): "Si el customer regresa la prenda con retraso, debe informar por
+    // correo al provider sobre el retraso" - the provider's own late-return email
+    // (:booking-return-completed-late-owner) reads this to state the exact day count, so it
+    // has to be written at the moment the laundry confirms the late return. `booking.end` is
+    // fixed in the past (2020-08-11), so this is unambiguously overdue by the time any test
+    // run executes it.
+    it('writes daysLate on the late return transition only, never the on-time one', async () => {
+      const late = setupSdk({ lastTransition: 'transition/mark-overdue' });
+      await run({ transactionId: TX_ID, status: 'returned' });
+      const { daysLate } = late.transition.mock.calls[0][0].params.metadata;
+      expect(Number.isInteger(daysLate)).toBe(true);
+      expect(daysLate).toBeGreaterThan(0);
+
+      const onTime = setupSdk({ lastTransition: 'transition/laundry-confirm-pickup' });
+      await run({ transactionId: TX_ID, status: 'returned' });
+      expect(onTime.transition.mock.calls[0][0].params.metadata.daysLate).toBeUndefined();
+    });
+
     it.each([
       ['pending-cleaning', 'transition/laundry-confirm-return', 'pending-cleaning'],
       ['cleaning-in-progress', 'transition/laundry-mark-pending-cleaning', 'cleaning-in-progress'],

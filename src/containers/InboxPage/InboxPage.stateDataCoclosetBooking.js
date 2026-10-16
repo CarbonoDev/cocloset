@@ -72,6 +72,14 @@ export const getStateDataForCoclosetBookingProcess = (txInfo, processInfo) => {
       .cond([states.ACCEPTED, _], () => {
         return { processName, processState, tone: POSITIVE };
       })
+      // NEW (2026-10-15), alongside states.ACCEPTED_ON_LAUNDRY itself. Same treatment as
+      // ACCEPTED: nobody but the laundry acts here (the auto-accepted garment is already on
+      // the rack, just waiting on the laundry's own ready-for-pickup prep), so no
+      // actionNeeded, and the same positive tone an acceptance already earns regardless of
+      // which of the two paths produced it.
+      .cond([states.ACCEPTED_ON_LAUNDRY, _], () => {
+        return { processName, processState, tone: POSITIVE };
+      })
 
       // ---- The laundry custody chain -------------------------------------
       // First-time drop-off's own "in cleaning" moment (2026-09-21) - nobody but the laundry

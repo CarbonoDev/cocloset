@@ -37,8 +37,23 @@ const laundryNextStatus = ({ state, cleaningPhase, onLaundry } = {}) => {
   switch (state) {
     // Two counters, one state - see handoverSteps.js. A garment still with its owner has to
     // be taken in and washed; one already on the rack is ready now.
+    //
+    // onLaundry's conditional stays here even after the 2026-10-15 ACCEPTED/ACCEPTED_ON_LAUNDRY
+    // state split: STATES.ACCEPTED is now reached only via the manual accept, so in the
+    // ordinary case onLaundry will be false here. The condition is kept rather than hardcoded
+    // to 'garment-received', because this reads the LISTING's current custody flag, not the
+    // transaction's history - if a garment genuinely becomes available at the laundry while
+    // its booking is still waiting in ACCEPTED (e.g. a previous rental's garment was placed on
+    // the same listing's rack), there is still nothing for this endpoint to "receive".
     case STATES.ACCEPTED:
       return onLaundry === true ? 'ready-for-pickup' : 'garment-received';
+    // THE ALREADY-ON-LAUNDRY PATH'S OWN CASE (2026-10-15). STATES.ACCEPTED_ON_LAUNDRY is
+    // reachable only via :transition/operator-accept, which only ever fires when the garment
+    // is already on the laundry's rack - so, unlike STATES.ACCEPTED above, there is no
+    // onLaundry branch to make: the next and only step is "mark ready". Mirrors
+    // STATES.INITIAL_CLEANING's single-branch case below for the same reason.
+    case STATES.ACCEPTED_ON_LAUNDRY:
+      return 'ready-for-pickup';
     // The garment just finished its first wash (2026-09-21) - the only way out is the same
     // "mark ready" button as the onLaundry-already-true case above. See laundryActionsFor's
     // matching case in src/util/laundryStatuses.js.

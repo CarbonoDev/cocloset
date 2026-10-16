@@ -93,7 +93,12 @@ export const isLate = row => isOverdue(row) || wasReturnedLate(row);
 // The states a garment is in BEFORE the customer walks out with it. Named as its
 // own list because "has it gone out yet" is asked from more than one angle and
 // the answer is the boundary between `ready-for-pickup` and `picked-up`.
-const STATES_BEFORE_PICKUP = ['accepted', 'initial-cleaning', 'ready-for-pickup'];
+//
+// 'accepted-on-laundry' INCLUDED (2026-10-15): the auto-accept/already-on-laundry state split
+// - a booking sitting there is just as much "before the customer walks out with it" as one
+// sitting in 'accepted', and leaving it out would make isDeliverToday silently stop matching
+// every auto-accepted same-day booking.
+const STATES_BEFORE_PICKUP = ['accepted', 'accepted-on-laundry', 'initial-cleaning', 'ready-for-pickup'];
 
 /**
  * Does this garment have to go out to its renter TODAY?
@@ -386,6 +391,11 @@ export const sortRows = rows =>
 export const STATUS_TONES = {
   // Transaction laundry statuses
   accepted: 'Amber',
+  // NEW (2026-10-15): the auto-accept/already-on-laundry state split. Amber, like `returned` -
+  // the studio already has the garment, and the pending action is the STUDIO'S OWN (mark
+  // ready), not a counterparty's. That is the same "ops must act" signal `returned` carries,
+  // unlike `accepted` (where an outside party - the provider - owes the action).
+  'accepted-on-laundry': 'Amber',
   'initial-cleaning': 'Blue',
   'ready-for-pickup': 'Green',
   'picked-up': 'Violet',

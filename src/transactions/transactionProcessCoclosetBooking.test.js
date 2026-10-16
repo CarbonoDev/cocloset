@@ -116,7 +116,13 @@ describe('the JS graph matches ext/transaction-processes/cocloset-booking/proces
     // auto-complete-from-initial-cleaning), -5 for the removed provider-review diamond
     // (review-1/-2-by-provider, review-2-by-customer, expire-customer/-provider-review-period).
     // 2026-10-13: +1 for transition/customer-cancel (the customer's own 'accepted' cancel door).
-    expect(ednTransitions.length).toEqual(38);
+    // 2026-10-15: +5 for the accepted/accepted-on-laundry state split and the missed-dropoff
+    // auto-cancel - operator-complete-from-accepted-on-laundry,
+    // auto-complete-from-accepted-on-laundry, cancel-from-accepted-on-laundry,
+    // customer-cancel-from-accepted-on-laundry, cancel-for-missed-dropoff. (accept and
+    // operator-accept and laundry-mark-ready are NOT new transitions - only their :to/:from
+    // moved - so they are not part of this delta.)
+    expect(ednTransitions.length).toEqual(44);
   });
 
   it('declares exactly the transitions the EDN declares', () => {
@@ -230,13 +236,17 @@ describe('cocloset-booking graph shape', () => {
     );
   });
 
-  it('lists all nine ways of reaching delivered', () => {
+  it('lists all eleven ways of reaching delivered', () => {
+    // 2026-10-15: +2 for the accepted-on-laundry state split - operator-complete-from- and
+    // auto-complete-from-accepted-on-laundry.
     expect(process.getTransitionsToStates([states.DELIVERED]).sort()).toEqual(
       [
         transitions.COMPLETE,
         transitions.OPERATOR_COMPLETE,
+        transitions.OPERATOR_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
         transitions.LAUNDRY_MARK_AVAILABLE,
         transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
+        transitions.AUTO_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
         transitions.AUTO_COMPLETE_FROM_READY,
         transitions.AUTO_COMPLETE_FROM_PICKED_UP,
         transitions.AUTO_COMPLETE_FROM_OVERDUE,
@@ -244,6 +254,48 @@ describe('cocloset-booking graph shape', () => {
         transitions.AUTO_COMPLETE_FROM_CLEANING,
       ].sort()
     );
+  });
+
+  // 2026-10-15: the accepted/accepted-on-laundry state split - see the EDN's "THE STATE
+  // SPLIT" comment above :transition/operator-accept for the full reasoning.
+  it('splits operator-accept into its own state, reachable no other way', () => {
+    expect(process.getStateAfterTransition(transitions.OPERATOR_ACCEPT)).toEqual(
+      states.ACCEPTED_ON_LAUNDRY
+    );
+    expect(process.getTransitionsToStates([states.ACCEPTED_ON_LAUNDRY])).toEqual([
+      transitions.OPERATOR_ACCEPT,
+    ]);
+    expect(process.getTransitionsToStates([states.ACCEPTED])).toEqual([transitions.ACCEPT]);
+  });
+
+  it('moves laundry-mark-ready to start from accepted-on-laundry, not accepted', () => {
+    expect(graph.states[states.ACCEPTED].on[transitions.LAUNDRY_MARK_READY]).toBeUndefined();
+    expect(graph.states[states.ACCEPTED_ON_LAUNDRY].on[transitions.LAUNDRY_MARK_READY]).toEqual(
+      states.READY_FOR_PICKUP
+    );
+  });
+
+  it('gives accepted-on-laundry its own full mirror of backstop and cancel transitions', () => {
+    const onLaundry = graph.states[states.ACCEPTED_ON_LAUNDRY].on;
+    expect(onLaundry[transitions.OPERATOR_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY]).toEqual(
+      states.DELIVERED
+    );
+    expect(onLaundry[transitions.AUTO_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY]).toEqual(
+      states.DELIVERED
+    );
+    expect(onLaundry[transitions.CANCEL_FROM_ACCEPTED_ON_LAUNDRY]).toEqual(states.CANCELED);
+    expect(onLaundry[transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY]).toEqual(
+      states.CANCELED
+    );
+  });
+
+  it('gives accepted an auto-cancel-for-missed-dropoff exit, reachable only from there', () => {
+    expect(graph.states[states.ACCEPTED].on[transitions.CANCEL_FOR_MISSED_DROPOFF]).toEqual(
+      states.CANCELED
+    );
+    expect(
+      graph.states[states.ACCEPTED_ON_LAUNDRY].on[transitions.CANCEL_FOR_MISSED_DROPOFF]
+    ).toBeUndefined();
   });
 });
 
@@ -265,6 +317,9 @@ describe('cocloset-booking payout and cancel topology', () => {
       [
         transitions.COMPLETE,
         transitions.OPERATOR_COMPLETE,
+        // 2026-10-15: the accepted-on-laundry state split's own two payout-carrying exits.
+        transitions.OPERATOR_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
+        transitions.AUTO_COMPLETE_FROM_ACCEPTED_ON_LAUNDRY,
         transitions.AUTO_COMPLETE_FROM_INITIAL_CLEANING,
         transitions.AUTO_COMPLETE_FROM_READY,
         transitions.AUTO_COMPLETE_FROM_PICKED_UP,
@@ -292,7 +347,12 @@ describe('cocloset-booking payout and cancel topology', () => {
         transitions.OPERATOR_DECLINE,
         transitions.EXPIRE,
         transitions.CANCEL,
+        // 2026-10-15: the accepted-on-laundry state split's own cancel pair, plus the new
+        // auto-cancel-for-missed-dropoff - all three full refunds.
+        transitions.CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
         transitions.CUSTOMER_CANCEL,
+        transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
+        transitions.CANCEL_FOR_MISSED_DROPOFF,
         transitions.CANCEL_FROM_INITIAL_CLEANING,
         transitions.CANCEL_FROM_READY_FOR_PICKUP,
         transitions.CANCEL_FROM_PICKED_UP,
@@ -337,6 +397,7 @@ describe('cocloset-booking payout and cancel topology', () => {
   it('offers an operator cancel from every state that has not been paid out yet', () => {
     const cancelFrom = {
       [states.ACCEPTED]: transitions.CANCEL,
+      [states.ACCEPTED_ON_LAUNDRY]: transitions.CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
       [states.INITIAL_CLEANING]: transitions.CANCEL_FROM_INITIAL_CLEANING,
       [states.READY_FOR_PICKUP]: transitions.CANCEL_FROM_READY_FOR_PICKUP,
       [states.PICKED_UP]: transitions.CANCEL_FROM_PICKED_UP,
@@ -364,8 +425,21 @@ describe('cocloset-booking payout and cancel topology', () => {
     expect(transitions.CUSTOMER_CANCEL).not.toEqual(transitions.CANCEL);
   });
 
+  // 2026-10-15: accepted-on-laundry gets the SAME door, under its own name - see the EDN's
+  // ":STATE/ACCEPTED-ON-LAUNDRY NEEDS THE SAME DOOR" comment for why omitting this would have
+  // been a regression on the already-shipped feature above, not just a missing new one.
+  it('also offers the customer a self-cancel from accepted-on-laundry, as its own transition', () => {
+    expect(
+      graph.states[states.ACCEPTED_ON_LAUNDRY].on[transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY]
+    ).toEqual(states.CANCELED);
+    expect(transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY).not.toEqual(
+      transitions.CUSTOMER_CANCEL
+    );
+  });
+
   it('gives the customer no self-cancel anywhere past accepted', () => {
     [
+      states.ACCEPTED_ON_LAUNDRY,
       states.INITIAL_CLEANING,
       states.READY_FOR_PICKUP,
       states.PICKED_UP,
@@ -690,10 +764,10 @@ describe('cocloset-booking owner notifications', () => {
   // -----------------------------------------------------------------------
   // Cancellation.
   //
-  // All five cancels used to notify NOBODY: a full refund to the customer and
-  // a lost payout for the owner, in silence, including on the damage
-  // write-off path. `:on` and `:to` are both single-valued, so "tell both
-  // parties on all five" is exactly ten entries - there is no shorter
+  // All five full-refund cancels used to notify NOBODY: a full refund to the
+  // customer and a lost payout for the owner, in silence, including on the
+  // damage write-off path. `:on` and `:to` are both single-valued, so "tell
+  // both parties on all five" is exactly ten entries - there is no shorter
   // spelling, and a missing one is a silent refund all over again.
   //
   // CUSTOMER_CANCEL (2026-10-13) is deliberately EXCLUDED from this list, even
@@ -703,9 +777,17 @@ describe('cocloset-booking owner notifications', () => {
   // it does NOT share booking-cancelled/-owner - those templates say "was
   // cancelled by {marketplaceName}", which would misattribute a customer's own
   // cancellation to the marketplace. See the EDN's notification comment.
+  //
+  // CANCEL_FROM_ACCEPTED_ON_LAUNDRY (2026-10-15) IS INCLUDED, as the seventh: it is an
+  // operator cancel sharing the same two templates as the six below (see the EDN's own
+  // comment on it), so it belongs in this family rather than the customer-actor or
+  // missed-dropoff ones, which are both tested separately further down - see their own
+  // dedicated describe blocks for why they are NOT in this list (customer actor; own unique
+  // templates respectively).
   // -----------------------------------------------------------------------
   const CANCEL_TRANSITIONS = [
     transitions.CANCEL,
+    transitions.CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
     transitions.CANCEL_FROM_INITIAL_CLEANING,
     transitions.CANCEL_FROM_READY_FOR_PICKUP,
     transitions.CANCEL_FROM_PICKED_UP,
@@ -713,15 +795,49 @@ describe('cocloset-booking owner notifications', () => {
     transitions.CANCEL_FROM_RETURNED,
   ];
 
-  it('covers every OPERATOR cancel transition the process has, not a list of our own', () => {
-    // If a seventh operator cancel is ever added, this fails rather than
-    // leaving the new one silently unnotified. CUSTOMER_CANCEL is filtered
-    // out here on purpose - see the comment above and the dedicated block below.
+  // The SEVENTH way into :state/cancelled (2026-10-13), deliberately kept out of
+  // CANCEL_TRANSITIONS above rather than folded into it: it is a PARTIAL refund (total minus
+  // the cleaning fee), settled directly against Stripe rather than through
+  // calculate-full-refund/stripe-refund-payment, and it does not share booking-cancelled /
+  // booking-cancelled-owner - sharing those would claim a FULL refund happened. See the EDN's
+  // own comment on the transition for the full argument.
+  const PARTIAL_REFUND_CANCEL_TRANSITIONS = [
+    transitions.PARTIAL_REFUND_CANCEL_FROM_INITIAL_CLEANING,
+  ];
+
+  it('covers every cancel transition the process has, not a list of our own', () => {
+    // If an eighth cancel is ever added, this fails rather than leaving the new one silently
+    // unnotified - whichever of the two groups above it belongs with.
     const ednCancels = readEdnTransitions()
       .filter(t => toJsState(t.to) === states.CANCELED)
-      .filter(t => t.transition !== transitions.CUSTOMER_CANCEL)
+      .filter(
+        t =>
+          ![
+            transitions.CUSTOMER_CANCEL,
+            transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
+            transitions.CANCEL_FOR_MISSED_DROPOFF,
+          ].includes(t.transition)
+      )
       .map(t => t.transition);
-    expect(ednCancels.slice().sort()).toEqual(CANCEL_TRANSITIONS.slice().sort());
+    const allKnownCancels = [...CANCEL_TRANSITIONS, ...PARTIAL_REFUND_CANCEL_TRANSITIONS];
+    expect(ednCancels.slice().sort()).toEqual(allKnownCancels.slice().sort());
+  });
+
+  it('gives the partial-refund cancel its own two-notification pair, not the shared full-refund templates', () => {
+    PARTIAL_REFUND_CANCEL_TRANSITIONS.forEach(transition => {
+      expect(notificationEntriesOn(transition)).toHaveLength(2);
+      expect(
+        notificationRolesOn(transition)
+          .slice()
+          .sort()
+      ).toEqual(['customer', 'provider']);
+      // Specifically NOT booking-cancelled/-owner: those say "refunded in full" /
+      // "the renter was refunded in full", which would be false here.
+      expect(templatesByRoleOn(transition)).toEqual({
+        customer: 'booking-partial-refund-cancelled',
+        provider: 'booking-partial-refund-cancelled-owner',
+      });
+    });
   });
 
   it.each(CANCEL_TRANSITIONS)('notifies exactly two parties on %s', transition => {
@@ -750,12 +866,12 @@ describe('cocloset-booking owner notifications', () => {
     });
   });
 
-  it('gives every one of the twelve entries its own name', () => {
-    // Six cancel transitions x two roles each = twelve (2026-09-21 added
-    // cancel-from-initial-cleaning as the sixth).
+  it('gives every one of the fourteen entries its own name', () => {
+    // Seven cancel transitions x two roles each = fourteen (2026-10-15 added
+    // cancel-from-accepted-on-laundry as the seventh).
     const names = CANCEL_TRANSITIONS.flatMap(notificationsOn);
-    expect(names).toHaveLength(12);
-    expect(new Set(names).size).toEqual(12);
+    expect(names).toHaveLength(14);
+    expect(new Set(names).size).toEqual(14);
   });
 
   // -----------------------------------------------------------------------
@@ -776,9 +892,20 @@ describe('cocloset-booking owner notifications', () => {
         'cancel-booking',
       ]);
 
-      // Every EDN cancel is now accounted for: the six operator ones plus this one.
+      // Every EDN cancel is now accounted for: the seven operator ones, this one, the
+      // accepted-on-laundry customer door, and the missed-dropoff auto-cancel.
+      // Every EDN cancel is now accounted for: the six operator ones, this one, and the
+      // customer-initiated partial-refund door at initial-cleaning (2026-10-13, tested in its
+      // own describe block elsewhere in this file).
       expect(ednCancels.map(t => t.transition).sort()).toEqual(
-        [...CANCEL_TRANSITIONS, transitions.CUSTOMER_CANCEL].sort()
+        [
+          
+          ...CANCEL_TRANSITIONS,
+          transitions.CUSTOMER_CANCEL,
+          transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY,
+          transitions.CANCEL_FOR_MISSED_DROPOFF,
+          transitions.PARTIAL_REFUND_CANCEL_FROM_INITIAL_CLEANING,
+        ].sort()
       );
     });
 
@@ -796,6 +923,101 @@ describe('cocloset-booking owner notifications', () => {
         customer: 'booking-customer-cancelled',
         provider: 'booking-customer-cancelled-owner',
       });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // transition/customer-cancel-from-accepted-on-laundry (2026-10-15) - the SAME door as
+  // transition/customer-cancel above, reachable from the second state the state split
+  // created. See the EDN's ":STATE/ACCEPTED-ON-LAUNDRY NEEDS THE SAME DOOR" comment.
+  // -----------------------------------------------------------------------
+  describe('transition/customer-cancel-from-accepted-on-laundry', () => {
+    it('is wired exactly like the EDN describes: customer actor, accepted-on-laundry -> cancelled', () => {
+      const ednCancels = readEdnTransitions().filter(t => toJsState(t.to) === states.CANCELED);
+      const entry = ednCancels.find(
+        t => t.transition === transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY
+      );
+
+      expect(entry).toBeDefined();
+      expect(toJsState(entry.from)).toEqual(states.ACCEPTED_ON_LAUNDRY);
+      expect(entry.actions).toEqual([
+        'calculate-full-refund',
+        'stripe-refund-payment',
+        'cancel-booking',
+      ]);
+    });
+
+    it('notifies the same two parties as transition/customer-cancel, reusing its templates', () => {
+      expect(
+        notificationEntriesOn(transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY)
+      ).toHaveLength(2);
+      expect(
+        notificationRolesOn(transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY)
+          .slice()
+          .sort()
+      ).toEqual(['customer', 'provider']);
+
+      // Same event, same attribution story, no new copy needed - see the EDN's own comment.
+      expect(templatesByRoleOn(transitions.CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY)).toEqual({
+        customer: 'booking-customer-cancelled',
+        provider: 'booking-customer-cancelled-owner',
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // transition/cancel-for-missed-dropoff (2026-10-15) - the actual new feature. System-fired
+  // (no actor), :at :time/booking-start, and - unlike every cancel above - its OWN unique
+  // templates, because this is the one cancellation whose reason is specific, known in
+  // advance, and squarely the provider's fault. See the EDN's own comment on this transition.
+  // -----------------------------------------------------------------------
+  describe('transition/cancel-for-missed-dropoff', () => {
+    const entry = () =>
+      readEdnTransitions().find(t => t.transition === transitions.CANCEL_FOR_MISSED_DROPOFF);
+
+    it('is wired exactly like the EDN describes: accepted -> cancelled, full refund', () => {
+      const e = entry();
+      expect(e).toBeDefined();
+      expect(toJsState(e.from)).toEqual(states.ACCEPTED);
+      expect(toJsState(e.to)).toEqual(states.CANCELED);
+      expect(e.actions).toEqual([
+        'calculate-full-refund',
+        'stripe-refund-payment',
+        'cancel-booking',
+      ]);
+    });
+
+    it('fires at exactly booking-start, with no actor (system-fired)', () => {
+      const raw = fs.readFileSync(EDN_PATH, 'utf8');
+      expect(raw).toMatch(
+        /:name :transition\/cancel-for-missed-dropoff,\s*:at \{:fn\/timepoint \[:time\/booking-start\]\}/
+      );
+      // No `:actor` key on this transition's own chunk.
+      const withoutComments = raw
+        .split('\n')
+        .map(line => line.replace(/;;.*$/, ''))
+        .join('\n');
+      const chunk = withoutComments
+        .split('{:name :transition/')
+        .find(c => c.startsWith('cancel-for-missed-dropoff'));
+      expect(chunk).not.toContain(':actor');
+    });
+
+    it('notifies both parties with its OWN unique templates, not booking-cancelled/-owner', () => {
+      expect(notificationEntriesOn(transitions.CANCEL_FOR_MISSED_DROPOFF)).toHaveLength(2);
+      expect(
+        notificationRolesOn(transitions.CANCEL_FOR_MISSED_DROPOFF)
+          .slice()
+          .sort()
+      ).toEqual(['customer', 'provider']);
+
+      const templates = templatesByRoleOn(transitions.CANCEL_FOR_MISSED_DROPOFF);
+      expect(templates).toEqual({
+        customer: 'booking-cancelled-missed-dropoff',
+        provider: 'booking-cancelled-missed-dropoff-owner',
+      });
+      expect(templates.customer).not.toEqual('booking-cancelled');
+      expect(templates.provider).not.toEqual('booking-cancelled-owner');
     });
   });
 });

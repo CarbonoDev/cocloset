@@ -25,6 +25,8 @@ const TRANSITION_PER_STATE = {
   'payment-expired': transitions.EXPIRE_PAYMENT,
   preauthorized: transitions.CONFIRM_PAYMENT,
   accepted: transitions.ACCEPT,
+  // NEW (2026-10-15): the auto-accept/already-on-laundry state split.
+  'accepted-on-laundry': transitions.OPERATOR_ACCEPT,
   declined: transitions.DECLINE,
   expired: transitions.EXPIRE,
   'initial-cleaning': transitions.LAUNDRY_RECEIVE_FROM_PROVIDER,
@@ -75,11 +77,13 @@ describe('InboxPage state data for cocloset-booking', () => {
       expect(stateDataFor(TRANSITION_PER_STATE[state], 'provider').actionNeeded).toBeFalsy();
     });
 
-    ['accepted', 'initial-cleaning', 'picked-up', 'returned', 'cleaning'].forEach(state => {
-      ROLES.forEach(role => {
-        expect(stateDataFor(TRANSITION_PER_STATE[state], role).actionNeeded).toBeFalsy();
-      });
-    });
+    ['accepted', 'accepted-on-laundry', 'initial-cleaning', 'picked-up', 'returned', 'cleaning'].forEach(
+      state => {
+        ROLES.forEach(role => {
+          expect(stateDataFor(TRANSITION_PER_STATE[state], role).actionNeeded).toBeFalsy();
+        });
+      }
+    );
   });
 
   it('marks only the truly terminal states as final', () => {
@@ -88,9 +92,11 @@ describe('InboxPage state data for cocloset-booking', () => {
     });
     // `delivered` opens the review window, so it is not final.
     expect(stateDataFor(TRANSITION_PER_STATE.delivered, 'customer').isFinal).toBeFalsy();
-    ['ready-for-pickup', 'picked-up', 'overdue', 'returned', 'cleaning'].forEach(state => {
-      expect(stateDataFor(TRANSITION_PER_STATE[state], 'customer').isFinal).toBeFalsy();
-    });
+    ['accepted-on-laundry', 'ready-for-pickup', 'picked-up', 'overdue', 'returned', 'cleaning'].forEach(
+      state => {
+        expect(stateDataFor(TRANSITION_PER_STATE[state], 'customer').isFinal).toBeFalsy();
+      }
+    );
   });
 
   it('keeps the provider sale notification at preauthorized', () => {
@@ -118,7 +124,10 @@ describe('InboxPage state data for cocloset-booking', () => {
       );
     });
 
-    it.each(['accepted', 'reviewed'])('is positive for %s', state => {
+    // 'accepted-on-laundry' joined this list 2026-10-15, alongside the state itself: an
+    // acceptance earns the same positive tone regardless of which of the two paths produced
+    // it.
+    it.each(['accepted', 'accepted-on-laundry', 'reviewed'])('is positive for %s', state => {
       ROLES.forEach(role =>
         expect(stateDataFor(TRANSITION_PER_STATE[state], role).tone).toBe('positive')
       );

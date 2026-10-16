@@ -40,6 +40,7 @@ const {
   releaseCleaningHold,
 } = require('../api-util/listingCustody');
 const { notifyReturnScheduled, notifyCleaningRequired } = require('../api-util/laundryMailer');
+const { getBookingOverdueDays } = require('../api-util/dates');
 const log = require('../log');
 
 // Lets an authenticated laundry user advance a transaction through the laundry
@@ -141,6 +142,7 @@ const buildTransitionMetadata = ({
   existingTicketCode,
   existingLaundryCodes,
   laundryCode,
+  bookingEnd,
 }) => {
   const metadata = {};
 
@@ -246,6 +248,28 @@ const buildTransitionMetadata = ({
       // damaged, and the damage outlives the state.
       metadata.damageReported = { flag: damaged, note: damageNote || '' };
     }
+  }
+
+  // HOW LATE, IN DAYS (2026-10-15). "Si el customer regresa la prenda con retraso, debe
+  // informar por correo al provider sobre el retraso" - the provider's own email
+  // (:notification/booking-return-completed-late, :template :booking-return-completed-late-owner)
+  // has to say the exact day count, and Sharetribe's notification templates have no
+  // arithmetic (see the comment in booking-new-request-html.html for the same constraint
+  // elsewhere), so the number has to be computed here, at the moment the laundry confirms the
+  // late return, and carried in metadata where the template can read it directly.
+  //
+  // ONLY on the LATE transition - a return confirmed on time has nothing to report, and
+  // `getBookingOverdueDays` would just answer 0 for it anyway (the "not yet overdue" branch),
+  // so gating on the transition name rather than the computed value keeps the intent visible
+  // in the metadata itself: the key's mere presence already says this return was late.
+  //
+  // Same shape as `getBookingOverdueDays` in src/util/dates.js (see that function's server
+  // mirror in api-util/dates.js for why this cannot just import it), read against `now` at the
+  // moment of confirmation rather than at booking-end - a return confirmed several days after
+  // the garment actually came back should still report the day it was ACTUALLY returned, which
+  // is what this moment answers.
+  if (transition === TRANSITIONS.LAUNDRY_CONFIRM_RETURN_LATE) {
+    metadata.daysLate = getBookingOverdueDays(bookingEnd);
   }
 
   if (cleaningPhase) {
@@ -629,6 +653,7 @@ module.exports = (req, res) => {
           existingTicketCode: data.attributes?.metadata?.ticketCode,
           existingLaundryCodes: data.attributes?.metadata?.[TRANSACTION_CODE_HISTORY_KEY],
           laundryCode: laundryCodeCheck.value,
+          bookingEnd: booking?.attributes?.end,
         });
 
         return integrationSdk.transactions

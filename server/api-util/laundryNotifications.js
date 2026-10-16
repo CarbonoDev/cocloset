@@ -375,13 +375,17 @@ const garmentHandedBackNotification = ({
 /**
  * Customer self-cancellation (2026-10-13) - the laundry side.
  *
- * Fires on `transition/customer-cancel`: the renter cancelled while the booking was still
- * sitting in `:state/accepted`, i.e. before ANY laundry-side transition fired for this
- * booking (see that transition's comment in process.edn - that is deliberately the only
- * condition under which a customer can self-cancel). Two physical situations both land here:
+ * Fires on EITHER `transition/customer-cancel` (from `:state/accepted`) or, since the
+ * 2026-10-15 accepted/accepted-on-laundry state split,
+ * `transition/customer-cancel-from-accepted-on-laundry` (from `:state/accepted-on-laundry`) -
+ * see server/api/customer-cancel-notify-laundry.js for where both are checked. Before that
+ * split, both of the physical situations below shared one state and so shared one transition;
+ * the split moved the second situation to its own state and its own (new) transition, but the
+ * laundry-facing message below did not need to change, because it was never about which state
+ * the booking was in - it is about there being no new handover to expect FOR THIS BOOKING:
  * the provider never dropped the garment off, or it was already at the laundry from a
- * previous cycle but the laundry had not yet run its ready-for-pickup prep. Either way there
- * is no new handover to expect FOR THIS BOOKING, and that is the whole message.
+ * previous cycle but the laundry had not yet run its ready-for-pickup prep. Either way, that
+ * is the whole message.
  *
  * Mirrors returnScheduledNotification's exact shape: a plain subject/text/html via the shared
  * renderEmail() helper above, same optional-ticket-code suffix convention.
@@ -424,6 +428,55 @@ const bookingCancelledNotification = ({
   });
 };
 
+/**
+ * Customer partial-refund self-cancellation (2026-10-13) - tells the assigned laundry that a
+ * booking it has ALREADY RECEIVED THE GARMENT FOR is off.
+ *
+ * DELIBERATELY NOT bookingCancelledNotification-shaped wording ("before any handover took
+ * place"): by the time `transition/partial-refund-cancel-from-initial-cleaning` can fire, the
+ * laundry has already run `transition/laundry-receive-from-provider` - the garment is
+ * physically on their rack. So this says the opposite of the full-refund-while-accepted
+ * cancellation: there IS a garment at the studio for this transaction, and it is not going to
+ * be rented out under this booking, but the laundry's OWN custody of it (onLaundry on the
+ * listing) is untouched by this mail - this is a transaction-level notice, not a custody
+ * instruction.
+ *
+ * @param {Object} data
+ * @param {string} [data.laundryName]
+ * @param {string} [data.garmentTitle]
+ * @param {string} [data.ticketCode] - cosmetic display code, if the laundry already issued one
+ * @param {string} [data.customerName]
+ * @param {string} [data.transactionId]
+ * @param {string} [data.marketplaceName]
+ * @returns {{subject: string, text: string, html: string}}
+ */
+const partialRefundBookingCancelledNotification = ({
+  laundryName,
+  garmentTitle,
+  ticketCode,
+  customerName,
+  transactionId,
+  marketplaceName,
+} = {}) => {
+  const name = resolveMarketplaceName(marketplaceName);
+  const garment = garmentTitle || UNKNOWN_GARMENT;
+  const renter = customerName || 'The renter';
+  const ticketSuffix = ticketCode ? ` (${ticketCode})` : '';
+  return renderEmail({
+    subject: `${name}: booking cancelled after drop-off — ${garment}${ticketSuffix}`,
+    greetingName: laundryName,
+    intro: `${renter} cancelled this booking for ${garment} after you already received it for its first cleaning. This booking will not go out on rental, but it does not change your custody of the garment - it stays with you under its own listing, exactly as before.`,
+    rows: [
+      ['Ticket', ticketCode],
+      ['Garment', garmentTitle],
+      ['Customer', customerName],
+      ['Transaction', transactionId],
+    ],
+    outro: 'If you were expecting to prepare this garment for pickup under this booking, you can stand down - that will not happen under this transaction.',
+    marketplaceName: name,
+  });
+};
+
 module.exports = {
   garmentHandedBackNotification,
   newIncomingGarmentNotification,
@@ -431,6 +484,7 @@ module.exports = {
   returnScheduledNotification,
   cleaningRequiredNotification,
   bookingCancelledNotification,
+  partialRefundBookingCancelledNotification,
   // Exported for tests and for reuse by any future laundry-facing email.
   escapeHtml,
   formatDateTime,

@@ -1,0 +1,1 @@
+{{set-translations (asset "content/email-texts.json")}}{{t "BookingCancelledMissedDropoffOwner.Subject" "The rental of {listingTitle} was cancelled - you did not drop it off in time" listingTitle=transaction.listing.title}}

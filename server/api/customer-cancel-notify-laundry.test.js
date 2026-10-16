@@ -168,6 +168,22 @@ describe('customer-cancel-notify-laundry: the happy path', () => {
       );
     });
   });
+
+  // NEW (2026-10-15): the SAME self-cancel event, reachable from the second state the
+  // accepted/accepted-on-laundry split added. Without this check, a booking cancelled from
+  // accepted-on-laundry would have silently stopped notifying the laundry the moment the
+  // split shipped - see this endpoint's own comment on TRANSITIONS.CUSTOMER_CANCEL_FROM_
+  // ACCEPTED_ON_LAUNDRY for why that would have been a regression, not a new gap.
+  it('also notifies the laundry for customer-cancel-from-accepted-on-laundry', () => {
+    setup({ lastTransition: 'transition/customer-cancel-from-accepted-on-laundry' });
+
+    return run().then(res => {
+      expect(res.statusCode).toBe(200);
+      expect(notifyBookingCancelled).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'studio@example.com', transactionId: TX_ID })
+      );
+    });
+  });
 });
 
 describe('customer-cancel-notify-laundry: authentication and authorization', () => {

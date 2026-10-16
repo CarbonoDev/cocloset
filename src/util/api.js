@@ -525,3 +525,28 @@ export const updateLaundryAddress = body => {
 export const lenderNewRequest = body => {
   return post('/api/lender-new-request', body);
 };
+
+// Customer self-cancellation AFTER the garment has reached the laundry for its first wash
+// (state/initial-cleaning) - cocloset-booking only. UNLIKE a plain transition, this is a
+// multi-step server call (verify eligibility, compute the withheld cleaning fee, refund
+// directly against Stripe, write an audit record, THEN fire the Sharetribe transition), so it
+// is deliberately NOT routed through the generic transition thunk
+// (TransactionPage.duck.js's makeTransitionThunk) - see partialRefundCancelThunk there, which
+// calls this directly rather than dispatching a transition name through the SDK.
+//
+// Every response is a DEFINITIVE answer about what happened to the customer's money and the
+// booking - there is no "fire and continue" here, because the client shows a non-dismissible
+// loading state while this is in flight. Possible shapes of `data`:
+//   - `{ refunded: true, cancelled: true, requiresManualFollowUp: false, refundAmount,
+//      refundCurrency, transition, transaction }` - full success.
+//   - `{ refunded: true, cancelled: false, requiresManualFollowUp: true, refundAmount,
+//      refundCurrency }` - the refund succeeded but the Sharetribe transition failed; the
+//      money moved, the booking has not yet been marked cancelled, and this needs a human or
+//      a retry (which will resume safely rather than refunding twice).
+//   - a non-2xx rejection with `error`/`reason` fields such as `not-eligible` (wrong state),
+//     `no-payment-intent-on-record` (transaction predates the payment-intent ledger), or
+//     `stripe-refund-failed` (Stripe itself rejected the refund - nothing moved).
+// See `server/api/customer-partial-refund-cancel.js` for the authoritative list.
+export const customerPartialRefundCancel = body => {
+  return post('/api/customer-partial-refund-cancel', body);
+};

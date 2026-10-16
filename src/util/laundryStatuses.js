@@ -34,6 +34,11 @@
  */
 export const LAUNDRY_STATES = [
   'accepted',
+  // THE AUTO-ACCEPT / ALREADY-ON-LAUNDRY STATE (2026-10-15) - see
+  // src/transactions/transactionProcessCoclosetBooking.js's ACCEPTED_ON_LAUNDRY. Ranked
+  // alongside 'accepted': both are "awaiting the next laundry-side step", just reached by
+  // different paths (manual drop-off pending vs. already on the rack).
+  'accepted-on-laundry',
   // The first-time drop-off's own "in cleaning" state (2026-09-21) - see
   // src/transactions/transactionProcessCoclosetBooking.js's INITIAL_CLEANING.
   'initial-cleaning',
@@ -211,6 +216,11 @@ export const opsStatus = row => {
  */
 export const CUSTODY_ACTIVE_STATES = [
   'accepted',
+  // NEW (2026-10-15): the auto-accept/already-on-laundry state split. A garment sitting here
+  // is just as committed to a live booking as one sitting in 'accepted' - omitting it would
+  // let the laundry hand an auto-accepted garment back to its owner mid-rental, which
+  // `canHandBackToOwner` below exists specifically to prevent.
+  'accepted-on-laundry',
   'initial-cleaning',
   'ready-for-pickup',
   'picked-up',
@@ -284,6 +294,13 @@ export const laundryActionsFor = row => {
       // is what announced a coat as collectable the moment its ticket was typed.
       case 'accepted':
         return row.onLaundry === true ? 'ready-for-pickup' : 'garment-received';
+      // THE ALREADY-ON-LAUNDRY PATH'S OWN CASE (2026-10-15). A row in this state is reachable
+      // only via :transition/operator-accept, which only ever fires when the garment is
+      // already on the laundry's rack - so, unlike 'accepted' above, there is no onLaundry
+      // branch to make: the next and only step is "mark ready". Mirrors 'initial-cleaning'
+      // below for the same single-branch reason.
+      case 'accepted-on-laundry':
+        return 'ready-for-pickup';
       // The garment just finished its first wash (2026-09-21) - the only way out is the same
       // "mark ready" button as the onLaundry-already-true path above. The server picks which
       // of the two `laundry-mark-ready*` transitions to fire from the real current state (see
