@@ -142,30 +142,58 @@ const lastIndexForState = steps =>
     {}
   );
 
-// THE ONE STATE THAT ISN'T ONE MOMENT.
+// WHERE THE TRANSACTION SITS ON THIS READER'S LIST: { index, settled }.
+// `settled` means the step at `index` has already HAPPENED, so it reads DONE instead of CURRENT.
 //
 //   > "he aceptado la solicitud del pedido, pero aún no lo he llevado a la laundry. Esto
 //   >  debería mostrar el segundo punto con un contorno oscuro pero sin relleno (...) el punto
 //   >  actual debe ser 'Drop off at cleaner'" (Jonathan, 2026-09-11)
 //
-// `bookingConfirmed`, `dropOffAtCleaners` and `laundryPreparing` all share `state: ACCEPTED`
-// on purpose (see the comment on `dropOffAtCleaners` above) - `lastIndexForState` resolves
-// that tie to the LAST of the three, so a transaction that has only just been accepted, with
-// nobody having carried the garment anywhere yet, was marked "laundryPreparing" as CURRENT and
-// "dropOffAtCleaners" as already DONE. Both were wrong: the garment has not left its owner.
-//
-// The disambiguating fact already exists elsewhere in this codebase - `metadata.onLaundry`,
-// the same flag `create-availability-buffer` and the initial-cleaning floor read - it just was
-// not threaded into this function. `onLaundry !== true` means the accepted booking is still
-// waiting on the owner, so the current step is `dropOffAtCleaners`; `onLaundry === true` means
-// the studio already has it, so `laundryPreparing` resumes being current and
-// `dropOffAtCleaners` reads DONE, same as before this fix for that case.
-const currentIndexForAccepted = (steps, onLaundry) => {
-  if (onLaundry === true) {
-    return lastIndexForState(steps)[coclosetStates.ACCEPTED];
+// - ACCEPTED isn't one moment. `bookingConfirmed`, `dropOffAtCleaners` and `laundryPreparing`
+//   all share it on purpose (see the comment on `dropOffAtCleaners` above), and
+//   `lastIndexForState` would resolve that tie to the LAST of the three. `metadata.onLaundry`
+//   decides instead: `onLaundry !== true` means the garment is still with its owner, so the
+//   current step is `dropOffAtCleaners`; `onLaundry === true` means the studio already has it,
+//   so `laundryPreparing` is current and `dropOffAtCleaners` reads DONE.
+// - ACCEPTED_ON_LAUNDRY (auto-accept, garment already at the studio) and INITIAL_CLEANING (the
+//   studio received the garment and is washing it) have no step of their own in the list.
+//   Both mean the garment is at the studio being prepared, so both point at
+//   `laundryPreparing`. Without this they resolved to `undefined` and the whole list went grey.
+// - If the state's own step is not on this reader's list (the customer has no `cleaning` or
+//   `readyForNextRental`), use the nearest EARLIER step they do see, settled: the rental has
+//   moved past everything they are shown, so it reads DONE rather than current.
+// - DELIVERED is an arrival, not a wait: it is reached when the studio marks the garment
+//   available again, so its own step (`readyForNextRental`) has happened and is settled too.
+//   The review is answered separately in `timelineStatusFor` and is what is left current.
+const currentPositionFor = (steps, state, onLaundry) => {
+  const aliasKey =
+    state === coclosetStates.ACCEPTED
+      ? onLaundry === true
+        ? 'laundryPreparing'
+        : 'dropOffAtCleaners'
+      : state === coclosetStates.ACCEPTED_ON_LAUNDRY || state === coclosetStates.INITIAL_CLEANING
+      ? 'laundryPreparing'
+      : null;
+  if (aliasKey) {
+    return { index: steps.findIndex(step => step.key === aliasKey), settled: false };
   }
-  const dropOffIndex = steps.findIndex(step => step.key === 'dropOffAtCleaners');
-  return dropOffIndex >= 0 ? dropOffIndex : lastIndexForState(steps)[coclosetStates.ACCEPTED];
+
+  const ownIndex = lastIndexForState(steps)[state];
+  if (ownIndex !== undefined) {
+    return { index: ownIndex, settled: state === coclosetStates.DELIVERED };
+  }
+
+  const fullIndex = RENTAL_TIMELINE_STEPS.reduce(
+    (found, step, index) => (step.state === state ? index : found),
+    -1
+  );
+  for (let i = fullIndex - 1; i >= 0; i--) {
+    const index = steps.findIndex(step => step.key === RENTAL_TIMELINE_STEPS[i].key);
+    if (index >= 0) {
+      return { index, settled: true };
+    }
+  }
+  return { index: -1, settled: false };
 };
 
 // States that come BEFORE the first step. A booking still awaiting payment or acceptance has
@@ -216,7 +244,7 @@ const REVIEWABLE_STATES = [coclosetStates.DELIVERED, coclosetStates.REVIEWED];
  * @param {Object} [options]
  * @param {string} [options.audience] - whose list to mark; defaults to the customer's
  * @param {boolean} [options.onLaundry] - the listing's `metadata.onLaundry`; disambiguates the
- *   ACCEPTED state's three shared steps (see `currentIndexForAccepted`)
+ *   ACCEPTED state's three shared steps (see `currentPositionFor`)
  * @returns {Array<{key: string, status: string}>} that reader's steps, in order
  */
 export const timelineStatusFor = (processState, options = {}) => {
@@ -232,12 +260,10 @@ export const timelineStatusFor = (processState, options = {}) => {
 
   const isBefore = PRE_TIMELINE_STATES.includes(normalised);
   const isOff = OFF_TIMELINE_STATES.includes(normalised);
-  const currentIndex =
+  const { index: currentIndex, settled } =
     isBefore || isOff
-      ? -1
-      : normalised === coclosetStates.ACCEPTED
-      ? currentIndexForAccepted(steps, onLaundry)
-      : lastIndexForState(steps)[normalised];
+      ? { index: -1, settled: false }
+      : currentPositionFor(steps, normalised, onLaundry);
 
   const canReview = REVIEWABLE_STATES.includes(processState);
   const reviewStatus = hasReviewed(processState)
@@ -256,7 +282,9 @@ export const timelineStatusFor = (processState, options = {}) => {
         : index < currentIndex
         ? STEP_DONE
         : index === currentIndex
-        ? STEP_CURRENT
+        ? settled
+          ? STEP_DONE
+          : STEP_CURRENT
         : STEP_PENDING,
   }));
 };

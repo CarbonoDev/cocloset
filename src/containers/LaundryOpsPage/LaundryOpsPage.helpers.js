@@ -219,7 +219,9 @@ export const filterByTab = (rows, tab, now = new Date()) => {
         r => isSameDayAs(r.bookingEnd, now) && STATES_OUT_WITH_RENTER.includes(opsStatus(r))
       );
     case 'pending-cleaning':
-      return rows.filter(r => opsStatus(r) === 'pending-cleaning');
+      return rows.filter(r =>
+        CLEANING_STATUSES.includes(opsStatus(r))
+      );
     case 'ready-for-pickup':
       return rows.filter(r => opsStatus(r) === 'ready-for-pickup');
     case 'late-returns':
