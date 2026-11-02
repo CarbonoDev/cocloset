@@ -344,13 +344,34 @@ const InboxTransactionPanel = props => {
       {/* The way back to the page that can ACT on this rental - accept it, decline it, message
           the other party. See the note at the top of this file: the row that used to be this
           link is now a selector, so this is the only route left to it. */}
-      <NamedLink
-        className={css.panelFullLink}
-        name={transactionRole === 'customer' ? 'OrderDetailsPage' : 'SaleDetailsPage'}
-        params={{ id: transaction.id?.uuid }}
-      >
-        <FormattedMessage id={needsProviderAction ? "InboxPage.panel.takeAction" : "InboxPage.panel.openFull" } />
-      </NamedLink>
+      {needsProviderAction ? (
+        <div className={css.actionCard}>
+          <p className={css.actionCardEyebrow}>
+            <FormattedMessage id="InboxPage.panel.takeActionEyebrow" />
+          </p>
+          <h3 className={css.actionCardTitle}>
+            <FormattedMessage id="InboxPage.panel.takeActionTitle" />
+          </h3>
+          <p className={css.actionCardBody}>
+            <FormattedMessage id="InboxPage.panel.takeActionBody" />
+          </p>
+          <NamedLink
+            className={css.actionCardButton}
+            name="SaleDetailsPage"
+            params={{ id: transaction.id?.uuid }}
+          >
+            <FormattedMessage id="InboxPage.panel.takeAction" />
+          </NamedLink>
+        </div>
+      ) : (
+        <NamedLink
+          className={css.panelFullLink}
+          name={transactionRole === 'customer' ? 'OrderDetailsPage' : 'SaleDetailsPage'}
+          params={{ id: transaction.id?.uuid }}
+        >
+          <FormattedMessage id="InboxPage.panel.openFull" />
+        </NamedLink>
+      )}
 
       {/* GATED TOO, NOT JUST THE BUTTON.
             > "puedes revisar si todo esta finalizado en cuestión de que el provider no debe

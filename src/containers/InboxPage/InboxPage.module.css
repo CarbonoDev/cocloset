@@ -961,3 +961,57 @@
   background-color: var(--coclosetToneCriticalBg);
   color: var(--coclosetToneCriticalFg);
 }
+
+/* Action card */
+.actionCard {
+  background-color: var(--coclosetSurfaceRaised);
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 12px;
+  margin-top: 20px;
+  padding: 18px;
+}
+
+.actionCardEyebrow {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetBrandDark);
+  font-weight: var(--fontWeightSemiBold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 8px 0;
+}
+
+.actionCardTitle {
+  font-family: var(--fontFamilyDisplay);
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
+  margin: 0;
+}
+
+.actionCardBody {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 6px 0 14px 0;
+}
+
+.actionCardButton {
+  composes: marketplaceDefaultFontStyles from global;
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background-color: var(--coclosetBrand);
+  color: var(--colorWhite);
+  font-weight: var(--fontWeightSemiBold);
+  text-align: center;
+  text-decoration: none;
+  transition: var(--transitionStyleButton);
+
+  &:hover,
+  &:focus-visible {
+    background-color: var(--coclosetBrandDark);
+    color: var(--colorWhite);
+    text-decoration: none;
+  }
+}
