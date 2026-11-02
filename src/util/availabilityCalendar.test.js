@@ -1,0 +1,288 @@
+import {
+  CALENDAR_WEEKS,
+  DAY_AVAILABLE,
+  DAY_BOOKED,
+  DAY_CLEANING,
+  DAY_SELECTED,
+  buildCalendarDays,
+  classifyDay,
+  selectedRange,
+  DAY_NO_ROOM,
+} from './availabilityCalendar';
+
+// The read-only five-week view. Its whole job is one distinction the client asked for by name:
+//
+//   > "Debemos identificar cual es cleaning y cual es booked"
+//
+// Those are different facts from different sources - booked is availability, cleaning is the
+// turnaround owed after a rental, which availability does not know about - so the tests that
+// matter here are the ones where a day could be read as either.
+
+const day = iso => new Date(`${iso}T00:00:00.000Z`);
+const UTC = 'Etc/UTC';
+
+const slot = (start, end) => ({ attributes: { start: day(start), end: day(end) } });
+
+// A garment free all month except 17-24 Aug, which is booked, and owing two cleaning days
+// after that rental.
+const TIME_SLOTS = [slot('2026-08-01', '2026-08-17'), slot('2026-08-24', '2026-09-30')];
+const GAPS = [{ start: day('2026-08-24'), end: day('2026-08-26') }];
+
+const classify = (iso, extra = {}) =>
+  classifyDay({
+    day: day(iso),
+    allTimeSlots: TIME_SLOTS,
+    cleaningGaps: GAPS,
+    timeZone: UTC,
+    ...extra,
+  });
+
+describe('classifyDay', () => {
+  it('calls a free day available', () => {
+    expect(classify('2026-08-10')).toBe(DAY_AVAILABLE);
+  });
+
+  it('calls a day inside a rental booked', () => {
+    expect(classify('2026-08-20')).toBe(DAY_BOOKED);
+  });
+
+  it('calls the turnaround after a rental cleaning, not available', () => {
+    // THE POINT OF THE WHOLE FEATURE. The availability API says these days are free - the
+    // buffer exception that should say otherwise is written from a browser and, on Dev, is
+    // not there. Only the server-resolved gap list knows.
+    expect(classify('2026-08-24')).toBe(DAY_CLEANING);
+    expect(classify('2026-08-25')).toBe(DAY_CLEANING);
+  });
+
+  it('prefers cleaning over booked when a day is both', () => {
+    // If the buffer exception DID land, the day is unavailable and in a gap. "Booked" would
+    // be true and less true: the reader wants to know a wash is why.
+    const bookedAndCleaning = classifyDay({
+      day: day('2026-08-24'),
+      allTimeSlots: [slot('2026-08-01', '2026-08-17')],
+      cleaningGaps: GAPS,
+      timeZone: UTC,
+    });
+    expect(bookedAndCleaning).toBe(DAY_CLEANING);
+  });
+
+  it('prefers the selection over everything', () => {
+    // A selected day that also looks booked means the picker and this grid disagree, and
+    // painting it grey would hide that rather than show it.
+    const selection = selectedRange(day('2026-08-24'), 7, UTC);
+    expect(classify('2026-08-24', { selection })).toBe(DAY_SELECTED);
+  });
+
+  it('reads a day past the fetched months as booked, not available', () => {
+    // The safe direction: an unknown day must not be painted as bookable.
+    expect(classify('2026-12-01')).toBe(DAY_BOOKED);
+  });
+});
+
+describe('selectedRange', () => {
+  it('covers the rental period and NOT the turnaround after it', () => {
+    // The buffer belongs to the studio. Painting it as "your selection" tells a customer they
+    // have the garment for longer than they do.
+    const range = selectedRange(day('2026-08-10'), 7, UTC);
+    expect(range.start.toISOString()).toBe('2026-08-10T00:00:00.000Z');
+    expect(range.end.toISOString()).toBe('2026-08-17T00:00:00.000Z');
+  });
+
+  it('is null with no period chosen yet', () => {
+    expect(selectedRange(day('2026-08-10'), null, UTC)).toBeNull();
+    expect(selectedRange(null, 7, UTC)).toBeNull();
+  });
+});
+
+describe('buildCalendarDays', () => {
+  const days = buildCalendarDays({
+    today: day('2026-08-12'),
+    allTimeSlots: TIME_SLOTS,
+    cleaningGaps: GAPS,
+    timeZone: UTC,
+    firstDayOfWeek: 1,
+  });
+
+  it('draws five whole weeks', () => {
+    expect(days).toHaveLength(CALENDAR_WEEKS * 7);
+  });
+
+  it('starts on the first day of the week containing today, so the columns line up', () => {
+    // 2026-08-12 is a Wednesday; with Monday as the first weekday the grid opens on the 10th.
+    expect(days[0].date.toISOString()).toBe('2026-08-10T00:00:00.000Z');
+    expect(days[0].isPast).toBe(true);
+  });
+
+  it('never calls a day that has already passed available', () => {
+    days
+      .filter(d => d.isPast)
+      .forEach(d => {
+        expect(d.status).not.toBe(DAY_AVAILABLE);
+      });
+  });
+
+  it('marks the cleaning days as cleaning', () => {
+    const cleaning = days.filter(d => d.status === DAY_CLEANING).map(d => d.date.getUTCDate());
+    expect(cleaning).toEqual([24, 25]);
+  });
+
+  // TODAY, which this strip used to paint "No longer available" on every listing every day.
+  //
+  //   > "el día de hoy esté habilitado para seleccionarlo" (Jonathan, 2026-09-28)
+  //
+  // The cause was never here: the listing page asked Sharetribe for availability from
+  // TOMORROW's midnight, so today had no containing slot, came out BOOKED, and was then
+  // relabelled past. With the fetch fixed (see fetchMonthlyTimeSlots in ListingPage.duck.js)
+  // today is an ordinary day - and the strip has to agree with the picker about which garments
+  // may actually go out on it.
+  describe('today', () => {
+    const todayIso = '2026-08-12';
+    const build = extra =>
+      buildCalendarDays({
+        today: day(todayIso),
+        allTimeSlots: TIME_SLOTS,
+        cleaningGaps: GAPS,
+        timeZone: UTC,
+        firstDayOfWeek: 1,
+        ...extra,
+      });
+    const todayCell = built => built.find(d => d.date.getTime() === day(todayIso).getTime());
+
+    it('is not past, and is available when the garment may go out today', () => {
+      const cell = todayCell(build({ canStartToday: true }));
+
+      expect(cell.isPast).toBe(false);
+      expect(cell.status).toBe(DAY_AVAILABLE);
+    });
+
+    it('defaults to available for a caller that says nothing about custody', () => {
+      // A default of "restricted" would have every other consumer of this module silently
+      // hide today; the picker is the one that knows, and it always passes the flag.
+      expect(todayCell(build({})).status).toBe(DAY_AVAILABLE);
+    });
+
+    it('is no-room, not available, when the garment may NOT go out today', () => {
+      // Free - nobody has it - but a rental cannot start here. Calling it available would be
+      // the strip promising a day the picker refuses, which is the whole reason DAY_NO_ROOM
+      // exists; calling it booked would say someone has the garment, which is false.
+      const cell = todayCell(build({ canStartToday: false }));
+
+      expect(cell.status).toBe(DAY_NO_ROOM);
+      expect(cell.isPast).toBe(false);
+    });
+
+    it('does not restrict any day other than today', () => {
+      const built = build({ canStartToday: false });
+      const tomorrow = built.find(d => d.date.getTime() === day('2026-08-13').getTime());
+
+      expect(tomorrow.status).toBe(DAY_AVAILABLE);
+    });
+
+    it('still calls today booked when someone actually has the garment', () => {
+      // Precedence: availability first. "Cannot go out today" must not overwrite the more
+      // specific truth that the garment is out on a rental.
+      const built = buildCalendarDays({
+        today: day('2026-08-18'), // inside the 17-24 Aug booking
+        allTimeSlots: TIME_SLOTS,
+        cleaningGaps: GAPS,
+        timeZone: UTC,
+        firstDayOfWeek: 1,
+        canStartToday: false,
+      });
+      const cell = built.find(d => d.date.getTime() === day('2026-08-18').getTime());
+
+      expect(cell.status).toBe(DAY_BOOKED);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+//   > "nota que no aparecen ocupados ni el 10 que es hoy, ni 11 ni 12; pero el calendario a
+//   >  buscar no estan habilitados" (Jonathan, 2026-09-10)
+//
+// Both views were right and read as one wrong answer: the strip says whether a day is BOOKED,
+// the picker above it says whether a rental can START there. A seven-day rental from the 10th
+// ran into a booking on the 13th, so the picker refused a day the strip called available.
+// ---------------------------------------------------------------------------
+describe('a free day the rental does not fit into', () => {
+  const TZ = 'Etc/UTC';
+  const day = n => new Date(Date.UTC(2026, 8, n));
+  // One contiguous free block, then a booking from the 13th: the shape of the report.
+  const slotsFreeUntil13 = [{ attributes: { start: day(1), end: day(13) } }];
+
+  it('is not available when the whole window does not fit', () => {
+    expect(
+      classifyDay({
+        day: day(10),
+        allTimeSlots: slotsFreeUntil13,
+        cleaningGaps: [],
+        timeZone: TZ,
+        windowDays: 7,
+      })
+    ).toBe(DAY_NO_ROOM);
+  });
+
+  it('is not called booked either, because nobody has it', () => {
+    // Saying "booked" would be a different untruth, and it is the one that would send a reader
+    // away from a garment that is simply not free for long enough yet.
+    const status = classifyDay({
+      day: day(10),
+      allTimeSlots: slotsFreeUntil13,
+      cleaningGaps: [],
+      timeZone: TZ,
+      windowDays: 7,
+    });
+    expect(status).not.toBe(DAY_BOOKED);
+  });
+
+  it('is available when the window does fit', () => {
+    expect(
+      classifyDay({
+        day: day(1),
+        allTimeSlots: [{ attributes: { start: day(1), end: day(30) } }],
+        cleaningGaps: [],
+        timeZone: TZ,
+        windowDays: 7,
+      })
+    ).toBe(DAY_AVAILABLE);
+  });
+
+  it('says nothing about room before a period is chosen', () => {
+    // "Nothing fits" is not something that can be said before there is something to fit.
+    expect(
+      classifyDay({
+        day: day(10),
+        allTimeSlots: slotsFreeUntil13,
+        cleaningGaps: [],
+        timeZone: TZ,
+      })
+    ).toBe(DAY_AVAILABLE);
+  });
+
+  it('still reports a genuinely booked day as booked', () => {
+    // The window check runs LAST: no-room is only interesting about a day that is otherwise
+    // yours, and a booked day must keep saying so.
+    expect(
+      classifyDay({
+        day: day(20),
+        allTimeSlots: slotsFreeUntil13,
+        cleaningGaps: [],
+        timeZone: TZ,
+        windowDays: 7,
+      })
+    ).toBe(DAY_BOOKED);
+  });
+
+  it('counts a cleaning gap inside the window as no room', () => {
+    // The day a rental ends is owed to its wash, and no time slot says so.
+    expect(
+      classifyDay({
+        day: day(1),
+        allTimeSlots: [{ attributes: { start: day(1), end: day(30) } }],
+        cleaningGaps: [{ start: day(4), end: day(6) }],
+        timeZone: TZ,
+        windowDays: 7,
+      })
+    ).toBe(DAY_NO_ROOM);
+  });
+});

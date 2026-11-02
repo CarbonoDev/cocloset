@@ -3,10 +3,16 @@ const moment = require('moment-timezone/builds/moment-timezone-with-data-10-year
 const { types } = require('sharetribe-flex-sdk');
 const { Money } = types;
 
-const { getAmountAsDecimalJS, convertDecimalJSToNumber } = require('./currency');
+const { getAmountAsDecimalJS, convertDecimalJSToNumber, unitDivisor } = require('./currency');
 const { nightsBetween, daysBetween } = require('./dates');
+const { getListingCategoryValues } = require('./categoryPricing');
+const { resolveCleaningFeeMajorUnits } = require('./cleaningFeeEnv');
+const { resolveSpecialHandlingFeeMajorUnits } = require('./specialHandlingFeeEnv');
+const { getIntegrationSdk } = require('./integrationSdk');
 const LINE_ITEM_NIGHT = 'line-item/night';
 const LINE_ITEM_DAY = 'line-item/day';
+const LINE_ITEM_CLEANING_FEE = 'line-item/cleaning-fee';
+const LINE_ITEM_SPECIAL_HANDLING_FEE = 'line-item/special-handling-fee';
 
 /** Helper functions for constructing line items*/
 
@@ -440,4 +446,190 @@ exports.getCustomerCommissionMaybe = (customerCommission, order, currency) => {
           includeFor: ['customer'],
         },
       ];
+};
+
+// Converts a flat fee given in major currency units (e.g. euros) to the
+// currency's subunits (e.g. cents), the unit Money/line items expect. Shared by
+// every flat customer-paid fee this file resolves (cleaning fee, special-handling
+// fee) - non-positive or invalid amounts collapse to 0, which each fee's own
+// getXFeeLineItemMaybe reads as "no line item".
+const positiveMajorUnitsToSubunits = (amountMajorUnits, currency) => {
+  const isValidAmount =
+    typeof amountMajorUnits === 'number' &&
+    Number.isFinite(amountMajorUnits) &&
+    amountMajorUnits > 0;
+  if (!isValidAmount || !currency) {
+    return 0;
+  }
+  return new Decimal(amountMajorUnits)
+    .times(unitDivisor(currency))
+    .toNearest(1, Decimal.ROUND_HALF_UP)
+    .toNumber();
+};
+
+/**
+ * Resolves the cleaning fee for a listing, in the given currency's subunits (ready to
+ * hand to getCleaningFeeLineItemMaybe).
+ *
+ * THE FEE COMES FROM THE SERVER ENVIRONMENT, NOT FROM THE LAUNDRY. A category's fee is
+ * `CLEANING_FEE_<CATEGORY_ID>` (see api-util/cleaningFeeEnv.js for the convention, the
+ * highest-in-the-chain rule and the malformed-value handling); of every category in this
+ * listing's own chain that is priced, the highest wins, then DEFAULT_CLEANING_FEE, then
+ * nothing (which adds no line item at all).
+ *
+ * WHAT THIS DELIBERATELY NO LONGER DOES: it used to look the listing's assigned laundry
+ * up through the Integration API and read `privateData.cleaningFee` /
+ * `privateData.categoryPricing.<id>.cleaningFee` off its profile. Per the client the fee
+ * is now marketplace-level env configuration, and the laundry's form no longer collects
+ * one — so reading those keys would only let stale stored data keep pricing rentals after
+ * the input that produced it was removed. Nothing here may read a fee from a laundry
+ * profile again, and there is no longer any laundry lookup on the checkout path at all:
+ * the whole `isLaundry` trust question this function used to carry (a de-flagged
+ * laundry, a listing migrated from the unguarded `publicData.assignedLaundryId`) simply
+ * cannot affect a price any more, because no laundry-owned value is an input to one.
+ *
+ * PREVIEW AND CHARGE AGREE BY CONSTRUCTION: this is called only from
+ * lineItems.buildLineItemsForListing, which is the single entry point used by
+ * /api/transaction-line-items (the preview the customer sees),
+ * /api/initiate-privileged and /api/transition-privileged (what is actually charged).
+ * The category chain is read from the same stored listing entity in all three, so the
+ * resolved fee cannot differ between the quote and the charge.
+ *
+ * Synchronous, unlike the version that had to make an API call. buildLineItemsForListing
+ * still returns a Promise so no endpoint had to change.
+ *
+ * @param {Object} listing
+ * @param {string} currency
+ * @returns {number} cleaning fee amount in the currency's subunits
+ */
+exports.resolveCleaningFeeInSubunits = (listing, currency) => {
+  const feeMajorUnits = resolveCleaningFeeMajorUnits(
+    getListingCategoryValues(listing?.attributes?.publicData)
+  );
+
+  // null means "configured nowhere", which is a zero fee and therefore no line item.
+  // positiveMajorUnitsToSubunits already collapses that to 0, so there is nothing to branch on.
+  return positiveMajorUnitsToSubunits(feeMajorUnits, currency);
+};
+
+/**
+ * Resolves the special-handling fee for a listing, in the given currency's subunits
+ * (ready to hand to getSpecialHandlingFeeLineItemMaybe).
+ *
+ * Charged whenever the listing carries ANY Special Care flag (see
+ * src/util/specialCare.js) - which flag doesn't matter, the fee is flat and per-booking,
+ * not per-flag. The amount itself comes from the server environment
+ * (specialHandlingFeeEnv.js): $15 unless overridden, and the override can be $0.
+ *
+ * UNLIKE resolveCleaningFeeInSubunits, THIS MAKES AN INTEGRATION API CALL. Special Care
+ * lives in the listing's `privateData` (owner + operator only, by design - see
+ * src/util/specialCare.js for why), so the `listing` this function receives from a
+ * customer's own session (initiate-privileged.js, transition-privileged.js, and
+ * transaction-line-items.js for an anonymous/customer preview) never carries it - the
+ * Marketplace API simply omits privateData the caller isn't allowed to read. There is no
+ * way around this that doesn't also read a party's own privateData through their own
+ * session, which a renter does not have for someone else's listing. Both
+ * initiate-privileged.js and transition-privileged.js already call the Integration API
+ * on this same request for other reasons (cleaning-gap checks, handover QR), so this is
+ * not a new category of cost on the checkout path, only one more call on it.
+ *
+ * PREVIEW AND CHARGE AGREE BY CONSTRUCTION, same reasoning as the cleaning fee: this is
+ * called only from lineItems.buildLineItemsForListing, the single entry point all three
+ * endpoints share, and it always re-fetches the listing fresh rather than trusting
+ * whatever privateData (if any) happened to be on the object it was passed - an owner
+ * previewing their OWN listing would otherwise see a different fee than what a customer
+ * is later charged, purely because `ownListings.show` exposes privateData and
+ * `listings.show` doesn't.
+ *
+ * @param {Object} listing
+ * @param {string} currency
+ * @returns {Promise<number>} special-handling fee amount in the currency's subunits
+ */
+exports.resolveSpecialHandlingFeeInSubunits = (listing, currency) => {
+  const listingId = listing?.id.uuid;
+  if (!listingId) {
+    return Promise.resolve(0);
+  }
+
+  return getIntegrationSdk()
+    .listings.show({ id: listingId })
+    .then(response => {
+      const privateData = response.data.data.attributes.privateData;
+      const flags = privateData?.specialCare?.flags;
+      const hasSpecialCare = Array.isArray(flags) && flags.length > 0;
+
+      if (!hasSpecialCare) {
+        return 0;
+      }
+
+      return positiveMajorUnitsToSubunits(resolveSpecialHandlingFeeMajorUnits(), currency);
+    });
+};
+
+/**
+ * Builds the cleaning-fee line item, if applicable. It's a flat fee (quantity 1)
+ * paid entirely by the customer and added on top of the customer's total - it is
+ * NOT netted against the provider's payout, same pattern as customer-commission
+ * (`includeFor: ['customer']` only). A zero/invalid amount means no line item is
+ * added at all (mirrors how the item unit type skips its shipping-fee line item
+ * for free/pickup delivery).
+ *
+ * @param {number} cleaningFeeInSubunits
+ * @param {string} currency
+ * @returns {Array} cleaning fee line item, or [] if there's nothing to charge
+ */
+exports.getCleaningFeeLineItemMaybe = (cleaningFeeInSubunits, currency) => {
+  const isPositiveAmount =
+    typeof cleaningFeeInSubunits === 'number' &&
+    Number.isFinite(cleaningFeeInSubunits) &&
+    cleaningFeeInSubunits > 0;
+
+  if (!isPositiveAmount || !currency) {
+    return [];
+  }
+
+  return [
+    {
+      code: LINE_ITEM_CLEANING_FEE,
+      unitPrice: new Money(cleaningFeeInSubunits, currency),
+      quantity: 1,
+      includeFor: ['customer'],
+    },
+  ];
+};
+
+/**
+ * Builds the special-handling-fee line item, if applicable. Same shape as the cleaning
+ * fee: a flat fee (quantity 1) paid entirely by the customer, on top of the customer's
+ * total, NOT netted against the provider's payout (`includeFor: ['customer']` only). A
+ * zero/invalid amount means no line item is added at all - which is also how
+ * `SPECIAL_HANDLING_FEE=0` disables the fee outright rather than charging nothing-looking
+ * like-something.
+ *
+ * Deliberately not added to `LINE_ITEMS` in src/util/types.js: like the cleaning fee, it
+ * falls through to LineItemUnknownItemsMaybe, which turns `line-item/special-handling-fee`
+ * into "Special handling fee" automatically. No client/translation change needed.
+ *
+ * @param {number} specialHandlingFeeInSubunits
+ * @param {string} currency
+ * @returns {Array} special-handling-fee line item, or [] if there's nothing to charge
+ */
+exports.getSpecialHandlingFeeLineItemMaybe = (specialHandlingFeeInSubunits, currency) => {
+  const isPositiveAmount =
+    typeof specialHandlingFeeInSubunits === 'number' &&
+    Number.isFinite(specialHandlingFeeInSubunits) &&
+    specialHandlingFeeInSubunits > 0;
+
+  if (!isPositiveAmount || !currency) {
+    return [];
+  }
+
+  return [
+    {
+      code: LINE_ITEM_SPECIAL_HANDLING_FEE,
+      unitPrice: new Money(specialHandlingFeeInSubunits, currency),
+      quantity: 1,
+      includeFor: ['customer'],
+    },
+  ];
 };

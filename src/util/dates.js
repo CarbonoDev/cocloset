@@ -999,3 +999,29 @@ export const getEndOfWeek = (date, timeZone, firstDayOfWeek) => {
   const m = timeZone ? moment(date).tz(timeZone) : moment(date);
   return getEndOfWeekAsMoment(m, timeZone, firstDayOfWeek).toDate();
 };
+
+/**
+ * Get the overdue days that the customer has without deliver the garment. 
+ * Example: if booking ends at september 29, overdue starts when now is september 30.
+**/
+export const getBookingOverdueDays = bookingEnd => {
+  if (!bookingEnd) return 0;
+
+  const endDate = new Date(bookingEnd);
+
+  // bookingEnd es exclusivo, así que el último día real es el anterior
+  endDate.setUTCDate(endDate.getUTCDate() - 1);
+
+  const today = new Date();
+
+  endDate.setUTCHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
+
+  const differenceInMs = today.getTime() - endDate.getTime();
+
+  if (differenceInMs <= 0) {
+    return 0;
+  }
+
+  return Math.floor(differenceInMs / (1000 * 60 * 60 * 24));
+};

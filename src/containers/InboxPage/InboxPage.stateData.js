@@ -1,6 +1,7 @@
 import { bool, shape, string } from 'prop-types';
 import {
   BOOKING_PROCESS_NAME,
+  COCLOSET_BOOKING_PROCESS_NAME,
   INQUIRY_PROCESS_NAME,
   PURCHASE_PROCESS_NAME,
   NEGOTIATION_PROCESS_NAME,
@@ -10,6 +11,7 @@ import {
 } from '../../transactions/transaction';
 
 import { getStateDataForBookingProcess } from './InboxPage.stateDataBooking.js';
+import { getStateDataForCoclosetBookingProcess } from './InboxPage.stateDataCoclosetBooking.js';
 import { getStateDataForInquiryProcess } from './InboxPage.stateDataInquiry.js';
 import { getStateDataForPurchaseProcess } from './InboxPage.stateDataPurchase.js';
 import { getStateDataForNegotiationProcess } from './InboxPage.stateDataNegotiation.js';
@@ -21,6 +23,10 @@ export const stateDataShape = shape({
   actionNeeded: bool,
   isFinal: bool,
   isSaleNotification: bool,
+  // 'positive' | 'negative'. How the status pill is coloured, and nothing more -
+  // see InboxPage.stateDataCoclosetBooking.js. Optional, so a process that does
+  // not set it keeps the neutral/green pill it has today.
+  tone: string,
 });
 
 // Translated name of the state of the given transaction
@@ -45,6 +51,8 @@ export const getStateData = params => {
     return getStateDataForDownloadProcess(params, processInfo());
   } else if (processName === BOOKING_PROCESS_NAME) {
     return getStateDataForBookingProcess(params, processInfo());
+  } else if (processName === COCLOSET_BOOKING_PROCESS_NAME) {
+    return getStateDataForCoclosetBookingProcess(params, processInfo());
   } else if (processName === INQUIRY_PROCESS_NAME) {
     return getStateDataForInquiryProcess(params, processInfo());
   } else if (processName === NEGOTIATION_PROCESS_NAME) {

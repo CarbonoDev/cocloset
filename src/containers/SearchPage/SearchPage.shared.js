@@ -461,6 +461,39 @@ export const pickListingFieldFilters = params => {
  * @param {Array<String>} activeListingTypes select configs that are marked only for these active listing types
  * @returns Array of grouped arrays. First subarray contains primary configs and the second contains secondary configs.
  */
+// The listing field the brand filter is built from. Named rather than inlined because the
+// string is the contract with Console: rename the field there and this stops matching, which
+// is a filter quietly sliding back down the row rather than an error.
+// Matched case-insensitively, and `brands` as well as `brand`: this is a Console-authored key
+// on the fields we did not synthesise, and a filter silently sliding back down the row because
+// somebody named it "Brands" is not a failure anybody would attribute to this.
+const BRAND_FILTER_KEYS = ['brand', 'brands'];
+
+/**
+ * Put the brand filter first.
+ *
+ *   > "El filtro de brand puedes colocarlo en el primer lugar de los filtros en search?"
+ *   >   (Jonathan, 2026-09-08)
+ *
+ * Custom filters otherwise appear in the order Console lists the listing fields in, and they
+ * appear AFTER the built-ins - so no amount of reordering in Console could have put brand
+ * first. It is hoisted here instead, which also means it cannot be pushed back down by
+ * accident the next time somebody adds a listing field.
+ *
+ * A no-op when brand is not an active filter (not indexed, or limited to a listing type this
+ * search does not cover), because it reorders the list that was already built rather than
+ * adding to it.
+ *
+ * @param {Array<Object>} filters
+ * @returns {Array<Object>}
+ */
+const isBrandFilter = filter => BRAND_FILTER_KEYS.includes(String(filter?.key || '').toLowerCase());
+
+const hoistBrandFirst = filters => {
+  const brand = filters.filter(isBrandFilter);
+  return brand.length > 0 ? [...brand, ...filters.filter(f => !isBrandFilter(f))] : filters;
+};
+
 export const groupListingFieldConfigs = (configs, activeListingTypes) =>
   configs.reduce(
     (grouped, config) => {
@@ -538,7 +571,8 @@ export const createSearchResultSchema = (
 const getSelectedSecondaryFiltersCount = (
   validQueryParams,
   filterConfigs,
-  customSecondaryFilters
+  customSecondaryFilters,
+  builtInSecondaryFilters = []
 ) => {
   const hasSecondaryFilters = !!(customSecondaryFilters && customSecondaryFilters.length > 0);
   const potentialSecondaryFilters = hasSecondaryFilters
@@ -553,7 +587,15 @@ const getSelectedSecondaryFiltersCount = (
   );
   const pickRelevant = name => relevantQueryParamNames.includes(name);
   const selectedSecondaryFilters = Object.keys(potentialSecondaryFilters).filter(pickRelevant);
-  return selectedSecondaryFilters?.length;
+
+  // A BUILT-IN filter is counted by its RAW key. Only custom listing fields are namespaced -
+  // for a default filter the key maps 1-on-1 onto the query parameter (see util/search.js), so
+  // running `keywords` through constructQueryParamName would look for `pub_keywords` and never
+  // find it. That would leave "More filters" showing no count while a keyword was active.
+  const selectedBuiltInCount = builtInSecondaryFilters.filter(f => !!validQueryParams[f.key])
+    .length;
+
+  return selectedSecondaryFilters.length + selectedBuiltInCount;
 };
 
 /**
@@ -572,6 +614,211 @@ const getSelectedSecondaryFiltersCount = (
  * @param {Object} [params.currentUser]
  * @returns {Object} Derived values used by map and grid variants in render
  */
+/**
+ * THE PICKUP FILTER, expressed as a listing field so the template's own machinery carries it.
+ *
+ *   > "Manten el filtro / Arma un endpoint publico para mostrar laundries"
+ *
+ * It cannot come from Console: it filters on `metadata.assignedLaundryId`, which is written by
+ * our server rather than by an owner, and its options are studio names that live on the laundry
+ * USER - neither of which a listing-field config can express.
+ *
+ * SYNTHESISED AS A FIELD RATHER THAN AS A NEW FILTER KIND, deliberately. Handed to
+ * `pickListingFieldFilters` it is validated, named (`meta_` from its scope), grouped
+ * primary/secondary, rendered by the existing enum case and dropped from the URL when its value
+ * is not a real option - all by code that already exists. A bespoke `schemaType: 'laundry'`
+ * would have needed a branch in each of those places, and the fourth one anybody forgot would
+ * have been the bug.
+ *
+ * ONLY WHEN THERE ARE OPTIONS. An empty list is what "not answered yet" and "the lookup failed"
+ * both look like, and a dropdown offering nothing reads as "this marketplace has no laundries",
+ * which is worse than no dropdown.
+ *
+ * @param {Array<Object>} listingFields - from config.listing
+ * @param {Array<{id: string, name: string, neighborhood: string}>} laundryOptions
+ * @param {Object} intl - the label is TEXT here, not a key: Console supplies a human label for
+ *   every other filter and the components render it verbatim.
+ * @returns {Array<Object>}
+ */
+export const withLaundryPickupFilter = (listingFields = [], laundryOptions = [], intl) => {
+  if (!Array.isArray(laundryOptions) || laundryOptions.length === 0) {
+    return listingFields;
+  }
+
+  return [
+    ...listingFields,
+    {
+      key: 'assignedLaundryId',
+      scope: 'meta',
+      schemaType: 'enum',
+      // LABELLED BY NEIGHBOURHOOD, NOT BY BUSINESS NAME.
+      //
+      //   > "filtremos por laundry pero usando el nombre del vecindario que tenga en su
+      //   >  dirección, solo es cambiar el label en las opciones de búsqueda"
+      //
+      // Someone choosing where to collect is choosing a part of town. The studio name is
+      // the fallback rather than the default: a studio that has not filled its
+      // neighborhood in would otherwise become a blank row in the dropdown, which is
+      // worse than a name the reader has to look up.
+      enumOptions: laundryOptions.map(option => ({
+        option: option.id,
+        label: option.neighborhood || option.name,
+      })),
+      filterConfig: {
+        // The search schema for this key is live - verified against Dev, where filtering by
+        // each studio returns exactly its own garments. Without it Sharetribe would ignore the
+        // parameter and quietly return the whole marketplace.
+        indexForSearch: true,
+        showFilter: true,
+        group: 'primary',
+        // MULTI-SELECT NOW (Jonathan, 2026-09-21: "debe ser para todos los fields"). This
+        // REVERSES the single-dropdown design this filter originally shipped with - "a garment
+        // has exactly one collection point" is true of a LISTING, but says nothing about how
+        // many studios a renter may want to search across at once ("show me everything pickable
+        // up at these two studios" is a real, different question from the single-listing fact).
+        // Same mechanism as brand/size: still one `assignedLaundryId` per listing, only the
+        // search query can now name several.
+        filterType: 'SelectMultipleFilter',
+        label: intl ? intl.formatMessage({ id: 'SearchPage.laundryPickupFilterLabel' }) : 'Pickup',
+      },
+    },
+  ];
+};
+
+/**
+ * The neighborhood filter.
+ *
+ *   > "el vecindario tambien debe guardarse en el listing y debemos poder filtrar por
+ *   >  vecindario, el cual me dará el mismo resultado que filtrar por laundry, pero es algo
+ *   >  que solicita mi cliente" (Jonathan, 2026-09-09)
+ *
+ * SAME RESULTS AS THE PICKUP FILTER, AND STILL WORTH HAVING. Every garment has exactly one
+ * studio and every studio is in exactly one part of town, so the two filters partition the
+ * same listings. What differs is what the reader is asked. The pickup filter offers one row
+ * PER STUDIO - two studios in Sant Antoni are two identical-looking rows - while this one
+ * offers each part of town once. That is the question a renter actually has.
+ *
+ * BUILT FROM THE STUDIOS, FILTERED ON THE LISTINGS. The options are the distinct
+ * neighborhoods of the studios that exist, deduplicated here; the query runs against
+ * `publicData.pickupNeighborhood`, which the assignment stamps onto each listing and
+ * the propagation keeps current (server/api-util/laundryAssignment.js).
+ *
+ * IT NEEDS A SEARCH SCHEMA, and that is not something this file can check. An extended-data
+ * parameter with no schema is not rejected by Sharetribe - it is IGNORED, and the search
+ * returns the whole marketplace. That failure looks like a filter that does nothing rather
+ * than like an error, which is why it is called out here and in the handover notes rather
+ * than left to be discovered:
+ *
+ *   flex-cli search set --key pickupNeighborhood --type enum --scope public
+ *
+ * @param {Array<Object>} listingFields - from config.listing
+ * @param {Array<{id: string, name: string, neighborhood: string}>} laundryOptions
+ * @param {Object} intl
+ * @returns {Array<Object>}
+ */
+export const withNeighborhoodFilter = (listingFields = [], laundryOptions = [], intl) => {
+  const neighborhoods = [
+    ...new Set(
+      (Array.isArray(laundryOptions) ? laundryOptions : [])
+        .map(option => option?.neighborhood)
+        .filter(name => typeof name === 'string' && name.trim() !== '')
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+
+  // No dropdown rather than an empty one, for the same reason as the pickup filter: a filter
+  // offering nothing reads as "this marketplace has no neighborhoods".
+  if (neighborhoods.length === 0) {
+    return listingFields;
+  }
+
+  return [
+    ...listingFields,
+    {
+      key: 'pickupNeighborhood',
+      scope: 'public',
+      schemaType: 'enum',
+      // The value IS the label. A neighborhood has no id of its own - it is a string a studio
+      // typed or Mapbox returned - so inventing one would mean a second mapping to keep in
+      // step with the studios, for nothing.
+      enumOptions: neighborhoods.map(name => ({ option: name, label: name })),
+      filterConfig: {
+        indexForSearch: true,
+        showFilter: true,
+        group: 'primary',
+        // MULTI-SELECT NOW, same reversal and reasoning as the pickup filter beside it
+        // (Jonathan, 2026-09-21: "debe ser para todos los fields") - a renter searching across
+        // several parts of town at once is a real question, even though any one garment still
+        // sits in exactly one neighborhood.
+        filterType: 'SelectMultipleFilter',
+        label: intl
+          ? intl.formatMessage({ id: 'SearchPage.neighborhoodFilterLabel' })
+          : 'Neighborhood',
+      },
+    },
+  ];
+};
+
+/**
+ * The brand filter, built from the brands that exist rather than from Console.
+ *
+ *   > "En search page, puedes agregar brand como primary filter? Es un texto a ingresar,
+ *   >  entonces hay que manejarlo bien para que funcione"
+ *   > "podemos usar un selector de brands que ya existen para mostrarlos en el filtro, pero no
+ *   >  podemos mostrar un select de brands ni poder agregar todas las brands en console"
+ *
+ * "Hay que manejarlo bien" is the whole problem. Sharetribe cannot filter "text contains" on
+ * extended data: the schema types are enum / multi-enum / boolean / long / text, and `text`
+ * gives no parameter of its own - it only feeds `keywords`, which also matches title and
+ * description, so searching a brand would return every listing that merely mentions it.
+ *
+ * So `pub_brand` carries an ENUM search schema, pushed by CLI, and the options are the brands
+ * already on listings. Brand is deliberately NOT a Console listing field - it had to be removed
+ * for the CLI to own the schema - which is exactly why this config is injected here.
+ *
+ * IDENTICAL IN SHAPE TO `withLaundryPickupFilter` above: a filter Console knows nothing about,
+ * options from a public endpoint, backed by a schema that was verified against Dev rather than
+ * assumed. If you change one, look at the other.
+ *
+ * @param {Array<Object>} listingFields
+ * @param {Array<{brand: string, count: number}>} brandOptions
+ * @param {Object} intl
+ * @returns {Array<Object>}
+ */
+export const withBrandFilter = (listingFields = [], brandOptions = [], intl) => {
+  if (!Array.isArray(brandOptions) || brandOptions.length === 0) {
+    return listingFields;
+  }
+
+  return [
+    ...listingFields,
+    {
+      key: 'brand',
+      scope: 'public',
+      // ENUM, not text. The value stored on a listing is still free text the owner typed - the
+      // schema type only describes how the API may be asked about it.
+      schemaType: 'enum',
+      // `option` is the stored spelling, so the query is an exact match on what is really there.
+      // The endpoint has already collapsed casing variants onto one spelling, so the list never
+      // shows `Zara` and `ZARA` a step apart.
+      enumOptions: brandOptions.map(({ brand }) => ({ option: brand, label: brand })),
+      filterConfig: {
+        indexForSearch: true,
+        showFilter: true,
+        // "brand como primary filter", verbatim.
+        group: 'primary',
+        // MULTI-SELECT (Jonathan, 2026-09-21: "puedo buscar dos brands... a la vez"). The
+        // `has_any:` prefix the old comment here worried about is only for `multi-enum`
+        // (array-valued) fields - a plain `enum` field like this one already encodes "any of
+        // these" as an ordinary comma-separated value (`pub_brand=Zara,Nike`), which Sharetribe
+        // resolves as OR natively. No schema change, no data migration: a listing still stores
+        // one brand string, only the search query can now name several.
+        filterType: 'SelectMultipleFilter',
+        label: intl ? intl.formatMessage({ id: 'SearchPage.brandFilterLabel' }) : 'Brand',
+      },
+    },
+  ];
+};
+
 export const getDerivedRenderData = ({
   intl,
   location,
@@ -583,6 +830,12 @@ export const getDerivedRenderData = ({
   searchInProgress,
   currentPathParams = {},
   currentUser,
+  // Cocloset: the studios a customer can filter by, from the public endpoint. Empty until it
+  // answers, and on any failure - see the note on `laundryFilterConfig` below.
+  laundryOptions = [],
+  // Cocloset: the brands a customer can filter by, from the public endpoint. Same contract as
+  // laundryOptions - empty until it answers, and on any failure.
+  brandOptions = [],
 }) => {
   const { listingType: listingTypePathParam } = currentPathParams;
 
@@ -598,7 +851,15 @@ export const getDerivedRenderData = ({
   const categoryConfiguration = config.categoryConfiguration;
   const listingCategories = categoryConfiguration.categories;
   const listingFieldsConfig = pickListingFieldFilters({
-    listingFields,
+    listingFields: withBrandFilter(
+      withNeighborhoodFilter(
+        withLaundryPickupFilter(listingFields, laundryOptions, intl),
+        laundryOptions,
+        intl
+      ),
+      brandOptions,
+      intl
+    ),
     locationSearch: location.search,
     categoryConfiguration,
     activeListingTypes,
@@ -625,8 +886,25 @@ export const getDerivedRenderData = ({
   const validQueryParams = urlQueryParams;
 
   const isKeywordSearch = isMainSearchTypeKeywords(config);
-  const builtInPrimaryFilters = defaultFiltersConfig.filter(f =>
-    ['categoryLevel', 'listingType'].includes(f.key)
+
+  // ---------------------------------------------------------------------------
+  //   > "Hay que remover el filtro 'Listing type' de search"
+  //
+  // This marketplace has exactly ONE listing type - garment-rental - so the control offered a
+  // choice with a single option: it could narrow nothing and rule nothing out. See the
+  // single-listing-type note in coclosetWizardFlow.test.js, which pins the same fact from the
+  // other end.
+  //
+  // DROPPED FROM THE ROW, NOT FROM THE CONFIG. `listingType` stays in `defaultFiltersConfig`,
+  // so `pub_listingType` in a URL is still validated and still applied - a saved link or a
+  // listing-type page variant keeps working. This only stops DRAWING a control for it.
+  // ---------------------------------------------------------------------------
+  const HIDDEN_BUILT_IN_FILTER_KEYS = ['listingType'];
+
+  const builtInPrimaryFilters = defaultFiltersConfig.filter(
+    f =>
+      ['categoryLevel', 'listingType'].includes(f.key) &&
+      !HIDDEN_BUILT_IN_FILTER_KEYS.includes(f.key)
   );
   const builtInFilters = isKeywordSearch
     ? defaultFiltersConfig.filter(
@@ -637,19 +915,40 @@ export const getDerivedRenderData = ({
     listingFieldsConfig,
     activeListingTypes
   );
-  const availablePrimaryFilters = [
+  // ---------------------------------------------------------------------------
+  //   > "El filtro de keywords debe estar en more filters"
+  //
+  // Keywords only reaches this point when the main search is by LOCATION - Console's
+  // `mainSearch.searchType`, which is `location` on this marketplace. When it is `keywords`
+  // instead, the box lives in the topbar and the branch above has already dropped the filter,
+  // so the split below finds nothing to move and this is a no-op. That is the correct
+  // behaviour, not an accident: what the client is looking at is the location case.
+  // ---------------------------------------------------------------------------
+  const isSecondaryBuiltInFilter = f => f.key === 'keywords';
+  const builtInSecondaryFilters = builtInFilters.filter(isSecondaryBuiltInFilter);
+  const builtInPrimaryTailFilters = builtInFilters.filter(f => !isSecondaryBuiltInFilter(f));
+
+  const availablePrimaryFilters = hoistBrandFirst([
     ...builtInPrimaryFilters,
     ...customPrimaryFilters,
-    ...builtInFilters,
-  ];
+    ...builtInPrimaryTailFilters,
+  ]);
   const availableFilters = [
-    ...builtInPrimaryFilters,
-    ...customPrimaryFilters,
-    ...builtInFilters,
+    ...hoistBrandFirst([
+      ...builtInPrimaryFilters,
+      ...customPrimaryFilters,
+      ...builtInPrimaryTailFilters,
+    ]),
+    ...builtInSecondaryFilters,
     ...customSecondaryFilters,
   ];
 
-  const hasSecondaryFilters = !!(customSecondaryFilters && customSecondaryFilters.length > 0);
+  // "More filters" has to open for a built-in that was moved there too, or keywords would be
+  // banished from the primary row into a panel that never renders.
+  const hasSecondaryFilters = !!(
+    (customSecondaryFilters && customSecondaryFilters.length > 0) ||
+    builtInSecondaryFilters.length > 0
+  );
 
   const selectedFilters = validQueryParams;
   const keysOfSelectedFilters = Object.keys(selectedFilters);
@@ -663,7 +962,8 @@ export const getDerivedRenderData = ({
   const selectedSecondaryFiltersCount = getSelectedSecondaryFiltersCount(
     validQueryParams,
     filterConfigs,
-    customSecondaryFilters
+    customSecondaryFilters,
+    builtInSecondaryFilters
   );
 
   const hasPaginationInfo = !!pagination && pagination.totalItems != null;
@@ -742,15 +1042,39 @@ export const onResetAll = ({
   location,
   urlQueryParams,
   setState,
+  laundryOptions,
+  brandOptions,
 }) => {
   const { listingFields: listingFieldsConfig } = config?.listing || {};
   const { defaultFilters: defaultFiltersConfig } = config?.search || {};
 
-  const filterQueryParamNames = getQueryParamNames(listingFieldsConfig, defaultFiltersConfig);
+  // THE SYNTHESISED FILTERS COUNT TOO.
+  //
+  //   > "si doy click en Reset All no se limpia, se limpia hasta que doy click manualmente a
+  //   >  ese filtro" (Jonathan, 2026-09-09)
+  //
+  // Three of the filters on this page do not come from Console - pickup, neighborhood and
+  // brand are built from the studios and the brands that exist (see withLaundryPickupFilter
+  // and the two below it). "Reset all" strips the params it knows about, and it was reading
+  // only `config.listing.listingFields` - so it stripped every Console filter and left ours
+  // in the URL, which is a Reset that visibly resets some things.
+  //
+  // Built by calling the SAME synthesis functions the page renders from, rather than by
+  // listing the three keys here: a fourth synthesised filter would otherwise be a fourth
+  // thing that survives a reset, and nothing would fail until somebody noticed.
+  const allListingFields = withBrandFilter(
+    withNeighborhoodFilter(
+      withLaundryPickupFilter(listingFieldsConfig, laundryOptions),
+      laundryOptions
+    ),
+    brandOptions
+  );
+
+  const filterQueryParamNames = getQueryParamNames(allListingFields, defaultFiltersConfig);
 
   setState({ currentQueryParams: {} });
 
-  const queryParams = omit(urlQueryParams, filterQueryParamNames);
+  const queryParams = omit(urlQueryParams, [...filterQueryParamNames, 'pickupToday']);
 
   const { routeName, pathParams } = getSearchPageResourceLocatorStringParams(
     routeConfiguration,
@@ -786,7 +1110,8 @@ export const onApplyFilters = ({
     currentPathParams,
   };
 
-  const searchParams = { ...urlQueryParams, ...currentQueryParams };
+  const { pickupToday: _stalePickupToday, ...stateWithoutPickupToday } = currentQueryParams || {};
+  const searchParams = { ...urlQueryParams, ...stateWithoutPickupToday };
   const search = cleanSearchFromConflictingParams(searchParams, filterConfigs, sortConfig);
 
   const { routeName, pathParams } = getSearchPageResourceLocatorStringParams(
@@ -833,7 +1158,8 @@ export const createFilterValueChangeHandler = (
   return updatedURLParams => {
     const updater = prevState => {
       const { address, bounds, keywords } = urlQueryParams;
-      const mergedQueryParams = { ...urlQueryParams, ...prevState.currentQueryParams };
+      const { pickupToday: _stalePickupToday, ...stateWithoutPickupToday } = prevState.currentQueryParams || {};
+      const mergedQueryParams = { ...urlQueryParams, ...stateWithoutPickupToday };
 
       const keywordsMaybe = isMainSearchTypeKeywords(config) ? { keywords } : {};
 
@@ -856,7 +1182,10 @@ export const createFilterValueChangeHandler = (
 
     const callback = () => {
       if (useHistoryPush) {
-        const searchParams = getState().currentQueryParams;
+        const pickupTodayMaybe = urlQueryParams.pickupToday
+          ? { pickupToday: urlQueryParams.pickupToday }
+          : {};
+        const searchParams = { ...getState().currentQueryParams, ...pickupTodayMaybe };
         const search = cleanSearchFromConflictingParams(searchParams, filterConfigs, sortConfig);
 
         const { routeName, pathParams } = getSearchPageResourceLocatorStringParams(

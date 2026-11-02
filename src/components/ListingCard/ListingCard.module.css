@@ -127,3 +127,159 @@
   word-break: break-word;
   hyphens: auto;
 }
+
+/* ================ Cocloset: the editorial card ================ */
+/* Used by the landing page's "New & noteworthy" carousel. The stock `.info` block above is
+   untouched — the search page and the map still render exactly as they did. */
+
+.editorialInfo {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 0 0;
+}
+
+.editorialBrand {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 4px 0;
+  padding: 0;
+}
+
+/* ⚠️ Clamped at two lines, and that is load-bearing rather than cosmetic: the carousel sets
+   its container height in JS (calculateCarouselHeight in SectionListings.js) from an estimate
+   that assumes exactly this. A third line would be clipped, not scrolled. */
+/* NOT `--fontFamilyDisplay`: the reference screenshot's garment title is a plain sans-serif,
+   the same family as the rest of the card's small print - `marketplaceDefaultFontStyles`
+   already sets that, this class only needs to make it bigger and bolder. An earlier version
+   of this rule re-set the family to the site's display serif, which is what the site's
+   article/section headings use, not a card title (found by comparing the rendered carousel
+   against the reference screenshot).
+   Round 3 (2026-09-18): sits alone on its own row now - the price moved down to pair with
+   the size/collection-point line instead (see .editorialMetaRow), matching the round-3
+   reference. Bumped 17px -> 19px alongside that, closer to the reference's weight. */
+.editorialTitle {
+  composes: marketplaceDefaultFontStyles from global;
+  font-size: 19px;
+  line-height: 22px;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInk);
+  margin: 0;
+  padding: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Round 3 (2026-09-18): the size/collection-point line and the price, on one row, price
+   pushed to the far right - this is what the reference actually pairs the price with, not
+   the title (see the removed .editorialHeadline and EditorialInfo in ListingCard.js).
+   `margin-left: auto` on .editorialPrice rather than `justify-content: space-between` here,
+   so the price still lands on the right even on a listing with no size/neighborhood at all
+   (a lone flex child has nothing to space-between against). */
+.editorialMetaRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+/* Never lets a long price wrap under itself or get squeezed by the meta line. */
+.editorialPrice {
+  composes: marketplaceDefaultFontStyles from global;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--coclosetInkMuted);
+  margin: 0 0 0 auto;
+  padding: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* The "$50" in "From $50": `.priceValue`/`.perUnit` normally inherit `--marketplaceColor`
+   (the template's stock purple, see ListingCard.module.css above) - fine for the default
+   card, but nothing like the reference screenshot's coral price on the editorial one. Scoped
+   to `.editorialPrice` so the default (non-editorial) card elsewhere is untouched. */
+.editorialPrice .priceValue,
+.editorialPrice .perUnit {
+  color: var(--coclosetBrand);
+}
+
+/* Round 3 (2026-09-18): top margin moved to the new .editorialMetaRow wrapper (it now has a
+   sibling, .editorialPrice, sharing the same row) - a margin here too would double it up. */
+.editorialMeta {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+  padding: 0;
+}
+
+/* THE SAVE HEART, over the card image.
+   > "puede estar en listingCard, pero tambien debe verse en listingPage" (Jonathan, 2026-09-08)
+
+   A wrapper exists only when a caller asks for the heart (see `showFavorite`), because the
+   card's own root is a link and a button cannot live inside one. */
+.cardWithFavorite {
+  position: relative;
+  min-width: 0;
+
+  /* A STACKING CONTEXT OF ITS OWN.
+     > "El z index del icono del corazón se ve encima del algunos modales o del menú en mobile"
+     >   (Jonathan, 2026-09-08)
+
+     The heart needs a z-index to sit above the card image. Without this line that z-index is
+     measured against the whole page, so it also sat above the mobile menu and any overlay
+     that did not declare a higher one. `isolation` confines it: inside this card the heart is
+     still on top, and outside it the card has no z-index at all. Raising every modal instead
+     would have been the same bug waiting for the next overlay somebody adds. */
+  isolation: isolate;
+}
+
+.cardFavorite {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+
+  /* NO Z-INDEX. It does not need one and it must not have one.
+     > "El z index del icono del corazón se ve encima del algunos modales o del menú en mobile"
+     >   (Jonathan, 2026-09-08, still visible 2026-09-10)
+
+     An absolutely positioned element already paints above the in-flow content of its own
+     stacking context, so the heart sits over the card image for free. The `z-index: 1` it had
+     bought nothing and cost everything: a positive z-index enters the page's stacking
+     competition, and this card is nested several contexts deep - the sticky filter bar, the
+     search wrapper - so what it competes against is not the modal but whatever ancestor the
+     modal happens to live under. `isolation` alone did not settle that, because it confines a
+     z-index rather than removing it.
+
+     The rule to keep: a card is content. Content does not declare a z-index. */
+
+  /* Legible over any photograph. A bare icon disappears against a pale garment on a pale
+     background, which is most of this marketplace. */
+  background-color: var(--colorWhite);
+  box-shadow: var(--boxShadowPopup, 0 2px 8px rgba(0, 0, 0, 0.15));
+
+  &:hover:enabled {
+    background-color: var(--colorWhite);
+  }
+}
+
+/* THE "PICKUP TODAY" TAG, same corner as the heart on purpose (mockup).
+   > "la tag debe ser mostrada (...) en la esquina superior derecha de la listing card"
+   >   (Jonathan, 2026-09-11)
+
+   No z-index, same reasoning as .cardFavorite above: this already paints over the card image
+   for free by being absolutely positioned inside .cardWithFavorite's own stacking context. */
+.cardPickupToday {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* Two badges, one corner: when the pickup-today tag is showing, the heart moves down rather
+   than sitting underneath it. Anchored on the tag's own height plus a gap rather than a fixed
+   guess, so the two never touch regardless of font metrics. */
+.cardFavoriteShifted {
+  top: 44px;
+}

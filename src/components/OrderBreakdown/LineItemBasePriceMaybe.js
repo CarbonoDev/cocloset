@@ -1,6 +1,7 @@
 import React from 'react';
 import { FormattedMessage, intlShape } from '../../util/reactIntl';
 import { formatMoney } from '../../util/currency';
+import { weeksFromDays } from '../../util/rentalWeeks';
 import {
   LINE_ITEM_DAY,
   LINE_ITEM_FILE,
@@ -21,11 +22,15 @@ import css from './OrderBreakdown.module.css';
  * @param {Object} props
  * @param {Array<propTypes.lineItem>} props.lineItems - The line items to render
  * @param {propTypes.lineItemUnitType} props.code - The code of the line item
+ * @param {number} [props.flatRatePeriodDays] - Cocloset: the length of the booking in days
+ *   when the base line item prices the WHOLE period rather than a day of it (a fixed 7- or
+ *   14-day garment rental). Resolved by OrderBreakdown; see the comment there. Absent on
+ *   every other kind of listing, which keeps the stock per-unit rendering below untouched.
  * @param {intlShape} props.intl - The intl object
  * @returns {JSX.Element}
  */
 const LineItemBasePriceMaybe = props => {
-  const { lineItems, code, intl } = props;
+  const { lineItems, code, flatRatePeriodDays, intl } = props;
   const isDigitalItem = code === LINE_ITEM_FILE;
   const isNightly = code === LINE_ITEM_NIGHT;
   const isDaily = code === LINE_ITEM_DAY;
@@ -62,7 +67,33 @@ const LineItemBasePriceMaybe = props => {
   const unitPrice = unitPurchase ? formatMoney(intl, unitPurchase.unitPrice) : null;
   const total = unitPurchase ? formatMoney(intl, unitPurchase.lineTotal) : null;
 
-  const message = unitPurchase?.seats ? (
+  // Cocloset: the price is for the whole rental period, so say so instead of multiplying it
+  // by a quantity of 1. Placed ahead of the seats branch because a fixed-period garment
+  // rental has no seats — a garment is one physical object.
+  //
+  // IN WEEKS WHEN IT IS WEEKS.
+  //
+  //   > "en el checkout y otros sitios como transaction page (...) ahi aun aparece x n days,
+  //   >  pero debe ser x n weeks" (Jonathan, 2026-09-07)
+  //
+  // Garments are rented by the week, so "for 14 days" is arithmetic the reader has to do to
+  // get back to the thing they chose. The emails were changed to read in weeks first; this
+  // is the same rule on the screens, sharing `weeksFromDays` so the two cannot drift.
+  //
+  // Days remain the fallback for a period that is not a whole number of weeks - still true,
+  // where "2 weeks" for a 10-day rental would not be.
+  const flatRatePeriodWeeks = weeksFromDays(flatRatePeriodDays);
+  const message = flatRatePeriodWeeks ? (
+    <FormattedMessage
+      id="OrderBreakdown.baseUnitRentalPeriodWeeks"
+      values={{ unitPrice, weeks: flatRatePeriodWeeks }}
+    />
+  ) : flatRatePeriodDays ? (
+    <FormattedMessage
+      id="OrderBreakdown.baseUnitRentalPeriod"
+      values={{ unitPrice, days: flatRatePeriodDays }}
+    />
+  ) : unitPurchase?.seats ? (
     <FormattedMessage
       id={`${translationKey}Seats`}
       values={{ unitPrice, quantity, seats: unitPurchase.seats }}

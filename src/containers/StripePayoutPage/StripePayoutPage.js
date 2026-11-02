@@ -8,7 +8,11 @@ import { createResourceLocatorString } from '../../util/routes';
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import { ensureCurrentUser } from '../../util/data';
 import { propTypes } from '../../util/types';
-import { showCreateListingLinkForUser, showPaymentDetailsForUser } from '../../util/userHelpers';
+import {
+  showCreateListingLinkForUser,
+  showPaymentDetailsForUser,
+  isLaundryUser,
+} from '../../util/userHelpers';
 import { getDisplayAccountType } from '../../util/stripeConnect';
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 import {
@@ -195,6 +199,7 @@ export const StripePayoutPageComponent = props => {
             />
             <UserNav
               currentPage="StripePayoutPage"
+              showLaundryProfileLink={isLaundryUser(currentUser)}
               showManageListingsLink={showManageListingsLink}
             />
           </>

@@ -1,10 +1,11 @@
 import React, { act } from 'react';
+import { Route } from 'react-router-dom';
 import '@testing-library/jest-dom';
 
 import { renderWithProviders as render, testingLibrary } from '../../util/testHelpers';
-import { fakeIntl } from '../../util/testData';
+import { createCurrentUser, fakeIntl } from '../../util/testData';
 
-import AuthenticationPage from './AuthenticationPage';
+import AuthenticationPage, { AuthenticationPageComponent } from './AuthenticationPage';
 
 const { screen, waitFor, userEvent } = testingLibrary;
 
@@ -83,6 +84,67 @@ describe('AuthenticationPage', () => {
     waitFor(() =>
       expect(screen.findByRole('button', { name: 'SignupForm.signUp' })).toBeInTheDocument()
     );
+  });
+});
+
+// A LAUNDRY'S REAL HOME IS ITS OPS DASHBOARD (Jonathan, 2026-09-11): "puedes hacer
+// que el login nos redirija al dashboard de laundry una vez que inicie sesión y el
+// usuario sea laundry?"
+describe('AuthenticationPage post-login redirect', () => {
+  beforeEach(() => {
+    window.scrollTo = jest.fn();
+  });
+
+  const baseProps = {
+    tab: 'login',
+    authInProgress: false,
+    scrollingDisabled: false,
+    onLogout: noop,
+    onManageDisableScrolling: noop,
+    onResendVerificationEmail: noop,
+    submitLogin: noop,
+    submitSignup: noop,
+    sendVerificationEmailInProgress: false,
+    params: {},
+    // No `state.from`: direct access to /login, not a redirect-back-after-login.
+    location: { state: {} },
+    intl: fakeIntl,
+  };
+
+  const renderAuthenticated = currentUser =>
+    render(
+      <>
+        <AuthenticationPageComponent {...baseProps} isAuthenticated currentUser={currentUser} />
+        {/* Location probe: NamedRedirect navigates via react-router's own
+            <Redirect>, which leaves nothing to assert on directly. */}
+        <Route
+          path="*"
+          render={({ location }) => <div data-testid="location">{location.pathname}</div>}
+        />
+      </>
+    );
+
+  it('sends an already-authenticated laundry straight to its ops dashboard', async () => {
+    const laundry = createCurrentUser('laundry-userId', {
+      profile: { metadata: { isLaundry: true } },
+    });
+
+    await act(async () => {
+      renderAuthenticated(laundry);
+    });
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/laundry/dashboard');
+  });
+
+  it('sends an ordinary authenticated user to the landing page, unchanged', async () => {
+    const ordinary = createCurrentUser('ordinary-userId');
+
+    await act(async () => {
+      renderAuthenticated(ordinary);
+    });
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/');
+    expect(screen.getByTestId('location')).not.toHaveTextContent('/laundry');
   });
 });
 

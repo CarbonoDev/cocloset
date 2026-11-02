@@ -19,6 +19,11 @@ import {
   handleSubmitValuesForPriceVariants,
 } from './BookingPriceVariants';
 import {
+  getInitialValuesForRentalPeriods,
+  handleSubmitValuesForRentalPeriods,
+} from './RentalPeriodPrices';
+import { usesFixedRentalPeriods } from '../../../../util/rentalPeriods';
+import {
   getInitialValuesForStartTimeInterval,
   handleSubmitValuesForStartTimeInterval,
 } from './StartTimeInverval';
@@ -41,6 +46,14 @@ const getInitialValues = props => {
   const listingTypeConfig = getListingTypeConfig(publicData, listingTypes);
   // Note: publicData contains priceVariationsEnabled if listing is created with priceVariations enabled.
   const isPriceVariationsInUse = isPriceVariationsEnabled(publicData, listingTypeConfig);
+
+  // Cocloset: a garment is priced per fixed rental period, one flat price each. Checked
+  // first for the same reason as in EditListingPricingForm — a garment-rental listing also
+  // satisfies the price-variations branch below, and would otherwise be seeded with the
+  // free-form variants the form no longer renders.
+  if (usesFixedRentalPeriods(listingTypeConfig)) {
+    return getInitialValuesForRentalPeriods(props);
+  }
 
   return unitType === FIXED || isPriceVariationsInUse
     ? {
@@ -101,6 +114,7 @@ const EditListingPricingPanel = props => {
     ready,
     onSubmit,
     submitButtonText,
+    previewListingLink,
     listingTypes,
     panelUpdated,
     updateInProgress,
@@ -121,6 +135,8 @@ const EditListingPricingPanel = props => {
 
   // Note: publicData contains priceVariationsEnabled if listing is created with priceVariations enabled.
   const isPriceVariationsInUse = isPriceVariationsEnabled(publicData, listingTypeConfig);
+  // Cocloset: fixed 7/14-day rental periods, one flat price each. See RentalPeriodPrices.js.
+  const isFixedRentalPeriod = usesFixedRentalPeriods(listingTypeConfig);
 
   const isCompatibleCurrency = isValidCurrencyForTransactionProcess(
     transactionProcessAlias,
@@ -167,7 +183,11 @@ const EditListingPricingPanel = props => {
             // New values for listing attributes
             let updateValues = {};
 
-            if (unitType === FIXED || isPriceVariationsInUse) {
+            if (isFixedRentalPeriod) {
+              // Cocloset: two flat period prices in, `price` + `priceVariants` out.
+              // See RentalPeriodPrices.js.
+              updateValues = handleSubmitValuesForRentalPeriods(values, {}, marketplaceCurrency);
+            } else if (unitType === FIXED || isPriceVariationsInUse) {
               let publicDataUpdates = { priceVariationsEnabled: isPriceVariationsInUse };
               // NOTE: components that handle price variants and start time interval are currently
               // exporting helper functions that handle the initial values and the submission values.
@@ -196,14 +216,10 @@ const EditListingPricingPanel = props => {
                 },
               };
             } else {
-              const priceVariationsEnabledMaybe = isBooking
-                ? {
-                    publicData: {
-                      priceVariationsEnabled: false,
-                    },
-                  }
+              const publicDataMaybe = isBooking
+                ? { publicData: { priceVariationsEnabled: false } }
                 : {};
-              updateValues = { price, ...priceVariationsEnabledMaybe };
+              updateValues = { price, ...publicDataMaybe };
             }
 
             // Save the initialValues to state
@@ -212,6 +228,7 @@ const EditListingPricingPanel = props => {
               initialValues: getInitialValues({
                 listing: getOptimisticListing(listing, updateValues),
                 listingTypes,
+                marketplaceCurrency,
               }),
             });
             onSubmit(updateValues);
@@ -222,6 +239,7 @@ const EditListingPricingPanel = props => {
           isPriceVariationsInUse={isPriceVariationsInUse}
           listingMinimumPriceSubUnits={listingMinimumPriceSubUnits}
           saveActionMsg={submitButtonText}
+          previewListingLink={previewListingLink}
           disabled={disabled}
           ready={ready}
           updated={panelUpdated}

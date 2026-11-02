@@ -12,10 +12,11 @@ import {
   isUserAuthorized,
   pickUserFieldsData,
   showCreateListingLinkForUser,
+  isLaundryUser,
 } from '../../util/userHelpers';
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 
-import { H3, Page, UserNav, NamedLink, LayoutSingleColumn } from '../../components';
+import { H3, Page, UserNav, NamedLink, NamedRedirect, LayoutSingleColumn } from '../../components';
 
 import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer';
 import FooterContainer from '../../containers/FooterContainer/FooterContainer';
@@ -104,6 +105,21 @@ export const ProfileSettingsPageComponent = props => {
       bio,
       publicData: {
         ...pickUserFieldsData(rest, 'public', userType, userFields),
+        // THE NEIGHBOURHOOD, WRITTEN BY THE MEMBER THEMSELVES.
+        //
+        //   > "En mi form de profile settings, puedo ingresar el nombre de mi
+        //   >  vecindario y éste se debe mostrar en mi perfil" (Jonathan, 2026-09-03)
+        //
+        // `publicData`, because the whole point is that other members read it on
+        // the profile. Not a Console user field: those are configured per
+        // marketplace and this one is part of how Cocloset works - a wardrobe
+        // organised around where people actually are - so it ships with the app
+        // rather than depending on an operator having added it.
+        //
+        // `null` rather than `''` when cleared: Sharetribe only removes a
+        // publicData key when it is explicitly set to null, so an empty string
+        // would leave the profile rendering a blank line forever.
+        neighborhood: rest.neighborhood?.trim() ? rest.neighborhood.trim() : null,
       },
     };
     const uploadedImage = props.image;
@@ -116,6 +132,19 @@ export const ProfileSettingsPageComponent = props => {
 
     onUpdateProfile(updatedValues);
   };
+
+  // A LAUNDRY'S REAL SETTINGS PAGE IS /laundry-profile.
+  //
+  //   > "en laundry /profile-settings nos debe llevar a /laundry-profile, solo si
+  //   >  el usuario es laundry" (Jonathan, 2026-09-11)
+  //
+  // ProfileSettingsForm already hides Display Name and Bio for a laundry (its
+  // Business Name / Description live on LaundryProfileForm instead), so this page
+  // has nothing left for a laundry to configure - sending it here at all would be a
+  // dead end that only looks like a settings page.
+  if (currentUser?.id && isLaundryUser(currentUser)) {
+    return <NamedRedirect name="LaundryProfilePage" />;
+  }
 
   const user = ensureCurrentUser(currentUser);
   const { firstName, lastName, displayName, bio, publicData } = user?.attributes.profile;
@@ -139,6 +168,7 @@ export const ProfileSettingsPageComponent = props => {
         lastName,
         ...displayNameMaybe,
         bio,
+        neighborhood: publicData?.neighborhood || '',
         profileImage: user.profileImage,
         ...initialValuesForUserFields(publicData, 'public', userType, userFields),
       }}
@@ -167,6 +197,7 @@ export const ProfileSettingsPageComponent = props => {
             <TopbarContainer />
             <UserNav
               currentPage="ProfileSettingsPage"
+              showLaundryProfileLink={isLaundryUser(currentUser)}
               showManageListingsLink={showManageListingsLink}
             />
           </>

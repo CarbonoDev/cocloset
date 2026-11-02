@@ -1,0 +1,417 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en">
+  {{set-translations (asset "content/email-texts.json")}}
+  {{set-locale (asset "general/localization.json" "locale" "en_US")}}
+  {{set-timezone transaction.listing.availability-plan.timezone}}
+  <head>
+    <meta http-equiv="Content-Type" content="text/html charset=UTF-8" />
+  </head>
+  {{~#*inline "format-money"}}{{format-text "${amount,number,::.00}" amount=money.amount currency=money.currency}}{{~/inline~}}
+  {{~#*inline "format-day"}}{{#with transaction.listing.availability-plan}}{{format-text "{date,date,::EE}" date=date}}{{/with}}{{~/inline~}}
+  {{~#*inline "format-day-before"}}{{#with transaction.listing.availability-plan}}{{format-text "{date,date,::EE}" date=(date-transform date days=-1)}}{{/with}}{{~/inline~}}
+  {{~#*inline "format-day-time"}}{{#with transaction.listing.availability-plan}}{{format-text "{date,date,::EEjmm}" date=date}}{{/with}}{{~/inline~}}
+  {{~#*inline "format-month-date"}}{{#with transaction.listing.availability-plan}}{{format-text "{date,date,::MMMd}" date=date}}{{/with}}{{~/inline~}}
+  {{~#*inline "format-month-date-day-before"}}{{#with transaction.listing.availability-plan}}{{format-text "{date,date,::MMMd}" date=(date-transform date days=-1)}}{{/with}}{{~/inline~}}
+  {{#with transaction as |tx|}}
+  <table style="background-color:#FFF;margin:0 auto;padding:24px 12px 0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+    <tbody>
+      <tr>
+        <td>
+          <table align="center" role="presentation" cellSpacing="0" cellPadding="0" border="0" width="100%" style="max-width:600px;margin:0 auto">
+            <tr style="width:100%">
+              <td style="padding-bottom:16px">
+                <img
+                  src="{{marketplace.url}}/static/images/cocloset-banner.jpg"
+                  alt="{{marketplace.name}}"
+                  width="600"
+                  style="width:100%;max-width:600px;display:block;margin:0 auto;border:0;border-radius:8px"
+                />
+              </td>
+            </tr>
+            <tr style="width:100%">
+              <td>
+                <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingAcceptedRequest.Title" "Your booking for the {listingTitle} rental from {providerDisplayName} is confirmed." listingTitle=listing.title providerDisplayName=provider.display-name}}</h1>
+                {{#each tx-line-items}}{{#eq "line-item/hour" code}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionHourly" "The item is available for pickup on {dateStart,date,::YYYYMMMd} at {laundryName} ({pickupNeighborhood}, {pickupAddress})." dateStart=booking.start laundryName=listing.public-data.assignedLaundryName pickupNeighborhood=listing.public-data.pickupNeighborhood pickupAddress=listing.public-data.pickupAddress}}</p>
+                {{/eq}}{{#eq "line-item/day" code}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionDaily" "The item is available for pickup on {dateStart,date,::YYYYMMMd} at {laundryName} ({pickupNeighborhood}, {pickupAddress})." dateStart=booking.start laundryName=listing.public-data.assignedLaundryName pickupNeighborhood=listing.public-data.pickupNeighborhood pickupAddress=listing.public-data.pickupAddress}}</p>
+                {{/eq}}{{#eq "line-item/night" code}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionDaily" "The item is available for pickup on {dateStart,date,::YYYYMMMd} at {laundryName} ({pickupNeighborhood}, {pickupAddress})." dateStart=booking.start laundryName=listing.public-data.assignedLaundryName pickupNeighborhood=listing.public-data.pickupNeighborhood pickupAddress=listing.public-data.pickupAddress}}</p>
+                {{/eq}}
+                {{#eq "line-item/fixed" code}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.DescriptionFixed" "The item is available for pickup on {dateStart,date,::YYYYMMMd} at {laundryName} ({pickupNeighborhood}, {pickupAddress})." dateStart=booking.start laundryName=listing.public-data.assignedLaundryName pickupNeighborhood=listing.public-data.pickupNeighborhood pickupAddress=listing.public-data.pickupAddress}}</p>
+                {{/eq}}{{/each}}
+                {{#if listing.metadata.onLaundry}}
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.QrInfo" "Show the order QR code at the counter to retrieve your rental–clean and ready for you!"}}</p>
+                <table style="margin:24px 0 0;background-color:#FAF7F2;border-radius:8px" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                  <tbody>
+                    <tr>
+                      <td align="center" style="padding:20px 16px">
+                        <img src="{{marketplace.url}}/api/transaction-qr?id={{url-encode id}}" width="180" height="180" alt="{{t "TransactionEmails.HandoverQrAlt" "Your pickup and return QR code"}}" style="display:block;margin:0 auto;border:0;width:180px;height:180px;max-width:100%" />
+                        <p style="font-size:13px;line-height:1.5;margin:8px 0 0;color:#767676">{{t "TransactionEmails.HandoverQrFallback" "No image above? Your email app is blocking pictures. Open your order page for the code, or read this reference out at the counter:"}} <span style="font-family:monospace;color:#484848">{{id}}</span></p>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                {{/if}}
+                <table style="color:#484848;font-size:16px;line-height:1.4;background-color:#FFF;padding:8px 24px;border-radius:8px;border:1px solid;border-color:#E1E1E1;margin:24px 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                  <tbody>
+                    <tr>
+                      <td>
+                      {{#if protected-data.priceVariantName}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{protected-data.priceVariantName}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#E1E1E1;margin:20px 0" />
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-top:1px;margin-bottom:1px">{{t "BookingAcceptedRequest.Start" "Start"}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-top:1px;margin-bottom:1px">{{t "BookingAcceptedRequest.End" "End"}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      {{else}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{t "BookingAcceptedRequest.Start" "Start"}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{t "BookingAcceptedRequest.End" "End"}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      {{/if}}
+                      {{#each tx-line-items}}{{#eq "line-item/hour" code}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-day-time date=booking.start}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-day-time date=booking.end}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-month-date date=booking.start}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-month-date date=booking.end}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/eq}}{{#eq "line-item/day" code}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-day date=booking.start}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-day-before date=booking.end}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-month-date date=booking.start}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-month-date-day-before date=booking.end}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/eq}}{{#eq "line-item/night" code}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-day date=booking.start}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-day date=booking.end}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-month-date date=booking.start}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-month-date date=booking.end}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/eq}}
+                        {{#eq "line-item/fixed" code}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-day-time date=booking.start}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-day-time date=booking.end}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-month-date date=booking.start}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;font-weight:700;margin-top:1px;margin-bottom:1px">{{> format-month-date date=booking.end}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/eq}} {{/each}}
+                        {{#each tx-line-items}}{{#contains include-for "customer"}}{{#eq "line-item/hour" code}}{{#if seats}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.PriceBreakdownHourlyWithSeats" "${amount,number,::.00} × {multiplier, number} {multiplier, plural, one {hour} other {hours}} x {seats, number} {seats, plural, one {seat} other {seats}}" amount=unit-price.amount currency=unit-price.currency multiplier=units seats=seats}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{else}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.PriceBreakdownHourly" "${amount,number,::.00} x {multiplier, number} {multiplier, plural, one {hour} other {hours}}" amount=unit-price.amount currency=unit-price.currency multiplier=quantity}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/if}}{{/eq}}{{#eq "line-item/day" code}}{{#if seats}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.PriceBreakdownDailyWithSeats" "${amount,number,::.00} × {multiplier, number} {multiplier, plural, one {day} other {days}} x {seats, number} {seats, plural, one {seat} other {seats}}" amount=unit-price.amount currency=unit-price.currency multiplier=units seats=seats}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{else}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  {{!-- The week count comes from a BLOCK PARAMETER on the enclosing #with transaction as |tx| block. Two other ways were tried against Dev and both silently printed days: @root.transaction.* (the renderer does not expose @root) and ../protected-data.* (relative paths count BLOCK frames, and this line sits inside four - #each, #contains, #eq, #if - only one of which changes the context, so no fixed number of ../ is right). A block param is resolved lexically and does not care how deep the reader is. The template language has no arithmetic, so the count itself is computed at checkout and carried in protectedData.bookingWeeks. --}}{{#if tx.protected-data.bookingWeeks}}<p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.PriceBreakdownWeekly" "${amount,number,::.00} x {weeks, number} {weeks, plural, one {week} other {weeks}}" amount=unit-price.amount currency=unit-price.currency weeks=tx.protected-data.bookingWeeks}}</p>{{else}}<p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.PriceBreakdownDaily" "${amount,number,::.00} x {multiplier, number} {multiplier, plural, one {day} other {days}}" amount=unit-price.amount currency=unit-price.currency multiplier=quantity}}</p>{{/if}}
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/if}}{{/eq}}{{#eq "line-item/night" code}}{{#if seats}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.PriceBreakdownNightlyWithSeats" "${amount,number,::.00} × {multiplier, number} {multiplier, plural, one {night} other {nights}} x {seats, number} {seats, plural, one {seat} other {seats}}" amount=unit-price.amount currency=unit-price.currency multiplier=units seats=seats}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{else}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingAcceptedRequest.PriceBreakdownNightly" "${amount,number,::.00} x {multiplier, number} {multiplier, plural, one {night} other {nights}}" amount=unit-price.amount currency=unit-price.currency multiplier=quantity}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/if}}{{/eq}}{{#eq "line-item/fixed" code}}{{#if seats}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{t "BookingAcceptedRequest.PriceBreakdownFixedWithSeats" "${amount,number,::.00} × {seats, number} {seats, plural, one {seat} other {seats}}" amount=unit-price.amount currency=unit-price.currency seats=seats}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{else}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{t "BookingAcceptedRequest.PriceBreakdownFixed" "${amount,number,::.00}" amount=unit-price.amount currency=unit-price.currency}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-bottom:1px">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/if}}{{/eq}}{{#eq "line-item/customer-commission" code}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-top:1px">{{t "BookingAcceptedRequest.MarketplaceFeeLabel" "{marketplaceName} fee" marketplaceName=marketplace.name}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-top:1px">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/eq}}{{#eq "line-item/cleaning-fee" code}}
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-top:1px">{{t "BookingAcceptedRequest.CleaningFeeLabel" "Cleaning fee"}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-top:1px">{{> format-money money=line-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        {{/eq}}{{/contains}}{{/each}}
+                        <hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#E1E1E1;margin:20px 0" />
+                        <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                          <tbody>
+                            <tr>
+                              <td>
+                                <td>
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-top:1px;font-weight:700">{{t "BookingAcceptedRequest.TotalPrice" "Total price"}}</p>
+                                </td>
+                                <td style="text-align:right">
+                                  <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848;margin-top:1px;font-weight:700">{{> format-money money=payin-total}}</p>
+                                </td>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <table style="padding:16px 0 0" align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+                  <tbody>
+                    <tr>
+                      <td><a href="{{marketplace.url}}/order/{{url-encode id}}/" target="_blank" style="color:#FFF;background-color:{{asset "design/branding.json" "marketplaceColors.notificationPrimaryButton" "#6938EF"}};border-radius:4px;font-size:15px;text-decoration:none;text-align:center;display:inline-block;min-width:210px;padding:0px 0px;line-height:100%;max-width:100%"><span><!--[if mso]><i style="letter-spacing: undefinedpx;mso-font-width:-100%;mso-text-raise:0" hidden>&nbsp;</i><![endif]--></span><span style="color:#FFF;background-color:{{asset "design/branding.json" "marketplaceColors.notificationPrimaryButton" "#6938EF"}};border-radius:4px;font-size:15px;text-decoration:none;text-align:center;display:inline-block;min-width:210px;padding:16px 32px;max-width:100%;line-height:120%;text-transform:none;mso-padding-alt:0px;mso-text-raise:0">{{t "BookingAcceptedRequest.Cta" "View order details"}}</span><span><!--[if mso]><i style="letter-spacing: undefinedpx;mso-font-width:-100%" hidden>&nbsp;</i><![endif]--></span></a>
+                        <div>
+                          <p style="font-size:14px;line-height:1.5;margin:16px 0;color:#484848">{{t "TransactionEmails.AccessibleLinkText" "Can't click the button? Here's a link for your convenience:"}} <a target="_blank" style="color:{{asset "design/branding.json" "marketplaceColors.notificationPrimaryButton" "#6938EF"}};text-decoration:none" href="{{marketplace.url}}/order/{{url-encode id}}/">{{marketplace.url}}/order/{{url-encode id}}/</a></p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                {{/with}}
+                <p style="font-size:16px;line-height:1.4;margin:24px 0 0;color:#484848">{{t "TransactionEmails.SignOff" "Warmly,"}}</p>
+                <p style="font-size:16px;line-height:1.4;margin:4px 0 0;color:#484848">{{t "TransactionEmails.SignOffTeam" "The {marketplaceName} Team" marketplaceName=marketplace.name}}</p>
+                <div>
+                  <hr style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#E1E1E1;margin:20px 0" />
+                  <p style="font-size:12px;line-height:15px;margin:0 auto;color:#b7b7b7;text-align:left;margin-bottom:50px">{{t "TransactionEmails.MembershipParagraph" "You're a member of {marketplaceName}. If you no longer want to receive these emails, please contact {marketplaceName} team." marketplaceName=marketplace.name }}</p>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</html>

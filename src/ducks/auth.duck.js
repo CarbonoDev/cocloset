@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import * as log from '../util/log';
 import { storableError } from '../util/errors';
 import { clearCurrentUser, fetchCurrentUser } from './user.duck';
-import { createUserWithIdp } from '../util/api';
+import { createUserWithIdp, initUserRole } from '../util/api';
 import { clearStoredReferralData } from '../util/webStorageHelpers';
 
 const authenticated = authInfo => authInfo?.isAnonymous === false;
@@ -101,6 +101,42 @@ const logoutThunk = createAsyncThunk(
   }
 );
 
+// Stamp the explicit `metadata.isLaundry = false` default onto the user that
+// just signed up (client requirement: every user is created with the flag set
+// to false, and an admin promotes them from Console). A user cannot write
+// their own metadata - `currentUser.updateProfile({ metadata })` is rejected
+// with `400 validation-disallowed-key` - so this has to be an Integration API
+// write on our own server: see server/api/init-user-role.js.
+//
+// FIRE-AND-CONTINUE, like createAvailabilityBuffer in TransactionPage.duck.js:
+// the promise is deliberately not returned, so nothing here can delay, block
+// or fail the signup that has already succeeded. Failures are logged only,
+// never surfaced. That is safe because the missing key is not a functional
+// difference - every consumer tests `isLaundry === true` (see
+// src/util/userHelpers.js), so a user without it behaves exactly as a
+// non-laundry. It only means an operator sees no key in Console until
+// scripts/backfill-laundry-role.js is run.
+//
+// Must run AFTER the login below: the endpoint identifies the user from their
+// own session, so an unauthenticated call would 401.
+//
+// KNOWN RESIDUAL GAP: because this is fired from the browser it is skipped if
+// the tab is closed mid-request, and it does not cover users an operator
+// creates directly in Console. Closing that properly needs a server-side
+// worker on Sharetribe's user events; until then the backfill script is the
+// reconciliation path.
+const initUserRoleFireAndContinue = () => {
+  try {
+    initUserRole().catch(e => {
+      log.error(e, 'init-user-role-failed');
+    });
+  } catch (e) {
+    // `window.fetch` may not exist at all in some environments; a signup must
+    // not blow up on a best-effort call.
+    log.error(e, 'init-user-role-failed');
+  }
+};
+
 const signupThunk = createAsyncThunk(
   'auth/signup',
   (params, thunkAPI) => {
@@ -112,6 +148,8 @@ const signupThunk = createAsyncThunk(
         dispatch(loginThunk({ username: params.email, password: params.password })).unwrap()
       )
       .then(() => {
+        initUserRoleFireAndContinue();
+
         // Clear potential referral data from session storage
         clearStoredReferralData();
         return params;

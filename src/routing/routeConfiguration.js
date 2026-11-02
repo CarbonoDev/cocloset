@@ -18,7 +18,12 @@ const CMSPage = loadable(() => import(/* webpackChunkName: "CMSPage" */ '../cont
 const ContactDetailsPage = loadable(() => import(/* webpackChunkName: "ContactDetailsPage" */ '../containers/ContactDetailsPage/ContactDetailsPage'));
 const EditListingPage = loadable(() => import(/* webpackChunkName: "EditListingPage" */ '../containers/EditListingPage/EditListingPage'));
 const EmailVerificationPage = loadable(() => import(/* webpackChunkName: "EmailVerificationPage" */ '../containers/EmailVerificationPage/EmailVerificationPage'));
+const FavoritesPage = loadable(() => import(/* webpackChunkName: "FavoritesPage" */ '../containers/FavoritesPage/FavoritesPage'));
 const InboxPage = loadable(() => import(/* webpackChunkName: "InboxPage" */ '../containers/InboxPage/InboxPage'));
+const HandoverPage = loadable(() => import(/* webpackChunkName: "HandoverPage" */ '../containers/HandoverPage/HandoverPage'));
+const PickupPage = loadable(() => import(/* webpackChunkName: "PickupPage" */ '../containers/PickupPage/PickupPage'));
+const LaundryOpsPage = loadable(() => import(/* webpackChunkName: "LaundryOpsPage" */ '../containers/LaundryOpsPage/LaundryOpsPage'));
+const LaundryProfilePage = loadable(() => import(/* webpackChunkName: "LaundryProfilePage" */ '../containers/LaundryProfilePage/LaundryProfilePage'));
 const MakeOfferPage = loadable(() => import(/* webpackChunkName: "MakeOfferPage" */ '../containers/MakeOfferPage/MakeOfferPage'));
 const LandingPage = loadable(() => import(/* webpackChunkName: "LandingPage" */ '../containers/LandingPage/LandingPage'));
 const ListingPageCoverPhoto = loadable(() => import(/* webpackChunkName: "ListingPageCoverPhoto" */ /* webpackPrefetch: true */ '../containers/ListingPage/ListingPageCoverPhoto'));
@@ -51,6 +56,16 @@ export const ACCOUNT_SETTINGS_PAGES = [
   'ManageAccountPage'
 ];
 
+export const LAUNDRY_OPS_PAGES = [
+  'LaundryProfilePage',
+  'LaundryOpsDashboardPage',
+  'LaundryOpsOrdersPage',
+  'LaundryOpsPickupsPage',
+  'LaundryOpsReturnsPage',
+  'LaundryOpsCleaningPage',
+  'LaundryOpsInventoryPage',
+];
+
 // https://en.wikipedia.org/wiki/Universally_unique_identifier#Nil_UUID
 const draftId = '00000000-0000-0000-0000-000000000000';
 const draftSlug = 'draft';
@@ -68,13 +83,13 @@ const RedirectToLandingPage = () => <NamedRedirect name="LandingPage" />;
 const routeConfiguration = (layoutConfig, accessControlConfig) => {
   const isSearchPageWithMap = layoutConfig.searchPage?.variantType === 'map';
   const SearchPage = isSearchPageWithMap ? SearchPageWithMap : SearchPageWithGrid;
-  const ListingPage = layoutConfig.listingPage?.variantType === 'carousel' 
-    ? ListingPageCarousel 
+  const ListingPage = layoutConfig.listingPage?.variantType === 'carousel'
+    ? ListingPageCarousel
     : ListingPageCoverPhoto;
 
   const isPrivateMarketplace = accessControlConfig?.marketplace?.private === true;
   const authForPrivateMarketplace = isPrivateMarketplace ? { auth: true } : {};
-  
+
   return [
     {
       path: '/',
@@ -165,10 +180,17 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       path: '/l/new',
       name: 'NewListingPage',
       auth: true,
+      // The first tab of the wizard. Cocloset runs a single listing type
+      // (garment-rental -> cocloset-booking), whose tab order starts with PHOTOS
+      // rather than DETAILS - see `tabsForListingType` in EditListingWizard.js.
+      // Route config has no access to listingTypes, so this is a constant; the
+      // wizard corrects a mismatch either way (an inactive tab redirects to the
+      // nearest active one), but pointing it at the real first tab avoids a
+      // needless redirect and a console message on every "create listing" click.
       component: () => (
         <NamedRedirect
           name="EditListingPage"
-          params={{ slug: draftSlug, id: draftId, type: 'new', tab: 'details' }}
+          params={{ slug: draftSlug, id: draftId, type: 'new', tab: 'photos' }}
         />
       ),
     },
@@ -283,6 +305,17 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       loadData: pageDataLoadingAPI.InboxPage.loadData,
     },
     {
+      // Saved garments. `auth: true` because the list is a fact about the signed-in user and
+      // nothing else - there is no anonymous version of this page to render. The heart on a
+      // listing sends a signed-out visitor to log in for the same reason.
+      path: '/favorites',
+      name: 'FavoritesPage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: FavoritesPage,
+      loadData: pageDataLoadingAPI.FavoritesPage.loadData,
+    },
+    {
       path: '/order/:id',
       name: 'OrderDetailsPage',
       auth: true,
@@ -386,6 +419,66 @@ const routeConfiguration = (layoutConfig, accessControlConfig) => {
       authPage: 'LoginPage',
       component: ManageAccountPage,
     },
+    {
+      // Where a scanned handover QR lands. The path is half of a contract - the other half
+      // is HANDOVER_PATH in server/api-util/handoverQr.js, which builds the URL that gets
+      // encoded into the image - so changing it here alone produces a code that scans to a
+      // 404. handoverQrUrlAgreement.test.js checks the two against each other.
+      //
+      // `auth: true` because the page has to know who is reading before it can decide what
+      // to show them; an anonymous scan is sent to log in and comes back here. Which of the
+      // three roles the reader is, and therefore whether they get an action at all, is
+      // decided by GET /api/handover-status - not here, and not in the browser.
+      path: '/handover/:id',
+      name: 'HandoverPage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: HandoverPage,
+      loadData: pageDataLoadingAPI.HandoverPage.loadData,
+    },
+    {
+      // Where a scanned PICKUP QR lands - a provider collecting a paused garment, not a
+      // rental handover. The path is half of a contract - the other half is PICKUP_PATH in
+      // server/api-util/listingPickupQr.js - and the token lives in the query string, never
+      // in the path itself. See listingPickupQrUrlAgreement.test.js.
+      //
+      // `auth: true` for the same reason HandoverPage needs it: the page has to know who is
+      // reading (owner vs. the assigned laundry) before it can decide what to show, which
+      // /api/listing-pickup-status - not this route - actually decides.
+      path: '/pickup/:listingId',
+      name: 'PickupPage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: PickupPage,
+      loadData: pageDataLoadingAPI.PickupPage.loadData,
+    },
+    {
+      // Laundry-only studio profile settings. Gated inside LaundryProfilePage
+      // itself (renders NotFoundPage for non-laundry users) since permission
+      // here depends on user metadata, not just authentication.
+      path: '/laundry-profile',
+      name: 'LaundryProfilePage',
+      auth: true,
+      authPage: 'LoginPage',
+      component: LaundryProfilePage,
+    },
+    // Laundry ops dashboard (mockups 04-09.jpg). One container, six routes:
+    // the `tab` extraProp selects which screen it renders, and they all share
+    // a single loadData because they render one payload from
+    // GET /api/laundry-orders. Gated inside LaundryOpsPage itself (renders
+    // NotFoundPage for non-laundry users), same as LaundryProfilePage above,
+    // since permission depends on user metadata rather than authentication.
+    // "Settings" in the ops sidebar links to LaundryProfilePage rather than
+    // duplicating it here.
+    ...['dashboard', 'orders', 'pickups', 'returns', 'cleaning', 'inventory'].map(tab => ({
+      path: `/laundry/${tab}`,
+      name: `LaundryOps${tab.charAt(0).toUpperCase()}${tab.slice(1)}Page`,
+      auth: true,
+      authPage: 'LoginPage',
+      component: LaundryOpsPage,
+      extraProps: { tab },
+      loadData: pageDataLoadingAPI.LaundryOpsPage.loadData,
+    })),
     {
       path: '/terms-of-service',
       name: 'TermsOfServicePage',

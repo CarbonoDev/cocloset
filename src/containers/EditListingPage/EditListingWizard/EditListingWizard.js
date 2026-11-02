@@ -16,11 +16,16 @@ import {
   requireListingFiles,
 } from '../../../util/configHelpers';
 import {
+  createSlug,
+  LISTING_PAGE_DRAFT_VARIANT,
   LISTING_PAGE_PARAM_TYPE_DRAFT,
   LISTING_PAGE_PARAM_TYPE_NEW,
+  LISTING_PAGE_PENDING_APPROVAL_VARIANT,
 } from '../../../util/urlHelpers';
-import { createResourceLocatorString } from '../../../util/routes';
+import { createResourceLocatorString, pathByRouteName } from '../../../util/routes';
 import {
+  LISTING_STATE_DRAFT,
+  LISTING_STATE_PENDING_APPROVAL,
   SCHEMA_TYPE_ENUM,
   SCHEMA_TYPE_MULTI_ENUM,
   SCHEMA_TYPE_TEXT,
@@ -37,10 +42,15 @@ import {
 } from '../../../util/fieldHelpers';
 import { ensureCurrentUser, ensureListing } from '../../../util/data';
 import { getDisplayAccountType } from '../../../util/stripeConnect';
-import { INQUIRY_PROCESS_NAME, resolveLatestProcessName } from '../../../transactions/transaction';
+import {
+  COCLOSET_BOOKING_PROCESS_NAME,
+  INQUIRY_PROCESS_NAME,
+  resolveLatestProcessName,
+} from '../../../transactions/transaction';
 
 // Import shared components
 import {
+  ExternalLink,
   Heading,
   Modal,
   NamedRedirect,
@@ -57,6 +67,7 @@ import EditListingWizardTab, {
   DELIVERY,
   FILES,
   LOCATION,
+  LAUNDRY,
   AVAILABILITY,
   PHOTOS,
   STYLE,
@@ -84,7 +95,7 @@ const STRIPE_ONBOARDING_RETURN_URL_FAILURE = 'failure';
  * @param {Object} listingTypeConfig - The listing type configuration
  * @returns {Array<string>} - The allowed tabs for the given process and listing type configuration
  */
-const tabsForListingType = (processName, listingTypeConfig) => {
+export const tabsForListingType = (processName, listingTypeConfig) => {
   const locationMaybe = displayLocation(listingTypeConfig) ? [LOCATION] : [];
   const pricingMaybe = displayPrice(listingTypeConfig) ? [PRICING] : [];
   const deliveryMaybe =
@@ -99,10 +110,45 @@ const tabsForListingType = (processName, listingTypeConfig) => {
   //         and listing publishing happens after last panel.
   // Note 3: The first tab creates a draft listing and title is mandatory attribute for it.
   //         Details tab asks for "title" and is therefore the first tab in the wizard flow.
+  //         EXCEPTION: cocloset-booking puts PHOTOS first (see below). There, creation is
+  //         pinned to the DETAILS tab wherever it sits, not to the first tab - see
+  //         `onCompleteEditListingWizardTab` in EditListingWizardTab.js.
   // Note 4: Ensure that the last panel contains the messaging for not-yet-verified files so
   //         that it is clear to the user why the 'publish' button is disabled during verification
   const tabs = {
-    ['default-booking']: [DETAILS, ...locationMaybe, PRICING, AVAILABILITY, ...styleOrPhotosTab],
+    ['default-booking']: [
+      DETAILS,
+      ...locationMaybe,
+      PRICING,
+      LAUNDRY,
+      AVAILABILITY,
+      ...styleOrPhotosTab,
+    ],
+    // Cocloset's own booking process. Photos first, Laundry Assignment last.
+    //
+    // This list deliberately DIVERGES from `default-booking` above - it is not a
+    // mirror of it any more, and the divergence is the point:
+    //
+    //   * LOCATION is gone. The listing's public pickup address is the assigned
+    //     laundry's, written server-side by the LAUNDRY step. The owner's OWN private
+    //     shipping address (privateData.ownerAddress) that this tab used to capture
+    //     now lives on the DETAILS panel, so removing the tab does not silently drop
+    //     the data.
+    //   * AVAILABILITY is gone. Every new garment gets a full 24/7 plan written
+    //     automatically when its draft is created (see
+    //     `setFullAvailabilityForCoclosetBooking` in EditListingDetailsPanel.js). That
+    //     is load-bearing, not a nicety: OrderPanel gates its booking form on
+    //     `availabilityPlan.timezone`, so a plan-less listing is not bookable at all.
+    //
+    // Neither panel, constant nor switch case has been deleted - `default-booking` and
+    // the other processes still use both, as does the existing EditListingPage test
+    // suite. Only this array changed.
+    //
+    // PHOTOS being first does NOT mean photos create the draft: `sdk.images.upload`
+    // takes no listing id and the uploaded ids live in Redux, so images can be
+    // collected before a listing exists, and creation stays on DETAILS (which owns
+    // `title` and `listingType`, both required by `ownListings.createDraft`).
+    [COCLOSET_BOOKING_PROCESS_NAME]: [...styleOrPhotosTab, DETAILS, PRICING, LAUNDRY],
     ['default-purchase']: [DETAILS, PRICING_AND_STOCK, ...deliveryMaybe, ...styleOrPhotosTab],
     ['default-negotiation']: [DETAILS, ...locationMaybe, ...pricingMaybe, ...styleOrPhotosTab],
     ['default-inquiry']: [DETAILS, ...locationMaybe, ...pricingMaybe, ...styleOrPhotosTab],
@@ -147,6 +193,9 @@ const tabLabelAndSubmit = (intl, tab, isNewListingFlow, isPriceDisabled, process
       isPriceDisabled && isNewListingFlow
         ? `EditListingWizard.${processNameString}${newOrEdit}.saveLocationNoPricingTab`
         : `EditListingWizard.${processNameString}${newOrEdit}.saveLocation`;
+  } else if (tab === LAUNDRY) {
+    labelKey = 'EditListingWizard.tabLabelLaundry';
+    submitButtonKey = `EditListingWizard.${processNameString}${newOrEdit}.saveLaundry`;
   } else if (tab === AVAILABILITY) {
     labelKey = 'EditListingWizard.tabLabelAvailability';
     submitButtonKey = `EditListingWizard.${processNameString}${newOrEdit}.saveAvailability`;
@@ -162,6 +211,103 @@ const tabLabelAndSubmit = (intl, tab, isNewListingFlow, isPriceDisabled, process
     label: intl.formatMessage({ id: labelKey }),
     submitButton: intl.formatMessage({ id: submitButtonKey }),
   };
+};
+
+/**
+ * PREVIEW THE LISTING THE WAY A RENTER WILL SEE IT.
+ *
+ *   > "En editListingPage puedes agregar un button que permita al provider previsualizar el
+ *   >  listing como draft?"
+ *
+ * The route already exists - `/l/:slug/:id/draft` renders an owner's unpublished listing, and
+ * ManageListingsPage has linked to it all along. What was missing was a way in from the wizard,
+ * which is where somebody actually wants it: while they are still deciding whether the garment
+ * reads well.
+ *
+ * ── OPENS IN A NEW TAB, AND THAT IS THE WHOLE POINT ────────────────────────
+ * Navigating away would take the half-filled tab with it. Every unsaved edit on the current
+ * panel would be gone, and the owner would come back to a form they have to fill in again -
+ * turning "let me look at it" into a punishment. So this is an `<a target="_blank">` rather
+ * than a NamedLink, which cannot carry a target.
+ *
+ * The preview shows what has been SAVED, which is exactly what a preview of a draft means, and
+ * the tab it opens from stays untouched behind it.
+ *
+ * NOTHING TO PREVIEW UNTIL THE DRAFT EXISTS. On a brand-new listing there is no id until the
+ * details tab is submitted, so the link is not rendered rather than rendered dead. The state
+ * decides the variant, the same way ManageListingCard does it: a draft previews as a draft, a
+ * listing awaiting approval as pending-approval, and a live one goes to its real page - so this
+ * keeps meaning something on the edit flow, not just while creating.
+ */
+const PreviewListingLink = props => {
+  const { listing, routeConfiguration, intl } = props;
+
+  const id = listing?.id?.uuid;
+  const { title, state } = listing?.attributes || {};
+
+  if (!id || !title) {
+    return null;
+  }
+
+  const slug = createSlug(title);
+  const variant =
+    state === LISTING_STATE_DRAFT
+      ? LISTING_PAGE_DRAFT_VARIANT
+      : state === LISTING_STATE_PENDING_APPROVAL
+      ? LISTING_PAGE_PENDING_APPROVAL_VARIANT
+      : null;
+
+  const href = variant
+    ? pathByRouteName('ListingPageVariant', routeConfiguration, { id, slug, variant })
+    : pathByRouteName('ListingPage', routeConfiguration, { id, slug });
+
+  return (
+    <ExternalLink
+      href={href}
+      className={css.previewLink}
+      title={intl.formatMessage({ id: 'EditListingWizard.previewListingTitle' })}
+    >
+      <FormattedMessage id="EditListingWizard.previewListing" />
+    </ExternalLink>
+  );
+};
+
+/**
+ * The contents of a single step in the wizard's step rail (mockups 10-15.jpg):
+ * a numbered badge that flips to a tick once the step's data is saved, followed
+ * by the step label.
+ *
+ * `Tabs` passes a child's `tabLabel` straight through to `TabNav` as the link's
+ * contents and never treats it as a string, so a node is safe here.
+ *
+ * The completed/current distinction is carried by the badge *shape* (tick vs.
+ * number) and by visually hidden status text, not by the fill colour alone.
+ *
+ * @param {Object} props
+ * @param {string} props.label - The translated step label
+ * @param {number} props.stepNumber - 1-based position of the step in the rail
+ * @param {boolean} props.completed - Whether the step's data has been saved
+ * @param {Object} props.intl
+ */
+const WizardStepLabel = props => {
+  const { label, stepNumber, completed, intl } = props;
+  const badgeClasses = classNames(css.stepBadge, { [css.stepBadgeDone]: completed });
+
+  return (
+    <>
+      <span className={badgeClasses} aria-hidden="true">
+        {completed ? <span className={css.stepBadgeCheck} /> : stepNumber}
+      </span>
+      <span className={css.stepLabel}>{label}</span>
+      <span className={css.stepStatus}>
+        {intl.formatMessage({
+          id: completed
+            ? 'EditListingWizard.stepStatusCompleted'
+            : 'EditListingWizard.stepStatusIncomplete',
+        })}
+      </span>
+    </>
+  );
 };
 
 /**
@@ -226,7 +372,18 @@ const hasValidListingFieldsInExtendedData = (publicData, privateData, config) =>
  *
  * @return true if tab / step is completed.
  */
-const tabCompleted = (tab, listing, config, options = {}) => {
+// Exported for tests. The LAUNDRY case in particular reads a field that recently
+// changed scope, and a regression there does not throw - it silently marks the tab
+// incomplete, which shows up as an owner being bounced back with no message.
+//
+// `options.collectedImages` carries the images the page can currently render -
+// EditListingPage's `pickRenderableImages`, i.e. the listing's own images PLUS the
+// ones uploaded in this session that are still only in Redux
+// (`EditListingPage.uploadedImages`). The PHOTOS case needs it because
+// cocloset-booking puts PHOTOS before the draft exists: `ensureListing` gives an
+// image-less listing until DETAILS creates one, so reading `listing.images` alone
+// would leave the second tab permanently locked.
+export const tabCompleted = (tab, listing, config, options = {}) => {
   const {
     availabilityPlan,
     description,
@@ -235,6 +392,7 @@ const tabCompleted = (tab, listing, config, options = {}) => {
     title,
     publicData,
     privateData,
+    metadata,
   } = listing.attributes;
   const images = listing.images;
   const {
@@ -278,11 +436,32 @@ const tabCompleted = (tab, listing, config, options = {}) => {
     case FILES:
       return filesRequired && hasAttachedFiles;
     case LOCATION:
-      return !!(geolocation && publicData?.location?.address);
+      return !!(
+        privateData?.ownerAddress?.street &&
+        privateData?.ownerAddress?.city &&
+        privateData?.ownerAddress?.postcode
+      );
+    case LAUNDRY:
+      // The assignment now lives in `metadata` (only the Integration API can write
+      // it - see server/api-util/laundryAssignment.js), so this reads metadata, not
+      // publicData. Reading the old key here would leave the tab permanently
+      // incomplete for every newly assigned listing: the owner saves successfully,
+      // is redirected forward, and is bounced straight back with nothing shown.
+      //
+      // The value IS visible by the time this runs. `metadata` is publicly
+      // readable even though it is operator-write-only, and the panel's save
+      // finishes with an `ownListings.update` whose expanded response carries the
+      // metadata the server has just written (verified against Dev), which is what
+      // refreshes the Redux entity this check reads.
+      return !!(geolocation && metadata?.assignedLaundryId);
     case AVAILABILITY:
       return !!availabilityPlan;
-    case PHOTOS:
-      return images && images.length > 0;
+    case PHOTOS: {
+      // Images held in Redux count. See the docblock above: before the draft is
+      // created they are the ONLY place the uploads exist.
+      const collectedImages = options.collectedImages || [];
+      return (images && images.length > 0) || collectedImages.length > 0;
+    }
     case STYLE:
       return !!cardStyle;
     default:
@@ -395,7 +574,7 @@ const getListingTypeConfig = (listing, selectedListingType, config) => {
  * @param {string} props.params.id - The id of the listing
  * @param {string} props.params.slug - The slug of the listing
  * @param {'new'|'draft'|'edit'} props.params.type - The type of the listing
- * @param {DETAILS | PRICING | PRICING_AND_STOCK | DELIVERY | FILES | LOCATION | AVAILABILITY | PHOTOS} props.params.tab - The name of the tab
+ * @param {DETAILS | PRICING | PRICING_AND_STOCK | DELIVERY | FILES | LOCATION | LAUNDRY | AVAILABILITY | PHOTOS} props.params.tab - The name of the tab
  * @param {propTypes.ownListing} props.listing - The listing object
  * @param {propTypes.error} [props.errors.createListingDraftError] - The error object for createListingDraft
  * @param {propTypes.error} [props.errors.publishListingError] - The error object for publishListing
@@ -595,9 +774,41 @@ class EditListingWizard extends Component {
         ? TABS_DETAILS_ONLY
         : tabsForListingType(processName, listingTypeConfig);
 
+    // `privateData.ownerAddress` - the owner's own private shipping address, the
+    // counterpart of the public laundry-derived pickup address - is captured by the
+    // LOCATION panel. cocloset-booking has no LOCATION step any more, so the DETAILS
+    // panel asks for those three fields instead: the client's reason for dropping the tab
+    // ("la dirección viene de laundry") is about the PUBLIC address and says nothing
+    // about the owner's own, and losing the field is the irreversible direction.
+    const captureOwnerAddress =
+      processName === COCLOSET_BOOKING_PROCESS_NAME && !tabs.includes(LOCATION);
+
+    // Images that are renderable right now: the listing's own plus this session's
+    // uploads, which live only in Redux until a listing exists to attach them to.
+    // `images` is intentionally left in `rest` (the tabs need it too), so read it
+    // off props rather than destructuring it out above.
+    const tabCompletedOptions = { collectedImages: this.props.images || [] };
+
     // Check if wizard tab is active / linkable.
     // When creating a new listing, we don't allow users to access next tab until the current one is completed.
-    const tabsStatus = tabsActive(isNewListingFlow, currentListing, tabs, config);
+    const tabsStatus = tabsActive(
+      isNewListingFlow,
+      currentListing,
+      tabs,
+      config,
+      tabCompletedOptions
+    );
+
+    // Per-tab completion, used only to draw the tick in the step rail.
+    // tabsActive() already calls tabCompleted() for the *previous* tab; this
+    // asks the same question about every tab so the rail can show its state.
+    const tabsCompleted = tabs.reduce(
+      (acc, tab) => ({
+        ...acc,
+        [tab]: tabCompleted(tab, currentListing, config, tabCompletedOptions),
+      }),
+      {}
+    );
 
     // Redirect user to first tab when encoutering outdated draft listings.
     if (invalidExistingListingType && isNewListingFlow && selectedTab !== tabs[0]) {
@@ -709,9 +920,27 @@ class EditListingWizard extends Component {
           rootClassName={css.tabsContainer}
           navRootClassName={css.nav}
           tabRootClassName={css.tab}
+          tabLinkClassName={css.tabLink}
+          tabSelectedLinkClassName={css.tabLinkSelected}
+          navHeader={
+            <div className={css.navHeader}>
+              <span className={css.navEyebrow}>
+                <FormattedMessage id="EditListingWizard.navEyebrow" />
+              </span>
+              <span className={css.navTitle}>
+                <FormattedMessage
+                  id={
+                    isNewListingFlow
+                      ? 'EditListingWizard.navTitleNew'
+                      : 'EditListingWizard.navTitleEdit'
+                  }
+                />
+              </span>
+            </div>
+          }
           ariaLabel={intl.formatMessage({ id: 'EditListingWizard.screenreader.tabNavigation' })}
         >
-          {tabs.map(tab => {
+          {tabs.map((tab, tabIndex) => {
             const tabTranslations = tabLabelAndSubmit(
               intl,
               tab,
@@ -724,8 +953,22 @@ class EditListingWizard extends Component {
                 {...rest}
                 key={tab}
                 tabId={`${id}_${tab}`}
-                tabLabel={tabTranslations.label}
+                tabLabel={
+                  <WizardStepLabel
+                    label={tabTranslations.label}
+                    stepNumber={tabIndex + 1}
+                    completed={!!tabsCompleted[tab]}
+                    intl={intl}
+                  />
+                }
                 tabSubmitButtonText={tabTranslations.submitButton}
+                previewListingLink={
+                  <PreviewListingLink
+                    listing={listing}
+                    routeConfiguration={routeConfiguration}
+                    intl={intl}
+                  />
+                }
                 tabLinkProps={tabLink(tab)}
                 selected={selectedTab === tab}
                 disabled={isNewListingFlow && !tabsStatus[tab]}
@@ -736,6 +979,7 @@ class EditListingWizard extends Component {
                 errors={errors}
                 handleCreateFlowTabScrolling={this.handleCreateFlowTabScrolling}
                 handlePublishListing={this.handlePublishListing}
+                captureOwnerAddress={captureOwnerAddress}
                 fetchInProgress={fetchInProgress}
                 onListingTypeChange={selectedListingType => this.setState({ selectedListingType })}
                 onManageDisableScrolling={onManageDisableScrolling}

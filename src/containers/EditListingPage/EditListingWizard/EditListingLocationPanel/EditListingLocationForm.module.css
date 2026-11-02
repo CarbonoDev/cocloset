@@ -19,39 +19,25 @@
   color: var(--colorFail);
 }
 
-.locationAutocompleteInput {
-}
-
-.locationAutocompleteInputIcon {
-  display: none;
-}
-
-.predictionsRoot {
-  position: absolute;
-  width: 100%;
-  top: 36px;
-  left: 0;
-  background-color: var(--marketplaceColor);
-  border-bottom-left-radius: var(--borderRadius);
-  border-bottom-right-radius: var(--borderRadius);
-  box-shadow: var(--boxShadowPopup);
-  z-index: calc(var(--zIndexPopup) + 1);
+.field {
+  flex-shrink: 0;
+  margin-bottom: 18px;
 
   @media (--viewportMedium) {
-    top: 40px;
+    margin-bottom: 24px;
   }
 }
 
-.validLocation {
-}
-
-.locationAddress,
-.building {
-  flex-shrink: 0;
-  margin-bottom: 24px;
+/* City + postcode side by side from medium up (mockup 14.jpg). Stacks on
+   mobile so neither field gets too narrow to read its own value. */
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
 
   @media (--viewportMedium) {
-    margin-bottom: 32px;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
   }
 }
 

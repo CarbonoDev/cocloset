@@ -1,0 +1,41 @@
+@import '../../styles/customMediaQueries.css';
+
+/* The same 44px thumb target as the heart it sits beside - see FavoriteButton.module.css. */
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  background-color: transparent;
+
+  color: var(--coclosetInk, var(--colorGrey700));
+  cursor: pointer;
+
+  &:hover:enabled {
+    background-color: var(--colorGrey50);
+  }
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+/* Hidden by default, like the heart's - a caller that wants the word overrides this. */
+.label {
+  display: none;
+}
+
+/* The confirmation after a copy. It sits BESIDE the button rather than replacing its label:
+   a control that renames itself after being pressed loses the reader still looking for it. */
+.feedback {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--coclosetInkMuted, var(--colorGrey600));
+  margin: 0;
+}

@@ -1,0 +1,102 @@
+@import '../../styles/customMediaQueries.css';
+
+/* Studio settings - mockup 03.jpg. Shares the ops shell's warm surfaces so the
+   Settings tab doesn't look like a different product from the other
+   /laundry/* screens. */
+
+.opsMain {
+  min-width: 0;
+  background-color: var(--coclosetCanvas);
+
+  @media (--viewportLarge) {
+    background-color: var(--coclosetCanvas);
+    border-left-color: var(--coclosetBorder);
+  }
+}
+
+/* THE RAIL IS DEFINED ONCE, NOT COPIED.
+     > "Al entrar al apartado de Settings en laundry-profile, la barra lateral se
+     >  hace demasiado ancha, no es similar a como se ve en el resto de las
+     >  pantallas" (Jonathan, 2026-09-03)
+
+   This page had its own copy of the rule, and the copy was missing the one
+   declaration that matters: the width. `LayoutSideNavigation` sets
+   `width: unset` on the aside from --viewportLarge, so without it the column is
+   as wide as its widest child - and `.opsNavHint` is a two-sentence paragraph
+   with nothing capping it, which resolved to ~570px of mostly empty rail. That
+   is the same bug that was fixed on the ops screens in August; it survived here
+   because "matches LaundryOpsPage" was a comment rather than a reference.
+
+   Composing the real rule makes the two pages the same rail by construction, so
+   the next change to it cannot land on one screen and miss the other. */
+.opsSideNav {
+  composes: opsSideNav from '../LaundryOpsPage/LaundryOpsPage.module.css';
+}
+
+.content {
+  margin-top: 18px;
+
+  @media (--viewportMedium) {
+    margin: 24px auto 0 auto;
+    max-width: 564px;
+  }
+
+  @media (--viewportLarge) {
+    margin: 0;
+    max-width: 564px;
+  }
+}
+
+.desktopTopbar,
+.mobileTopbar {
+  box-shadow: none;
+}
+
+/* Heading row + "View my profile" (2026-09-11): what a visitor actually sees is the
+   public ProfilePage, not this settings form - the button is the bridge between the
+   two, so it sits right beside the title rather than buried in the form below. */
+.headingRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  margin: 0 0 18px 0;
+  color: var(--coclosetInk);
+  letter-spacing: -0.4px;
+
+  @media (--viewportMedium) {
+    margin: 0 0 24px 0;
+  }
+}
+
+.viewProfileLink {
+  composes: marketplaceTinyFontStyles from global;
+  flex: 0 0 auto;
+  color: var(--coclosetBrand);
+  font-weight: var(--fontWeightSemiBold);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--coclosetBrandDark);
+    text-decoration: underline;
+  }
+}
+
+/* The form sits on its own paper card, matching the panel treatment used by
+   the dashboard and inventory screens. */
+.form {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadius);
+  background-color: var(--coclosetSurface);
+
+  @media (--viewportMedium) {
+    margin-top: 24px;
+    padding: 32px;
+  }
+}

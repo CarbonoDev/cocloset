@@ -1,0 +1,974 @@
+@import '../../styles/customMediaQueries.css';
+
+/* Laundry ops skin - mockups 04-09.jpg.
+   The information architecture (which screens, which columns, which filters)
+   was already in place; this file only supplies the visual finish. Surfaces
+   are the warm paper tones from the Cocloset token block in
+   src/styles/marketplaceDefaults.css - no hex values are hardcoded here. */
+
+/* ================ Page shell ================ */
+
+/* Handed to LayoutSideNavigation via mainColumnClassName / sideNavClassName,
+   which both already accept an extra class - no layout markup is changed. */
+/* Below --viewportLarge the side nav sits ABOVE the content, so the main column
+   owns the full viewport width. Anchoring max-width to 100vw there gives the
+   min-width:0 chain below (.content -> .tableWrapper -> .tableScroll) something
+   definite to resolve against: every ancestor's width is otherwise driven by
+   the 940px table's own min-content, which is circular, and the whole page ends
+   up 990px wide instead of the table scrolling inside its container.
+   From --viewportLarge the nav is a side column, so 100vw no longer applies. */
+.opsMain {
+  min-width: 0;
+  max-width: 100vw;
+  background-color: var(--coclosetCanvas);
+
+  @media (--viewportLarge) {
+    max-width: none;
+    background-color: var(--coclosetCanvas);
+    border-left-color: var(--coclosetBorder);
+  }
+
+  /* The ops screens are full-bleed in the mockups (03-09.jpg), not centred on
+     the template's 1056px reading column. The orders table needs that width:
+     inside the centred column its seven columns wrap onto three lines each. */
+  @media (--viewportLargeWithPaddings) {
+    padding: 48px 36px 82px 59px;
+  }
+}
+
+.opsSideNav {
+  background-color: var(--coclosetSurfaceRaised);
+  border-top-color: var(--coclosetBorder);
+
+  /* THE RAIL IS SIZED, NOT LEFT TO ITS CONTENTS.
+       > "esta demasiado ancho, por favor haslo mas delgado para que cubra solo el
+       >  texto y un poquito mas (...) debemos tener un poco de margin como el que
+       >  se ve a la izquierda pero a la derecha"
+
+     LayoutSideNavigation sets `width: unset` on the aside from --viewportLarge, so
+     the column is as wide as its widest child. Every nav label is one short word,
+     but `.opsNavHint` is a two-sentence paragraph with nothing capping it - so the
+     rail resolved to that sentence's max-content and took ~570px, most of it empty
+     beside seven links, and the orders table lost the width to it.
+
+     A declared width fixes the cause. 216px of content holds the longest label
+     ("Dashboard") several times over and lets the hint wrap to four or five lines,
+     which is what it should have been doing all along. `flex: 0 0 auto` because the
+     aside is a flex item beside a `flex-grow: 1` main: without it this width is a
+     starting point that the row is free to shrink.
+
+     The 36px right padding is the mirror of the left one the mockups already show,
+     and is what keeps the links off the `.opsMain` border beside them. */
+  @media (--viewportLarge) {
+    background-color: var(--coclosetSurfaceRaised);
+    flex: 0 0 auto;
+    width: 288px;
+    padding: 48px 36px 82px 36px;
+  }
+
+  /* The ops rail is a narrow, flush-left column in the mockups (03-09.jpg), not
+     the template's centred account-settings nav. Dropping the centring padding
+     hands ~150px back to the main column, which is what lets all seven table
+     columns - including the "Open" action - fit without scrolling on a laptop. */
+  @media (--viewportLargeWithPaddings) {
+    padding: 48px 36px 82px 36px;
+  }
+}
+
+/* min-width:0 all the way down to .tableScroll. LayoutSideNavigation's .main is
+   a flex column, and a flex item's default `min-width: auto` refuses to shrink
+   below its content - without this the 940px table widens the whole page on
+   mobile instead of scrolling inside its own container. */
+.content {
+  min-width: 0;
+  margin-top: 18px;
+
+  @media (--viewportMedium) {
+    margin: 24px auto 0 auto;
+  }
+
+  @media (--viewportLarge) {
+    margin: 0;
+  }
+}
+
+.desktopTopbar,
+.mobileTopbar {
+  box-shadow: none;
+}
+
+.pageTitle {
+  margin: 0 0 18px 0;
+  color: var(--coclosetInk);
+  letter-spacing: -0.4px;
+
+  @media (--viewportMedium) {
+    margin: 0 0 24px 0;
+  }
+}
+
+/* ================ Side nav ================ */
+
+.opsNav {
+  width: 100%;
+  padding: 12px 0;
+
+  @media (--viewportMedium) {
+    padding: 16px 0;
+  }
+
+  @media (--viewportLarge) {
+    padding: 0;
+  }
+}
+
+/* The studio identity block is redundant on mobile, where the side nav
+   collapses to a single scrolling strip under the topbar. */
+.opsNavHeader {
+  display: none;
+
+  @media (--viewportLarge) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--coclosetBorder);
+  }
+}
+
+.opsNavTitle {
+  color: var(--coclosetInk);
+  font-size: 15px;
+  font-weight: var(--fontWeightSemiBold);
+  letter-spacing: 1.6px;
+  line-height: 20px;
+  text-transform: uppercase;
+}
+
+.opsNavStudio {
+  color: var(--coclosetInkMuted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.opsNavList {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  overflow-x: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  @media (--viewportLarge) {
+    flex-direction: column;
+    gap: 2px;
+    overflow-x: visible;
+  }
+}
+
+.opsNavLink {
+  display: block;
+  padding: 8px 12px;
+  border-radius: var(--coclosetRadiusPill);
+  color: var(--coclosetInkMuted);
+  font-size: 14px;
+  font-weight: var(--fontWeightMedium);
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: var(--transitionStyle);
+
+  &:hover {
+    background-color: var(--coclosetSubtle);
+    color: var(--coclosetInk);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coclosetBrand);
+    outline-offset: 2px;
+  }
+
+  @media (--viewportLarge) {
+    padding: 9px 12px;
+    border-radius: var(--coclosetRadiusSmall);
+  }
+}
+
+/* Active state is carried by weight + ink colour as well as the fill, so it
+   survives forced-colours mode and reads without relying on hue. */
+.opsNavLinkActive {
+  background-color: var(--coclosetSubtle);
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+
+  &:hover {
+    background-color: var(--coclosetSubtle);
+  }
+}
+
+.opsNavHint {
+  display: none;
+
+  @media (--viewportLarge) {
+    display: block;
+    /* The 36px right margin this carried was standing in for the gutter the rail
+       itself now has (see `.opsSideNav`). Kept, it would inset the hint twice and
+       squeeze its text into a column narrower than the links above it. */
+    margin: 32px 0 0 0;
+    padding: 14px 16px;
+    border: 1px solid var(--coclosetBorder);
+    border-radius: var(--coclosetRadius);
+    background-color: var(--coclosetSurface);
+    color: var(--coclosetInkMuted);
+    font-size: 13px;
+    line-height: 18px;
+  }
+}
+
+/* ================ Shared text ================ */
+
+.primaryText {
+  display: block;
+  color: var(--coclosetInk);
+  font-size: 14px;
+  font-weight: var(--fontWeightMedium);
+  line-height: 20px;
+}
+
+.secondaryText {
+  display: block;
+  color: var(--coclosetInkMuted);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+/* "Deliver today" on a rental that starts the day it was booked. Amber rather than a status
+   tone: this is a deadline, not a state of the garment - the STATUS column next to it still
+   says what state the garment is in, and reusing one of those tones here would read as a
+   second, contradicting status. Sits between the two dates in the column, so it is scanned
+   with them rather than competing with the status badge. */
+.deliverToday {
+  display: inline-block;
+  margin: 2px 0;
+  padding: 1px 8px;
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetToneAmberBg);
+  color: var(--coclosetToneAmberFg);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemiBold);
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.emptyState {
+  margin: 0;
+  padding: 32px 0;
+  color: var(--coclosetInkMuted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.error {
+  margin: 0 0 12px 0;
+  color: var(--colorFail);
+  font-size: 14px;
+}
+
+.warning {
+  margin: 0 0 12px 0;
+  color: var(--colorAttentionDark);
+  font-size: 14px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* ================ Status badges ================ */
+
+/* A badge always renders its translated label, so the tone below is a
+   secondary cue and never the only way to read the status. */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetToneNeutralBg);
+  color: var(--coclosetToneNeutralFg);
+  font-size: 12px;
+  font-weight: var(--fontWeightMedium);
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+/* The leading dot is decorative only - the label carries the meaning. */
+.statusBadge::before {
+  content: '';
+  display: inline-block;
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.toneAmber {
+  background-color: var(--coclosetToneAmberBg);
+  color: var(--coclosetToneAmberFg);
+}
+
+.toneGreen {
+  background-color: var(--coclosetToneGreenBg);
+  color: var(--coclosetToneGreenFg);
+}
+
+.toneRose {
+  background-color: var(--coclosetToneRoseBg);
+  color: var(--coclosetToneRoseFg);
+}
+
+.toneBlue {
+  background-color: var(--coclosetToneBlueBg);
+  color: var(--coclosetToneBlueFg);
+}
+
+.toneViolet {
+  background-color: var(--coclosetToneVioletBg);
+  color: var(--coclosetToneVioletFg);
+}
+
+.toneNeutral {
+  background-color: var(--coclosetToneNeutralBg);
+  color: var(--coclosetToneNeutralFg);
+}
+
+.toneCritical {
+  background-color: var(--coclosetToneCriticalBg);
+  color: var(--coclosetToneCriticalFg);
+}
+
+.flagBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--coclosetToneCriticalFg);
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetToneCriticalBg);
+  color: var(--coclosetToneCriticalFg);
+  font-size: 12px;
+  font-weight: var(--fontWeightMedium);
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+/* ================ Orders table ================ */
+
+.tableWrapper {
+  min-width: 0;
+  margin-top: 18px;
+  max-width: 90vw;
+
+  @media (--viewportMedium) {
+    margin-top: 24px;
+  }
+}
+
+.tableControls {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 18px;
+
+  @media (--viewportMedium) {
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+}
+
+.tabs {
+  display: flex;
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+
+  @media (--viewportMedium) {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+}
+
+.tab {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetSurface);
+  color: var(--coclosetInkMuted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: var(--fontWeightMedium);
+  line-height: 18px;
+  white-space: nowrap;
+  transition: var(--transitionStyleButton);
+
+  &:hover {
+    border-color: var(--coclosetBorderStrong);
+    color: var(--coclosetInk);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coclosetBrand);
+    outline-offset: 2px;
+  }
+}
+
+/* Selected tab is inverted, not just tinted, so it reads at a glance and in
+   greyscale. */
+.tabActive {
+  border-color: var(--coclosetInk);
+  background-color: var(--coclosetInk);
+  color: var(--coclosetSurface);
+  font-weight: var(--fontWeightSemiBold);
+
+  &:hover {
+    border-color: var(--coclosetInk);
+    color: var(--coclosetSurface);
+  }
+}
+
+.search {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--coclosetBorder);
+  border-bottom-width: 1px;
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetSurface);
+  font-size: 14px;
+
+  &:hover,
+  &:focus {
+    border-color: var(--coclosetBrand);
+    box-shadow: none;
+  }
+
+  @media (--viewportMedium) {
+    flex-shrink: 0;
+    /* width: 280px; */
+  }
+}
+
+/* The 7-column table can't compress to a phone width without becoming
+   unreadable, so it scrolls horizontally inside its own container instead. */
+/* position:relative is load-bearing, not decorative: .visuallyHidden (on the
+   actions column's <th>) is position:absolute, and with a static ancestor it
+   resolves against the initial containing block - escaping the scroll box and
+   adding ~550px of horizontal scroll to the whole page on mobile. */
+.tableScroll {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadius);
+  background-color: var(--coclosetSurface);
+}
+
+.table {
+  width: 100%;
+  min-width: 940px;
+  border-collapse: collapse;
+}
+
+.th {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--coclosetBorder);
+  background-color: var(--coclosetSurfaceRaised);
+  color: var(--coclosetInkMuted);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemiBold);
+  letter-spacing: 0.8px;
+  line-height: 15px;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The whole summary row toggles its detail (see LaundryOrderRow), so it says so. The tint was
+   already here as a plain hover; `cursor` is what turns it from decoration into a promise.
+   Only this class - the detail row below it is deliberately not a target. */
+.row {
+  border-bottom: 1px solid var(--coclosetBorder);
+  cursor: pointer;
+  transition: var(--transitionStyle);
+
+  &:hover {
+    background-color: var(--coclosetSurfaceRaised);
+  }
+}
+
+.cell {
+  padding: 12px 10px;
+  vertical-align: top;
+}
+
+/* Ticket codes, rack codes and dates are atomic values - wrapping them mid
+   token ("MAR-\n1192") makes them slower to scan than a little extra width
+   costs, and the table already scrolls horizontally when space runs out. */
+.cellNoWrap {
+  padding: 12px 10px;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.qrPlaceholder {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px dashed var(--coclosetBorderStrong);
+  border-radius: var(--coclosetRadiusSmall);
+  color: var(--coclosetInkMuted);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+/* ================ Expanded row detail ================ */
+
+.detailCell {
+  padding: 0;
+  border-bottom: 2px solid var(--coclosetBorder);
+  background-color: var(--coclosetSurfaceRaised);
+}
+
+.detailPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background-color: var(--coclosetSurface);
+
+  @media (--viewportMedium) {
+    flex-direction: row;
+  }
+}
+
+.detailImage {
+  flex-shrink: 0;
+  width: 96px;
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  border-radius: var(--coclosetRadiusSmall);
+  object-fit: cover;
+}
+
+.thumbPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 96px;
+  padding: 8px;
+  border: 1px dashed var(--coclosetBorderStrong);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurfaceRaised);
+  color: var(--coclosetInkMuted);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.detailInfo {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.detailLine {
+  margin: 0 0 8px 0;
+  color: var(--coclosetInkMuted);
+  font-size: 13px;
+  line-height: 18px;
+  word-break: break-all;
+}
+
+/* Damage copy is red AND prefixed by its own label in the translation string,
+   so it isn't announced by colour alone. */
+.detailDamage {
+  display: block;
+  margin: 0 0 8px 0;
+  color: var(--coclosetToneCriticalFg);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.advance {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--coclosetBorder);
+}
+
+/* PrimaryButton is full-width by default, which turns a single row action into
+   a slab across the whole detail panel. Its FILL colour is deliberately left
+   alone - it comes from --colorPrimaryButton, which Console's branding asset
+   overrides at runtime, so hardcoding a colour here would be discarded in
+   any environment that sets one. */
+.advanceButton {
+  width: auto;
+  min-width: 220px;
+  padding: 0 24px;
+}
+
+.damageFields {
+  margin-bottom: 12px;
+}
+
+.damageToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: var(--coclosetInk);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 20px;
+  margin: 5px 0 20px 0;
+
+  @media (--viewportMedium) {
+    margin: 0;
+  }
+}
+
+.damageToggle input[type='checkbox'] {
+  margin: 0;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.damageNote {
+  width: 100%;
+  min-height: 72px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurface);
+  font-size: 14px;
+
+  &:hover,
+  &:focus {
+    border-color: var(--coclosetBrand);
+    box-shadow: none;
+  }
+}
+
+/* How many days this garment will take to clean, collected at the return step.
+   Drives listing.metadata.readyAt and the availability block - see
+   server/api/laundry-transaction-status.js. */
+.cleaningCodeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cleaningCodeSteps {
+  margin-bottom: 15px;
+}
+
+.cleaningCodeStep {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  line-height: 18px;
+  word-break: break-all;
+}
+
+.cleaningDaysField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.cleaningDaysLabel {
+  color: var(--coclosetInk);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cleaningDaysInput {
+  /* width: 100%; */
+  width: 160px;
+  padding: 10px 12px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurface);
+  font-size: 14px;
+
+  &:hover,
+  &:focus {
+    border-color: var(--coclosetBrand);
+    box-shadow: none;
+  }
+
+  /* @media (--viewportMedium) {
+    max-width: 160px;
+  } */
+}
+
+.cleaningDaysHint {
+  color: var(--coclosetInkMuted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* ================ Dashboard ================ */
+
+.dashboard {
+  margin-top: 18px;
+
+  @media (--viewportMedium) {
+    margin-top: 24px;
+  }
+}
+
+.tiles {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+
+  @media (--viewportMedium) {
+    gap: 16px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadius);
+  background-color: var(--coclosetSurface);
+  text-decoration: none;
+  transition: var(--transitionStyleButton);
+
+  &:hover {
+    border-color: var(--coclosetBrand);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coclosetBrand);
+    outline-offset: 2px;
+  }
+
+  @media (--viewportMedium) {
+    padding: 20px;
+  }
+}
+
+.tileLabel {
+  color: var(--coclosetInkMuted);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemiBold);
+  letter-spacing: 0.8px;
+  line-height: 15px;
+  text-transform: uppercase;
+}
+
+/* margin-top:auto keeps every count on the same baseline across the row even
+   when a neighbouring tile's label wraps to two lines. */
+.tileValue {
+  margin-top: auto;
+  color: var(--coclosetInk);
+  font-size: 30px;
+  font-weight: var(--fontWeightMedium);
+  line-height: 36px;
+
+  @media (--viewportMedium) {
+    font-size: 34px;
+    line-height: 40px;
+  }
+}
+
+/* Tinted counts. The label above each number always names what is being
+   counted, so the tint adds emphasis rather than meaning. */
+.tileValueBlue {
+  color: var(--coclosetToneBlueFg);
+}
+
+.tileValueViolet {
+  color: var(--coclosetToneVioletFg);
+}
+
+.tileValueCritical {
+  color: var(--coclosetToneCriticalFg);
+}
+
+/* The 8th dashboard card (LaundryDashboard's TicketLookupTile): a form
+   dressed as a `.tile` so it sits in the same grid as the 7 stat cards. */
+.ticketLookupTile {
+  cursor: default;
+
+  &:hover {
+    border-color: var(--coclosetBorder);
+  }
+}
+
+.ticketLookup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+
+  & .search {
+    flex: 1 1 140px;
+  }
+}
+
+.dashboardLink {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetInk);
+  color: var(--coclosetSurface);
+  font-size: 14px;
+  font-weight: var(--fontWeightSemiBold);
+  line-height: 20px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transitionStyleButton);
+
+  &:hover {
+    background-color: var(--coclosetBrandDark);
+    color: var(--coclosetSurface);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coclosetBrand);
+    outline-offset: 2px;
+  }
+}
+
+/* ================ Inventory ================ */
+
+.inventoryGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+  list-style: none;
+  margin: 18px 0 0 0;
+  padding: 0;
+
+  @media (--viewportMedium) {
+    gap: 16px;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 24px;
+  }
+
+  @media (--viewportLarge) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.inventoryCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadius);
+  background-color: var(--coclosetSurface);
+
+  @media (--viewportMedium) {
+    padding: 16px;
+  }
+}
+
+/* flex:none stops the fixed-ratio frame absorbing the extra height a taller
+   neighbour gives the grid row, which otherwise makes every thumbnail in a
+   row a slightly different size. */
+.inventoryImage {
+  flex: none;
+  width: 100%;
+  margin-bottom: 8px;
+  overflow: hidden;
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurfaceRaised);
+  aspect-ratio: 4 / 5;
+}
+
+/* Badge sits at the bottom of the card so badges line up across a row.
+   Unlike in the table - which scrolls horizontally - a card has a hard width,
+   and the longest labels ("Available for booking") are wider than a two-up
+   card at 390px, so here the badge is allowed to wrap. */
+.inventoryCard .statusBadge {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: auto;
+  white-space: normal;
+}
+
+/* Inside the fixed-ratio frame the thumb fills the whole box. */
+.inventoryImage .thumb {
+  height: 100%;
+  border-radius: 0;
+}
+
+.inventoryImage .thumbPlaceholder {
+  height: 100%;
+  border: none;
+}
+
+/* The one action on an inventory card. Quiet by default - most cards are just being read -
+   but a real button, because pressing it takes a garment out of the studio's inventory. */
+.handBackButton {
+  appearance: none;
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 6px 12px;
+
+  border: 1px solid var(--coclosetBorder);
+  border-radius: 999px;
+  background-color: var(--coclosetSurface);
+
+  color: var(--coclosetInk);
+  font-size: 13px;
+  font-weight: var(--fontWeightMedium);
+  cursor: pointer;
+
+  &:hover:enabled {
+    border-color: var(--coclosetInk);
+  }
+
+  &:disabled {
+    color: var(--coclosetInkMuted);
+    cursor: default;
+  }
+}

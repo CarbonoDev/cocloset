@@ -1,0 +1,149 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  background-color: var(--coclosetCanvas);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  padding: 40px 24px 48px 24px;
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+
+  /* 1.3fr:1fr rather than the near-even 1.1fr:1fr this started at - the bigger headline
+     below (2026-09-18 round 3) needs more of the row to keep its reference two-line break
+     ("The shared closet" / "on your corner.") instead of wrapping to three lines. The
+     collage column shrinks to match; its tiles are aspect-ratio boxes, so they just get a
+     little narrower/taller, not distorted. */
+  @media (--viewportLarge) {
+    grid-template-columns: 1.3fr 1fr;
+    align-items: center;
+    gap: 48px;
+    padding: 88px 36px 96px 36px;
+  }
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Sized off the round-3 reference screenshot (2026-09-18). First pass here bumped the
+   1280px-viewport size to 80px (~1.5x the previous 54px) - real-browser verification against
+   the reference at the same 1280px viewport showed that overshot: the reference's "The shared
+   closet" / "on your corner." two-line break measures out to ~63-68px in this column, not 80,
+   and 80px pushed the headline to a three-line wrap instead. Corrected the top breakpoint back
+   down to match viewportLarge's 68px (flat past 1024px, not a further bump) - verified via
+   screenshot that this restores the reference's two-line break at 1280px. max-width stays
+   raised at 640px so the (correctly, moderately) bigger text still reaches that same two-line
+   break rather than collapsing to three lines in a column that didn't grow. Also made
+   monotonic (38/52/46/54 across breakpoints, previously non-monotonic - see the 2026-09-13
+   log - is not repeated). */
+.headline {
+  font-family: var(--fontFamilyDisplay);
+  color: var(--coclosetPartnerTeal);
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin: 0 0 20px 0;
+  max-width: 640px;
+
+  @media (--viewportMedium) {
+    font-size: 58px;
+  }
+
+  @media (--viewportLarge) {
+    font-size: 68px;
+  }
+}
+
+/* Round 3 (2026-09-18): the standfirst had no explicit font-size at all, inheriting the
+   generic 16px body copy - the reference sets this paragraph noticeably larger. max-width
+   raised to match so it still wraps to the reference's ~3 lines instead of ~5 at the bigger
+   size. */
+.standfirst {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInk);
+  font-size: 17px;
+  line-height: 1.6;
+  max-width: 480px;
+  margin: 0 0 32px 0;
+
+  @media (--viewportMedium) {
+    font-size: 19px;
+  }
+}
+
+.standfirst > p {
+  margin: 0;
+}
+
+/* The pink pill. --coclosetLandingRose is scoped to this refresh's screenshots, not the
+   site-wide --coclosetBrand terracotta used everywhere else. */
+.cta {
+  composes: marketplaceDefaultFontStyles from global;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 32px;
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetLandingRose);
+  color: var(--colorWhite);
+  font-weight: var(--fontWeightSemiBold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all var(--transitionStyleButton);
+}
+
+.cta:hover,
+.cta:focus {
+  background-color: var(--coclosetLandingRoseDark);
+  text-decoration: none;
+}
+
+/* THE ASYMMETRIC PHOTO COLLAGE.
+ *
+ * A plain 2x2 grid, each tile forced to a 3:4 portrait box regardless of the source photo's
+ * own proportions (see .collageMedia below) - the four `hero-img` blocks carry no layout hint
+ * of their own, just images, so the grid shape lives entirely in this CSS. The second column
+ * is nudged up at the wide breakpoint to read as a staggered collage rather than a flat grid,
+ * matching the reference screenshot; an exact pixel match of that screenshot's grid isn't the
+ * goal, reading as "a compact collage, not 4 stacked rows" is.
+ */
+.collage {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.collageItem {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  aspect-ratio: 3 / 4;
+}
+
+@media (--viewportLarge) {
+  .collageItem:nth-child(2),
+  .collageItem:nth-child(4) {
+    margin-top: -44px;
+  }
+}
+
+/* FieldImage's own AspectRatioWrapper sizes its wrapper from the source image's NATURAL
+   aspect ratio (an inline padding-bottom % on an inner spacer div), which would fight the
+   fixed 3:4 box above. Its absolutely-positioned inner box (.aspectBox in
+   AspectRatioWrapper.module.css) already stretches to fill WHATEVER height this wrapper ends
+   up with, so forcing that one number - the wrapper's own height - to match .collageItem is
+   enough to make the image fill the 3:4 box and get cropped by object-fit: cover. There is no
+   `height` declared on AspectRatioWrapper's own `.root` to begin with, so this does not need
+   `!important` to win a cascade fight - it is simply the only rule that sets the property. */
+.collageMedia {
+  height: 100%;
+}

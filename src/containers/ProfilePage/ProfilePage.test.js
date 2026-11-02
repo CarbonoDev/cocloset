@@ -44,6 +44,7 @@ const attributes = {
       kitchenDescription: 'This is a kitchen description!',
       numberOfCookbooks: 10,
       userType: 'a',
+      neighborhood: 'Sant Antoni',
       notShownInProfileAttribute: 'Do not show this in profile',
     },
   },
@@ -130,6 +131,35 @@ describe('ProfilePage', () => {
     expect(screen.getByText('I am a great cook!')).toBeInTheDocument();
   });
 
+  //   > "puedo ingresar el nombre de mi vecindario y éste se debe mostrar en mi
+  //   >  perfil" (Jonathan, 2026-09-03)
+  //
+  // It is written on the settings page into publicData; this is the half that
+  // reads it back. Not a Console user field, so it does not arrive through
+  // CustomUserFields and has to be rendered on its own.
+  it('shows the neighborhood the member entered', async () => {
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: getInitialState(), config });
+    });
+
+    expect(screen.getByText('Sant Antoni')).toBeInTheDocument();
+  });
+
+  it('says nothing at all when the member has not given one', async () => {
+    // An empty line under the name would read as a rendering fault.
+    const stateWithout = getInitialState();
+    const users = stateWithout.marketplaceData.entities.user;
+    Object.keys(users).forEach(id => {
+      delete users[id].attributes.profile.publicData.neighborhood;
+    });
+
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: stateWithout, config });
+    });
+
+    expect(screen.queryByText('Sant Antoni')).not.toBeInTheDocument();
+  });
+
   it('Check that custom user information is shown correctly', async () => {
     let rendered = {};
     await act(async () => {
@@ -187,6 +217,166 @@ describe('ProfilePage', () => {
     expect(screen.getByText('reviewerA display name')).toBeInTheDocument();
     expect(screen.getByText('March 2024')).toBeInTheDocument();
     expect(screen.getAllByTitle('3/5')).toHaveLength(2);
+  });
+});
+
+// ── A LAUNDRY'S PUBLIC PROFILE (2026-09-11) ────────────────────────────────────────
+//
+//   > "Solo el Business Name reemplazando a 'Hello my name is [user name]'... Hay
+//   >  que quitar la sección de reviews... Hay que mostrar: store address,
+//   >  neighborhood, business hours, y description" (Jonathan)
+describe('ProfilePage for a laundry', () => {
+  const config = getHostedConfiguration();
+  const props = {
+    scrollingDisabled: false,
+    intl: fakeIntl,
+    viewport: fakeViewport,
+    params: {},
+  };
+
+  const laundryAttributes = {
+    profile: {
+      metadata: { isLaundry: true },
+      publicData: {
+        userType: 'a',
+        laundryProfile: {
+          studioName: 'Studio Pigalle',
+          address: '21 Rue Frochot, Paris',
+          neighborhood: 'Pigalle',
+          businessHours: 'Mon-Sat 11:00-21:00',
+          description: 'A neighborhood dry cleaner since 1998.',
+        },
+      },
+    },
+  };
+
+  const createLaundryUser = (userFn, id) => {
+    const user = userFn(id);
+    return {
+      ...user,
+      attributes: {
+        ...user.attributes,
+        profile: {
+          ...user.attributes.profile,
+          metadata: laundryAttributes.profile.metadata,
+          publicData: laundryAttributes.profile.publicData,
+        },
+      },
+    };
+  };
+
+  const getLaundryInitialState = () => {
+    const currentUser = createLaundryUser(createCurrentUser, userId);
+    const user = createLaundryUser(createUser, userId);
+    const listing = createListing('l1');
+    return {
+      ProfilePage: {
+        userId: user.id,
+        userListingRefs: [{ id: listing.id, type: 'listing' }],
+        userShowError: null,
+        queryListingsError: null,
+        reviews: [],
+        queryReviewsError: null,
+      },
+      user: {
+        currentUser,
+        currentUserHasListings: false,
+        sendVerificationEmailInProgress: false,
+      },
+      marketplaceData: {
+        entities: {
+          user: { userId: user },
+          listing: { l1: { ...listing, relationships: { author: user } } },
+        },
+      },
+    };
+  };
+
+  it('shows only the Business Name as the heading, with no "Hello, I\'m" framing', async () => {
+    // fakeIntl (test harness) renders every message as its own id, ignoring `values`
+    // - the interpolated name string is not what's asserted here, the CHOICE of
+    // message id is: the laundry heading must not be the "Hello, I'm {name}" one.
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: getLaundryInitialState(), config });
+    });
+
+    expect(screen.getByText('ProfilePage.laundryDesktopHeading')).toBeInTheDocument();
+    expect(screen.queryByText('ProfilePage.desktopHeading')).not.toBeInTheDocument();
+  });
+
+  it('shows store address, neighborhood, business hours and description', async () => {
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: getLaundryInitialState(), config });
+    });
+
+    expect(screen.getByText('21 Rue Frochot, Paris')).toBeInTheDocument();
+    expect(screen.getByText('Pigalle')).toBeInTheDocument();
+    expect(screen.getByText('Mon-Sat 11:00-21:00')).toBeInTheDocument();
+    expect(screen.getByText('A neighborhood dry cleaner since 1998.')).toBeInTheDocument();
+    // The styled details panel (2026-09-12) labels each one.
+    expect(screen.getByText('ProfilePage.laundryDetail.address')).toBeInTheDocument();
+    expect(screen.getByText('ProfilePage.laundryDetail.neighborhood')).toBeInTheDocument();
+    expect(screen.getByText('ProfilePage.laundryDetail.hours')).toBeInTheDocument();
+    expect(screen.getByText('ProfilePage.laundryDetail.about')).toBeInTheDocument();
+  });
+
+  // "los horarios... Se muestren mejor en una lista, es más cómodo leer asi"
+  // (Jonathan, 2026-09-11) - once `businessHoursByDay` is stored, the list wins
+  // over the old comma-joined sentence.
+  it('shows business hours as a per-day list once businessHoursByDay is stored', async () => {
+    const stateWithGrid = getLaundryInitialState();
+    const users = stateWithGrid.marketplaceData.entities.user;
+    Object.values(users).forEach(u => {
+      u.attributes.profile.publicData.laundryProfile.businessHoursByDay = {
+        mon: { open: '09:00', close: '18:00' },
+        tue: { open: '09:00', close: '14:00' },
+      };
+    });
+
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: stateWithGrid, config });
+    });
+
+    expect(screen.getByText('ProfilePage.day.mon')).toBeInTheDocument();
+    // 12-hour clock, per Jonathan's 2026-09-19 request - was "09:00–18:00".
+    expect(screen.getByText('09:00 AM – 06:00 PM')).toBeInTheDocument();
+    expect(screen.getByText('ProfilePage.day.tue')).toBeInTheDocument();
+    expect(screen.getByText('09:00 AM – 02:00 PM')).toBeInTheDocument();
+    // The list replaces the old sentence entirely - not shown alongside it.
+    expect(screen.queryByText('Mon-Sat 11:00-21:00')).not.toBeInTheDocument();
+    // Only open days appear - Wed was never ticked in this fixture.
+    expect(screen.queryByText('ProfilePage.day.wed')).not.toBeInTheDocument();
+  });
+
+  it('renders no reviews section at all', async () => {
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: getLaundryInitialState(), config });
+    });
+
+    expect(
+      screen.queryByRole('heading', { name: 'ProfilePage.reviewsFromMyCustomersTitle' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'ProfilePage.reviewsAsACustomerTitle' })
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not fall back to the plain member's neighborhood field for a laundry", async () => {
+    // The two keys are distinct (`laundryProfile.neighborhood` vs top-level
+    // `publicData.neighborhood`) - a laundry should never have the latter, but the
+    // page must read the RIGHT one regardless, not fall through to it.
+    const stateWithBoth = getLaundryInitialState();
+    const users = stateWithBoth.marketplaceData.entities.user;
+    Object.values(users).forEach(u => {
+      u.attributes.profile.publicData.neighborhood = 'Should not appear';
+    });
+
+    await act(async () => {
+      render(<ProfilePage {...props} />, { initialState: stateWithBoth, config });
+    });
+
+    expect(screen.getByText('Pigalle')).toBeInTheDocument();
+    expect(screen.queryByText('Should not appear')).not.toBeInTheDocument();
   });
 });
 

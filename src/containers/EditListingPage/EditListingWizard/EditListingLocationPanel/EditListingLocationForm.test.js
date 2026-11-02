@@ -6,27 +6,12 @@ import { renderWithProviders as render, testingLibrary } from '../../../../util/
 
 import EditListingLocationForm from './EditListingLocationForm';
 
-const { screen, userEvent, fireEvent } = testingLibrary;
+const { screen, userEvent } = testingLibrary;
 
 const noop = () => null;
 
-beforeAll(() => {
-  // Mock window.scroll - otherwise, Jest/JSDOM will print a not-implemented error.
-  window.mapboxgl = { accessToken: 'test' };
-  window.mapboxSdk = () => ({
-    geocoding: {
-      forwardGeocode: () => ({
-        send: () =>
-          Promise.resolve({
-            body: { features: [] },
-          }),
-      }),
-    },
-  });
-});
-
-describe('EditListingDeliveryForm', () => {
-  it('Check that shipping fees can be given and submit button activates', async () => {
+describe('EditListingLocationForm', () => {
+  it('Check that owner address fields can be given and submit button activates', async () => {
     const user = userEvent.setup();
     const saveActionMsg = 'Save location';
     await act(async () => {
@@ -44,17 +29,22 @@ describe('EditListingDeliveryForm', () => {
       );
     });
 
-    // Pickup fields
-    const address = 'EditListingLocationForm.address';
-    expect(screen.getByText(address)).toBeInTheDocument();
+    const street = 'EditListingLocationForm.street';
+    expect(screen.getByText(street)).toBeInTheDocument();
 
-    const building = 'EditListingLocationForm.building';
-    expect(screen.getByText(building)).toBeInTheDocument();
+    const city = 'EditListingLocationForm.city';
+    expect(screen.getByText(city)).toBeInTheDocument();
+
+    const postcode = 'EditListingLocationForm.postcode';
+    expect(screen.getByText(postcode)).toBeInTheDocument();
 
     // Test that save button is disabled at first
     expect(screen.getByRole('button', { name: saveActionMsg })).toBeDisabled();
 
-    await user.type(screen.getByTestId('location-search'), 'Erottajankatu 19, Helsinki');
-    await user.type(screen.getByRole('textbox', { name: building }), 'B');
+    await user.type(screen.getByRole('textbox', { name: street }), 'Main Street 123');
+    await user.type(screen.getByRole('textbox', { name: city }), 'Paris');
+    await user.type(screen.getByRole('textbox', { name: postcode }), '75009');
+
+    expect(screen.getByRole('button', { name: saveActionMsg })).toBeEnabled();
   });
 });

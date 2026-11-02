@@ -1,0 +1,569 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.error {
+  composes: h4 from global;
+  color: var(--colorFail);
+  margin-top: 0;
+  margin-bottom: 18px;
+}
+
+.field {
+  margin-bottom: 18px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
+}
+
+/* ── No usable address: the studio is invisible in the picker ─────────────────
+   Deliberately the loudest thing on this form ("una alerta llamativa"). It is
+   pitched above the mild amber used for the legacy-category notes below, because
+   the amber notes are housekeeping and this is "you are receiving nothing and
+   nowhere else will tell you". Full-bleed tint plus a thick leading rule, so it
+   reads as an alert even before the text does. */
+.addressAlert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px;
+  border: 1px solid var(--colorFail);
+  border-left-width: 6px;
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--colorFailSubtle);
+
+  @media (--viewportMedium) {
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 16px;
+  }
+}
+
+.addressAlertIcon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  stroke: var(--colorFail);
+
+  @media (--viewportMedium) {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.addressAlertBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  @media (--viewportMedium) {
+    gap: 8px;
+  }
+}
+
+.addressAlertTitle {
+  composes: h4 from global;
+  margin: 0;
+  padding: 0;
+  color: var(--colorFail);
+  font-weight: var(--fontWeightBold);
+}
+
+.addressAlertText {
+  composes: h5 from global;
+  margin: 0;
+  padding: 0;
+  color: var(--coclosetInk);
+}
+
+/* Sits directly under the address field: why it is closed, or why it just opened.
+   Muted, because unlike the alert above this is an explanation and not a problem. */
+.addressNote {
+  composes: h5 from global;
+  margin: -12px 0 18px 0;
+  padding: 0;
+  color: var(--coclosetInkMuted);
+
+  @media (--viewportMedium) {
+    margin: -16px 0 24px 0;
+  }
+}
+
+.addressNoteGranted {
+  composes: addressNote;
+  color: var(--coclosetToneGreenFg);
+}
+
+/* Mockup 03.jpg labels the studio settings fields in small caps rather than the
+   template's default sentence-case bold — it's what separates the label row from the
+   input value at a glance on a dense settings form. */
+.fieldLabel {
+  display: block;
+  margin: 0 0 4px 0;
+  padding: 0;
+  color: var(--coclosetInkMuted);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemiBold);
+  line-height: 16px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+
+  @media (--viewportMedium) {
+    font-size: 12px;
+    line-height: 16px;
+  }
+}
+
+.locationAutocompleteInput {
+}
+
+.locationAutocompleteInputIcon {
+  display: none;
+}
+
+.predictionsRoot {
+  position: absolute;
+  width: 100%;
+  top: 36px;
+  left: 0;
+  background-color: var(--marketplaceColor);
+  border-bottom-left-radius: var(--borderRadius);
+  border-bottom-right-radius: var(--borderRadius);
+  box-shadow: var(--boxShadowPopup);
+  z-index: calc(var(--zIndexPopup) + 1);
+
+  @media (--viewportMedium) {
+    top: 40px;
+  }
+}
+
+.validLocation {
+}
+
+/* ================ Accepted categories + turnaround (one table) ================ */
+
+/* A fieldset carries its own browser default border/padding/margin, which would draw a
+   second box around a section that already sits in a card. */
+.categoryFieldset {
+  margin: 0 0 18px 0;
+  padding: 0;
+  border: none;
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
+}
+
+/* Accepting a garment and saying how long it takes are one decision, so they are one
+   table: each row is a category, with its accept checkbox and (top level only) its
+   turnaround input side by side.
+
+   The table is fed from Console's category tree, so its length is not ours to control -
+   a marketplace with three levels of garment categories produces a very tall list. Cap
+   the ROWS (not the whole fieldset, or the label scrolls away too) and scroll inside the
+   card rather than pushing the save button off the bottom of a phone screen. */
+.categoryTable {
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--coclosetBorder);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetSurface);
+  list-style: none;
+
+  @media (--viewportMedium) {
+    max-height: 420px;
+  }
+}
+
+/* Rows stack on a phone (a number input next to a long category name would wrap into
+   two cramped columns) and sit on one line once there is width for it. */
+.categoryRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+
+  @media (--viewportMedium) {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+  }
+}
+
+.categoryRow + .categoryRow {
+  border-top: 1px solid var(--coclosetBorder);
+}
+
+/* Lets the label take the space the turnaround control does not, so long category names
+   wrap rather than pushing the input off the row. */
+.categoryCheckbox {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.categoryEmpty {
+  composes: h5 from global;
+  margin: 6px 0 0 0;
+  padding: 12px;
+  border: 1px dashed var(--coclosetBorderStrong);
+  border-radius: var(--coclosetRadiusSmall);
+  color: var(--coclosetInkMuted);
+}
+
+/* Indentation is what makes "Dresses / Maxi Dress" legible as a tree. The parent
+   stays visually dominant because ticking it accepts the whole branch. */
+.categoryLevel1 {
+  color: var(--coclosetInk);
+  font-weight: var(--fontWeightSemiBold);
+}
+
+.categoryLevel2 {
+  display: inline-block;
+  margin-left: 16px;
+  color: var(--coclosetInk);
+}
+
+.categoryLevel3 {
+  display: inline-block;
+  margin-left: 32px;
+  color: var(--coclosetInkMuted);
+}
+
+/* Free-text values saved before the picker existed. Shown, not deleted: a studio's
+   stated capabilities are its own data, and quietly dropping them would narrow which
+   garments it takes without anyone being told. They can't be re-added once removed,
+   which is the point - every NEW value now has to come from Console. */
+.legacyCategories {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--coclosetToneAmberBg);
+  border-radius: var(--coclosetRadiusSmall);
+  background-color: var(--coclosetToneAmberBg);
+}
+
+.legacyCategoriesNote {
+  composes: h5 from global;
+  margin: 0 0 8px 0;
+  color: var(--coclosetToneAmberFg);
+}
+
+.legacyCategoryList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legacyCategory {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--coclosetBorderStrong);
+  border-radius: var(--coclosetRadiusPill);
+  background-color: var(--coclosetSurface);
+}
+
+.legacyCategoryLabel {
+  composes: h5 from global;
+  margin: 0;
+  color: var(--coclosetInk);
+}
+
+.legacyCategoryRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: var(--coclosetRadiusPill);
+  color: var(--coclosetInkMuted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.legacyCategoryRemove:hover {
+  color: var(--coclosetBrandDark);
+}
+
+/* Visible label for screen readers only - the chip shows a bare x. */
+.legacyCategoryRemoveText {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The form now sits inside a card (LaundryProfilePage.module.css .form), which
+   supplies the bottom padding the old 56px margin was faking. */
+.submitButton {
+  margin-top: 6px;
+
+  @media (--viewportMedium) {
+    margin-top: 8px;
+  }
+}
+
+/* ================ Per-category turnaround control ================ */
+
+/* The studio-wide turnaround above is the FALLBACK; the real number is set per
+   top-level category, on that category's own row in the table above. Only top-level
+   rows carry one - turnaround is "por categoría grande", and a subcategory input would
+   be a control that silently does nothing. */
+
+.pricingHelp {
+  composes: h5 from global;
+  margin: 0 0 12px 0;
+  color: var(--coclosetInkMuted);
+}
+
+.pricingControl {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+
+  @media (--viewportMedium) {
+    width: 200px;
+  }
+}
+
+.pricingInput {
+}
+
+/* Number inputs sized for 2-4 digits rather than the full-width default: a row of
+   full-bleed boxes makes a long category list read as a wall of inputs. */
+.pricingInputRoot {
+  max-width: 120px;
+}
+
+.pricingInputLabel {
+  display: block;
+  margin: 0 0 2px 0;
+  padding: 0;
+  color: var(--coclosetInkMuted);
+  font-size: 11px;
+  font-weight: var(--fontWeightSemiBold);
+  line-height: 14px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+/* Shown ONLY while the input is empty — the answer to "which of these is using my
+   studio default, and what is that number?". Once the studio fills the box in, the
+   hint disappears rather than becoming permanent chrome. */
+.pricingFallback {
+  composes: h5 from global;
+  margin: 2px 0 0 0;
+  color: var(--coclosetInkMuted);
+  font-style: italic;
+}
+
+/* ================ Opening hours ================ */
+
+/* A fieldset because the seven rows are one answer to one question, and a screen reader
+   should hear the legend before any of them. */
+.hoursFieldset {
+  margin: 0 0 24px 0;
+  padding: 0;
+  border: none;
+}
+
+.hoursHelp {
+  margin: 0 0 12px 0;
+  color: var(--coclosetInkMuted);
+}
+
+/* The day and its two times on one line from the medium breakpoint, stacked below it -
+   three controls side by side on a phone would put each of them under a tappable width. */
+.hoursRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--coclosetBorder);
+
+  @media (--viewportMedium) {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+.hoursDay {
+  @media (--viewportMedium) {
+    flex: 0 0 140px;
+  }
+}
+
+.hoursTime {
+  @media (--viewportMedium) {
+    flex: 0 0 150px;
+  }
+}
+
+/* Sits under a field to say when it is needed, rather than what it is - the label already
+   does that. Quieter than the label and than the value. */
+.fieldHint {
+  margin: -12px 0 24px 0;
+  color: var(--coclosetInkMuted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* ================ Logo (2026-09-11) ================
+   Copied from ProfileSettingsForm.module.css - same upload mechanism, same
+   `--ProfileSettingsForm_avatarSize*` custom properties (marketplaceDefaults.css),
+   just relabelled for a studio's Logo instead of a member's profile picture. */
+
+.uploadAvatarInput {
+  display: none;
+}
+
+.uploadAvatarWrapper {
+  margin-bottom: 4px;
+}
+
+.label {
+  width: var(--ProfileSettingsForm_avatarSize);
+  @media (--viewportMedium) {
+    width: var(--ProfileSettingsForm_avatarSizeDesktop);
+  }
+}
+
+.avatarPlaceholder,
+.avatarContainer {
+  position: relative;
+  width: var(--ProfileSettingsForm_avatarSize);
+  height: var(--ProfileSettingsForm_avatarSize);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background-color: var(--colorGrey50);
+  border-radius: calc(var(--ProfileSettingsForm_avatarSize) / 2);
+  cursor: pointer;
+
+  @media (--viewportMedium) {
+    width: var(--ProfileSettingsForm_avatarSizeDesktop);
+    height: var(--ProfileSettingsForm_avatarSizeDesktop);
+    border-radius: calc(var(--ProfileSettingsForm_avatarSizeDesktop) / 2);
+  }
+}
+
+.avatarPlaceholder {
+  border-style: dashed;
+  border-color: var(--colorGrey100);
+  border-width: 2px;
+  transition: var(--transitionStyleButton);
+
+  &:hover {
+    border-color: var(--colorGrey300);
+  }
+}
+
+.avatarPlaceholderText {
+  max-width: 130px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.avatarUploadError {
+  border-style: dashed;
+  border-color: var(--colorFail);
+  border-width: 2px;
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+}
+
+.changeAvatar {
+  composes: h5 from global;
+  font-weight: var(--fontWeightMedium);
+
+  position: absolute;
+  bottom: 27px;
+  right: -129px;
+  width: 105px;
+  height: 41px;
+  padding: 11px 10px 7px 35px;
+
+  background-color: var(--colorWhite);
+  background-image: url('data:image/svg+xml;utf8,<svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg"><g stroke="%234A4A4A" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round"><path d="M5.307 11.155L1 13l1.846-4.308L10.54 1 13 3.46zM11 5L9 3M5 11L3 9"/></g></svg>');
+  background-repeat: no-repeat;
+  background-position: 15px 12px;
+  border: solid 1px var(--colorGrey100);
+  border-radius: 2px;
+  margin: 0;
+
+  @media (--viewportMedium) {
+    bottom: -10px;
+    right: auto;
+    transition: var(--transitionStyleButton);
+  }
+
+  &:hover {
+    border: solid 1px var(--colorGrey300);
+  }
+}
+
+.uploadingImage {
+  width: var(--ProfileSettingsForm_avatarSize);
+  height: var(--ProfileSettingsForm_avatarSize);
+
+  object-fit: cover;
+  background-color: var(--colorGrey100);
+  border-radius: calc(var(--ProfileSettingsForm_avatarSize) / 2);
+  overflow: hidden;
+
+  display: block;
+  position: relative;
+  margin: 0;
+
+  @media (--viewportMedium) {
+    width: var(--ProfileSettingsForm_avatarSizeDesktop);
+    height: var(--ProfileSettingsForm_avatarSizeDesktop);
+    border-radius: calc(var(--ProfileSettingsForm_avatarSizeDesktop) / 2);
+  }
+}
+
+.uploadingImageOverlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+
+  background-color: var(--colorWhite);
+  opacity: 0.8;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.avatarInvisible {
+  visibility: hidden;
+  position: absolute;
+  top: -1000px;
+  left: -1000px;
+}

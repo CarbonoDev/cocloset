@@ -11,7 +11,7 @@ import { createOwnListing, createStock, fakeIntl } from '../../../util/testData'
 
 import { ManageListingCard } from './ManageListingCard';
 
-const { screen, waitFor } = testingLibrary;
+const { screen, waitFor, fireEvent } = testingLibrary;
 
 const { Money } = sdkTypes;
 const noop = () => null;
@@ -145,6 +145,44 @@ describe('ManageListingCard', () => {
     expect(tree.queryByText('ManageListingCard.manageStock')).not.toBeInTheDocument();
   });
 
+  // Jonathan (2026-10-13): show this up front rather than let the provider click
+  // "Pause" and find out from an error (see listing-pause-eligibility.js).
+  it('hides "Pause Listing" and shows the active-rental badge when hasActiveTransaction is true', () => {
+    const listing = createOwnListing('listing-renting', {
+      title: 'the listing',
+      price: new Money(1000, 'USD'),
+      availabilityPlan: {
+        type: 'availability-plan/time',
+        timezone: 'Etc/UTC',
+        entries: [{ dayOfWeek: 'mon', startTime: '00:00', endTime: '00:00', seats: 1 }],
+      },
+      publicData: {
+        listingType: 'rent-bicycles-daily',
+        transactionProcessAlias: 'default-booking/release-1',
+        unitType: 'hour',
+      },
+    });
+
+    const tree = render(
+      <ManageListingCard
+        history={{ push: noop }}
+        listing={listing}
+        intl={fakeIntl}
+        isMenuOpen={false}
+        onCloseListing={noop}
+        onOpenListing={noop}
+        onToggleMenu={noop}
+        hasClosingError={false}
+        hasOpeningError={false}
+        availabilityEnabled={true}
+        hasActiveTransaction
+      />
+    );
+
+    expect(tree.getByText('ManageListingCard.activeRentalBadge')).toBeInTheDocument();
+    expect(tree.queryByText('ManageListingCard.closeListing')).not.toBeInTheDocument();
+  });
+
   it('Booking (day): normal', () => {
     const listing = createOwnListing('listing-day', {
       title: 'the listing',
@@ -196,6 +234,65 @@ describe('ManageListingCard', () => {
     expect(tree.getByText(/the Listing/i)).toBeInTheDocument();
     expect(tree.getByText('ManageListingCard.editListing')).toBeInTheDocument();
     expect(tree.getByText('ManageListingCard.manageAvailability')).toBeInTheDocument();
+  });
+
+  it('cocloset-booking: does not offer a "manage availability" link', () => {
+    // cocloset-booking has no AVAILABILITY step in its wizard - the plan is written
+    // automatically at draft creation - so there is no screen for this link to open.
+    // Rendering it anyway is not a harmless no-op: EditListingWizard's "tab not
+    // activated" branch quietly redirects to the Pricing panel and logs to the console,
+    // so the owner would be told they were going to availability and land on pricing.
+    //
+    // This must stay true even though the listing IS bookable in every other respect:
+    // `isBookingProcessAlias` deliberately counts cocloset-booking, which is what made
+    // the link appear here in the first place.
+    const listing = createOwnListing('garment-1', {
+      title: 'the garment',
+      description: 'Lorem ipsum',
+      price: new Money(1000, 'USD'),
+      publicData: {
+        listingType: 'garment-rental',
+        transactionProcessAlias: 'cocloset-booking/release-1',
+        unitType: 'day',
+      },
+    });
+
+    const config = getConfig([
+      {
+        id: 'garment-rental',
+        transactionProcess: {
+          // Console cannot name a custom process, so the hosted asset says
+          // default-booking and LISTING_TYPE_PROCESS_OVERRIDES rewrites it. The listing's
+          // own saved alias is what this component reads, and that is cocloset-booking.
+          name: 'default-booking',
+          alias: 'default-booking/release-1',
+        },
+        unitType: 'day',
+        availabilityType: 'oneSeat',
+      },
+    ]);
+
+    const tree = render(
+      <ManageListingCard
+        history={{ push: noop }}
+        listing={listing}
+        intl={fakeIntl}
+        isMenuOpen={false}
+        onCloseListing={noop}
+        onOpenListing={noop}
+        onToggleMenu={noop}
+        hasClosingError={false}
+        hasOpeningError={false}
+        availabilityEnabled={true}
+      />,
+      { config }
+    );
+
+    // The rest of the card is unaffected - this is a removed link, not a removed card.
+    expect(tree.getByText(/the garment/i)).toBeInTheDocument();
+    expect(tree.getByText('ManageListingCard.editListing')).toBeInTheDocument();
+    expect(tree.queryByText('ManageListingCard.manageAvailability')).not.toBeInTheDocument();
+    expect(tree.queryByText('ManageListingCard.manageStock')).not.toBeInTheDocument();
   });
 
   it('Booking (day): closed', () => {
@@ -253,6 +350,54 @@ describe('ManageListingCard', () => {
 
     expect(tree.getByText('ManageListingCard.closedListing')).toBeInTheDocument();
     expect(tree.getByText('ManageListingCard.openListing')).toBeInTheDocument();
+    // No garment at the laundry - nothing to collect, so no link to a pickup QR.
+    expect(tree.queryByText('ManageListingCard.viewPickupQr')).not.toBeInTheDocument();
+  });
+
+  it('Booking (day): closed, garment still at the laundry', () => {
+    const listing = createOwnListing('garment-1', {
+      title: 'the garment',
+      description: 'Lorem ipsum',
+      price: new Money(1000, 'USD'),
+      state: 'closed',
+      metadata: { onLaundry: true },
+      availabilityPlan: {
+        type: 'availability-plan/time',
+        timezone: 'Etc/UTC',
+        entries: [{ dayOfWeek: 'mon', startTime: '00:00', endTime: '00:00', seats: 1 }],
+      },
+      publicData: {
+        listingType: 'rent-bicycles-daily',
+        transactionProcessAlias: 'default-booking/release-1',
+        unitType: 'hour',
+      },
+    });
+
+    const onShowPickupQr = jest.fn();
+    const tree = render(
+      <ManageListingCard
+        history={{ push: noop }}
+        listing={listing}
+        intl={fakeIntl}
+        isMenuOpen={false}
+        onCloseListing={noop}
+        onOpenListing={noop}
+        onToggleMenu={noop}
+        onShowPickupQr={onShowPickupQr}
+        hasClosingError={false}
+        hasOpeningError={false}
+        availabilityEnabled={true}
+      />
+    );
+
+    // The card overlay links out to open the pickup QR modal rather than cramming a
+    // scannable code into the thumbnail itself.
+    const viewPickupQrButton = tree.getByText('ManageListingCard.viewPickupQr');
+    expect(viewPickupQrButton).toBeInTheDocument();
+
+    fireEvent.click(viewPickupQrButton);
+    expect(onShowPickupQr).toHaveBeenCalledTimes(1);
+    expect(onShowPickupQr).toHaveBeenCalledWith({ id: listing.id, title: 'the garment' });
   });
 
   it('Booking (day): pendingApproval', () => {
@@ -481,6 +626,49 @@ describe('ManageListingCard', () => {
     expect(tree.getByText(/the Listing/i)).toBeInTheDocument();
     expect(tree.getByText('ManageListingCard.editListing')).toBeInTheDocument();
     expect(tree.getByText('ManageListingCard.manageStock')).toBeInTheDocument();
+  });
+
+  it('Booking (day): close blocked while the garment is at the laundry', () => {
+    // The click is intercepted one level up in ManageListingsPage.js (it knows
+    // every listing's onLaundry flag; this card only knows its own). This test
+    // covers the card's half of the contract: given the blocked flag, show the
+    // guidance instead of silently doing nothing.
+    const listing = createOwnListing('garment-1', {
+      title: 'the garment',
+      description: 'Lorem ipsum',
+      price: new Money(1000, 'USD'),
+      metadata: { onLaundry: true },
+      availabilityPlan: {
+        type: 'availability-plan/time',
+        timezone: 'Etc/UTC',
+        entries: [
+          { dayOfWeek: 'mon', startTime: '00:00', endTime: '00:00', seats: 1 },
+        ],
+      },
+      publicData: {
+        listingType: 'rent-bicycles-daily',
+        transactionProcessAlias: 'default-booking/release-1',
+        unitType: 'hour',
+      },
+    });
+
+    const tree = render(
+      <ManageListingCard
+        history={{ push: noop }}
+        listing={listing}
+        intl={fakeIntl}
+        isMenuOpen={false}
+        onCloseListing={noop}
+        onOpenListing={noop}
+        onToggleMenu={noop}
+        hasClosingError={false}
+        hasOpeningError={false}
+        isCloseBlockedOnLaundry={true}
+        availabilityEnabled={true}
+      />
+    );
+
+    expect(tree.getByText('ManageListingCard.closeBlockedOnLaundry')).toBeInTheDocument();
   });
 
   it('Purchase (item): normal out-of-stock', () => {

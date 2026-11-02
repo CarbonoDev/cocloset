@@ -95,6 +95,25 @@ export const nonEmptyArray = message => value => {
   return value && Array.isArray(value) && value.length > 0 ? VALID : message;
 };
 
+/**
+ * At least `minCount` entries in an array field.
+ *
+ *   > "puedes integrar en el form de editlistingpage que el mínimo de imagenes es de dos,
+ *   >  si sube solo 1 no puede continuar"
+ *
+ * A generalisation of `nonEmptyArray` rather than an image-specific check, because the
+ * failure mode it guards is the same for any FieldArray: `nonEmptyArray` is satisfied by a
+ * single entry, so a listing with one photo passed validation and the wizard let the owner
+ * publish it.
+ *
+ * @param {number} minCount - the smallest acceptable length
+ * @param {string} message - shown when the array is shorter
+ * @returns {Function} a Final Form validator
+ */
+export const minCountArray = (minCount, message) => value => {
+  return value && Array.isArray(value) && value.length >= minCount ? VALID : message;
+};
+
 export const autocompleteSearchRequired = message => value => {
   return value && value.search ? VALID : message;
 };

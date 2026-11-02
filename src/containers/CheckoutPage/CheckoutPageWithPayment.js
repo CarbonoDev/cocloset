@@ -10,6 +10,7 @@ import {
 import { propTypes } from '../../util/types';
 import { ensureTransaction } from '../../util/data';
 import { createSlug } from '../../util/urlHelpers';
+import { getListingPickupLocation } from '../../util/listingLocation';
 import { isTransactionInitiateListingNotFoundError } from '../../util/errors';
 import {
   getProcess,
@@ -126,6 +127,21 @@ const getOrderParams = (
   const priceVariantMaybe = priceVariant ? prefixPriceVariantProperties(priceVariant) : {};
 
   const customerDefaultMessageMaybe = customerDefaultMessage ? { customerDefaultMessage } : {};
+
+  // THE RENTAL'S LENGTH IN WEEKS IS NO LONGER WRITTEN HERE.
+  //
+  //   > "el breakdown de dicho correo tiene que tener x 1 week o x 2 weeks dependiendo el
+  //   >  caso" (Jonathan, 2026-09-03)
+  //
+  // It used to be computed from `pageData.orderData.bookingDates` - one form's idea of the
+  // booking, read back out of session storage - and attached to `protectedData` below. A real
+  // transaction on Dev then arrived with every other protectedData key present and this one
+  // missing, so the emails went on printing days.
+  //
+  // It is now derived in server/api/initiate-privileged.js from `bookingStart`/`bookingEnd`:
+  // the dates the booking is actually made from, which no form shape and no session-storage
+  // round trip can lose. One writer, at the point the fact becomes true.
+  // See server/api-util/rentalWeeks.js.
 
   const protectedDataMaybe = {
     protectedData: {
@@ -543,7 +559,11 @@ export const CheckoutPageWithPayment = props => {
     orderData?.deliveryMethod === 'shipping' &&
     !hasTransactionPassedPendingPayment(existingTransaction, process);
 
-  const listingLocation = listing?.attributes?.publicData?.location;
+  // Pickup & return happen at the assigned laundry, not the owner's home
+  // address, which is private (see util/listingLocation.js). Reading
+  // publicData.location here made the whole location block vanish from
+  // checkout once the Location panel was repurposed.
+  const listingLocation = getListingPickupLocation(listing);
   const showPickUpLocation = isPurchase && orderData?.deliveryMethod === 'pickup';
   const showLocation = (isBooking || isNegotiation) && listingLocation?.address;
 

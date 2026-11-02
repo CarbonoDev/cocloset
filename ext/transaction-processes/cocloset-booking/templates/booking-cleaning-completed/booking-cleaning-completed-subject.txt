@@ -1,0 +1,1 @@
+{{set-translations (asset "content/email-texts.json")}}{{t "BookingCleaningCompleted.Subject" "{listingTitle} has been cleaned" listingTitle=transaction.listing.title}}

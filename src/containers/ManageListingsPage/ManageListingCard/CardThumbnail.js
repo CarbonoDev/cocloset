@@ -115,6 +115,14 @@ const DraftOverlay = props => {
           { listingTitle: title }
         )}
       >
+        {/* `tab: 'photos'` is the FIRST step of the cocloset-booking wizard rather than
+            the last one (see `tabsForListingType`), so this now resumes a draft at the
+            beginning instead of at the finish line. It still lands somewhere valid and
+            never dead-ends: a draft always has its images attached (they are handed to
+            createDraft on the details step), so the photos step reports itself complete
+            and every later step stays linkable. If a draft somehow has no images, the
+            wizard's own guard sends the owner here anyway - which is where this link
+            already points. */}
         <NamedLink
           className={css.finishListingDraftLink}
           name="EditListingPage"
@@ -153,7 +161,15 @@ const DraftOverlay = props => {
 };
 
 const ClosedOverlay = props => {
-  const { title, listingId, intl, inProgressListingId, onOpenListing } = props;
+  const {
+    title,
+    listingId,
+    intl,
+    inProgressListingId,
+    onOpenListing,
+    onLaundry,
+    onShowPickupQr,
+  } = props;
   return (
     <Overlay
       message={intl.formatMessage(
@@ -174,6 +190,21 @@ const ClosedOverlay = props => {
       >
         {intl.formatMessage({ id: 'ManageListingCard.openListing' })}
       </PrimaryButtonInline>
+      {/* Jonathan (2026-10-12): show the QR right here in a modal rather than sending the
+          provider to the listing's own page to find it (LaundryPickupNotice there still
+          renders it inline for anyone who lands on that page directly). */}
+      {onLaundry ? (
+        <InlineTextButton
+          rootClassName={css.viewPickupQrLink}
+          onClick={event => {
+            event.preventDefault();
+            event.stopPropagation();
+            onShowPickupQr({ id: listingId, title });
+          }}
+        >
+          {intl.formatMessage({ id: 'ManageListingCard.viewPickupQr' })}
+        </InlineTextButton>
+      ) : null}
     </Overlay>
   );
 };
@@ -287,6 +318,8 @@ const PendingApprovalOverlay = props => {
  * @param {function} props.onCloseListing - Close listing handler
  * @param {function} props.onOpenListing - Open listing handler
  * @param {function} props.onDiscardDraft - Discard draft handler
+ * @param {function} [props.onShowPickupQr] - Opens the pickup QR modal for this listing
+ * @param {boolean} [props.hasActiveTransaction] - Shows the "Active rental" badge
  * @returns {JSX.Element}
  */
 const CardThumbnail = props => {
@@ -300,6 +333,8 @@ const CardThumbnail = props => {
     onCloseListing,
     onOpenListing,
     onDiscardDraft,
+    onShowPickupQr,
+    hasActiveTransaction,
   } = props;
 
   const listingId = listing.id;
@@ -370,11 +405,21 @@ const CardThumbnail = props => {
     onOpenListing,
     onCloseListing,
     hasStockManagementInUse,
+    // A paused (closed) listing whose garment is still at the laundry gets its pickup QR
+    // right where the provider just paused it from - see ClosedOverlay.
+    onLaundry: listing.attributes?.metadata?.onLaundry === true,
+    onShowPickupQr,
   };
 
   return (
     <div className={css.thumbnailWrapper}>
       <Thumbnail {...thumbnailProps} as={isLinked ? NamedLink : 'div'} linkProps={linkProps} />
+
+      {hasActiveTransaction ? (
+        <span className={css.activeRentalBadge}>
+          <FormattedMessage id="ManageListingCard.activeRentalBadge" />
+        </span>
+      ) : null}
 
       {overlayType === 'draft' ? (
         <DraftOverlay {...overlayProps} />

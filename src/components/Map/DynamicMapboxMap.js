@@ -5,6 +5,7 @@ import React, { Component } from 'react';
 // TODO: we should add an overlay with text "use two fingers to pan".
 import MultiTouch from 'mapbox-gl-multitouch';
 
+import { mapboxStyleUrl } from '../../config/configMaps';
 import { circlePolyline } from '../../util/maps';
 
 const mapMarker = () => {
@@ -71,7 +72,9 @@ class DynamicMapboxMap extends Component {
 
     this.map = new window.mapboxgl.Map({
       container: this.mapContainer,
-      style: 'mapbox://styles/mapbox/streets-v10',
+      // Cocloset's own style when REACT_APP_MAPBOX_STYLE is set, Mapbox's otherwise. See
+      // config/configMaps.js - one value, so the interactive and static maps cannot diverge.
+      style: mapboxStyleUrl || 'mapbox://styles/mapbox/streets-v10',
       center: position,
       zoom,
       scrollZoom: false,

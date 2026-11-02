@@ -8,7 +8,11 @@ import { loadData as CMSPageLoader } from './CMSPage/CMSPage.duck';
 import { loadData as ContactDetailsPageLoader } from './ContactDetailsPage/ContactDetailsPage.duck';
 import { loadData as EditListingPageLoader } from './EditListingPage/EditListingPage.duck';
 import { loadData as EmailVerificationPageLoader } from './EmailVerificationPage/EmailVerificationPage.duck';
+import { loadData as FavoritesPageLoader } from './FavoritesPage/FavoritesPage.duck';
 import { loadData as InboxPageLoader } from './InboxPage/InboxPage.duck';
+import { loadData as HandoverPageLoader } from './HandoverPage/HandoverPage.duck';
+import { loadData as PickupPageLoader } from './PickupPage/PickupPage.duck';
+import { loadData as LaundryOpsPageLoader } from './LaundryOpsPage/LaundryOpsPage.duck';
 import { loadData as ListingPageLoader } from './ListingPage/ListingPage.duck';
 import { loadData as MakeOfferPageLoader } from './MakeOfferPage/MakeOfferPage.duck';
 import { loadData as ManageListingsPageLoader } from './ManageListingsPage/ManageListingsPage.duck';
@@ -47,8 +51,20 @@ const getPageDataLoadingAPI = () => {
     EmailVerificationPage: {
       loadData: EmailVerificationPageLoader,
     },
+    FavoritesPage: {
+      loadData: FavoritesPageLoader,
+    },
     InboxPage: {
       loadData: InboxPageLoader,
+    },
+    HandoverPage: {
+      loadData: HandoverPageLoader,
+    },
+    PickupPage: {
+      loadData: PickupPageLoader,
+    },
+    LaundryOpsPage: {
+      loadData: LaundryOpsPageLoader,
     },
     ListingPage: {
       loadData: ListingPageLoader,

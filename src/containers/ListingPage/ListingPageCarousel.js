@@ -7,6 +7,7 @@ import classNames from 'classnames';
 import { FormattedMessage } from '../../util/reactIntl';
 import { LISTING_STATE_CLOSED, propTypes } from '../../util/types';
 import { OFFER, REQUEST } from '../../transactions/transaction';
+import { showPickupTodayOnListingPage } from '../../util/searchCleaningFloor';
 
 // Global ducks (for Redux actions and thunks)
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -20,9 +21,12 @@ import {
   H4,
   Page,
   NamedLink,
+  FavoriteButton,
   OrderPanel,
+  ShareButton,
   LayoutSingleColumn,
   SectionText,
+  LaundryPickupNotice,
 } from '../../components';
 
 // Related components and modules
@@ -52,6 +56,9 @@ import Notifications from './Notifications/Notifications';
 import SectionReviews from './SectionReviews';
 import SectionAuthorMaybe from './SectionAuthorMaybe';
 import SectionMapMaybe from './SectionMapMaybe';
+import SectionListingHeader from './SectionListingHeader';
+import SectionCleaningWorks from './SectionCleaningWorks';
+import SectionRentalTimeline from './SectionRentalTimeline';
 import SectionGallery from './SectionGallery';
 import CustomListingFields from './CustomListingFields';
 import ListingPageAccessWrapper from './ListingPageAccessWrapper';
@@ -92,6 +99,18 @@ export const ListingPageComponent = props => {
     config,
     routeConfiguration,
     showOwnListingsOnly,
+    // Cocloset: the assigned studio's live turnaround and this garment's completed-rental
+    // count. Named here rather than left in `restOfProps` because the PAGE renders them -
+    // everything in that rest object is forwarded to OrderPanel.
+    cleaningTurnaroundDays,
+    completedRentals,
+    // Cocloset: the assigned studio's opening hours, for the pickup card. A same-day rental
+    // can be booked after the counter has shut, so the page has to say when it opens.
+    assignedLaundryHours,
+    // Cocloset: the real fetched availability calendar, also forwarded to OrderPanel via
+    // restOfProps below - named here too so the "Pickup Today" tag can self-correct against
+    // it. See the comment beside showPickupToday.
+    monthlyTimeSlots,
     ...restOfProps
   } = props;
 
@@ -212,6 +231,15 @@ export const ListingPageComponent = props => {
     }
   };
 
+  // THE "PICKUP TODAY" TAG, SELF-CORRECTED ONCE THE REAL CALENDAR IS IN.
+  //
+  //   > "Hay unas prendas que tienen el tag de Pickup Today, pero al entrar al listing page
+  //   >  de ese artículo, en realidad no podemos pedir hoy si no hasta dentro de varios días"
+  //   >   (Jonathan, 2026-09-19, listing 6aa26840-16da-44df-8a74-ff4ece1da4eb)
+  //
+  // See showPickupTodayOnListingPage in util/searchCleaningFloor.js for the full reasoning.
+  const showPickupToday = showPickupTodayOnListingPage(currentListing, monthlyTimeSlots);
+
   return (
     <Page
       title={schemaTitle}
@@ -258,19 +286,36 @@ export const ListingPageComponent = props => {
                 variantPrefix={config.layout.listingImage.variantPrefix}
               />
             )}
-            <div
-              className={showListingImage ? css.mobileHeading : css.noListingImageHeadingProduct}
-            >
-              {showListingImage ? (
-                <H2 as="h1" className={css.orderPanelTitle}>
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H2>
-              ) : (
-                <H3 as="h1" className={css.orderPanelTitle}>
-                  <FormattedMessage id="ListingPage.orderTitle" values={{ title: richTitle }} />
-                </H3>
-              )}
+            {/* The garment's own heading: brand, title, provenance.
+                  Replaces the template's mobile-only "ListingPage.orderTitle" block, which
+                  existed to repeat the sticky panel's title on a narrow screen. The design
+                  gives the main column a heading of its own at every width, so repeating the
+                  panel's is now a duplicate h1 rather than a fallback. */}
+            {/* SAVE IT, OR SEND IT TO SOMEBODY.
+                  > "en la página de listing page, se puedan ver dos iconos, el primero es para
+                  >  marcar como favorito (...) El segundo icono es de share"
+                  >   (Jonathan, 2026-09-08)
+
+                Directly under the gallery and above the heading: this is where a reader is
+                when they decide they like a garment, and both actions are about the garment
+                as a whole rather than about booking it. Putting them next to the order panel
+                would have made them look like part of the booking. */}
+            <div className={css.listingActions}>
+              <FavoriteButton listingId={currentListing?.id?.uuid} className={css.listingAction} />
+              <ShareButton
+                title={typeof title === 'string' ? title : undefined}
+                className={css.listingAction}
+              />
             </div>
+            <SectionListingHeader
+              publicData={publicData}
+              listingFieldConfigs={listingConfig.listingFields}
+              title={richTitle}
+              completedRentals={completedRentals}
+              reviews={reviews}
+              authorDisplayName={authorDisplayName}
+              showPickupToday={showPickupToday}
+            />
             {showDescription && <SectionText text={description} showAsIngress />}
 
             <CustomListingFields
@@ -286,7 +331,29 @@ export const ListingPageComponent = props => {
               publicData={publicData}
               listingId={currentListing.id}
               mapsConfig={config.maps}
+              cleaningTurnaroundDays={cleaningTurnaroundDays}
+              businessHoursByDay={assignedLaundryHours}
             />
+            {/* Why the calendar holds days after a rental, and what happens between paying and
+                wearing. Both sit here, after the pickup location, because both are about the
+                studio the section above just named. */}
+            <SectionCleaningWorks
+              cleaningTurnaroundDays={cleaningTurnaroundDays}
+              laundryName={publicData?.assignedLaundryName}
+            />
+            {/* Owner-only: collapsible since it competes for space with the sections
+                above/below it, unlike ManageListingsPage's always-open banner. Only
+                worth showing while the garment is actually at the laundry. */}
+            {isOwnListing && metadata?.onLaundry === true ? (
+              <LaundryPickupNotice
+                collapsible
+                id={`laundryPickupNotice-${currentListing.id.uuid}`}
+                className={css.laundryPickupNotice}
+                listingId={currentListing.id.uuid}
+                isPaused={currentListing.attributes.state === LISTING_STATE_CLOSED}
+              />
+            ) : null}
+            <SectionRentalTimeline />
             <SectionReviews reviews={reviews} fetchReviewsError={fetchReviewsError} />
             <SectionAuthorMaybe
               title={title}
@@ -331,6 +398,7 @@ export const ListingPageComponent = props => {
               onManageDisableScrolling={onManageDisableScrolling}
               onContactUser={onContactUser}
               {...restOfProps}
+              monthlyTimeSlots={monthlyTimeSlots}
               validListingTypes={config.listing.listingTypes}
               marketplaceCurrency={config.currency}
               dayCountAvailableForBooking={config.stripe.dayCountAvailableForBooking}
@@ -394,6 +462,19 @@ const ListingPage = props => {
     fetchLineItemsInProgress,
     fetchLineItemsError,
     inquiryModalOpenForListingId,
+    // Cocloset: the assigned laundry's CURRENT initial-cleaning turnaround, resolved by
+    // the duck at page load. null until it arrives, and on any failure - OrderPanel then
+    // falls back to the `metadata.initialCleaningDays` snapshot.
+    initialCleaningDays: liveInitialCleaningDays,
+    // Cocloset: day ranges another rental's wash has already claimed, so the picker does
+    // not offer them as a start date. See server/api-util/cleaningGaps.js.
+    cleaningGaps,
+    // Cocloset: the assigned studio's live turnaround, and how many rentals this garment has
+    // completed. Same page-load call as the gaps above.
+    cleaningTurnaroundDays,
+    completedRentals,
+    // Cocloset: the assigned studio's opening hours, read from its public profile at load.
+    assignedLaundryHours,
   } = useSelector(state => state.ListingPage);
   const currentUser = useSelector(state => state.user?.currentUser);
   const scrollingDisabled = useSelector(state => isScrollingDisabled(state));
@@ -461,6 +542,11 @@ const ListingPage = props => {
       lineItems={lineItems}
       fetchLineItemsInProgress={fetchLineItemsInProgress}
       fetchLineItemsError={fetchLineItemsError}
+      liveInitialCleaningDays={liveInitialCleaningDays}
+      cleaningGaps={cleaningGaps}
+      cleaningTurnaroundDays={cleaningTurnaroundDays}
+      completedRentals={completedRentals}
+      assignedLaundryHours={assignedLaundryHours}
       sendInquiryInProgress={sendInquiryInProgress}
       sendInquiryError={sendInquiryError}
       onManageDisableScrolling={onManageDisableScrolling}

@@ -23,6 +23,7 @@ import {
 import FilterComponent from './FilterComponent';
 import MainPanelHeader from './MainPanelHeader/MainPanelHeader';
 import SearchFiltersMobile from './SearchFiltersMobile/SearchFiltersMobile';
+import PickupTodayFilterToggle from './PickupTodayFilterToggle';
 import SortBy from './SortBy/SortBy';
 import SearchResultsPanel from './SearchResultsPanel/SearchResultsPanel';
 import NoSearchResultsMaybe from './NoSearchResultsMaybe/NoSearchResultsMaybe';
@@ -79,6 +80,10 @@ export class SearchPageComponent extends Component {
       location,
       urlQueryParams: validUrlQueryParamsFromProps(this.props),
       setState: this.setState.bind(this),
+      // The pickup, neighborhood and brand filters are built from these, so a reset that
+      // does not know about them leaves them in the URL. See onResetAll.
+      laundryOptions: this.props.laundryOptions,
+      brandOptions: this.props.brandOptions,
     });
   }
 
@@ -143,6 +148,9 @@ export class SearchPageComponent extends Component {
       config,
       params: currentPathParams = {},
       currentUser,
+      laundryOptions,
+      brandOptions,
+      pickupTodayIds,
     } = this.props;
 
     const {
@@ -173,6 +181,8 @@ export class SearchPageComponent extends Component {
       searchInProgress,
       currentPathParams,
       currentUser,
+      laundryOptions,
+      brandOptions,
     });
 
     const sortBy = mode => {
@@ -243,6 +253,10 @@ export class SearchPageComponent extends Component {
                   />
                 );
               })}
+              <PickupTodayFilterToggle
+                history={this.props.history}
+                location={this.props.location}
+              />
               <button className={css.resetAllButton} onClick={e => this.handleResetAll(e)}>
                 <FormattedMessage id={'SearchFiltersMobile.resetAll'} />
               </button>
@@ -320,6 +334,7 @@ export class SearchPageComponent extends Component {
                   isMapVariant={false}
                   listingTypeParam={listingTypePathParam}
                   intl={intl}
+                  pickupTodayIds={pickupTodayIds}
                 />
               </div>
             </div>
@@ -343,9 +358,20 @@ const SearchPage = props => {
   const selectListingsById = useMemo(makeGetListingsByIdSelector, []);
 
   const currentUser = useSelector(state => state.user?.currentUser);
-  const { pagination, searchInProgress, searchListingsError, searchParams } = useSelector(
-    state => state.SearchPage
-  );
+  const {
+    pagination,
+    searchInProgress,
+    searchListingsError,
+    searchParams,
+    // Cocloset: the studios the pickup filter offers. Empty until the public endpoint
+    // answers, and on any failure - the filter is then simply not rendered.
+    laundryOptions,
+    // Same contract, for the brand filter. See withBrandFilter in SearchPage.shared.js.
+    brandOptions,
+    // Cocloset: listing ids on this page verified as genuinely bookable today - see
+    // SearchPage.duck.js's searchListingsPayloadCreator and ListingCard's pickupTodayVerified.
+    pickupTodayIds,
+  } = useSelector(state => state.SearchPage);
   const listings = useSelector(state =>
     selectListingsById(state, state.SearchPage.currentPageResultIds)
   );
@@ -368,6 +394,9 @@ const SearchPage = props => {
       searchInProgress={searchInProgress}
       searchListingsError={searchListingsError}
       searchParams={searchParams}
+      laundryOptions={laundryOptions}
+      brandOptions={brandOptions}
+      pickupTodayIds={pickupTodayIds}
       onManageDisableScrolling={onManageDisableScrolling}
     />
   );

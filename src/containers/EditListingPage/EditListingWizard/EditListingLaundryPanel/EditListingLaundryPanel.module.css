@@ -1,0 +1,33 @@
+@import '../../../../styles/customMediaQueries.css';
+
+.root {
+  flex-grow: 1;
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Lede under the step heading - mockups 11/12/14.jpg all use the same
+   muted, slightly smaller paragraph. */
+.description {
+  max-width: 62ch;
+  margin: 0 0 18px 0;
+  color: var(--coclosetInkMuted);
+  font-size: 14px;
+  line-height: 20px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
+}
+
+.error {
+  margin: 0 0 12px 0;
+  color: var(--colorFail);
+  font-size: 14px;
+}
+
+.form {
+  flex-grow: 1;
+}

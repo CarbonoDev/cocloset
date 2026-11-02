@@ -2,6 +2,7 @@ import { displayPrice, isPriceVariationsEnabled } from '../../util/configHelpers
 import { formatMoney } from '../../util/currency';
 import { richText } from '../../util/richText';
 import { isBookingProcessAlias } from '../../transactions/transaction';
+import { usesFixedRentalPeriods } from '../../util/rentalPeriods';
 
 import css from './ListingCard.module.css';
 
@@ -66,13 +67,19 @@ export const getListingCardTranslations = (listing, config, intl) => {
     ? 'ListingCard.priceStartingFrom'
     : 'ListingCard.price';
 
-  const perUnitString = isBookable
-    ? intl.formatMessage({ id: 'ListingCard.perUnit' }, { unitType: publicData?.unitType })
-    : '';
+  // Cocloset: a garment's price is a flat rate for a whole rental period, so "per day" is
+  // not just imprecise here — it is the exact misreading this feature exists to prevent
+  // ("$100, no $700"). The card already says "From", which is true: `listing.price` holds
+  // the cheapest period. See src/util/rentalPeriods.js.
+  const isFixedRentalPeriod = usesFixedRentalPeriods(listingTypeConfig);
+  const perUnitString =
+    isBookable && !isFixedRentalPeriod
+      ? intl.formatMessage({ id: 'ListingCard.perUnit' }, { unitType: publicData?.unitType })
+      : '';
 
   // Single formatted price line (amount + per-unit if applicable); used for both card aria and price block
   const priceValue = <span className={css.priceValue}>{formattedPrice}</span>;
-  const pricePerUnit = isBookable ? <span className={css.perUnit}>{perUnitString}</span> : '';
+  const pricePerUnit = perUnitString ? <span className={css.perUnit}>{perUnitString}</span> : '';
   const priceMessage =
     showPrice && formattedPrice != null
       ? intl.formatMessage({ id: priceMessageId }, { priceValue, pricePerUnit })

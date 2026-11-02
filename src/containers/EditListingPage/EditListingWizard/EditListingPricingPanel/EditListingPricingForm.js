@@ -10,11 +10,13 @@ import * as validators from '../../../../util/validators';
 import { formatMoney } from '../../../../util/currency';
 import { types as sdkTypes } from '../../../../util/sdkLoader';
 import { FIXED, isBookingProcess } from '../../../../transactions/transaction';
+import { usesFixedRentalPeriods } from '../../../../util/rentalPeriods';
 
 // Import shared components
 import { Button, Form, FieldCurrencyInput } from '../../../../components';
 
 import BookingPriceVariants from './BookingPriceVariants';
+import RentalPeriodPrices from './RentalPeriodPrices';
 import StartTimeInterval from './StartTimeInverval';
 
 // Import modules from this directory
@@ -111,6 +113,7 @@ export const EditListingPricingForm = props => (
         invalid,
         pristine,
         saveActionMsg,
+        previewListingLink,
         updated,
         updateInProgress = false,
         fetchErrors,
@@ -135,13 +138,29 @@ export const EditListingPricingForm = props => (
 
       const isFixedLengthBooking = isBooking && unitType === FIXED;
       const isBookingPriceVariationsInUse = isBooking && isPriceVariationsInUse;
-      const isUsingPriceVariants = isFixedLengthBooking || isBookingPriceVariationsInUse;
+
+      // Cocloset: a garment is rented for one of two fixed periods, each with a flat price.
+      // Checked FIRST, because a garment-rental listing type would otherwise also satisfy
+      // `isBookingPriceVariationsInUse` and get the stock free-form variants editor, which
+      // lets an owner rename, delete and add periods the booking form cannot interpret.
+      // See RentalPeriodPrices.js for the full argument.
+      const isFixedRentalPeriod = usesFixedRentalPeriods(listingTypeConfig);
+      const isUsingPriceVariants =
+        !isFixedRentalPeriod && (isFixedLengthBooking || isBookingPriceVariationsInUse);
 
       return (
         <Form onSubmit={handleSubmit} className={classes}>
           <ErrorMessages fetchErrors={fetchErrors} />
 
-          {isUsingPriceVariants ? (
+          {isFixedRentalPeriod ? (
+            <RentalPeriodPrices
+              formId={formId}
+              className={css.input}
+              autoFocus={autoFocus}
+              marketplaceCurrency={marketplaceCurrency}
+              listingMinimumPriceSubUnits={listingMinimumPriceSubUnits}
+            />
+          ) : isUsingPriceVariants ? (
             <BookingPriceVariants
               formId={formId}
               formApi={formApi}
@@ -180,15 +199,20 @@ export const EditListingPricingForm = props => (
             />
           ) : null}
 
-          <Button
-            className={css.submitButton}
-            type="submit"
-            inProgress={submitInProgress}
-            disabled={submitDisabled}
-            ready={submitReady}
-          >
-            {saveActionMsg}
-          </Button>
+          <div className={css.submitSection}>
+            <div className={css.formActions}>
+              <Button
+                className={css.submitButton}
+                type="submit"
+                inProgress={submitInProgress}
+                disabled={submitDisabled}
+                ready={submitReady}
+              >
+                {saveActionMsg}
+              </Button>
+              {previewListingLink}
+            </div>
+          </div>
         </Form>
       );
     }}

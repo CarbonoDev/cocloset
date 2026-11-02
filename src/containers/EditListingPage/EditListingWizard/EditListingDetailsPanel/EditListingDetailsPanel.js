@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import classNames from 'classnames';
 
 // Import util modules
@@ -15,13 +15,24 @@ import {
   isFieldForListingType,
   pickCategoryFields,
 } from '../../../../util/fieldHelpers';
-import { isBookingProcessAlias } from '../../../../transactions/transaction';
+import {
+  COCLOSET_BOOKING_PROCESS_NAME,
+  isBookingProcessAlias,
+} from '../../../../transactions/transaction';
 
 // Import shared components
 import { H3, ListingLink } from '../../../../components';
 
 // Import modules from this directory
 import ErrorMessage from './ErrorMessage';
+import { fetchBrands } from '../../../../util/api';
+import { normalizeBrandForStorage } from '../../../../util/brandValue';
+import {
+  specialCareFlags,
+  specialCareForStorage,
+  specialCareNote,
+} from '../../../../util/specialCare';
+
 import EditListingDetailsForm from './EditListingDetailsForm';
 import css from './EditListingDetailsPanel.module.css';
 
@@ -219,6 +230,65 @@ const setNoAvailabilityForUnbookableListings = processAlias => {
       };
 };
 
+// The plan timezone for an automatically-created cocloset-booking listing.
+//
+// NOT the browser's zone, which is what the removed AVAILABILITY panel wrote. The
+// listing's plan timezone silently becomes the day-boundary authority for the server's
+// minimum-booking-days and initial-cleaning gates (server/api-util/bookingRules.js falls
+// back to 'Etc/UTC' today, with a test pinning it). Writing the owner's browser zone
+// would make those refusals depend on which machine the garment was listed from - a
+// garment listed in Madrid and one listed in Bogotá would compute different first
+// bookable days for identical data. 'Etc/UTC' preserves exactly today's server
+// behaviour.
+//
+// This is a deliberate choice, not a discovered constant: if Cocloset wants a single
+// marketplace-wide zone (e.g. 'Europe/Madrid'), this is the one line to change.
+export const FULL_AVAILABILITY_TIMEZONE = 'Etc/UTC';
+
+const DAYS_OF_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+/**
+ * A cocloset-booking listing must be available every day, all day, and it must get that
+ * plan without anyone being asked: the wizard has no AVAILABILITY step for this process
+ * (see `tabsForListingType`). This is load-bearing rather than cosmetic - OrderPanel
+ * gates its whole booking form on `availabilityPlan.timezone` existing, so a plan-less
+ * listing cannot be booked at all.
+ *
+ * The counterpart of `setNoAvailabilityForUnbookableListings` above, and shaped exactly
+ * like what the AVAILABILITY form itself persisted for a full-day `oneSeat` listing: one
+ * entry per weekday, `00:00` to `00:00`. The end time is not a typo - the form normalises
+ * a whole day's `24:00` down to `00:00` when saving (see AvailabilityPlanEntries.js), and
+ * `src/util/testData.js` carries the same shape.
+ *
+ * Skipped when the listing already has a plan, so editing the details of an existing
+ * listing never overwrites availability someone has deliberately set.
+ *
+ * @param {string} processAlias selected for this listing, e.g. 'cocloset-booking/release-1'
+ * @param {Object} [existingAvailabilityPlan] the plan already stored on the listing, if any
+ * @returns {Object} `{ availabilityPlan }`, or `{}` when nothing should be written
+ */
+export const setFullAvailabilityForCoclosetBooking = (processAlias, existingAvailabilityPlan) => {
+  const processName = processAlias ? processAlias.split('/')[0] : null;
+  const isCoclosetBooking = processName === COCLOSET_BOOKING_PROCESS_NAME;
+
+  if (!isCoclosetBooking || existingAvailabilityPlan) {
+    return {};
+  }
+
+  return {
+    availabilityPlan: {
+      type: 'availability-plan/time',
+      timezone: FULL_AVAILABILITY_TIMEZONE,
+      entries: DAYS_OF_WEEK.map(dayOfWeek => ({
+        dayOfWeek,
+        startTime: '00:00',
+        endTime: '00:00',
+        seats: 1,
+      })),
+    },
+  };
+};
+
 /**
  * Get initialValues for the form. This function includes
  * title, description, listingType, transactionProcessAlias, unitType,
@@ -248,10 +318,27 @@ const getInitialValues = (
   const listingType = publicData?.listingType || preselectedListingType;
 
   const nestedCategories = pickCategoryFields(publicData, categoryKey, 1, listingCategories);
+  // The owner's own private shipping address, which the LOCATION tab used to own. Kept
+  // under distinct `owner*` field names so it cannot collide with a configured listing
+  // field (those are always `pub_`/`priv_` namespaced) or with the category keys.
+  const { street, city, postcode } = privateData?.ownerAddress || {};
+
   // Initial values for the form
   return {
     title,
     description,
+    ownerStreet: street,
+    ownerCity: city,
+    ownerPostcode: postcode,
+    // Brand is not a Console listing field, so initialValuesForListingFields below does not
+    // pick it up - it reads Console's own fields. Editing a garment has to show the brand it
+    // already carries, or saving the tab would silently clear it.
+    brand: publicData?.brand,
+    // Same for special care, which is not a Console field either and for a stronger reason -
+    // see util/specialCare.js. Flattened into two form fields because that is what the
+    // checkbox group and the textarea bind to; recombined on submit.
+    specialCareFlags: specialCareFlags(privateData),
+    specialCareNote: specialCareNote(privateData) || '',
     ...nestedCategories,
     // Transaction type info: listingType, transactionProcessAlias, unitType
     ...getTransactionInfo({ listingTypes, existingListingTypeInfo, preselectedListingType }),
@@ -284,6 +371,9 @@ const getInitialValues = (
  * @param {boolean} props.ready - Whether the form is ready
  * @param {Function} props.onSubmit - The submit function
  * @param {Function} props.onListingTypeChange - The listing type change function
+ * @param {boolean} [props.captureOwnerAddress] - Whether this panel should also ask for the
+ *   owner's own private shipping address (`privateData.ownerAddress`). True only for
+ *   processes whose wizard has no LOCATION tab; see EditListingWizard.js.
  * @param {string} props.submitButtonText - The submit button text
  * @param {boolean} props.panelUpdated - Whether the panel is updated
  * @param {boolean} props.updateInProgress - Whether the update is in progress
@@ -302,7 +392,13 @@ const EditListingDetailsPanel = props => {
     ready,
     onSubmit,
     onListingTypeChange,
+    captureOwnerAddress = false,
+    // Injectable for tests and the styleguide example; normally the panel fetches its own,
+    // below. Empty until that answers and on any failure - the input still works, it just
+    // suggests nothing.
+    brandOptions: brandOptionsProp,
     submitButtonText,
+    previewListingLink,
     panelUpdated,
     updateInProgress,
     errors,
@@ -317,6 +413,49 @@ const EditListingDetailsPanel = props => {
   const listingFields = config.listing.listingFields;
   const listingCategories = config.categoryConfiguration.categories;
   const categoryKey = config.categoryConfiguration.key;
+  // Console has no brand field today; if one is ever added back it owns the value, and the
+  // bespoke input is not rendered - so this tab must not write brand either. Same "hosted
+  // wins" rule as listingFieldSearchConfig in util/listingFieldSearch.js.
+  const hasHostedBrandField = listingFields.some(field => field?.key === 'brand');
+
+  // THE BRANDS THE AUTOCOMPLETE OFFERS.
+  //
+  // Fetched by the panel rather than through the duck, matching EditListingLaundryPanel, which
+  // owns its own lookup for the same reason: this is wizard-tab data, not page data, and it is
+  // not needed for SSR.
+  //
+  // FAILURE IS NOT AN ERROR STATE and there is no spinner. Brand is a free-text field that
+  // happens to suggest; a list that never arrives costs the owner a convenience, not the
+  // ability to fill the form in, so blocking or shouting about it would be the wrong trade.
+  //
+  // Skipped entirely when Console owns the field, since then nothing renders the suggestions.
+  const [fetchedBrandOptions, setFetchedBrandOptions] = useState([]);
+  const skipBrandFetch = hasHostedBrandField || !!brandOptionsProp;
+
+  useEffect(() => {
+    if (skipBrandFetch) {
+      return undefined;
+    }
+    let isMounted = true;
+    // Wrapped rather than chained directly. Nothing about a suggestion list may break the form
+    // the owner is filling in, and `fetchBrands()` not returning a promise - a stubbed module,
+    // a future refactor - would otherwise throw inside an effect and take the whole panel down
+    // with it. The catch below cannot help with that; it is not a rejection.
+    Promise.resolve(fetchBrands())
+      .then(response => {
+        if (isMounted) {
+          setFetchedBrandOptions(Array.isArray(response?.data) ? response.data : []);
+        }
+      })
+      .catch(() => {
+        // Swallowed on purpose - see above. The input keeps working with no suggestions.
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [skipBrandFetch]);
+
+  const brandOptions = brandOptionsProp || fetchedBrandOptions;
 
   const { hasExistingListingType, existingListingTypeInfo } = hasSetListingType(publicData);
   const hasValidExistingListingType =
@@ -385,6 +524,7 @@ const EditListingDetailsPanel = props => {
           className={css.form}
           initialValues={initialValues}
           saveActionMsg={submitButtonText}
+          previewListingLink={previewListingLink}
           onSubmit={values => {
             const {
               title,
@@ -392,6 +532,12 @@ const EditListingDetailsPanel = props => {
               listingType,
               transactionProcessAlias,
               unitType,
+              ownerStreet,
+              ownerCity,
+              ownerPostcode,
+              brand,
+              specialCareFlags: submittedSpecialCareFlags,
+              specialCareNote: submittedSpecialCareNote,
               ...rest
             } = values;
 
@@ -415,6 +561,64 @@ const EditListingDetailsPanel = props => {
               nestedCategories,
               listingFields
             );
+            // The owner's own private shipping address - the counterpart of the public,
+            // laundry-derived pickup address. It is captured here only for processes whose
+            // wizard has no LOCATION tab (cocloset-booking); everywhere else that tab
+            // still owns the field, and sending it from here as well would overwrite a
+            // saved address with three undefineds the first time details were edited.
+            //
+            // THE SECOND GUARD IS NOT REDUNDANT. `FieldOwnerAddress` was commented out of
+            // the form on 2026-08-25 ("Remove address field no longer needed on the partner
+            // flow"), but `captureOwnerAddress` stayed on - so every details save was sending
+            // `ownerAddress: {street: undefined, city: undefined, postcode: undefined}`, and
+            // the first edit of any listing with a stored address wiped it. Exactly the
+            // failure the comment above describes, arriving from the other direction.
+            //
+            // So: send the key only when there is something to send. If the field is put
+            // back, an existing address is seeded into the form by `getInitialValues` and
+            // saves as before. The trade is that an owner cannot clear their address by
+            // emptying all three inputs; that needs an explicit null, and no UI asks for it.
+            const hasOwnerAddress = [ownerStreet, ownerCity, ownerPostcode].some(
+              value => typeof value === 'string' && value.trim() !== ''
+            );
+            const ownerAddressMaybe =
+              captureOwnerAddress && hasOwnerAddress
+                ? {
+                    ownerAddress: {
+                      street: ownerStreet,
+                      city: ownerCity,
+                      postcode: ownerPostcode,
+                    },
+                  }
+                : {};
+
+            // THE BRAND, SNAPPED ONTO A SPELLING THAT ALREADY EXISTS.
+            //
+            // Done here rather than on every keystroke, which would fight the person typing,
+            // and here rather than in the form because this is where publicData is assembled.
+            //
+            // `null` when the field is left empty, not `undefined`: Sharetribe only removes a
+            // publicData key when it is explicitly set to null, so an owner clearing the brand
+            // has to send one - the same reason the category levels above are nulled.
+            //
+            // Brand is NOT in `pickListingFieldsData` above: that reads Console's listing
+            // fields, and brand deliberately is not one. See util/brandValue.js.
+            const brandMaybe = hasHostedBrandField
+              ? {}
+              : { brand: normalizeBrandForStorage(brand, brandOptions) };
+
+            // WHAT THE STUDIO NEEDS TO KNOW, kept out of the renter's reach.
+            //
+            // Always sent, even when empty, and `specialCareForStorage` returns null in that
+            // case: Sharetribe only drops an extended-data key when it is explicitly null, so
+            // an owner UNCHECKING every box has to send one. Omitting the key instead would
+            // leave the old flags on the listing and the form would silently disagree with
+            // what the studio reads.
+            const specialCare = specialCareForStorage({
+              flags: submittedSpecialCareFlags,
+              note: submittedSpecialCareNote,
+            });
+
             // New values for listing attributes
             const updateValues = {
               title: title.trim(),
@@ -425,9 +629,14 @@ const EditListingDetailsPanel = props => {
                 unitType,
                 ...cleanedNestedCategories,
                 ...publicListingFields,
+                ...brandMaybe,
               },
-              privateData: privateListingFields,
+              privateData: { ...privateListingFields, ...ownerAddressMaybe, specialCare },
               ...setNoAvailabilityForUnbookableListings(transactionProcessAlias),
+              ...setFullAvailabilityForCoclosetBooking(
+                transactionProcessAlias,
+                listing?.attributes?.availabilityPlan
+              ),
             };
 
             onSubmit(updateValues);
@@ -444,8 +653,10 @@ const EditListingDetailsPanel = props => {
           pickSelectedCategories={values =>
             pickCategoryFields(values, categoryKey, 1, listingCategories)
           }
+          brandOptions={brandOptions}
           categoryPrefix={categoryKey}
           onListingTypeChange={onListingTypeChange}
+          showOwnerAddress={captureOwnerAddress}
           listingFieldsConfig={listingFields}
           listingCurrency={listing?.attributes?.price?.currency}
           marketplaceCurrency={config.currency}

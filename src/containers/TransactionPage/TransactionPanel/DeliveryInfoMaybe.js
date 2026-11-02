@@ -5,6 +5,8 @@ import getCountryCodes from '../../../translations/countryCodes';
 import { FormattedMessage } from '../../../util/reactIntl';
 import { Heading } from '../../../components';
 
+import { getListingPickupLocation } from '../../../util/listingLocation';
+
 import AddressLinkMaybe from './AddressLinkMaybe';
 
 import css from './TransactionPanel.module.css';
@@ -18,7 +20,8 @@ const DeliveryInfoMaybe = props => {
   const isPickup = deliveryMethod === 'pickup';
 
   if (isPickup) {
-    const pickupLocation = listing?.attributes?.publicData?.location || {};
+    // Pickup happens at the assigned laundry (see util/listingLocation.js).
+    const pickupLocation = getListingPickupLocation(listing);
     return (
       <div className={classes}>
         <Heading as="h3" rootClassName={css.sectionHeading}>

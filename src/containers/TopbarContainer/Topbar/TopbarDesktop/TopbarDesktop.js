@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../../../util/reactIntl';
-import { ACCOUNT_SETTINGS_PAGES } from '../../../../routing/routeConfiguration';
+import { isLaundryUser } from '../../../../util/userHelpers';
+import { ACCOUNT_SETTINGS_PAGES, LAUNDRY_OPS_PAGES } from '../../../../routing/routeConfiguration';
 import {
   Avatar,
   InlineTextButton,
@@ -39,6 +40,83 @@ const LoginLink = () => {
   );
 };
 
+/**
+ * THE LAUNDRY LINK, and who sees which one.
+ *
+ *   > "Si el usuario esta loggeado y es laundry, debe llevarlo a su panel, si no hay usuario
+ *   >  loggeado, debe llevarlo a landing de laundry"
+ *   > "Si esta loggeado y no es laundry no muestres el enlace"
+ *
+ * Three states, three answers, and the third is to render nothing: a customer or a garment
+ * owner has no use for either destination - the panel is not theirs and the partner pitch is
+ * not addressed to them - so the link is absent rather than pointing somewhere polite.
+ *
+ * `isLaundryUser` reads `metadata.isLaundry`, which is Integration-API-only, so this cannot
+ * be self-assigned to get at the panel. It is a NAVIGATION hint either way: LaundryOpsPage
+ * gates itself for non-laundry users, and this only decides what to draw.
+ *
+ * WHILE HYDRATING (`mounted === false`) the anonymous answer is drawn, matching how the signup
+ * and login links behave - the server does not know who is reading, and a link that changes
+ * after hydration is better than one that flickers between three shapes.
+ */
+const LaundryLinkMaybe = ({ isAuthenticated, currentUser }) => {
+  if (isAuthenticated) {
+    return isLaundryUser(currentUser) ? (
+      <NamedLink id="laundry-link" className={css.topbarLink} name="LaundryOpsDashboardPage">
+        <span className={css.topbarLinkLabel}>
+          <FormattedMessage id="TopbarDesktop.laundry" />
+        </span>
+      </NamedLink>
+    ) : null;
+  }
+
+  return (
+    <NamedLink
+      id="laundry-link"
+      className={css.topbarLink}
+      name="CMSPage"
+      params={{ pageId: 'become-a-partner' }}
+    >
+      <span className={css.topbarLinkLabel}>
+        {/* Anonymous readers get "Partner", not "Laundry" - the link goes to the partner
+            pitch either way, but a visitor who has never heard of the studio side reads
+            "Laundry" as a filter/category rather than as an invitation to sign up as one.
+            An authenticated laundry account keeps "Laundry" (its own ops dashboard). */}
+        <FormattedMessage id="TopbarDesktop.becomePartner" />
+      </span>
+    </NamedLink>
+  );
+};
+
+/**
+ * THE WAY IN TO BROWSING, FOR EVERYONE WHO BORROWS.
+ *
+ *   > "Puedes agregar un button con label 'Borrow' en el topbar, debe llevar a /s, no debe ser
+ *   >  visible para laundries"
+ *
+ * The search form beside it is a way to look for a PARTICULAR garment, which only helps
+ * somebody who already has one in mind. This is the way in for somebody who does not.
+ *
+ * HIDDEN FROM STUDIOS, and from nobody else. A laundry does not borrow; its topbar already
+ * carries the panel where its work lives, and one more link to a shop it has no use for is
+ * one more thing between it and that panel. Anonymous readers DO get it - they are exactly
+ * who a marketplace wants browsing - which is why this is keyed on being a laundry rather
+ * than on being signed in.
+ *
+ * WHILE HYDRATING the anonymous answer is drawn, matching LaundryLinkMaybe and the signup and
+ * login links: the server does not know who is reading. That means a studio sees this link for
+ * an instant on first paint. Showing it briefly to a studio is the cheaper mistake than hiding
+ * browsing from every anonymous reader until JavaScript arrives.
+ */
+const BorrowLinkMaybe = ({ currentUser }) =>
+  isLaundryUser(currentUser) ? null : (
+    <NamedLink id="borrow-link" className={css.topbarLink} name="SearchPage">
+      <span className={css.topbarLinkLabel}>
+        <FormattedMessage id="TopbarDesktop.borrow" />
+      </span>
+    </NamedLink>
+  );
+
 const InboxLink = ({ notificationCount, inboxTab }) => {
   const notificationDot = notificationCount > 0 ? <div className={css.notificationDot} /> : null;
   return (
@@ -60,8 +138,19 @@ const ProfileMenu = ({ currentPage, currentUser, onLogout, showManageListingsLin
   const currentPageClass = page => {
     const isAccountSettingsPage =
       page === 'AccountSettingsPage' && ACCOUNT_SETTINGS_PAGES.includes(currentPage);
-    return currentPage === page || isAccountSettingsPage ? css.currentPage : null;
+    const isLaundryOpsPage =
+      page === 'LaundryProfilePage' && LAUNDRY_OPS_PAGES.includes(currentPage);
+    return currentPage === page || isAccountSettingsPage || isLaundryOpsPage
+      ? css.currentPage
+      : null;
   };
+
+  // Store ops is reachable only for users the Integration API has flagged as a laundry
+  // (metadata.isLaundry - see isLaundryUser). Without this entry the ops shell had no
+  // link anywhere in the app and could only be reached by typing the URL. The target is
+  // LaundryProfilePage because it renders the ops rail, so this one link opens the whole
+  // /laundry/* section. LaundryProfilePage gates itself again server-side of this check.
+  const showLaundryProfileLink = isLaundryUser(currentUser);
 
   return (
     <Menu skipFocusOnNavigation={true}>
@@ -74,6 +163,17 @@ const ProfileMenu = ({ currentPage, currentUser, onLogout, showManageListingsLin
         <Avatar className={css.avatar} user={currentUser} disableProfileLink />
       </MenuLabel>
       <MenuContent className={css.profileMenuContent}>
+        {showLaundryProfileLink ? (
+          <MenuItem key="LaundryProfilePage">
+            <NamedLink
+              className={classNames(css.menuLink, currentPageClass('LaundryProfilePage'))}
+              name="LaundryProfilePage"
+            >
+              <span className={css.menuItemBorder} />
+              <FormattedMessage id="TopbarDesktop.laundryProfileLink" />
+            </NamedLink>
+          </MenuItem>
+        ) : null}
         {showManageListingsLink ? (
           <MenuItem key="ManageListingsPage">
             <NamedLink
@@ -85,6 +185,18 @@ const ProfileMenu = ({ currentPage, currentUser, onLogout, showManageListingsLin
             </NamedLink>
           </MenuItem>
         ) : null}
+        {/* Saved garments. In the user menu rather than as a topbar icon: it is a personal
+            list, it sits beside the other "things of mine" entries, and the topbar is already
+            carrying search on a narrow screen. */}
+        <MenuItem key="FavoritesPage">
+          <NamedLink
+            className={classNames(css.menuLink, currentPageClass('FavoritesPage'))}
+            name="FavoritesPage"
+          >
+            <span className={css.menuItemBorder} />
+            <FormattedMessage id="TopbarDesktop.favoritesLink" />
+          </NamedLink>
+        </MenuItem>
         <MenuItem key="ProfileSettingsPage">
           <NamedLink
             className={classNames(css.menuLink, currentPageClass('ProfileSettingsPage'))}
@@ -175,10 +287,20 @@ const TopbarDesktop = props => {
       currentPage={currentPage}
       currentUser={currentUser}
       onLogout={onLogout}
-      showManageListingsLink={showCreateListingsLink}
+      showManageListingsLink={showCreateListingsLink && !isLaundryUser(currentUser)}
       intl={intl}
     />
   ) : null;
+
+  // Anonymous readers get the partner pitch; a studio gets its panel; everyone else gets no
+  // link at all. See LaundryLinkMaybe.
+  const laundryLinkMaybe = (
+    <LaundryLinkMaybe isAuthenticated={authenticatedOnClientSide} currentUser={currentUser} />
+  );
+
+  // Everyone but a studio. Uses `currentUser` rather than the hydration-gated flag because
+  // an anonymous reader must get this link too - see BorrowLinkMaybe.
+  const borrowLinkMaybe = <BorrowLinkMaybe currentUser={mounted ? currentUser : null} />;
 
   const signupLinkMaybe = isAuthenticatedOrJustHydrated ? null : <SignupLink />;
   const loginLinkMaybe = isAuthenticatedOrJustHydrated ? null : <LoginLink />;
@@ -218,9 +340,11 @@ const TopbarDesktop = props => {
         customLinks={customLinks}
         intl={intl}
         hasClientSideContentReady={authenticatedOnClientSide || !isAuthenticatedOrJustHydrated}
-        showCreateListingsLink={showCreateListingsLink}
+        showCreateListingsLink={showCreateListingsLink && !isLaundryUser(currentUser)}
       />
 
+      {borrowLinkMaybe}
+      {laundryLinkMaybe}
       {inboxLinkMaybe}
       {profileMenuMaybe}
       {signupLinkMaybe}

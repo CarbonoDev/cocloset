@@ -1,6 +1,7 @@
 import { bool, func, oneOf, shape, string } from 'prop-types';
 import {
   BOOKING_PROCESS_NAME,
+  COCLOSET_BOOKING_PROCESS_NAME,
   INQUIRY_PROCESS_NAME,
   PURCHASE_PROCESS_NAME,
   NEGOTIATION_PROCESS_NAME,
@@ -8,6 +9,7 @@ import {
   resolveLatestProcessName,
 } from '../../transactions/transaction';
 import { getStateDataForBookingProcess } from './TransactionPage.stateDataBooking.js';
+import { getStateDataForCoclosetBookingProcess } from './TransactionPage.stateDataCoclosetBooking.js';
 import { getStateDataForInquiryProcess } from './TransactionPage.stateDataInquiry.js';
 import { getStateDataForPurchaseProcess } from './TransactionPage.stateDataPurchase.js';
 import { getStateDataForNegotiationProcess } from './TransactionPage.stateDataNegotiation.js';
@@ -157,6 +159,8 @@ export const getStateData = (params, process) => {
     return getStateDataForDownloadProcess(params, processInfo());
   } else if (processName === BOOKING_PROCESS_NAME) {
     return getStateDataForBookingProcess(params, processInfo());
+  } else if (processName === COCLOSET_BOOKING_PROCESS_NAME) {
+    return getStateDataForCoclosetBookingProcess(params, processInfo());
   } else if (processName === INQUIRY_PROCESS_NAME) {
     return getStateDataForInquiryProcess(params, processInfo());
   } else if (processName === NEGOTIATION_PROCESS_NAME) {

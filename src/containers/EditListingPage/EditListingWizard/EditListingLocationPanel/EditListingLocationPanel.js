@@ -14,23 +14,10 @@ import css from './EditListingLocationPanel.module.css';
 
 const getInitialValues = props => {
   const { listing } = props;
-  const { geolocation, publicData } = listing?.attributes || {};
+  const { privateData } = listing?.attributes || {};
+  const { street, city, postcode } = privateData?.ownerAddress || {};
 
-  // Only render current search if full place object is available in the URL params
-  // TODO bounds are missing - those need to be queried directly from Google Places
-  const locationFieldsPresent = publicData?.location?.address && geolocation;
-  const location = publicData?.location || {};
-  const { address, building } = location;
-
-  return {
-    building,
-    location: locationFieldsPresent
-      ? {
-          search: address,
-          selectedPlace: { address, origin: geolocation },
-        }
-      : null,
-  };
+  return { street, city, postcode };
 };
 
 /**
@@ -95,30 +82,29 @@ const EditListingLocationPanel = props => {
       <H3 as="h1">
         <FormattedMessage id={panelHeadingProps.id} values={{ ...panelHeadingProps.values }} />
       </H3>
+      <p className={css.description}>
+        <FormattedMessage id="EditListingLocationPanel.description" />
+      </p>
       <EditListingLocationForm
         className={css.form}
         initialValues={state.initialValues}
         onSubmit={values => {
-          const { building = '', location } = values;
-          const {
-            selectedPlace: { address, origin },
-          } = location;
+          const { street, city, postcode } = values;
 
-          // New values for listing attributes
+          // New values for listing attributes.
+          // This is the owner's own address, used only for shipping the garment
+          // to the assigned laundry - it is never shown to renters and never
+          // used as the listing's public geolocation/pickup address (that comes
+          // from the Laundry Assignment step instead, see EditListingLaundryPanel).
           const updateValues = {
-            geolocation: origin,
-            publicData: {
-              location: { address, building },
+            privateData: {
+              ownerAddress: { street, city, postcode },
             },
           };
-          // Save the initialValues to state
-          // LocationAutocompleteInput doesn't have internal state
-          // and therefore re-rendering would overwrite the values during XHR call.
+          // Save the initialValues to state so the form doesn't flash back to
+          // stale values while the update XHR is in flight.
           setState({
-            initialValues: {
-              building,
-              location: { search: address, selectedPlace: { address, origin } },
-            },
+            initialValues: { street, city, postcode },
           });
           onSubmit(updateValues);
         }}

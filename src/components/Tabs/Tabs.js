@@ -26,6 +26,9 @@ import css from './Tabs.module.css';
  * @param {string} [props.rootClassName] - Custom class that overrides the default class for the root element
  * @param {string} [props.navRootClassName] - Custom class that overrides the default class for the nav element
  * @param {string} [props.tabRootClassName] - Custom class that overrides the default class for the tab element
+ * @param {string} [props.tabLinkClassName] - Custom class that overrides the default class for a tab's link
+ * @param {string} [props.tabSelectedLinkClassName] - Custom class that overrides the default class for the selected tab's link
+ * @param {React.ReactNode} [props.navHeader] - Optional content rendered above the tabs inside the nav
  * @returns {JSX.Element} Tab navigation component
  */
 const Tabs = props => {
@@ -35,6 +38,9 @@ const Tabs = props => {
     rootClassName,
     navRootClassName,
     tabRootClassName,
+    tabLinkClassName,
+    tabSelectedLinkClassName,
+    navHeader,
     ariaLabel,
   } = props;
   const rootClasses = rootClassName || css.root;
@@ -76,6 +82,9 @@ const Tabs = props => {
         rootClassName={navRootClassName}
         tabs={tabNavTabs}
         tabRootClassName={tabRootClassName}
+        tabLinkClassName={tabLinkClassName}
+        tabSelectedLinkClassName={tabSelectedLinkClassName}
+        header={navHeader}
         ariaLabel={ariaLabel}
       />
       {selectedTabPanel}

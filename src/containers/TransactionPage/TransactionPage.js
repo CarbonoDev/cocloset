@@ -20,6 +20,7 @@ import { requireListingImage } from '../../util/configHelpers';
 import { getCurrentUserTypeRoles, hasPermissionToViewData } from '../../util/userHelpers.js';
 import { userDisplayNameAsString } from '../../util/data';
 import { isMobileSafari } from '../../util/userAgent';
+import { autoAcceptBooking } from '../../util/api';
 
 import {
   INQUIRY_PROCESS_NAME,
@@ -35,6 +36,8 @@ import {
   isInquiryProcess,
   DOWNLOAD_PROCESS_NAME,
   isDownloadProcess,
+  COCLOSET_BOOKING_PROCESS_NAME,
+  isCoclosetBookingProcess,
 } from '../../transactions/transaction';
 
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -72,15 +75,19 @@ import ReportModal from './ReportModal/ReportModal';
 import ReviewModal from './ReviewModal/ReviewModal';
 import RequestChangesModal from './RequestChangesModal/RequestChangesModal';
 import MakeCounterOfferModal from './MakeCounterOfferModal/MakeCounterOfferModal';
+import CancelBookingModal from './CancelBookingModal/CancelBookingModal';
+import PartialRefundCancelModal from './PartialRefundCancelModal/PartialRefundCancelModal';
 import SendMessageForm from './SendMessageForm/SendMessageForm';
 import TransactionPanel from './TransactionPanel/TransactionPanel';
 
 import {
   makeTransition,
+  partialRefundCancel,
   sendMessage,
   sendReview,
   fetchMoreMessages,
   fetchTimeSlots,
+  fetchTransaction,
   fetchTransactionLineItems,
   uploadFile,
   clearUploadedFiles,
@@ -91,6 +98,24 @@ import css from './TransactionPage.module.css';
 
 const MAX_MOBILE_SCREEN_WIDTH = 1023;
 const SEND_MESSAGE_FORM_ID = 'TransactionPanel.SendMessageForm';
+
+// Confirm the customer's self-cancellation (transition/customer-cancel, cocloset-booking
+// only) and close the confirm modal. No form values, unlike onDisputeOrder/onReportOrder
+// above - CancelBookingModal is a plain "are you sure", not a form - so the modal is closed
+// immediately rather than waiting on the transition: the confirmation already happened, and
+// ActionButtons already surfaces transitionInProgress/transitionError for what follows.
+const onConfirmCancelBooking = (
+  currentTransactionId,
+  transitionName,
+  onTransition,
+  setCancelBookingModalOpen
+) => () => {
+  setCancelBookingModalOpen(false);
+  onTransition(currentTransactionId, transitionName, {}).catch(e => {
+    // Do nothing - already logged inside the transition thunk, and surfaced to the user via
+    // the action button's own error state.
+  });
+};
 
 // Submit dispute and close the review modal
 const onDisputeOrder = (
@@ -331,6 +356,13 @@ export const TransactionPageComponent = props => {
   const [changeRequestSubmitted, setChangeRequestSubmitted] = useState(false);
   const [isMakeCounterOfferModalOpen, setMakeCounterOfferModalOpen] = useState(false);
   const [counterOfferSubmitted, setCounterOfferSubmitted] = useState(false);
+  // Customer self-cancel (2026-10-13, cocloset-booking only). See CancelBookingModal's header
+  // for why this reuses the DiscardDraftModal "are you sure" pattern rather than a new one.
+  const [isCancelBookingModalOpen, setCancelBookingModalOpen] = useState(false);
+  // Customer partial-refund self-cancel (2026-10-13, cocloset-booking's initial-cleaning
+  // state only). Separate open/close state from every modal above because this one has its
+  // own non-dismissible loading sub-state - see PartialRefundCancelModal's own header.
+  const [isPartialRefundCancelModalOpen, setPartialRefundCancelModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -370,7 +402,12 @@ export const TransactionPageComponent = props => {
     transitionInProgress,
     transitionError,
     onTransition,
+    onRefetchTransaction = () => {},
     nextTransitions,
+    partialRefundCancelInProgress,
+    partialRefundCancelError,
+    partialRefundCancelResult,
+    onPartialRefundCancel,
     callSetInitialValues,
     onInitializeCardPaymentData,
     onUploadFile,
@@ -394,6 +431,54 @@ export const TransactionPageComponent = props => {
   } catch (error) {
     // Process was not recognized!
   }
+
+  // A CUSTOMER OR PROVIDER LANDING ON THIS PAGE GETS A SECOND CHANCE AT AUTO-ACCEPT.
+  //
+  //   > "esto ya funciona, pero la transacción no se hace update, el usuario tiene que hacer
+  //   >  refresh (...) necesitamos asegurar que si ocurre el auto-accept se muestre al
+  //   >  cliente el status correcto" (Jonathan, 2026-09-11)
+  //
+  // Checkout already awaits auto-accept before it redirects here (see
+  // CheckoutPageTransactionHelpers.js), so in the normal path this never has anything to do.
+  // But that call is fired from the browser: it never runs at all if the tab closes mid-
+  // checkout, and a failed or timed-out attempt there is swallowed on purpose, so a payment
+  // never looks broken because an accept did not land. Either way, the customer would be
+  // stuck reading "waiting for the provider" on a garment that is sitting at its own laundry,
+  // with nothing short of a manual refresh (once the endpoint is retried some other way) to
+  // notice.
+  //
+  // The endpoint is idempotent and re-checks everything itself (state, `onLaundry`, process)
+  // from the stored data - never from anything this page believes - so calling it again here
+  // is free when there is nothing to do, and self-healing when there was. Ref-guarded to once
+  // per transaction id per page life: a `nothing-to-do` answer must not be retried on every
+  // render, and the endpoint is not a polling target.
+  const autoAcceptAttemptedForTxIdRef = useRef(null);
+  useEffect(() => {
+    const txId = transaction?.id;
+    const isCoclosetBooking = processName === COCLOSET_BOOKING_PROCESS_NAME;
+    const isPreauthorized =
+      !!process && !!transaction && process.getState(transaction) === process.states.PREAUTHORIZED;
+
+    if (!txId || !isCoclosetBooking || !isPreauthorized) {
+      return;
+    }
+    if (autoAcceptAttemptedForTxIdRef.current === txId.uuid) {
+      return;
+    }
+    autoAcceptAttemptedForTxIdRef.current = txId.uuid;
+
+    autoAcceptBooking({ transactionId: txId })
+      .then(response => {
+        if (response?.data?.accepted) {
+          onRefetchTransaction(txId, transactionRole, config);
+        }
+      })
+      .catch(() => {
+        // Swallowed on purpose, same reasoning as the checkout call site: a customer just
+        // viewing their own order must never see an error because a defensive re-check
+        // failed. The provider's manual accept remains the fallback either way.
+      });
+  }, [transaction, process, processName, transactionRole, config, onRefetchTransaction]);
 
   const isTxOnPaymentPending = tx => {
     return process ? process.getState(tx) === process.states.PENDING_PAYMENT : null;
@@ -526,26 +611,36 @@ export const TransactionPageComponent = props => {
 
     // The download process only supports a single customer-side review transition.
     // Bidirectional review transitions (REVIEW_1/REVIEW_2) don't exist in that process.
-    const transitionOptions = isDownloadProcess(processName)
-      ? {
-          reviewAsFirst: transitions.REVIEW,
-          hasOtherPartyReviewedFirst: false,
-        }
-      : transactionRole === CUSTOMER
-      ? {
-          reviewAsFirst: transitions.REVIEW_1_BY_CUSTOMER,
-          reviewAsSecond: transitions.REVIEW_2_BY_CUSTOMER,
-          hasOtherPartyReviewedFirst: process
-            .getTransitionsToStates([states.REVIEWED_BY_PROVIDER])
-            .includes(transaction.attributes.lastTransition),
-        }
-      : {
-          reviewAsFirst: transitions.REVIEW_1_BY_PROVIDER,
-          reviewAsSecond: transitions.REVIEW_2_BY_PROVIDER,
-          hasOtherPartyReviewedFirst: process
-            .getTransitionsToStates([states.REVIEWED_BY_CUSTOMER])
-            .includes(transaction.attributes.lastTransition),
-        };
+    //
+    // cocloset-booking is the SAME SHAPE (2026-09-21): the provider can no longer review the
+    // customer at all, so REVIEW_1_BY_CUSTOMER always publishes immediately and there is no
+    // "other party reviewed first" to wait for - see the EDN's :transition/review-1-by-customer
+    // comment. The provider branch below is unreachable for this process (the UI does not offer
+    // a review button to the provider at DELIVERED - see TransactionPage.stateDataCoclosetBooking.js),
+    // so it is never hit here.
+    const transitionOptions =
+      isDownloadProcess(processName) || isCoclosetBookingProcess(processName)
+        ? {
+            reviewAsFirst: isDownloadProcess(processName)
+              ? transitions.REVIEW
+              : transitions.REVIEW_1_BY_CUSTOMER,
+            hasOtherPartyReviewedFirst: false,
+          }
+        : transactionRole === CUSTOMER
+        ? {
+            reviewAsFirst: transitions.REVIEW_1_BY_CUSTOMER,
+            reviewAsSecond: transitions.REVIEW_2_BY_CUSTOMER,
+            hasOtherPartyReviewedFirst: process
+              .getTransitionsToStates([states.REVIEWED_BY_PROVIDER])
+              .includes(transaction.attributes.lastTransition),
+          }
+        : {
+            reviewAsFirst: transitions.REVIEW_1_BY_PROVIDER,
+            reviewAsSecond: transitions.REVIEW_2_BY_PROVIDER,
+            hasOtherPartyReviewedFirst: process
+              .getTransitionsToStates([states.REVIEWED_BY_CUSTOMER])
+              .includes(transaction.attributes.lastTransition),
+          };
     const params = { reviewRating: rating, reviewContent };
 
     onSendReview(transaction, transitionOptions, params, config)
@@ -567,6 +662,60 @@ export const TransactionPageComponent = props => {
   const onOpenReportModal = () => {
     setReportModalOpen(true);
   };
+
+  // Open the cancel-booking confirm modal. Passed down as `primaryButtonProps.onAction` for
+  // the customer-cancel button (TransactionPage.stateDataCoclosetBooking.js) INSTEAD OF the
+  // default "transition now" behaviour - this moves a real refund and must survive one
+  // accidental click.
+  const onOpenCancelBookingModal = () => {
+    setCancelBookingModalOpen(true);
+  };
+
+  // Open the customer partial-refund self-cancel confirm modal. Passed down as
+  // `primaryButtonProps.onAction` for the INITIAL_CLEANING + customer action button
+  // (TransactionPage.stateDataCoclosetBooking.js), INSTEAD OF the default "transition now"
+  // behaviour - this moves real money through a Stripe refund and must survive one accidental
+  // click, same reasoning as the other confirm modals above.
+  const onOpenPartialRefundCancelModal = () => {
+    setPartialRefundCancelModalOpen(true);
+  };
+
+  // Fire the real call. UNLIKE onDisputeOrder/onReportOrder above, this does NOT close the
+  // modal immediately: the modal's own `inProgress` sub-state IS the point (the client's
+  // "invasive loader" requirement) - it has to stay open and non-dismissible until
+  // onPartialRefundCancel's promise settles. The effect below closes it automatically only on
+  // a clean, full success; every error and the manual-follow-up case stay open so the
+  // customer can read the specific reason before dismissing it themselves.
+  const onConfirmPartialRefundCancel = () => {
+    if (!transaction?.id) {
+      return;
+    }
+    onPartialRefundCancel(transaction.id).catch(() => {
+      // Do nothing - already logged inside the thunk, and surfaced to the user via
+      // PartialRefundCancelModal's own error prop.
+    });
+  };
+
+  // Auto-close on a clean, full success ONLY - "on success, close and let the existing
+  // transaction-refresh show the new cancelled state" (the client's own UX spec). A result
+  // with requiresManualFollowUp true is NOT this kind of success: the modal has to stay open
+  // so PartialRefundCancelModal can show that distinct message instead of silently vanishing
+  // on a booking that is not actually marked cancelled yet.
+  useEffect(() => {
+    if (
+      isPartialRefundCancelModalOpen &&
+      !partialRefundCancelInProgress &&
+      !partialRefundCancelError &&
+      partialRefundCancelResult?.cancelled === true
+    ) {
+      setPartialRefundCancelModalOpen(false);
+    }
+  }, [
+    isPartialRefundCancelModalOpen,
+    partialRefundCancelInProgress,
+    partialRefundCancelError,
+    partialRefundCancelResult,
+  ]);
 
   const deletedListingTitle = intl.formatMessage({
     id: 'TransactionPage.deletedListing',
@@ -747,6 +896,10 @@ export const TransactionPageComponent = props => {
           onOpenReviewModal,
           onOpenRequestChangesModal,
           onOpenMakeCounterOfferModal,
+          onOpenCancelBookingModal,
+          onOpenPartialRefundCancelModal,
+          partialRefundCancelInProgress,
+          partialRefundCancelError,
           onCheckoutRedirect: handleSubmitOrderRequest,
           onMakeOfferRedirect: onMakeOffer,
           intl,
@@ -760,6 +913,14 @@ export const TransactionPageComponent = props => {
     ? transaction.attributes?.lineItems?.find(
         item => LISTING_UNIT_TYPES.includes(item.code) && !item.reversal
       )
+    : null;
+
+  // For PartialRefundCancelModal's confirm step, so it can name the exact amount being
+  // withheld rather than speaking generically. `undefined` (not found) is a legitimate case -
+  // see server/api/customer-partial-refund-cancel.js's own fallback for a transaction with no
+  // cleaning-fee line item - and the modal reads fine either way.
+  const cleaningFeeLineItem = hasLineItems
+    ? transaction.attributes?.lineItems?.find(item => item.code === 'line-item/cleaning-fee')
     : null;
 
   const formatLineItemUnitType = (transaction, listing) => {
@@ -846,9 +1007,11 @@ export const TransactionPageComponent = props => {
       listing={listing}
       customer={customer}
       provider={provider}
+      booking={booking}
       transitions={txTransitions}
       processName={processName}
       protectedData={transaction?.attributes?.protectedData}
+      metadata={transaction?.attributes?.metadata}
       marketplaceName={config.marketplaceName}
       messages={messages}
       savePaymentMethodFailed={savePaymentMethodFailed}
@@ -1051,6 +1214,7 @@ export const TransactionPageComponent = props => {
           sendReviewInProgress={sendReviewInProgress}
           sendReviewError={sendReviewError}
           marketplaceName={config.marketplaceName}
+          isCustomerRole={isCustomerRole}
         />
         {process?.transitions?.REPORT ? (
           <ReportModal
@@ -1134,6 +1298,48 @@ export const TransactionPageComponent = props => {
             currencyConfig={currencyConfig}
           />
         ) : null}
+        {process?.transitions?.CUSTOMER_CANCEL ? (
+          <CancelBookingModal
+            id="CancelBookingModal"
+            isOpen={isCancelBookingModalOpen}
+            focusElementId={`${actionButtonContainer}_${ACTION_BUTTON_1_ID}`}
+            onCloseModal={() => setCancelBookingModalOpen(false)}
+            onManageDisableScrolling={onManageDisableScrolling}
+            onConfirm={onConfirmCancelBooking(
+              transaction?.id,
+              // READ FROM stateData, NOT HARDCODED (2026-10-15). There are now TWO
+              // customer-cancel doors - CUSTOMER_CANCEL from 'accepted' and
+              // CUSTOMER_CANCEL_FROM_ACCEPTED_ON_LAUNDRY from 'accepted-on-laundry' - and
+              // TransactionPage.stateDataCoclosetBooking.js's own cond for each state is what
+              // decides which one actually applies, via the `transition` field it carries on
+              // `primaryButtonProps` (see actionButtonProps's `extra.transition` there). A
+              // transaction in the wrong state for a hardcoded CUSTOMER_CANCEL would get a
+              // clean Sharetribe 409 instead of a cancellation. Falls back to CUSTOMER_CANCEL
+              // for safety if stateData has not set one.
+              stateData?.primaryButtonProps?.transition || process.transitions.CUSTOMER_CANCEL,
+              onTransition,
+              setCancelBookingModalOpen
+            )}
+            inProgress={
+              transitionInProgress ===
+              (stateData?.primaryButtonProps?.transition || process.transitions.CUSTOMER_CANCEL)
+            }
+          />
+        ) : null}
+        {process?.transitions?.PARTIAL_REFUND_CANCEL_FROM_INITIAL_CLEANING ? (
+          <PartialRefundCancelModal
+            id="PartialRefundCancelModal"
+            isOpen={isPartialRefundCancelModalOpen}
+            focusElementId={`${actionButtonContainer}_${ACTION_BUTTON_1_ID}`}
+            onCloseModal={() => setPartialRefundCancelModalOpen(false)}
+            onManageDisableScrolling={onManageDisableScrolling}
+            onConfirm={onConfirmPartialRefundCancel}
+            inProgress={partialRefundCancelInProgress}
+            error={partialRefundCancelError}
+            result={partialRefundCancelResult}
+            cleaningFeeLineItem={cleaningFeeLineItem}
+          />
+        ) : null}
       </LayoutSingleColumn>
     </Page>
   );
@@ -1175,6 +1381,9 @@ const TransactionPage = props => {
     fetchLineItemsError,
     fileUploadsDisabled,
     fileDownloads,
+    partialRefundCancelInProgress,
+    partialRefundCancelError,
+    partialRefundCancelResult,
   } = useSelector(state => state.TransactionPage, shallowEqual);
 
   const currentUser = useSelector(state => state.user?.currentUser);
@@ -1192,6 +1401,17 @@ const TransactionPage = props => {
     (txId, transitionName, params) => dispatch(makeTransition(txId, transitionName, params)),
     [dispatch]
   );
+  const onRefetchTransaction = useCallback(
+    (txId, txRole, config) => dispatch(fetchTransaction(txId, txRole, config)),
+    [dispatch]
+  );
+  // Mirrors onTransition's own shape exactly (dispatch the backward-compatible wrapper, same
+  // as makeTransition above) - see onConfirmPartialRefundCancel's own comment for why no
+  // `.catch()` here needs to do anything: the real success/failure state this page reacts to
+  // is partialRefundCancelInProgress/-Error/-Result in Redux, not this promise.
+  const onPartialRefundCancel = useCallback(txId => dispatch(partialRefundCancel(txId)), [
+    dispatch,
+  ]);
   const onShowMoreMessages = useCallback(
     (txId, config) => dispatch(fetchMoreMessages(txId, config)),
     [dispatch]
@@ -1247,6 +1467,7 @@ const TransactionPage = props => {
       transitionError={transitionError}
       scrollingDisabled={scrollingDisabled}
       transaction={transaction}
+      onRefetchTransaction={onRefetchTransaction}
       fetchMessagesInProgress={fetchMessagesInProgress}
       fetchMessagesError={fetchMessagesError}
       totalMessagePages={totalMessagePages}
@@ -1265,6 +1486,10 @@ const TransactionPage = props => {
       fetchLineItemsError={fetchLineItemsError}
       fileUploads={fileUploads}
       fileUploadsDisabled={fileUploadsDisabled}
+      partialRefundCancelInProgress={partialRefundCancelInProgress}
+      partialRefundCancelError={partialRefundCancelError}
+      partialRefundCancelResult={partialRefundCancelResult}
+      onPartialRefundCancel={onPartialRefundCancel}
       onTransition={onTransition}
       onShowMoreMessages={onShowMoreMessages}
       onSendMessage={onSendMessage}

@@ -3,7 +3,11 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { types as sdkTypes, createImageVariantConfig } from '../../util/sdkLoader';
 import { storableError } from '../../util/errors';
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
-import { transactionLineItems } from '../../util/api';
+import {
+  fetchListingInitialCleaning,
+  sweepListingAvailability,
+  transactionLineItems,
+} from '../../util/api';
 import * as log from '../../util/log';
 import { denormalisedResponseEntities } from '../../util/data';
 import {
@@ -326,8 +330,34 @@ const fetchMonthlyTimeSlots = (dispatch, listing) => {
         : null;
     };
 
+    // ── WHY A DAY-UNIT LISTING IS ASKED ABOUT FROM THE START OF TODAY ──────────
+    //
+    //   > "el día de hoy esté habilitado para seleccionarlo y que la fecha de reserva sea hoy"
+    //   >   (Jonathan, 2026-09-28)
+    //
+    // `nextBoundary` is TOMORROW's midnight for a day-unit listing, so this query used to
+    // begin after today had ended. Availability for today never reached the browser, and every
+    // surface built on it agreed that today was unbookable: the picker disabled it, and the
+    // five-week strip painted it "No longer available". That looked like a platform rule and
+    // was documented as one twice - it is not. `/timeslots/query` returns availability from
+    // wherever the query starts, so asking from the start of today returns today; and
+    // Sharetribe accepts a booking that starts at today's midnight. Both measured against Dev
+    // on 2026-09-28; see isWindowAvailableFn in BookingRentalPeriodForm for the figures.
+    //
+    // ONLY FOR WHOLE-DAY UNITS. An hour- or fixed-duration listing is booked at a time of day,
+    // and for those `nextBoundary` is doing real work: it is what stops the picker offering a
+    // slot that began this morning. Whether a DAY may be booked once it has started is a
+    // question about the garment, not the clock, and it is answered by `canBeCollectedToday`
+    // in the picker - which is also what keeps today off the calendar for a garment that is
+    // not at its studio.
+    //
+    // The month arithmetic above still runs off `nextBoundary` deliberately: it decides WHICH
+    // two months are fetched, and moving it would change that on the last day of a month.
+    const isWholeDayUnit = timeUnit === 'day' && !isFixed;
+    const rangeStart = isWholeDayUnit ? startOfToday : nextBoundary;
+
     return Promise.all([
-      dispatch(fetchTimeSlots(listing.id, nextBoundary, nextMonthEnd, tz, options(startOfToday))),
+      dispatch(fetchTimeSlots(listing.id, rangeStart, nextMonthEnd, tz, options(startOfToday))),
       dispatch(fetchTimeSlots(listing.id, nextMonth, followingMonthEnd, tz, options(nextMonth))),
     ]);
   }
@@ -335,6 +365,138 @@ const fetchMonthlyTimeSlots = (dispatch, listing) => {
   // By default return an empty array
   return Promise.all([]);
 };
+
+////////////////////////////////////////
+// Fetch live initial cleaning days   //
+////////////////////////////////////////
+//
+//   > "desde el momento de la carga de listingPage, se debe consultar las propiedades
+//   >  de la laundry seleccionada para este listing para obtener los días que se
+//   >  necesiten para el lavado siempre que onLaundry sea false, ya que, si la laundry
+//   >  necesita por ejemplo 2 días para su lavado, la disponibilidad debe estar 2 días
+//   >  despues de hoy"
+//
+// `listing.metadata.initialCleaningDays` is a SNAPSHOT written when the owner assigned a
+// laundry, so a studio that later changes its turnaround does not move the calendar floor
+// on the garments it already holds. This resolves the studio's CURRENT number.
+//
+// IT HAS TO BE A SERVER ENDPOINT. The turnaround lives in the laundry USER's
+// `privateData`, and no user may read another user's privateData - so there is no
+// Marketplace API call the browser could make. See server/api/listing-initial-cleaning.js.
+//
+// IT HAS TO BE IN loadData, NOT A useEffect. This repo loads page data from ducks so that
+// SSR and client navigation take the same path (see src/containers/pageDataLoadingAPI.js).
+// The fetch itself is browser-only for a mundane reason: src/util/api.js builds its base
+// URL from `window.location.origin`. That is the same restriction fetchMonthlyTimeSlots
+// above lives with, and it costs nothing here - OrderPanel renders the booking form only
+// after mount, so the calendar never paints server-side anyway.
+//
+// FAILURE IS NOT AN ERROR STATE. There is no `...Error` field in the slice and no
+// rejected case: every failure - offline, 429, 500, SSR - leaves `initialCleaningDays`
+// null, and the calendar falls back to the `metadata` snapshot it used before this
+// existed. A stale floor is a small wrong; a listing page that will not render is a big
+// one.
+//
+// THE SAME CALL NOW ALSO BRINGS THE CLEANING GAPS. One request, because both answers come
+// from the same listing on the same page load and both feed the same picker, and because a
+// second endpoint would be a second thing to keep in step with the checkout gate. See
+// server/api-util/cleaningGaps.js for what a gap is and why the calendar cannot derive one.
+const fetchInitialCleaningDaysPayloadCreator = ({ listingId }) => {
+  return fetchListingInitialCleaning(listingId.uuid)
+    .then(response => {
+      const days = response?.data?.initialCleaningDays;
+      const gaps = response?.data?.cleaningGaps;
+      const turnaround = response?.data?.cleaningTurnaroundDays;
+      const rentals = response?.data?.completedRentals;
+
+      return {
+        initialCleaningDays: Number.isInteger(days) && days > 0 ? days : null,
+        // How long this garment's studio takes between rentals. Shown on the page as prose
+        // ("that is why the calendar holds N days") rather than used for any arithmetic - the
+        // gaps above are already computed server-side from this exact number.
+        cleaningTurnaroundDays: Number.isInteger(turnaround) && turnaround > 0 ? turnaround : null,
+        // How many rentals this garment has completed. Absent (rather than 0) when the read
+        // failed, so the page omits the line instead of claiming a history it did not read.
+        completedRentals: Number.isInteger(rentals) ? rentals : null,
+        // Absent stays absent: a failed gap read must not reach the picker as "there are no
+        // gaps", which would look exactly like a clear calendar. Only an array the server
+        // actually sent is trusted.
+        cleaningGaps: Array.isArray(gaps)
+          ? gaps
+              .map(gap => ({ start: new Date(gap.start), end: new Date(gap.end) }))
+              .filter(gap => !Number.isNaN(gap.start.getTime()) && !Number.isNaN(gap.end.getTime()))
+          : null,
+      };
+    })
+    .catch(e => {
+      // Logged, not surfaced. The snapshot fallback is silent on purpose, but a laundry
+      // whose profile has become unreadable is worth knowing about.
+      log.error(e, 'fetching-live-initial-cleaning-days-failed', { listingId: listingId.uuid });
+      return {
+        initialCleaningDays: null,
+        cleaningGaps: null,
+        cleaningTurnaroundDays: null,
+        completedRentals: null,
+      };
+    });
+};
+
+export const fetchInitialCleaningDaysThunk = createAsyncThunk(
+  'ListingPage/fetchInitialCleaningDays',
+  fetchInitialCleaningDaysPayloadCreator
+);
+
+/////////////////////////////////////////
+// Fetch the assigned studio's hours   //
+/////////////////////////////////////////
+//
+//   > "se puede reservar aunque laundry haya cerrado, solo aseguremonos que se muestren los
+//   >  horarios de la laundry en la listing page, o en el checkout o en transaction page"
+//   >   (Jonathan, 2026-09-28)
+//
+// WHY THIS IS NOW WORTH A REQUEST. A rental can start the day it is booked, at any hour -
+// the client was explicit that a closed studio is not a reason to refuse the booking ("sea
+// cual sea la hora"). That makes the studio's opening hours the one piece of information a
+// customer needs and could not work out: booking a same-day collection at 23:50 is allowed,
+// and the page has to be honest that the counter is shut until the morning.
+//
+// A PLAIN MARKETPLACE API CALL, NOT A SERVER ENDPOINT, which is the whole reason this is
+// cheap. The hours live in the laundry user's `publicData.laundryProfile.businessHoursByDay`
+// (see util/businessHours.js) - public, so the browser may read them with its own
+// possibly-anonymous session. Contrast fetchInitialCleaningDaysThunk above, which needs a
+// server endpoint precisely because the turnaround lives in `privateData`. Verified against
+// Dev with an anonymous SDK: `users.show` on an assigned studio returns the hours.
+//
+// FAILURE IS NOT AN ERROR STATE, like its neighbour: any failure leaves `assignedLaundryHours`
+// null and the pickup card simply omits the hours. There is no version of this worth failing
+// a listing page over.
+const fetchAssignedLaundryHoursPayloadCreator = ({ laundryId }, thunkAPI) => {
+  const { extra: sdk } = thunkAPI;
+
+  return sdk.users
+    .show({ id: new UUID(laundryId) })
+    .then(response => {
+      const byDay =
+        response?.data?.data?.attributes?.profile?.publicData?.laundryProfile
+          ?.businessHoursByDay;
+      // An object with at least one day, or null. A studio that has never saved the per-day
+      // grid has only the old free-text summary, which is a sentence rather than data and is
+      // deliberately not shown here - see util/businessHours.js on the two fields.
+      return {
+        assignedLaundryHours:
+          byDay && typeof byDay === 'object' && Object.keys(byDay).length > 0 ? byDay : null,
+      };
+    })
+    .catch(e => {
+      log.error(e, 'fetching-assigned-laundry-hours-failed', { laundryId });
+      return { assignedLaundryHours: null };
+    });
+};
+
+export const fetchAssignedLaundryHoursThunk = createAsyncThunk(
+  'ListingPage/fetchAssignedLaundryHours',
+  fetchAssignedLaundryHoursPayloadCreator
+);
 
 //////////////////////////////////
 // Fetch Transaction Line Items //
@@ -396,6 +558,24 @@ const initialState = {
   sendInquiryInProgress: false,
   sendInquiryError: null,
   inquiryModalOpenForListingId: null,
+  // Cocloset: the assigned laundry's CURRENT initial-cleaning turnaround, resolved at
+  // page load (see fetchInitialCleaningDaysThunk). null means "no live answer" - which is
+  // both the initial state and the outcome of every failure - and the calendar then falls
+  // back to `listing.metadata.initialCleaningDays`. There is deliberately no error field.
+  initialCleaningDays: null,
+  // Cocloset: day ranges that cannot be a rental START, because another booking's wash is
+  // owed then. null means "not known" (initial state, or a failed read) and is deliberately
+  // different from `[]`, which means "asked, and there are none".
+  cleaningGaps: null,
+  // Cocloset: the assigned studio's turnaround, and how many rentals this garment has
+  // completed. Both resolved by the same page-load call; both null until it answers, and on
+  // any failure, so the page can leave the line out rather than state a wrong number.
+  cleaningTurnaroundDays: null,
+  completedRentals: null,
+  // Cocloset: the assigned studio's opening hours, one entry per open day, for the pickup
+  // card. null until the read answers and on any failure - the card then omits the hours
+  // rather than implying a studio is open when nobody asked it.
+  assignedLaundryHours: null,
 };
 
 const listingPageSlice = createSlice({
@@ -515,6 +695,19 @@ const listingPageSlice = createSlice({
       .addCase(fetchTransactionLineItemsThunk.rejected, (state, action) => {
         state.fetchLineItemsInProgress = false;
         state.fetchLineItemsError = action.payload;
+      })
+      // Only `fulfilled`, and the payload creator never rejects: a failed resolution is
+      // reported as a null payload, so there is nothing for a rejected case to do beyond
+      // what the initial state already says.
+      .addCase(fetchInitialCleaningDaysThunk.fulfilled, (state, action) => {
+        state.initialCleaningDays = action.payload?.initialCleaningDays ?? null;
+        state.cleaningGaps = action.payload?.cleaningGaps ?? null;
+        state.cleaningTurnaroundDays = action.payload?.cleaningTurnaroundDays ?? null;
+        state.completedRentals = action.payload?.completedRentals ?? null;
+      })
+      // Same contract as above: fulfilled only, null for "no answer".
+      .addCase(fetchAssignedLaundryHoursThunk.fulfilled, (state, action) => {
+        state.assignedLaundryHours = action.payload?.assignedLaundryHours ?? null;
       });
   },
 });
@@ -566,6 +759,69 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
       // This can happen parallel to loadData.
       // We are not interested to return them from loadData call.
       fetchMonthlyTimeSlots(dispatch, listing);
+
+      // Cocloset: resolve the assigned laundry's CURRENT initial-cleaning turnaround, so
+      // the calendar floor reflects what the studio can do today rather than what it
+      // could do on the day it was assigned. Booking listings only - there is no calendar
+      // to move otherwise.
+      //
+      // NO LONGER GATED ON `onLaundry !== true`, AND THAT GATE WAS A BUG.
+      //
+      // It was right when this call answered one question: the INITIAL cleaning lead time,
+      // which applies only before a garment has ever reached its studio. Skipping the request
+      // for a garment already there saved a round trip and changed nothing.
+      //
+      // The same call now also carries the days blocked by the wash owed after each booking,
+      // the studio's turnaround, and the completed-rental count - none of which are
+      // first-time-only. So the gate quietly meant: THE MOMENT A GARMENT HAS BEEN TO A
+      // LAUNDRY ONCE, ITS CALENDAR STOPS HEARING ABOUT CLEANING DAYS. Which is every garment
+      // after its first rental.
+      //
+      // Reported by the client, and reproduced against Dev: four of seven listings had real
+      // cleaning gaps the page never asked for. The checkout gate still refused those dates -
+      // so no double booking happened - but the picker offered a day the payment would then
+      // decline, which is the exact failure the agreement tests exist to prevent.
+      //
+      // WHAT IT COSTS, PLAINLY: one Integration API read per listing view for any garment
+      // with a studio assigned, rather than only on its first rental. That is the price of a
+      // calendar that tells the truth. Skipped entirely when no laundry is assigned - there
+      // are then no gaps, no turnaround and no lead time to fetch.
+      //
+      // Awaited as little as the time slots are: not part of the returned promise, because a
+      // slow or failing lookup must not hold up (or fail) the listing page.
+      const assignedLaundryId = listing?.attributes?.metadata?.assignedLaundryId;
+      const hasAssignedLaundry = !!assignedLaundryId;
+      if (typeof window !== 'undefined' && listing?.id && hasAssignedLaundry) {
+        dispatch(fetchInitialCleaningDaysThunk({ listingId: listing.id }));
+
+        // The studio's opening hours, for the pickup card. A separate request rather than a
+        // field on the one above because it needs no server endpoint at all: the hours are
+        // public on the studio's own profile. See fetchAssignedLaundryHoursThunk.
+        dispatch(fetchAssignedLaundryHoursThunk({ laundryId: assignedLaundryId }));
+
+        // GIVE BACK THE DAYS A FINISHED BOOKING IS STILL BLOCKING.
+        //
+        //   > "habia hecho una reservación (...) y la cancelé como operator, por lo tanto, los
+        //   >  días reservados deberían estar disponibles, sin embargo no lo estan"
+        //   >   (Jonathan, 2026-09-07)
+        //
+        // Accepting a booking blocks its window; nothing ever unblocked it, and a cancellation
+        // made from Console runs no code of ours at all. So the cleanup is triggered by the
+        // read instead - here, where a stale block is visible, and by the page that shows it.
+        //
+        // NOT AWAITED, NOT DISPATCHED, AND FAILURES ARE SWALLOWED. It changes no Redux state:
+        // the calendar this fixes is the one fetchMonthlyTimeSlots loads above, so freed days
+        // appear on the NEXT load rather than this one. That is the honest trade - the
+        // alternative is holding a listing page open on a write - and it converges, because
+        // every visitor runs it.
+        // Wrapped so a SYNCHRONOUS throw inside the call lands in the same `catch` as a
+        // rejected request. Without it such a throw escapes into loadData and takes the whole
+        // listing page down - for a cleanup nobody is waiting on. The same shape as the guard
+        // on HandoverPage.duck's fetch, and for the same reason.
+        Promise.resolve()
+          .then(() => sweepListingAvailability(listing.id.uuid))
+          .catch(() => null);
+      }
     }
     return response;
   });

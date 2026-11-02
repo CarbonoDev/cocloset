@@ -8,11 +8,13 @@ import { connect } from 'react-redux';
 import { camelize } from '../../util/string';
 import { propTypes } from '../../util/types';
 import { getFeaturedListingsProps } from '../../util/data';
+import { mapCoclosetSections } from '../../util/coclosetLandingSections';
 
 import { fetchFeaturedListings } from '../../ducks/featuredListings.duck';
 import { getListingsById } from '../../ducks/marketplaceData.duck';
 
 import { H1 } from '../PageBuilder/Primitives/Heading';
+import { coclosetPageOptions } from '../PageBuilder/coclosetPageOptions';
 import FallbackPage, { fallbackSections } from './FallbackPage';
 import { ASSET_NAME } from './PrivacyPolicyPage.duck';
 
@@ -50,6 +52,7 @@ const PrivacyPolicyContent = props => {
     <SectionBuilder
       {...sectionsData}
       options={{
+        ...coclosetPageOptions,
         featuredListings,
         fieldComponents: {
           heading1: { component: CustomHeading1, pickValidProps: exposeContentAsChildren },
@@ -66,7 +69,11 @@ const PrivacyPolicyPageComponent = props => {
 
   return (
     <PageBuilder
-      pageAssetsData={pageAssetsData?.[camelize(ASSET_NAME)]?.data}
+      // Cocloset: the same treatment CMSPage gives every `/p/*` page. Without it this
+      // page - reached from the footer, next to those - was the one hosted page still
+      // rendering in stock section styles.
+      pageAssetsData={mapCoclosetSections(pageAssetsData?.[camelize(ASSET_NAME)]?.data)}
+      options={coclosetPageOptions}
       inProgress={inProgress}
       error={error}
       fallbackPage={<FallbackPage />}

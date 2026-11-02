@@ -6,7 +6,7 @@ import arrayMutators from 'final-form-arrays';
 import { fakeIntl } from '../../../../util/testData';
 import { renderWithProviders as render, testingLibrary } from '../../../../util/testHelpers';
 
-import EditListingPhotosForm, { FieldAddImage } from './EditListingPhotosForm';
+import EditListingPhotosForm, { FieldAddImage, MIN_LISTING_IMAGES } from './EditListingPhotosForm';
 
 const { screen, userEvent, waitFor, act } = testingLibrary;
 
@@ -79,5 +79,58 @@ describe('EditListingDeliveryForm', () => {
     expect(input.files[0]).toBe(file);
     expect(input.files.item(0)).toBe(file);
     expect(input.files).toHaveLength(1);
+  });
+  // ---------------------------------------------------------------------------
+  // Cocloset: the photo minimum.
+  //
+  //   > "el mínimo de imagenes es de dos, si sube solo 1 no puede continuar"
+  //
+  // "No puede continuar" is the assertion: the SUBMIT BUTTON has to be disabled, not just a
+  // message shown. The stock `nonEmptyArray` validator is satisfied by a single photo, so
+  // before this a one-photo listing walked straight through to the next wizard tab.
+  // ---------------------------------------------------------------------------
+  const renderWithImages = count => {
+    const images = Array.from({ length: count }, (_, i) => ({
+      id: `image-${i}`,
+      type: 'image',
+      attributes: { variants: {} },
+    }));
+
+    return render(
+      <EditListingPhotosForm
+        initialValues={{ images }}
+        images={images}
+        intl={fakeIntl}
+        dispatch={noop}
+        onImageUpload={v => Promise.reject(v)}
+        onSubmit={v => v}
+        saveActionMsg="Save photos"
+        stripeConnected={false}
+        updated={false}
+        ready={false}
+        updateInProgress={false}
+        disabled={false}
+        onRemoveImage={noop}
+        listingImageConfig={{ aspectWidth: 1, aspectHeight: 1, variantPrefix: 'listing-card' }}
+        allFilesUploadedAndVerified={true}
+      />
+    );
+  };
+
+  const saveButton = () => screen.getByRole('button', { name: 'Save photos' });
+
+  it('refuses to continue with fewer photos than the minimum', () => {
+    renderWithImages(MIN_LISTING_IMAGES - 1);
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('continues once the minimum is met', () => {
+    renderWithImages(MIN_LISTING_IMAGES);
+    expect(saveButton()).not.toBeDisabled();
+  });
+
+  it('still refuses with no photos at all', () => {
+    renderWithImages(0);
+    expect(saveButton()).toBeDisabled();
   });
 });

@@ -1,0 +1,98 @@
+@import '../../../../styles/customMediaQueries.css';
+
+/* Hardcoded, not dependent on Console's `appearance` (currently the plain default) - same
+   approach SectionCoclosetHero/Laundry use for their own fixed backgrounds. */
+.root {
+  background-color: var(--coclosetPartnerTealDark);
+}
+
+.layout {
+  max-width: var(--contentMaxWidthPages);
+  margin: 0 auto;
+  padding: 48px 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  /* NOT `center`: the form card can grow much taller than the info copy once validation
+     messages stack up, and centering the shorter column vertically against a tall one
+     pushed the headline down past the fold - "text ends up vertically centered and you
+     need to scroll to see it" (Jonathan, 2026-09-12). Top-aligning keeps the headline
+     pinned to where the section starts regardless of how tall the form gets. */
+  align-items: start;
+
+  @media (--viewportLarge) {
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+    padding: 64px 36px;
+  }
+}
+
+.info {
+  color: var(--colorWhite);
+}
+
+.headline {
+  font-family: var(--fontFamilyDisplay);
+  color: var(--colorWhite);
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 400;
+  margin: 0 0 16px 0;
+
+  @media (--viewportMedium) {
+    font-size: 42px;
+  }
+
+  @media (--viewportMedium) {
+    font-size: 63px;
+    line-height: 73px;
+    letter-spacing: 0px;
+    text-align: left;
+  }
+}
+
+.body {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--colorWhite);
+  margin: 0;
+}
+
+.body > p {
+  font-weight: 400;
+  margin: 0;
+  color: var(--colorWhite);
+
+  @media (--viewportMedium) {
+    font-size: 26.67px;
+    line-height: 37px;
+    letter-spacing: 0px;
+    text-align: left;
+  }
+}
+
+.card {
+  background-color: var(--coclosetSurface);
+  border-radius: var(--coclosetRadius);
+  box-shadow: var(--boxShadowPopup);
+  padding: 28px 24px;
+
+  @media (--viewportMedium) {
+    padding: 36px;
+  }
+}
+
+.submitted {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.submittedTitle {
+  color: var(--coclosetInk);
+  margin: 0 0 12px 0;
+}
+
+.submittedMessage {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  margin: 0;
+}

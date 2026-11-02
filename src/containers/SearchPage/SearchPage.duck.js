@@ -15,7 +15,12 @@ import { hasPermissionToViewData, isUserAuthorized } from '../../util/userHelper
 import { parse } from '../../util/urlHelpers';
 import { getReferralParams } from '../../util/webStorageHelpers';
 
+import { fetchBrands, fetchLaundryOptions } from '../../util/api';
+import * as log from '../../util/log';
+
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
+import { RENTAL_WINDOW_DAYS } from '../../util/rentalPeriods';
+import { withoutUnbookableListings, withOnlyPickupTodayListings } from '../../util/searchCleaningFloor';
 
 // Pagination page size might need to be dynamic on responsive page layouts
 // Current design has max 3 columns 12 is divisible by 2 and 3
@@ -194,28 +199,81 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
         ? getExclusiveEndDate(endRaw, searchTZ)
         : null;
 
-    const today = getStartOf(new Date(), 'day', searchTZ);
-    const possibleStartDate = subtractTime(today, 14, 'hours', searchTZ);
+    // THE CUTOFF HAS TO BE ANCHORED ON THE ACTUAL MOMENT, NOT ON UTC'S CALENDAR PAGE.
+    //
+    //   > listing `6aa26840-16da-44df-8a74-ff4ece1da4eb` still showing for a search dated
+    //   >  2026-09-10, tested in the evening (Jonathan, 2026-09-10)
+    //
+    // `startDate` is the picked day read as UTC midnight (see parseDateFromISO8601 above), but
+    // the picker itself runs in the visitor's own local calendar. For any timezone behind UTC,
+    // "today" locally can already read as UTC's NEXT day by evening - e.g. at 9pm in Mexico
+    // City (UTC-6) it is already past 3am UTC tomorrow. The old cutoff compared against
+    // `getStartOf(now, 'day', 'Etc/UTC')` minus a 14-hour grace window, which is generous
+    // against UTC's *own* clock but not against a visitor whose local day runs behind it: the
+    // gap between a UTC-midnight-anchored "today" and the real instant can reach ~30 hours for
+    // UTC-6 and worse further west. Once it did, `hasValidDates` went false and the whole date
+    // filter silently dropped out (`{}`), returning every listing unfiltered - the picker
+    // wasn't wrong, it just stopped running at all.
+    //
+    // So the cutoff is measured against the real "now", not a UTC day boundary, with a buffer
+    // wide enough to cover any visitor's local "today" (up to UTC-12, the most negative real
+    // offset). Being generous here costs nothing: this is a past/nonsense guard against a URL
+    // param, not the search window itself.
+    const possibleStartDate = subtractTime(new Date(), 36, 'hours', searchTZ);
     const hasValidDates =
       hasValues &&
       startDate.getTime() >= possibleStartDate.getTime() &&
       startDate.getTime() <= endDate.getTime();
 
-    const dayCount = isEntireRangeAvailable ? daysBetween(startDate, endDate) : 1;
+    // THE DATE IS A START DATE, NOT A RANGE OF DAYS SOMEBODY WANTS FREE.
+    //
+    //   > "el filtro de dates (...) muestra un listing que no es propio de las fechas
+    //   >  seleccionadas" (Jonathan, 2026-09-10)
+    //
+    // Nothing in this marketplace is rented by the day: a garment goes out for a whole period,
+    // 7 days or 14. So "is this free on the 10th?" - the question this filter used to ask - is
+    // not a question anybody can act on, and the listing that prompted the report answered it
+    // honestly: the 10th WAS free. What was not possible was a 7-day rental starting then,
+    // because a booking sat across the 13th to the 21st.
+    //
+    // The picker has always asked the right question (isWindowAvailableFn in
+    // BookingRentalPeriodForm), so the filter now asks it too: is a whole rental period free,
+    // starting on the day you picked. Anything else puts garments in front of a reader that
+    // the next screen refuses.
+    //
+    // The END OF THE PICKED RANGE IS IGNORED on purpose. Selecting "10 to 11" cannot mean a
+    // two-day rental because no such rental exists; it can only mean "I want it around the
+    // 10th". The first day is the only part of that with a meaning the marketplace can honour.
     const day = 1440;
     const hour = 60;
-    // When entire range is required to be available, we count minutes of included date range,
-    // but there's a need to subtract one hour due to possibility of daylight saving time.
-    // If partial range is needed, then we just make sure that the shortest time unit supported
-    // is available within the range.
-    // You might want to customize this to match with your time units (e.g. day: 1440 - 60)
-    const minDuration = isEntireRangeAvailable ? dayCount * day - hour : hour;
+    const windowEnd = getStartOf(startDate, 'day', searchTZ, RENTAL_WINDOW_DAYS, 'days');
+    // The whole window, not one hour of it. `time-partial` with the prolonged window below is
+    // what let a garment free on the 12th answer a search for the 10th.
+    const minDuration = RENTAL_WINDOW_DAYS * day - hour;
+
+    // THE API REJECTS A `start` MORE THAN A DAY OLD, EVEN WHEN THE CUTOFF ABOVE ALLOWS IT.
+    //
+    // The 36-hour grace period on `hasValidDates` exists so a visitor behind UTC can still pick
+    // "today" late in their day (see above). But `getProlongedStart` then subtracts another 14
+    // hours from that already-stale `startDate`, and Sharetribe's own search endpoint hard-
+    // rejects a `start` more than 24 hours in the past with a 400 - which would have surfaced
+    // as a broken search page, not a wrong result. So the prolonged start is clamped to the
+    // API's own limit rather than trusted as-is; the query is still permissive (it just can't
+    // reach as far back as `getProlongedStart` would like when `startDate` itself is stale).
+    const earliestAllowedStart = subtractTime(new Date(), 24, 'hours', searchTZ);
+    const prolongedStart = getProlongedStart(startDate);
+    const start =
+      prolongedStart.getTime() < earliestAllowedStart.getTime()
+        ? earliestAllowedStart
+        : prolongedStart;
+
     return hasValidDates
       ? {
-          start: getProlongedStart(startDate),
-          end: getProlongedEnd(endDate),
-          // Availability can be time-full or time-partial.
-          // However, due to prolonged time window, we need to use time-partial.
+          start,
+          end: getProlongedEnd(windowEnd),
+          // Still time-partial, because the window above is prolonged by a day's worth of
+          // hours to cover other time zones - `time-full` would then demand availability
+          // outside the rental itself. `minDuration` is what enforces the whole period.
           availability: 'time-partial',
           // minDuration uses minutes
           minDuration,
@@ -268,6 +326,7 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
     perPage,
     price,
     dates,
+    pickupToday,
     seats,
     sort,
     mapSearch,
@@ -278,7 +337,64 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
   // The params related to default filters are prepared one-by-one
   // We could consider moving them to the prepareAPIParams function too.
   const priceMaybe = priceSearchParams(price);
-  const datesMaybe = datesSearchParams(dates);
+
+  // The FIRST day the reader asked about, kept out of the query params on purpose - it is not
+  // something the API is asked, it is what the cleaning floor is compared against once the API
+  // has answered. Parsed the same way `datesSearchParams` parses it, and null unless the
+  // dates filter produced a usable range, so a search with no dates filters nothing.
+  //
+  // CLAMPED FORWARD TO UTC'S OWN "TODAY" - the cleaning floor (util/cleaningFloor.js) is
+  // deliberately anchored on the marketplace's day-boundary authority (UTC), not on whichever
+  // browser is shopping, precisely so the floor cannot depend on a customer's clock. A visitor
+  // behind UTC (e.g. Mexico City) can still pick their own local "today" late in the day - see
+  // the 36h grace window above - and that picked day, read as UTC midnight, is then genuinely
+  // BEHIND the marketplace's current UTC day. Comparing that stale value against a floor that
+  // is correctly anchored on real UTC "today" made every listing look unbookable, including
+  // ones with nothing wrong at all (onLaundry already true, cleaning long finished) - the 36h
+  // widening fixed the query but broke this comparison by construction. Clamping to "no earlier
+  // than UTC's actual today" keeps both halves asking about the same day.
+  const today = getStartOf(new Date(), 'day', 'Etc/UTC');
+
+  // "PICKUP TODAY" IS NOT A NEW QUESTION, JUST TODAY'S ANSWER TO THE OLD ONE.
+  //
+  //   > "hay que agregar un filtro en el search que nos permita filtrar por listings que
+  //   >  esten disponibles para hoy" (Jonathan, 2026-09-11)
+  //
+  // Rather than a second copy of the date filter's own timezone handling (the 36h cutoff
+  // above, the UTC-anchored clamp just below, the API's own "not more than a day in the past"
+  // limit further down), this is internally just `dates=<today>,<today>`, fed through the SAME
+  // datesSearchParams - it inherits every fix already made to that function instead of risking
+  // a fourth, independent bug in the same family. An explicit `dates` filter still wins if the
+  // reader set one; "today" and a chosen range cannot both be the question being asked.
+  //
+  // TRUE, NOT "true". `util/urlHelpers.js`'s `parse()` - what `loadData` actually feeds this
+  // thunk from the URL - turns the query string "true"/"false" into real booleans before this
+  // function ever sees them, so a URL of `?pickupToday=true` arrives here as the boolean
+  // `true`. Comparing against the STRING `'true'` (as this did originally) never matches
+  // anything reached through the real page-load path: the filter silently did nothing, on
+  // every search, indistinguishable from an unfiltered one - which is exactly the reported
+  // "the filter returns listings that don't even qualify" (Jonathan, 2026-09-19). Checked
+  // against both forms since a caller could still hand this a literal string directly (as the
+  // duck's own tests do, dispatching without going through parse() at all).
+  const isPickupToday = pickupToday === true || pickupToday === 'true';
+  const todayIso = today.toISOString().slice(0, 10);
+  const effectiveDates = dates || (isPickupToday ? `${todayIso},${todayIso}` : dates);
+  const datesMaybe = datesSearchParams(effectiveDates);
+
+  // THE SAME REAL WINDOW, kept around regardless of whether THIS search is filtered by
+  // pickupToday - see the verification pass below, which needs it for every search so the
+  // CARD badge (not just the filter) can tell the truth. Cheap to compute; only occasionally
+  // spent.
+  const todayWindowParams = datesSearchParams(`${todayIso},${todayIso}`);
+
+  const requestedStart =
+    datesMaybe.start &&
+    typeof effectiveDates === 'string' &&
+    effectiveDates.split(',').length === 2
+      ? [parseDateFromISO8601(effectiveDates.split(',')[0], 'Etc/UTC'), today].reduce((a, b) =>
+          a.getTime() > b.getTime() ? a : b
+        )
+      : null;
   const stockMaybe = stockFilters(datesMaybe);
   const seatsMaybe = seatsSearchParams(seats, datesMaybe);
   const sortMaybe = sortSearchParams(sort, searchParams?.keywords !== undefined);
@@ -324,14 +440,111 @@ const searchListingsPayloadCreator = ({ searchParams, config }, thunkAPI) => {
     perPage,
   };
 
-  return sdk.listings
-    .query(params)
+  // pickupToday: the API paginates BEFORE we filter, so we fetch all the
+  // candidates (up to 5 pages of 100), filter them, and paginate ourselves.
+  const fetchAllPickupCandidates = async () => {
+    const { page: _page, ...base } = params;
+    const query = p => sdk.listings.query({ ...base, perPage: 100, page: p });
+    const first = await query(1);
+    const totalPages = Math.min(first.data.meta?.totalPages || 1, 5);
+    const rest = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) => query(i + 2))
+    );
+    const all = [first, ...rest];
+    return {
+      ...first,
+      data: {
+        ...first.data,
+        data: all.flatMap(r => r.data.data),
+        included: all.flatMap(r => r.data.included || []),
+      },
+    };
+  };
+
+  const paginateLocally = res => {
+    if (!isPickupToday) return res;
+    const items = res.data.data;
+    const pageSize = params.perPage;
+    const page = Number(params.page) || 1;
+    const from = (page - 1) * pageSize;
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: items.slice(from, from + pageSize),
+        meta: {
+          ...res.data.meta,
+          page,
+          perPage: pageSize,
+          totalItems: items.length,
+          totalPages: Math.max(1, Math.ceil(items.length / pageSize)),
+        },
+      },
+    };
+  };
+
+  return (isPickupToday ? fetchAllPickupCandidates() : sdk.listings.query(params))
     .then(response => {
       const listingFields = config?.listing?.listingFields;
       const sanitizeConfig = { listingFields };
 
-      dispatch(addMarketplaceEntities(response, sanitizeConfig));
-      return response;
+      // Dropped BEFORE the entities are stored, so nothing downstream has to remember to
+      // exclude them again: the results, the map and the count all read what is kept.
+      //
+      // pickupToday's post-fetch pass is the STRICTER one - the same rule the card badge
+      // uses, additionally requiring onLaundry - so it runs instead of (not on top of)
+      // withoutUnbookableListings' plain cleaning-floor check.
+      const filtered = paginateLocally(
+        isPickupToday
+          ? withOnlyPickupTodayListings(response)
+          : withoutUnbookableListings(response, requestedStart)
+      );
+
+      // VERIFY THE CARD'S OWN CLAIM, NOT JUST THE FILTER'S.
+      //
+      //   > "Puedes revisar lo necesario para que en una listing card, solo se muestre
+      //   >  'Pickup today' solo si realmente puedo reservar a partir de hoy? Es muy confuso
+      //   >  para el usuario si se muestra ese tag pero realmente no puedo reservar hoy"
+      //   >   (Jonathan, 2026-09-19)
+      //
+      // isPickupTodayListing (util/searchCleaningFloor.js) is a metadata-only approximation,
+      // on purpose - a real per-card availability check would mean one query per card in a
+      // grid of 24. The compromise: ONE bounded follow-up query per search results PAGE,
+      // scoped only to the `onLaundry` candidates already on it (typically far fewer than the
+      // full page), asking Sharetribe the exact question the picker and the pickupToday
+      // filter already ask - does a whole rental window fit starting today. Its answer is
+      // what the card actually renders from now on; the approximation is only what decides
+      // whether this query runs at all.
+      //
+      // Skipped entirely when isPickupToday: withOnlyPickupTodayListings already ran the real
+      // query to build `filtered`, so every id in it is already verified.
+      const onLaundryCandidateIds = isPickupToday
+        ? []
+        : (filtered?.data?.data || [])
+            .filter(listing => listing?.attributes?.metadata?.onLaundry === true)
+            .map(listing => listing.id);
+
+      const verifyPickupToday =
+        onLaundryCandidateIds.length === 0
+          ? Promise.resolve([])
+          : sdk.listings
+              .query({
+                ids: onLaundryCandidateIds,
+                ...todayWindowParams,
+                perPage: onLaundryCandidateIds.length,
+              })
+              .then(verifyResponse => verifyResponse.data.data.map(listing => listing.id.uuid))
+              // Fails closed: nobody gets the badge rather than everybody, if the check
+              // itself cannot be answered.
+              .catch(() => []);
+
+      return verifyPickupToday.then(verifiedIds => {
+        dispatch(addMarketplaceEntities(filtered, sanitizeConfig));
+        const pickupTodayIds = isPickupToday
+          ? (filtered?.data?.data || []).map(listing => listing.id.uuid)
+          : verifiedIds;
+        return { ...filtered, pickupTodayIds };
+      });
     })
     .catch(e => {
       const error = storableError(e);
@@ -347,6 +560,57 @@ export const searchListings = createAsyncThunk(
   searchListingsPayloadCreator
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The studios a customer can filter by.
+//
+//   > "Manten el filtro / Arma un endpoint publico para mostrar laundries"
+//
+// The filter itself needs no help - `meta_assignedLaundryId` has a live search schema
+// (verified against Dev: filtering by each of the three studios returns exactly its own
+// garments). What it needs is the list of studios to offer, and a studio's name lives on the
+// laundry USER, which the browser cannot query. Hence a server endpoint.
+//
+// PUBLIC, and deliberately its own endpoint rather than the authenticated directory with the
+// session removed - see server/api/laundry-options.js for what that distinction protects.
+//
+// FAILURE IS NOT AN ERROR STATE. No rejected case and no error field: a marketplace whose
+// search page will not render because a dropdown could not be populated is a far worse
+// outcome than a search page with one filter missing.
+// ─────────────────────────────────────────────────────────────────────────────
+export const fetchLaundryOptionsThunk = createAsyncThunk('SearchPage/fetchLaundryOptions', () =>
+  fetchLaundryOptions()
+    .then(response => (Array.isArray(response?.data) ? response.data : []))
+    .catch(e => {
+      // Logged, not surfaced. A studio directory that has become unreadable is worth
+      // knowing about even though the customer is never told.
+      log.error(e, 'fetching-laundry-options-failed', {});
+      return [];
+    })
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The brands a customer can filter by.
+//
+//   > "podemos usar un selector de brands que ya existen para mostrarlos en el filtro"
+//
+// Same shape as the studio lookup above, for the same reason. `pub_brand` has a live search
+// schema - verified against Dev, where `pub_brand=Reformation` returns exactly its one garment
+// while an unrecognised KEY returns the whole marketplace, which is how you tell a schema is
+// really there rather than being silently ignored. What the filter needs is the list of brands
+// to OFFER, and brand is deliberately not a Console field, so the values come from the listings.
+//
+// FAILURE IS NOT AN ERROR STATE, as above: a search page that will not render because a dropdown
+// could not be filled is worse than one filter short.
+// ─────────────────────────────────────────────────────────────────────────────
+export const fetchBrandsThunk = createAsyncThunk('SearchPage/fetchBrands', () =>
+  fetchBrands()
+    .then(response => (Array.isArray(response?.data) ? response.data : []))
+    .catch(e => {
+      log.error(e, 'fetching-brands-failed', {});
+      return [];
+    })
+);
+
 // ================ Slice ================ //
 
 const searchPageSlice = createSlice({
@@ -358,6 +622,17 @@ const searchPageSlice = createSlice({
     searchListingsError: null,
     currentPageResultIds: [],
     activeListingId: null,
+    // Cocloset: the studios a customer can filter the results by, as { id, name }. Empty
+    // until the public endpoint answers, and on any failure - the filter then renders
+    // nothing rather than an empty dropdown, which would read as "there are no laundries".
+    laundryOptions: [],
+    // Cocloset: the brands a customer can filter by, as { brand, count }. Empty until the
+    // public endpoint answers, and on any failure - the filter then renders nothing rather than
+    // an empty dropdown, which would read as "there are no brands".
+    brandOptions: [],
+    // Cocloset: listing ids on the current page verified (a real availability query, not the
+    // metadata-only approximation) as bookable starting today. See searchListingsPayloadCreator.
+    pickupTodayIds: [],
   },
   reducers: {
     setActiveListing: (state, action) => {
@@ -376,11 +651,26 @@ const searchPageSlice = createSlice({
         state.currentPageResultIds = resultIds(action.payload.data);
         state.pagination = action.payload.data.meta;
         state.searchInProgress = false;
+        // Which of this page's results are verified, for real, as bookable from today - see
+        // the "VERIFY THE CARD'S OWN CLAIM" comment in searchListingsPayloadCreator. Plain
+        // uuid strings, matched against listing.id.uuid wherever a card renders.
+        state.pickupTodayIds = action.payload.pickupTodayIds || [];
       })
       .addCase(searchListings.rejected, (state, action) => {
         console.error(action.payload);
         state.searchInProgress = false;
         state.searchListingsError = action.payload;
+      })
+      // Only `fulfilled`, and the payload creator never rejects: a failed lookup resolves to
+      // an empty list, which is what the initial state already says. The pickup filter is an
+      // improvement on a working search, not a new dependency of it.
+      .addCase(fetchLaundryOptionsThunk.fulfilled, (state, action) => {
+        state.laundryOptions = action.payload;
+      })
+      // Same contract: only `fulfilled`, because the payload creator resolves to an empty list
+      // instead of rejecting.
+      .addCase(fetchBrandsThunk.fulfilled, (state, action) => {
+        state.brandOptions = action.payload;
       });
   },
 });
@@ -449,6 +739,27 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
         'publicData.shippingEnabled',
         'publicData.priceVariationsEnabled',
         'publicData.priceVariants',
+        // Cocloset: what the search card actually shows. `fields.listing` is an ALLOWLIST -
+        // a field not named here arrives undefined, so the brand eyebrow, the size and the
+        // collection point would each render as nothing at all, on every card, with no error
+        // anywhere. Adding the card's fields and adding them to this list are one change.
+        'publicData.brand',
+        'publicData.size',
+        'publicData.assignedLaundryName',
+        'publicData.pickupNeighborhood',
+        // WHAT THE DATE FILTER CANNOT ASK SHARETRIBE.
+        //
+        //   > "tengo un listing que estará disponible hasta el día 22 de septiembre; sin
+        //   >  embargo, cuando hago filtros por fecha (...) aparece el listing como resultado"
+        //   >   (Jonathan, 2026-09-10)
+        //
+        // The initial cleaning lead time is not on the calendar - it is relative to a drop-off
+        // that has not happened yet - so `listings.query` has no reason to exclude a garment
+        // that cannot be collected for another fortnight. These three are what the same rule
+        // the picker applies needs to run here. See util/searchCleaningFloor.js.
+        'metadata.initialCleaningDays',
+        'metadata.onLaundry',
+        'metadata.readyAt',
       ],
       'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
       'fields.image': [
@@ -464,5 +775,19 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
     config,
   });
 
-  return dispatch(searchListingsCall);
+  const searchPromise = dispatch(searchListingsCall);
+
+  // The pickup filter's options, AFTER the search is under way and never awaited. The results
+  // do not depend on them, so a slow studio lookup must not delay the listings - and firing it
+  // second keeps the search the first thing this page does, which is what it is for.
+  //
+  // Browser-only for the same mundane reason ListingPage's live-cleaning fetch is: src/util/
+  // api.js builds its base URL from `window.location.origin`. It costs nothing here, since
+  // the filter bar renders after mount either way.
+  if (typeof window !== 'undefined') {
+    dispatch(fetchLaundryOptionsThunk());
+    dispatch(fetchBrandsThunk());
+  }
+
+  return searchPromise;
 };

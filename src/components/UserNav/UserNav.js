@@ -1,7 +1,7 @@
 import React from 'react';
 import { FormattedMessage, useIntl } from '../../util/reactIntl';
 import classNames from 'classnames';
-import { ACCOUNT_SETTINGS_PAGES } from '../../routing/routeConfiguration';
+import { ACCOUNT_SETTINGS_PAGES, LAUNDRY_OPS_PAGES } from '../../routing/routeConfiguration';
 import { LinkTabNavHorizontal } from '../../components';
 
 import css from './UserNav.module.css';
@@ -14,14 +14,38 @@ import css from './UserNav.module.css';
  * @param {string} [props.className] - Custom class that extends the default class for the root element
  * @param {string} [props.rootClassName] - Custom class that overrides the default class for the root element
  * @param {string} props.currentPage - The current page (e.g. 'ManageListingsPage')
+ * @param {boolean} [props.showManageListingsLink] - Whether to show the "Your listings" tab
+ * @param {boolean} [props.showLaundryProfileLink] - Whether to show the "Studio profile" tab.
+ *   Callers pass isLaundryUser(currentUser); this component stays presentational, matching
+ *   how showManageListingsLink is already threaded through from each page.
  * @returns {JSX.Element} User navigation component
  */
 const UserNav = props => {
-  const { className, rootClassName, currentPage, showManageListingsLink } = props;
+  const {
+    className,
+    rootClassName,
+    currentPage,
+    showManageListingsLink,
+    showLaundryProfileLink,
+  } = props;
   const intl = useIntl();
   const classes = classNames(rootClassName || css.root, className);
 
-  const manageListingsTabMaybe = showManageListingsLink
+  // Sits first so the ops section reads as the laundry's primary home, ahead of the
+  // generic account tabs. Non-laundry users never get this tab.
+  const laundryProfileTabMaybe = showLaundryProfileLink
+    ? [
+        {
+          text: <FormattedMessage id="UserNav.laundryProfile" />,
+          selected: LAUNDRY_OPS_PAGES.includes(currentPage),
+          linkProps: {
+            name: 'LaundryProfilePage',
+          },
+        },
+      ]
+    : [];
+
+  const manageListingsTabMaybe = showManageListingsLink && !showLaundryProfileLink
     ? [
         {
           text: <FormattedMessage id="UserNav.yourListings" />,
@@ -34,6 +58,7 @@ const UserNav = props => {
     : [];
 
   const tabs = [
+    ...laundryProfileTabMaybe,
     ...manageListingsTabMaybe,
     {
       text: <FormattedMessage id="UserNav.profileSettings" />,

@@ -38,6 +38,7 @@
     "path-to-regexp": "^8.4.2",
     "postinstall-postinstall": "^2.1.0",
     "prop-types": "^15.8.1",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-app-polyfill": "^3.0.0",
     "react-dom": "^18.3.1",
@@ -54,10 +55,12 @@
     "remark-parse": "^9.0.0",
     "remark-rehype": "^8.1.0",
     "seedrandom": "^3.0.5",
+    "sharetribe-flex-integration-sdk": "^1.14.0",
     "sharetribe-flex-sdk": "^1.24.1",
     "sitemap": "^9.0.1",
     "smoothscroll-polyfill": "^0.4.0",
     "source-map-support": "^0.5.21",
+    "stripe": "^23.0.0",
     "unified": "^9.2.2"
   },
   "devDependencies": {

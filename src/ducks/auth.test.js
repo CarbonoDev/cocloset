@@ -5,6 +5,17 @@ import configureStore from '../store';
 import { clearCurrentUser } from './user.duck';
 import reducer, { authenticationInProgress, login, logout, signup } from './auth.duck';
 
+// `initUserRole` is the best-effort POST /api/init-user-role that stamps
+// `metadata.isLaundry = false` on a brand new user. Mocked here so the tests
+// below can assert it is fired after signup - and, more importantly, that its
+// failures cannot affect the signup. Everything else in util/api is left real.
+jest.mock('../util/api', () => ({
+  ...jest.requireActual('../util/api'),
+  initUserRole: jest.fn(() => Promise.resolve({ data: {} })),
+}));
+
+const { initUserRole } = require('../util/api');
+
 const logger = actions => () => {
   return next => action => {
     actions.push(action);
@@ -419,6 +430,11 @@ describe('auth duck', () => {
   });
 
   describe('signup thunk', () => {
+    beforeEach(() => {
+      initUserRole.mockClear();
+      initUserRole.mockImplementation(() => Promise.resolve({ data: {} }));
+    });
+
     it('should dispatch success and login', () => {
       const fakeCurrentUser = createCurrentUser({ id: 'test-user' });
       const fakeCurrentUserResponse = { data: { data: fakeCurrentUser, include: [] } };
@@ -507,6 +523,94 @@ describe('auth duck', () => {
         expect(actions[0].type).toBe('auth/signup/pending');
         expect(actions[1].type).toBe('auth/signup/rejected');
         expect(actions[1].payload?.message).toEqual(error.message);
+      });
+    });
+
+    // Client requirement: every user is created with `metadata.isLaundry =
+    // false`. A user cannot write their own metadata, so signup fires a
+    // server-side call to do it - after the login, because the endpoint
+    // identifies the user from their own session.
+    describe('isLaundry default (initUserRole)', () => {
+      const signupParams = {
+        email: 'pekka@example.com',
+        password: 'some pass',
+        firstName: 'Pekka',
+        lastName: 'Pohjola',
+        protectedData: { phoneNumber: '+123 555 1234567' },
+      };
+
+      const successSdk = () => {
+        const fakeCurrentUser = createCurrentUser({ id: 'test-user' });
+        return {
+          currentUser: {
+            create: jest.fn(() => Promise.resolve({})),
+            show: jest.fn(() => Promise.resolve({ data: { data: fakeCurrentUser, include: [] } })),
+          },
+          login: jest.fn(() => Promise.resolve({})),
+          authInfo: jest.fn(() => Promise.resolve({})),
+          transactions: {
+            query: jest.fn(() => Promise.resolve({ data: { data: [], include: [] } })),
+          },
+        };
+      };
+
+      const storeFor = sdk =>
+        configureStore({
+          initialState: { auth: reducer(undefined, { type: '@@INIT' }) },
+          sdk,
+        });
+
+      it('is called once a successful signup has authenticated the user', () => {
+        const sdk = successSdk();
+        const store = storeFor(sdk);
+
+        return signup(signupParams)(store.dispatch, store.getState, sdk).then(() => {
+          expect(initUserRole).toHaveBeenCalledTimes(1);
+          // Takes no arguments: the server derives the target user from the
+          // caller's own session, so there is nothing a client can influence.
+          expect(initUserRole.mock.calls[0]).toEqual([]);
+          expect(sdk.login).toHaveBeenCalled();
+        });
+      });
+
+      it('is not called when the signup itself fails', () => {
+        const sdk = { currentUser: { create: jest.fn(() => Promise.reject(new Error('nope'))) } };
+        const store = storeFor(sdk);
+
+        log.error = jest.fn();
+
+        return signup(signupParams)(store.dispatch, store.getState, sdk).catch(() => {
+          expect(initUserRole).not.toHaveBeenCalled();
+        });
+      });
+
+      // Fire-and-continue: the flag is cosmetic (every consumer tests
+      // `isLaundry === true`), so a failure here must never surface to the
+      // user or turn a completed signup into an error.
+      it('does not fail the signup when the endpoint rejects', () => {
+        initUserRole.mockImplementation(() => Promise.reject(new Error('500 from server')));
+        const sdk = successSdk();
+        const store = storeFor(sdk);
+
+        log.error = jest.fn();
+
+        return signup(signupParams)(store.dispatch, store.getState, sdk).then(result => {
+          expect(result).toEqual(signupParams);
+        });
+      });
+
+      it('does not fail the signup when the call throws synchronously', () => {
+        initUserRole.mockImplementation(() => {
+          throw new Error('window.fetch is not a function');
+        });
+        const sdk = successSdk();
+        const store = storeFor(sdk);
+
+        log.error = jest.fn();
+
+        return signup(signupParams)(store.dispatch, store.getState, sdk).then(result => {
+          expect(result).toEqual(signupParams);
+        });
       });
     });
   });

@@ -18,6 +18,9 @@ import css from './SearchResultsPanel.module.css';
  * @param {Object} props.search - The search
  * @param {Function} props.setActiveListing - The function to handle the active listing
  * @param {boolean} [props.isMapVariant] - Whether the map variant is enabled
+ * @param {Array<string>} [props.pickupTodayIds] - listing ids on this page verified (a real
+ *   availability query, not the card's own metadata-only approximation) as bookable starting
+ *   today - see SearchPage.duck.js's searchListingsPayloadCreator.
  * @returns {JSX.Element}
  */
 const SearchResultsPanel = props => {
@@ -31,6 +34,7 @@ const SearchResultsPanel = props => {
     isMapVariant = true,
     listingTypeParam,
     intl,
+    pickupTodayIds = [],
   } = props;
   const classes = classNames(rootClassName || css.root, className);
   const pageName = listingTypeParam ? 'SearchPageWithListingType' : 'SearchPage';
@@ -77,11 +81,26 @@ const SearchResultsPanel = props => {
       <ul className={isMapVariant ? css.listingCardsMapVariant : css.listingCards}>
         {listings.map(l => (
           <li key={l.id.uuid} className={css.resultItem}>
+            {/* THE EDITORIAL CARD, per the client's search-page design: brand eyebrow, title,
+                price set against it, then size and collection point on one line.
+
+                This component was written for the landing page's carousel, and its own header
+                says the search grid deliberately kept the default layout - "a browsing grid
+                wants the price first and the seller named, because the reader is comparing".
+                The client's design says otherwise for this marketplace, and the design decides
+                what a browsing grid should look like. One variant, two surfaces, no new card.
+
+                NB the fields it shows (brand, size, assignedLaundryName) have to be asked for
+                in SearchPage.duck.js's `fields.listing` allowlist, or every card renders the
+                image and nothing else. */}
             <ListingCard
               className={css.listingCard}
               listing={l}
               renderSizes={cardRenderSizes(isMapVariant)}
               setActiveListing={setActiveListing}
+              variant="editorial"
+              showFavorite
+              pickupTodayVerified={pickupTodayIds.includes(l.id.uuid)}
             />
           </li>
         ))}

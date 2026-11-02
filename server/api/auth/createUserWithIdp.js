@@ -7,6 +7,9 @@ const {
   clearPendingSignupTokenCookieOptions,
   parseJsonCookie,
 } = require('../../api-util/cookieOptions');
+const { getIntegrationSdk } = require('../../api-util/integrationSdk');
+const { ensureLaundryRoleDefault } = require('../../api-util/laundryRoleDefaults');
+const log = require('../../log');
 
 const CLIENT_ID = process.env.REACT_APP_SHARETRIBE_SDK_CLIENT_ID;
 const CLIENT_SECRET = process.env.SHARETRIBE_SDK_CLIENT_SECRET;
@@ -79,18 +82,52 @@ module.exports = (req, res) => {
   const idpClientId =
     idpId === FACEBOOK_IDP_ID ? FACBOOK_APP_ID : idpId === GOOGLE_IDP_ID ? GOOGLE_CLIENT_ID : null;
 
+  // The IdP signup path already runs on our server, so it can apply the
+  // `metadata.isLaundry = false` default inline with no extra round trip and
+  // no reliance on the browser (unlike the email/password path, which has to
+  // POST /api/init-user-role from the client - see src/ducks/auth.duck.js).
+  // Captured from the createWithIdp response below.
+  let createdUserId = null;
+
   sdk.currentUser
     .createWithIdp({ idpId, idpClientId, idpToken, ...rest })
-    .then(() =>
+    .then(createResponse => {
+      createdUserId = createResponse?.data?.data?.id || null;
+
       // After the user is created, we need to call loginWithIdp endpoint
       // so that the user will be logged in.
-      sdk.loginWithIdp({
+      return sdk.loginWithIdp({
         idpId,
         idpClientId: `${idpClientId}`,
         idpToken: `${idpToken}`,
-      })
-    )
+      });
+    })
     .then(apiResponse => {
+      // Fall back to the now-authenticated session if the create response did
+      // not carry the id. This has to happen BEFORE the response is sent: this
+      // `sdk`'s token store writes cookies onto `res`, so it must not be used
+      // once headers are out.
+      //
+      // EVERY failure mode here resolves to `null` rather than rejecting -
+      // including a synchronous throw, since `currentUser.show` is not
+      // guaranteed to exist on every SDK build. Resolving the id is
+      // best-effort; it must never be able to fail an IdP signup that has
+      // already succeeded.
+      let userIdPromise;
+      try {
+        userIdPromise = createdUserId
+          ? Promise.resolve(createdUserId)
+          : sdk.currentUser
+              .show()
+              .then(userResponse => userResponse?.data?.data?.id || null)
+              .catch(() => null);
+      } catch (e) {
+        userIdPromise = Promise.resolve(null);
+      }
+
+      return userIdPromise.then(userId => ({ apiResponse, userId }));
+    })
+    .then(({ apiResponse, userId }) => {
       const { status, statusText, data } = apiResponse;
       res
         .clearCookie('st-authinfo', clearPendingSignupCookieOptions())
@@ -105,6 +142,36 @@ module.exports = (req, res) => {
           })
         )
         .end();
+
+      // Fire-and-continue, deliberately NOT awaited and deliberately after the
+      // response: a failure to stamp the default must never turn a successful
+      // signup into an error. A user without the key still behaves exactly as
+      // a non-laundry (every consumer tests `=== true`), and
+      // scripts/backfill-laundry-role.js can repair it later.
+      //
+      // The try/catch is load-bearing, not defensive noise: `getIntegrationSdk()`
+      // THROWS SYNCHRONOUSLY when its env vars are missing, and this code runs
+      // after `res.end()` - letting that reach the outer `.catch` would call
+      // handleError on an already-sent response.
+      try {
+        if (!userId) {
+          log.error(
+            new Error('Could not resolve the created IdP user id'),
+            'init-user-role-idp-no-user-id',
+            { idpId }
+          );
+          return;
+        }
+
+        ensureLaundryRoleDefault(getIntegrationSdk(), userId).catch(e => {
+          log.error(e, 'init-user-role-idp-failed', {
+            idpId,
+            userId: userId?.uuid || userId,
+          });
+        });
+      } catch (e) {
+        log.error(e, 'init-user-role-idp-failed', { idpId });
+      }
     })
     .catch(e => {
       handleError(res, e);

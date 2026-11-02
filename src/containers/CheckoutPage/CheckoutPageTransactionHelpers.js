@@ -4,6 +4,7 @@ import { ensureStripeCustomer, ensureTransaction } from '../../util/data';
 import { minutesBetween } from '../../util/dates';
 import { formatMoney } from '../../util/currency';
 import { NEGOTIATION_PROCESS_NAME, resolveLatestProcessName } from '../../transactions/transaction';
+import { autoAcceptBooking, lenderNewRequest } from '../../util/api';
 import { storeData } from './CheckoutPageSessionHelpers';
 
 /**
@@ -293,12 +294,111 @@ export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
       ? Promise.resolve(storedTx)
       : onConfirmPayment(transactionId, transitionName, {});
 
-    orderPromise.then(order => {
+    // AWAITED, which corrects the note further down rather than replacing it.
+    //
+    //   > "Al hacer booking de una prenda que ya está en laundry se hace la autoaceptación,
+    //   >  pero el customer tiene que hacer refresh para ver el nuevo status; esto ya se habia
+    //   >  corregido" (Jonathan, 2026-09-10)
+    //
+    // It WAS corrected, and the correction was aimed at the wrong screen. Re-persisting the
+    // accepted transaction fixes the CHECKOUT page's own copy of it - but the customer never
+    // sees that page again. This promise resolving is what makes CheckoutPageWithPayment
+    // redirect to /order/:id, and that page loads the transaction from the API itself.
+    //
+    // So it was a RACE, not a missing write: fire-and-continue put the redirect and the
+    // acceptance side by side, and whichever landed first decided what the order page read.
+    // It won often enough to look fixed. It stopped winning when this endpoint grew work - it
+    // now blocks the garment's calendar and mails the studio before it answers - and a race
+    // lost by getting slower was never really won.
+    //
+    // Awaiting removes it. The cost is bounded and honest: the confirmation arrives one call
+    // later, on a screen already saying it is processing a payment. The failure behaviour does
+    // not change, because the catch below still swallows - a customer whose auto-accept fails
+    // gets their booking and their confirmation exactly as before.
+    return orderPromise.then(order => {
       // Store the returned transaction (order)
       persistTransaction(order, pageData, storeData, setPageData, sessionStorageKey);
-    });
 
-    return orderPromise;
+      // Cocloset: a garment that is ALREADY at its laundry has nobody to wait for.
+      //
+      //   > "si la prenda esta onLaundry = true, no tiene caso que el provider acepte, se
+      //   >  debe confirmar automáticamente"
+      //
+      // The server decides - it reads the listing's `metadata.onLaundry`, which only it can
+      // trust - and does nothing for a garment that is not there yet. See
+      // server/api/auto-accept-booking.js.
+      //
+      // IT HAS TO BE HERE, IN STEP 3, AND NOT IN STEP 1. This was fired right after
+      // `fnRequestPayment` created the order, and at that point the transaction's last
+      // transition is `transition/request-payment`: the state is `pending-payment`, the card
+      // has not been charged, and there is nothing to accept. The endpoint refuses anything
+      // that is not `preauthorized` - correctly, since Sharetribe would 409 it - so it
+      // answered `not-awaiting-acceptance` and did nothing, on EVERY booking. The garment
+      // being at its studio never mattered; the call was simply too early.
+      //
+      // `preauthorized` is reached by the transition this step fires, so this is the first
+      // moment the endpoint has anything to do. The unit tests did not catch it because they
+      // exercise the endpoint, which was right, rather than the call site, which was not.
+      //
+      // AWAITED, WHICH IT WAS NOT. The original reasoning - "awaiting would put a second
+      // network call between them and their confirmation for no benefit" - had one word wrong:
+      // there IS a benefit, and it is the whole feature. The next screen re-reads the
+      // transaction, so not waiting meant showing whichever state won a race. See the note at
+      // the top of this function. A failure still cannot present as a failed payment, because
+      // the catch below swallows it. The endpoint is idempotent, so a reload costs nothing.
+      //
+      // Known gap, the same one create-availability-buffer has documented since it was
+      // written: this is fired from the browser, so it does not run if the tab is closed
+      // first. The booking then simply waits for the provider, which is the behaviour that
+      // existed before this feature - it degrades to the old path rather than breaking. The
+      // real fix for both is a server-side worker on Sharetribe's transaction events.
+      return (
+        autoAcceptBooking({ transactionId: order?.id })
+          .then(response => {
+            // AND THE PAGE FOLLOWS, WITHOUT A RELOAD.
+            //
+            //   > "se hace el autoaccept y esto funciona, pero el customer debe hacer refresh
+            //   >  para ver el nuevo status" (Jonathan, 2026-09-07)
+            //
+            // The order persisted above is the PRE-acceptance transaction - it has to be, the
+            // acceptance had not happened yet - so the confirmation page rendered
+            // `preauthorized` and stayed there until something re-read it. A refresh was that
+            // something.
+            //
+            // Re-persisting the entity the endpoint returns closes that, and it does NOT
+            // change the fire-and-continue shape above: nothing awaits this, the page paints
+            // immediately, and it flips to the accepted state when the call lands - usually
+            // before the customer has finished reading. Awaiting instead would put a second
+            // network call between them and their confirmation, and make an auto-accept
+            // failure look like a failed payment.
+            const acceptedTransaction = response?.data?.transaction;
+            if (acceptedTransaction) {
+              persistTransaction(
+                acceptedTransaction,
+                pageData,
+                storeData,
+                setPageData,
+                sessionStorageKey
+              );
+            }
+          })
+          .catch(() => {
+            // Swallowed on purpose: the endpoint logs its own failures server-side, and there is
+            // nothing a customer could do about this one. Swallowing is also what keeps the
+            // await above safe - a slow or broken acceptance must never turn into a failed
+            // payment on screen.
+          })
+          .then(() => {
+            // After auto-accept has settled, so the server reads the final state. Not awaited.
+            lenderNewRequest({ transactionId: order?.id?.uuid }).catch(() => {});
+            return order;
+          })
+          // Whatever happened to the acceptance, the caller gets the ORDER back. The redirect is
+          // built from its id, and the accepted entity is not what the next page reads anyway -
+          // it refetches. This function's contract does not change.
+          .then(() => order)
+      );
+    });
   };
 
   //////////////////////////////////////////////////////////

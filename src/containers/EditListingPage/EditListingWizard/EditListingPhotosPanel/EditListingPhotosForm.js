@@ -9,7 +9,7 @@ import classNames from 'classnames';
 // Import configs and util modules
 import { FormattedMessage, useIntl } from '../../../../util/reactIntl';
 import { propTypes } from '../../../../util/types';
-import { nonEmptyArray, composeValidators } from '../../../../util/validators';
+import { nonEmptyArray, minCountArray, composeValidators } from '../../../../util/validators';
 import { isUploadImageOverLimitError } from '../../../../util/errors';
 
 // Import shared components
@@ -20,6 +20,16 @@ import ListingImage from './ListingImage';
 import css from './EditListingPhotosForm.module.css';
 
 const ACCEPT_IMAGES = 'image/*';
+
+/**
+ * The smallest number of photos a listing may be published with.
+ *
+ *   > "el mínimo de imagenes es de dos, si sube solo 1 no puede continuar"
+ *
+ * Exported so the test asserts against the same number the form enforces rather than a
+ * literal 2 written twice.
+ */
+export const MIN_LISTING_IMAGES = 2;
 
 const ImageUploadError = props => {
   return props.uploadOverLimit ? (
@@ -36,6 +46,11 @@ const ImageUploadError = props => {
 // NOTE: PublishListingError and ShowListingsError are here since Photos panel is the last visible panel
 // before creating a new listing. If that order is changed, these should be changed too.
 // Create and show listing errors are shown above submit button
+//
+// That order HAS changed for one process: cocloset-booking runs Photos first and Laundry
+// Assignment last (see `tabsForListingType`), so EditListingLaundryForm carries the same
+// two notices plus the files-not-ready explanation. These stay here because Photos is
+// still the last panel for every other process.
 const PublishListingError = props => {
   return props.error ? (
     <p className={css.error}>
@@ -170,6 +185,7 @@ export const EditListingPhotosForm = props => {
           disabled,
           ready,
           saveActionMsg,
+          previewListingLink,
           updated,
           updateInProgress,
           touched,
@@ -226,6 +242,17 @@ export const EditListingPhotosForm = props => {
                     intl.formatMessage({
                       id: 'EditListingPhotosForm.imageRequired',
                     })
+                  ),
+                  // A garment needs more than one photo to be rentable — a renter is
+                  // deciding on a physical object they cannot inspect. Both validators are
+                  // kept: `nonEmptyArray` names the empty case ("add a photo"), which is a
+                  // different instruction from "add one more".
+                  minCountArray(
+                    MIN_LISTING_IMAGES,
+                    intl.formatMessage(
+                      { id: 'EditListingPhotosForm.minimumImagesRequired' },
+                      { minCount: MIN_LISTING_IMAGES }
+                    )
                   )
                 )}
               >
@@ -300,15 +327,18 @@ export const EditListingPhotosForm = props => {
                 </p>
               ) : null}
 
-              <Button
-                className={css.submitButton}
-                type="submit"
-                inProgress={submitInProgress}
-                disabled={submitDisabled}
-                ready={submitReady}
-              >
-                {saveActionMsg}
-              </Button>
+              <div className={css.formActions}>
+                <Button
+                  className={css.submitButton}
+                  type="submit"
+                  inProgress={submitInProgress}
+                  disabled={submitDisabled}
+                  ready={submitReady}
+                >
+                  {saveActionMsg}
+                </Button>
+                {previewListingLink}
+              </div>
             </div>
           </Form>
         );

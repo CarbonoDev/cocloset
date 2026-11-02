@@ -6,13 +6,20 @@
 import CheckoutPage from './CheckoutPage/CheckoutPage.duck';
 import ContactDetailsPage from './ContactDetailsPage/ContactDetailsPage.duck';
 import EditListingPage from './EditListingPage/EditListingPage.duck';
+import FavoritesPage from './FavoritesPage/FavoritesPage.duck';
 import InboxPage from './InboxPage/InboxPage.duck';
+import HandoverPage from './HandoverPage/HandoverPage.duck';
+import PickupPage from './PickupPage/PickupPage.duck';
+import LaundryOpsPage from './LaundryOpsPage/LaundryOpsPage.duck';
+import LaundryProfilePage from './LaundryProfilePage/LaundryProfilePage.duck';
 import ListingPage from './ListingPage/ListingPage.duck';
 import MakeOfferPage from './MakeOfferPage/MakeOfferPage.duck';
 import ManageListingsPage from './ManageListingsPage/ManageListingsPage.duck';
 import PasswordChangePage from './PasswordChangePage/PasswordChangePage.duck';
 import PasswordRecoveryPage from './PasswordRecoveryPage/PasswordRecoveryPage.duck';
 import PasswordResetPage from './PasswordResetPage/PasswordResetPage.duck';
+import landingInviteForm from './PageBuilder/SectionBuilder/SectionCoclosetLandingInvite/SectionCoclosetLandingInvite.duck';
+import partnerApplicationForm from './PageBuilder/SectionBuilder/SectionCoclosetPartnerForm/SectionCoclosetPartnerForm.duck';
 import PaymentMethodsPage from './PaymentMethodsPage/PaymentMethodsPage.duck';
 import ManageAccountPage from './ManageAccountPage/ManageAccountPage.duck';
 import ProfilePage from './ProfilePage/ProfilePage.duck';
@@ -26,13 +33,20 @@ export {
   CheckoutPage,
   ContactDetailsPage,
   EditListingPage,
+  FavoritesPage,
   InboxPage,
+  HandoverPage,
+  PickupPage,
+  LaundryOpsPage,
+  LaundryProfilePage,
   ListingPage,
   MakeOfferPage,
   ManageListingsPage,
   PasswordChangePage,
   PasswordRecoveryPage,
   PasswordResetPage,
+  landingInviteForm,
+  partnerApplicationForm,
   PaymentMethodsPage,
   ManageAccountPage,
   ProfilePage,

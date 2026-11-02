@@ -13,6 +13,8 @@ import { ASSET_NAME } from './LandingPage.duck';
 import { fetchFeaturedListings } from '../../ducks/featuredListings.duck';
 import { getListingsById } from '../../ducks/marketplaceData.duck';
 import { getFeaturedListingsProps } from '../../util/data';
+import { mapCoclosetSections } from '../../util/coclosetLandingSections';
+import { coclosetPageOptions } from '../PageBuilder/coclosetPageOptions';
 
 const PageBuilder = loadable(() =>
   import(/* webpackChunkName: "PageBuilder" */ '../PageBuilder/PageBuilder')
@@ -23,7 +25,11 @@ export const LandingPageComponent = props => {
 
   return (
     <PageBuilder
-      pageAssetsData={pageAssetsData?.[camelize(ASSET_NAME)]?.data}
+      // Cocloset: the sections are retyped from the NAMES the operator gave them in Console,
+      // so the four bespoke layouts get their components and the two named `ignore` keep the
+      // stock ones. See util/coclosetLandingSections.js.
+      pageAssetsData={mapCoclosetSections(pageAssetsData?.[camelize(ASSET_NAME)]?.data)}
+      options={coclosetPageOptions}
       inProgress={inProgress}
       error={error}
       fallbackPage={<FallbackPage error={error} />}

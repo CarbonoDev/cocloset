@@ -228,7 +228,11 @@ const getVariantURL = (socialSharingImage, variantName) => {
     : null;
 };
 
-const mergeBranding = (brandingConfig, defaultBranding) => {
+// Exported so the derived colours can be tested against a real hosted `mainColor`
+// without going through mergeConfig (which needs a full set of hosted assets to run).
+// `marketplaceColorDark` painted on `marketplaceColor` is how the booking calendar's
+// disabled days became invisible - see src/styles/datepickerColors.test.js.
+export const mergeBranding = (brandingConfig, defaultBranding) => {
   const {
     marketplaceColors,
     logo,
@@ -526,15 +530,33 @@ const validSchemaOptions = (enumOptions, schemaType) => {
 
 // listingFieldsConfig.filterConfig
 const filterTypes = ['SelectSingleFilter', 'SelectMultipleFilter'];
+// EVERY ENUM/MULTI-ENUM FILTER IS MULTI-SELECT NOW.
+//
+//   > "puedes hacer que los filtros sean multiples? Es decir, que no se seleccione una única
+//   >  opción, por ejemplo, puedo buscar dos brands o tres sizes a la vez... no solo es para
+//   >  brand o size, debe ser para todos los fields" (Jonathan, 2026-09-21)
+//
+// Whatever `filterType` a Console-hosted listing field is configured with is now IGNORED for
+// enum/multi-enum schema types - this always emits `SelectMultipleFilter`, which is what
+// FilterComponent.js reads to decide between a single dropdown and a checkbox group. That is
+// the one lever needed: an enum field's STORED value is unchanged (still one option per
+// listing), and Sharetribe already resolves a comma-separated value on a plain enum param as
+// "any of these" natively - no search-schema change, no data migration, no change to how a
+// provider fills the field in when creating a listing.
+//
+// This is deliberately unconditional rather than "default to multi, unless Console says
+// otherwise": Jonathan asked for every field, and an operator who explicitly set
+// SelectSingleFilter in Console for some field would otherwise still get single-select,
+// silently contradicting "todos los fields". If a field ever needs to go back to single-select,
+// that is a code change here, not a Console setting, until a real per-field decision is asked
+// for again.
 const validFilterType = (filterType, schemaType) => {
   const isEnumSchemaType = ['enum', 'multi-enum'].includes(schemaType);
   const isUndefined = typeof searchMode === 'undefined';
   const isKnownFilterType = filterTypes.includes(filterType);
   const shouldHaveFilterType = isEnumSchemaType && (isKnownFilterType || isUndefined);
   const isValid = !isEnumSchemaType || shouldHaveFilterType;
-  const filterTypeMaybe = shouldHaveFilterType
-    ? { filterType: filterType || 'SelectMultipleFilter' }
-    : {};
+  const filterTypeMaybe = shouldHaveFilterType ? { filterType: 'SelectMultipleFilter' } : {};
   return [isValid, filterTypeMaybe];
 };
 
@@ -1127,22 +1149,59 @@ export const allowProviderUpdateOffer = listingTypeConfig => {
 // Restructure hosted listing config //
 ///////////////////////////////////////
 
-const restructureListingTypes = hostedListingTypes => {
+/**
+ * Listing types whose transaction process is overridden in code rather than in Console.
+ *
+ * WHY THIS EXISTS: Sharetribe Console only offers Sharetribe's own built-in processes when
+ * you edit a listing type. A custom process pushed with `flex-cli process push` cannot be
+ * selected there, so the hosted listing-type asset permanently reports the built-in process
+ * even though we want our own. This map is the only way to point a listing type at a custom
+ * process.
+ *
+ * Keyed by the hosted listing type id, valued with the process name and alias to use instead.
+ *
+ * Note the direction of the override: everywhere else in this template, hosted Console config
+ * wins over local config (see mergeListingConfig below, where local listing types are used
+ * only when debugging). This is the deliberate exception, which is why it lives here at the
+ * point hosted config is read, rather than somewhere it could be mistaken for a default.
+ *
+ * When changing this, remember the alias is copied onto each listing's `publicData` at
+ * creation time (see EditListingDetailsPanel) and read back from there when a transaction
+ * starts (see CheckoutPage). Existing listings therefore keep whichever alias they were
+ * created with — they are not retroactively migrated by editing this map.
+ */
+export const LISTING_TYPE_PROCESS_OVERRIDES = {
+  'garment-rental': {
+    process: 'cocloset-booking',
+    alias: 'cocloset-booking/release-1',
+  },
+};
+
+// Exported for testing: this is where LISTING_TYPE_PROCESS_OVERRIDES is applied, and it is
+// worth guarding directly rather than only through mergeConfig, which needs a complete set
+// of hosted assets to run.
+export const restructureListingTypes = hostedListingTypes => {
   return (
     hostedListingTypes?.map(listingType => {
       const { id, label, transactionProcess, unitType, ...rest } = listingType;
-      return transactionProcess
-        ? {
-            listingType: id,
-            label,
-            transactionType: {
-              process: transactionProcess.name,
-              alias: transactionProcess.alias,
-              unitType,
-            },
-            ...rest,
-          }
-        : null;
+      if (!transactionProcess) {
+        return null;
+      }
+
+      // See LISTING_TYPE_PROCESS_OVERRIDES above: Console cannot point a listing type at a
+      // custom process, so we substitute it here.
+      const override = LISTING_TYPE_PROCESS_OVERRIDES[id];
+
+      return {
+        listingType: id,
+        label,
+        transactionType: {
+          process: override?.process || transactionProcess.name,
+          alias: override?.alias || transactionProcess.alias,
+          unitType,
+        },
+        ...rest,
+      };
     }) || []
   );
 };
@@ -1382,9 +1441,13 @@ const mergeListingConfig = (hostedConfig, defaultConfigs, categoriesInUse) => {
   // When debugging, include default configs by passing 'true' here.
   // Otherwise, use listing types and fields from hosted assets.
   const shouldMerge = mergeDefaultTypesAndFieldsForDebugging(false);
-  const listingTypes = shouldMerge
+  // restructureListingTypes yields null for a hosted listing type that has no transaction
+  // process. Without filtering those out, the listingTypesInUse map below dereferences null
+  // and takes down config parsing (and with it the whole app) over one malformed entry.
+  const listingTypes = (shouldMerge
     ? union(hostedListingTypes, defaultListingTypes, 'listingType')
-    : hostedListingTypes;
+    : hostedListingTypes
+  ).filter(Boolean);
   const listingFields = shouldMerge
     ? union(hostedListingFields, defaultListingFields, 'key')
     : hostedListingFields;

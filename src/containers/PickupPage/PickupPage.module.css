@@ -1,0 +1,47 @@
+.root {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 24px;
+
+  @media (--viewportMedium) {
+    padding: 48px 24px;
+  }
+}
+
+.heading {
+  margin: 0 0 24px 0;
+}
+
+.status {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.statusHeading {
+  margin: 0;
+  color: var(--coclosetInk);
+}
+
+.confirmBlock {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.confirmButton {
+  align-self: flex-start;
+}
+
+.error {
+  composes: marketplaceTinyFontStyles from global;
+  background-color: var(--coclosetToneAmberBg);
+  color: var(--coclosetToneAmberFg);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 0;
+}

@@ -1,0 +1,69 @@
+@import '../../styles/customMediaQueries.css';
+
+.content {
+  /* EXPLICIT width, not just a max. This block sits inside a layout that sizes its children,
+     and without it the column collapsed to the width of its content - which on a page holding
+     ONE saved garment is the width of one small card. That is what the client saw. */
+  width: 100%;
+  max-width: var(--contentMaxWidthPages, 1056px);
+  margin: 0 auto;
+  padding: 24px 24px 96px 24px;
+
+  @media (--viewportMedium) {
+    padding: 40px 36px 120px 36px;
+  }
+}
+
+.heading {
+  margin: 0 0 24px 0;
+}
+
+/* Cards sized by a MINIMUM rather than by a column count.
+   > "El tamaño de la listingCard en el listado de favoritos se ve muy pequeño"
+   >   (Jonathan, 2026-09-08)
+
+   `repeat(3, 1fr)` divides whatever width the container happens to have, so a container that
+   is narrower than expected produces three unreadably small cards rather than one readable
+   one. `auto-fill` with a floor asks the opposite question - how many cards of a usable size
+   fit - and a garment photo below about 260px is not something anybody can judge a garment
+   from, which is the entire job of this page. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @media (--viewportMedium) {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 32px;
+  }
+}
+
+.gridItem {
+  min-width: 0;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.emptyText {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--coclosetInkMuted, var(--colorGrey600));
+  margin: 0;
+}
+
+.emptyLink {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--marketplaceColor);
+}
+
+.error {
+  composes: marketplaceDefaultFontStyles from global;
+  color: var(--colorFail);
+}

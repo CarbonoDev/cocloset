@@ -46,6 +46,7 @@ const FieldDateRangePickerComponent = props => {
     useMobileMargins,
     isDayBlocked = day => false,
     isOutsideRange,
+    minimumNights,
     ...rest
   } = props;
 
@@ -69,7 +70,13 @@ const FieldDateRangePickerComponent = props => {
       return isOutsideRange(day) || isDayBlocked(day);
     },
     isDaily,
-    minimumNights: isDaily ? 0 : 1,
+    // A caller may raise the floor (Cocloset: the owner's per-listing minimum
+    // rental length). Passed explicitly rather than left to the `...rest` spread
+    // below, which would have overridden it by accident and silently: a prop
+    // that only works because of key order is a prop nobody can safely reorder.
+    // The default is unchanged - a daily booking may be one day, a nightly one
+    // must be at least one night.
+    minimumNights: Number.isInteger(minimumNights) ? minimumNights : isDaily ? 0 : 1,
     readOnly: typeof window !== 'undefined' && window.innerWidth < MAX_MOBILE_SCREEN_WIDTH,
     value: valueArray,
     ...restOfInput,

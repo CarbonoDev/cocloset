@@ -1,16 +1,23 @@
 @import '../../../styles/customMediaQueries.css';
 
+/**
+ * Step panel - mockups 10-15.jpg.
+ *
+ * The mockups run one warm canvas behind both the rail and the form, with a
+ * single hairline rule between them, so the panel drops the template's white
+ * fill and keeps only the divider.
+ */
 .panel {
   flex-grow: 1;
-  padding: 11px 24px 0 24px;
+  padding: 20px 24px 0 24px;
+  background-color: var(--coclosetCanvas);
 
   @media (--viewportLarge) {
-    padding: 48px 36px 82px 59px;
-    border-left: 1px solid var(--colorGrey100);
-    background-color: var(--colorWhite);
+    padding: 68px 36px 82px 59px;
+    border-left: 1px solid var(--coclosetBorder);
   }
 
   @media (--viewportLargeWithPaddings) {
-    padding: 48px calc((100% - 1056px) / 2) 82px 59px;
+    padding: 68px calc((100% - 1056px) / 2) 82px 59px;
   }
 }

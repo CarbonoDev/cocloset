@@ -16,6 +16,34 @@ const transactionLineItems = require('./api/transaction-line-items');
 const initiatePrivileged = require('./api/initiate-privileged');
 const transitionPrivileged = require('./api/transition-privileged');
 const deleteAccount = require('./api/delete-account');
+const laundryPartnerApplication = require('./api/laundry-partner-application');
+const emailSignup = require('./api/email-signup');
+const laundries = require('./api/laundries');
+const laundryOptions = require('./api/laundry-options');
+const brands = require('./api/brands');
+const createAvailabilityBuffer = require('./api/create-availability-buffer');
+const laundryTransactionStatus = require('./api/laundry-transaction-status');
+const listingReadinessStatus = require('./api/listing-readiness-status');
+const listingCustodyStatus = require('./api/listing-custody-status');
+const laundryReceiveGarment = require('./api/laundry-receive-garment');
+const listingAvailabilitySweep = require('./api/listing-availability-sweep');
+const laundryListingsRefresh = require('./api/laundry-listings-refresh');
+const listingLaundryAssignment = require('./api/listing-laundry-assignment');
+const listingPauseEligibility = require('./api/listing-pause-eligibility');
+const listingsActiveTransactions = require('./api/listings-active-transactions');
+const listingInitialCleaning = require('./api/listing-initial-cleaning');
+const lenderNewRequest = require('./api/lender-new-request');
+const laundryAddress = require('./api/laundry-address');
+const laundryOrders = require('./api/laundry-orders');
+const transactionQr = require('./api/transaction-qr');
+const handoverStatus = require('./api/handover-status');
+const listingPickupQr = require('./api/listing-pickup-qr');
+const listingPickupStatus = require('./api/listing-pickup-status');
+const listingPickupConfirm = require('./api/listing-pickup-confirm');
+const autoAcceptBooking = require('./api/auto-accept-booking');
+const customerCancelNotifyLaundry = require('./api/customer-cancel-notify-laundry');
+const customerPartialRefundCancel = require('./api/customer-partial-refund-cancel');
+const initUserRole = require('./api/init-user-role');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -56,6 +84,126 @@ router.post('/transaction-line-items', transactionLineItems);
 router.post('/initiate-privileged', initiatePrivileged);
 router.post('/transition-privileged', transitionPrivileged);
 router.post('/delete-account', deleteAccount);
+router.get('/laundries', laundries);
+// PUBLIC, and deliberately a different endpoint from the one above rather than the same one
+// with its session requirement removed: this returns a studio's name and id and nothing else,
+// for the search page's pickup filter. See the header of server/api/laundry-options.js for
+// what that distinction is protecting.
+router.get('/laundry-options', laundryOptions);
+// PUBLIC for the same reason: the brand autocomplete feeds a search filter anonymous visitors
+// use. Returns brands that are already printed on published listings, nothing more. See the
+// header of server/api/brands.js.
+router.get('/brands', brands);
+router.post('/create-availability-buffer', createAvailabilityBuffer);
+router.post('/laundry-transaction-status', laundryTransactionStatus);
+router.post('/listing-readiness-status', listingReadinessStatus);
+// The studio taking a garment IN from its owner at the start of a rental: the step that used
+// to be fused onto "ready for the renter", which announced a coat as collectable before it
+// had been washed. See server/api/laundry-receive-garment.js.
+router.post('/laundry-receive-garment', laundryReceiveGarment);
+// Give back the days a booking blocked once that booking is over. Fired by the listing page
+// on load, because a cancellation from Console runs no code of ours. See
+// server/api/listing-availability-sweep.js for what it will and will not delete.
+router.post('/listing-availability-sweep', listingAvailabilitySweep);
+// Re-stamp a studio's name and address onto its garments. Fired after the studio saves its
+// profile: the address path has always propagated, an ordinary profile save never did.
+router.post('/laundry-listings-refresh', laundryListingsRefresh);
+// Garment custody (`listing.metadata.onLaundry`) - writable by the assigned
+// laundry OR the listing's owner, and only while the listing has no active
+// transaction. See server/api/listing-custody-status.js.
+router.post('/listing-custody-status', listingCustodyStatus);
+// The assigned-laundry guard: may this owner change the listing's laundry right
+// now? Read the header of server/api/listing-laundry-assignment.js before relying
+// on it - it is a server-side DECISION, not a write gate.
+router.post('/listing-laundry-assignment', listingLaundryAssignment);
+// May this listing be paused right now? See server/api/listing-pause-eligibility.js -
+// the only question worth asking server-side is whether a transaction is still
+// active, not whether the garment happens to be at the laundry.
+router.post('/listing-pause-eligibility', listingPauseEligibility);
+// Bulk, UI-only read for the same question, across every listing on a page load at
+// once - see server/api/listings-active-transactions.js. Not authoritative; the
+// eligibility check above is still what the actual pause click is gated on.
+router.get('/listings-active-transactions', listingsActiveTransactions);
+router.get('/laundry-orders', laundryOrders);
+
+// A laundry's OWN address, and only the address - the rest of the studio profile
+// still saves straight from the browser. Gated on an admin-granted
+// `metadata.addressChangeAllowed` once an address exists, and propagates the change
+// to every listing assigned to that studio. Read the header of
+// server/api/laundry-address.js before relying on the gate: the address stays in
+// owner-writable `publicData`, so this gates OUR path, not every path.
+router.post('/laundry-address', laundryAddress);
+
+// The assigned laundry's CURRENT initial-cleaning turnaround for one listing, as a
+// single integer. PUBLIC and rate limited - ListingPage is public, and the customer who
+// needs the number has no session yet. Read the header of
+// server/api/listing-initial-cleaning.js before widening the response: the same laundry
+// privateData blob holds per-category cleaning fees, which must never reach the browser.
+router.get('/listing-initial-cleaning', listingInitialCleaning);
+
+// Renders the handover QR for a transaction as a PNG, for a plain <img src>.
+// Unauthenticated by design - it echoes back only the transaction id it was
+// given. See the header of server/api/transaction-qr.js before changing that.
+router.get('/transaction-qr', transactionQr);
+
+// What a scanned handover QR resolves to. Authenticated, and answers only the three roles
+// that have business with the garment - the assigned laundry (which alone gets an action),
+// the customer and the provider. The laundry is not a party to the transaction, so it cannot
+// read it through the Marketplace API at all; see the header of
+// server/api/handover-status.js.
+router.get('/handover-status', handoverStatus);
+
+// The pickup QR: a provider pauses a listing to collect a garment sitting at the laundry
+// with no active rental. Owner-only (mints a real credential, the pickup token - see the
+// header of server/api/listing-pickup-qr.js for why that differs from the transaction QR
+// above, which is deliberately unauthenticated).
+router.get('/listing-pickup-qr', listingPickupQr);
+// What a scanned pickup QR resolves to - both the owner and the assigned laundry may read
+// it, only the laundry ever gets canConfirm. See server/api/listing-pickup-status.js.
+router.get('/listing-pickup-status', listingPickupStatus);
+// The confirm action a scanned pickup QR's page fires. A second, token-gated door onto the
+// SAME hand-back write listing-custody-status.js performs - see
+// server/api/listing-pickup-confirm.js for why both doors exist rather than one replacing
+// the other.
+router.post('/listing-pickup-confirm', listingPickupConfirm);
+
+//
+router.post('/lender-new-request', lenderNewRequest);
+
+// Accept a paid booking on the operator's behalf when the garment is already at its laundry -
+// there is nobody to wait for. Uses `transition/operator-accept`, which the process has always
+// had; no EDN change was needed. Does nothing, loudly, for a garment that is not at its studio.
+// See the header of server/api/auto-accept-booking.js.
+router.post('/auto-accept-booking', autoAcceptBooking);
+
+// The laundry-side effect of a customer's self-cancellation (transition/customer-cancel).
+// That transition is not privileged and is fired straight from the browser, so this is only
+// the Mailgun notification half - it never re-runs or second-guesses the cancellation itself.
+// See the header of server/api/customer-cancel-notify-laundry.js.
+router.post('/customer-cancel-notify-laundry', customerCancelNotifyLaundry);
+
+// Customer self-cancellation AFTER the garment has reached the laundry for its first wash
+// (state/initial-cleaning) - a PARTIAL refund (total minus the cleaning fee), settled directly
+// against Stripe because Sharetribe's own refund actions are always 100%-or-nothing. This is
+// the primary action, not a side effect - see the header of
+// server/api/customer-partial-refund-cancel.js.
+router.post('/customer-partial-refund-cancel', customerPartialRefundCancel);
+
+// Applies the `metadata.isLaundry = false` default to the CALLING user, right
+// after signup. Takes no request parameters at all - the target is the
+// caller's own session and the value is hard-coded. See
+// server/api/init-user-role.js.
+router.post('/init-user-role', initUserRole);
+
+// Public, unauthenticated: laundry-partner applications from PartnerLandingPage.
+// The handler never builds a Marketplace or Integration API SDK, so it cannot touch
+// marketplace data. See server/api/laundry-partner-application.js.
+router.post('/laundry-partner-application', laundryPartnerApplication);
+
+// Public, unauthenticated: the landing page's email-list signup form (the `invite` section).
+// Same shape as laundry-partner-application above, own rate limiter, own delivery channel.
+// See server/api/email-signup.js.
+router.post('/email-signup', emailSignup);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed

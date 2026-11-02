@@ -17,7 +17,11 @@ import {
   LISTING_PAGE_PARAM_TYPE_EDIT,
   createSlug,
 } from '../../../util/urlHelpers';
-import { isBookingProcessAlias, isPurchaseProcessAlias } from '../../../transactions/transaction';
+import {
+  COCLOSET_BOOKING_PROCESS_NAME,
+  isBookingProcessAlias,
+  isPurchaseProcessAlias,
+} from '../../../transactions/transaction';
 
 import { NamedLink, IconSpinner } from '../../../components';
 
@@ -104,7 +108,20 @@ const LinkToStockOrAvailabilityTab = props => {
     ? LISTING_PAGE_PARAM_TYPE_DRAFT
     : LISTING_PAGE_PARAM_TYPE_EDIT;
 
-  if (!hasListingType || !(isBookable || hasStockManagementInUse)) {
+  // cocloset-booking listings have no AVAILABILITY step: they are given a full 24/7
+  // plan automatically when their draft is created, and the tab is not in their wizard
+  // at all (see `tabsForListingType`). Linking there anyway does not fail loudly - the
+  // wizard's "tab not activated" branch quietly redirects to the Pricing panel and logs
+  // a console message - so the link would advertise a screen that does not exist and
+  // then take the owner somewhere else. There is nothing honest to point it at, so it
+  // is not rendered. If per-garment blocked dates are wanted later, the availability
+  // panel is still built and wired; it needs a route back into the wizard, not a link
+  // that guesses.
+  const isCoclosetBooking =
+    transactionProcessAlias?.split('/')[0] === COCLOSET_BOOKING_PROCESS_NAME;
+  const showAvailabilityLink = isBookable && !isCoclosetBooking;
+
+  if (!hasListingType || !(showAvailabilityLink || hasStockManagementInUse)) {
     return null;
   }
 
@@ -112,7 +129,7 @@ const LinkToStockOrAvailabilityTab = props => {
     <>
       <span className={css.manageLinksSeparator}>{' • '}</span>
 
-      {isBookable ? (
+      {showAvailabilityLink ? (
         <NamedLink
           className={css.manageLink}
           name="EditListingPage"
@@ -170,6 +187,11 @@ const LinkToStockOrAvailabilityTab = props => {
  * @param {function} props.onOpenListing - The function to open the listing
  * @param {function} props.onDiscardDraft - The function to discard the draft
  * @param {function} props.onToggleMenu - The function to toggle the menu
+ * @param {boolean} [props.isCloseBlockedOnLaundry] - Whether closing was blocked because the
+ *   garment is still at the laundry partner (listing.attributes.metadata.onLaundry === true)
+ * @param {function} [props.onShowPickupQr] - Opens the pickup QR modal for this listing
+ * @param {boolean} [props.hasActiveTransaction] - Shows the active-rental badge and hides
+ *   "Pause Listing" - see ManageListingsPage.js's bulk eligibility read
  * @returns {JSX.Element} Manage listing card component
  */
 export const ManageListingCard = props => {
@@ -189,6 +211,9 @@ export const ManageListingCard = props => {
     onOpenListing,
     onDiscardDraft,
     onToggleMenu,
+    isCloseBlockedOnLaundry,
+    onShowPickupQr,
+    hasActiveTransaction,
   } = props;
   const classes = classNames(rootClassName || css.root, className);
   const currentListing = ensureOwnListing(listing);
@@ -221,6 +246,8 @@ export const ManageListingCard = props => {
           onCloseListing={onCloseListing}
           onOpenListing={onOpenListing}
           onDiscardDraft={onDiscardDraft}
+          onShowPickupQr={onShowPickupQr}
+          hasActiveTransaction={hasActiveTransaction}
         />
 
         <CardMenu
@@ -229,6 +256,7 @@ export const ManageListingCard = props => {
           inProgressListingId={actionsInProgressListingId}
           onToggleMenu={onToggleMenu}
           onCloseListing={onCloseListing}
+          hasActiveTransaction={hasActiveTransaction}
         />
 
         {thisListingInProgress ? (
@@ -237,6 +265,10 @@ export const ManageListingCard = props => {
           </Overlay>
         ) : hasError ? (
           <Overlay errorMessage={intl.formatMessage({ id: 'ManageListingCard.actionFailed' })} />
+        ) : isCloseBlockedOnLaundry ? (
+          <Overlay
+            errorMessage={intl.formatMessage({ id: 'ManageListingCard.closeBlockedOnLaundry' })}
+          />
         ) : null}
       </div>
 

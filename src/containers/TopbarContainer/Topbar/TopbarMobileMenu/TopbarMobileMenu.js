@@ -5,9 +5,10 @@
 import React from 'react';
 import classNames from 'classnames';
 
-import { ACCOUNT_SETTINGS_PAGES } from '../../../../routing/routeConfiguration';
+import { ACCOUNT_SETTINGS_PAGES, LAUNDRY_OPS_PAGES } from '../../../../routing/routeConfiguration';
 import { FormattedMessage } from '../../../../util/reactIntl';
 import { ensureCurrentUser } from '../../../../util/data';
+import { isLaundryUser } from '../../../../util/userHelpers';
 
 import {
   AvatarLarge,
@@ -95,11 +96,30 @@ const TopbarMobileMenu = props => {
     );
   });
 
-  const createListingsLinkMaybe = showCreateListingsLink ? (
-    <NamedLink className={css.createNewListingLink} name="NewListingPage">
-      <FormattedMessage id="TopbarMobileMenu.newListingLink" />
-    </NamedLink>
-  ) : null;
+  // Declared above the link that uses it, and above BOTH renders below - the anonymous branch
+  // returns before `currentPageClass` further down is ever defined.
+  const currentPageClassFor = page => (currentPage === page ? css.currentPage : null);
+
+  // Mobile twin of the desktop Borrow link - the way in to browsing for everyone who
+  // borrows, which is everyone but a studio. See BorrowLinkMaybe in TopbarDesktop.
+  //
+  // Built once and rendered in BOTH branches below, because an anonymous reader is exactly
+  // who a marketplace wants browsing: a link that only appears after signing in would hide
+  // the shop from the people most likely to want it.
+  const borrowLinkMaybe = isLaundryUser(currentUser) ? null : (
+    <li className={classNames(css.navigationLink, currentPageClassFor('SearchPage'))}>
+      <NamedLink name="SearchPage">
+        <FormattedMessage id="TopbarMobileMenu.borrowLink" />
+      </NamedLink>
+    </li>
+  );
+
+  const createListingsLinkMaybe =
+    showCreateListingsLink && !isLaundryUser(currentUser) ? (
+      <NamedLink className={css.createNewListingLink} name="NewListingPage">
+        <FormattedMessage id="TopbarMobileMenu.newListingLink" />
+      </NamedLink>
+    ) : null;
 
   if (!isAuthenticated) {
     const signup = (
@@ -132,7 +152,10 @@ const TopbarMobileMenu = props => {
             />
           </div>
 
-          <ul className={css.customLinksWrapper}>{extraLinks}</ul>
+          <ul className={css.customLinksWrapper}>
+            {borrowLinkMaybe}
+            {extraLinks}
+          </ul>
 
           <div className={css.spacer} />
         </div>
@@ -151,13 +174,29 @@ const TopbarMobileMenu = props => {
     const isAccountSettingsPage =
       page === 'AccountSettingsPage' && ACCOUNT_SETTINGS_PAGES.includes(currentPage);
     const isInboxPage = currentPage?.indexOf('InboxPage') === 0 && page?.indexOf('InboxPage') === 0;
-    return currentPage === page || isAccountSettingsPage || isInboxPage ? css.currentPage : null;
+    const isLaundryOpsPage =
+      page === 'LaundryProfilePage' && LAUNDRY_OPS_PAGES.includes(currentPage);
+    return currentPage === page || isAccountSettingsPage || isInboxPage || isLaundryOpsPage
+      ? css.currentPage
+      : null;
   };
 
-  const manageListingsLinkMaybe = showCreateListingsLink ? (
-    <li className={classNames(css.navigationLink, currentPageClass('ManageListingsPage'))}>
-      <NamedLink name="ManageListingsPage">
-        <FormattedMessage id="TopbarMobileMenu.yourListingsLink" />
+  const manageListingsLinkMaybe =
+    showCreateListingsLink && !isLaundryUser(currentUser) ? (
+      <li className={classNames(css.navigationLink, currentPageClass('ManageListingsPage'))}>
+        <NamedLink name="ManageListingsPage">
+          <FormattedMessage id="TopbarMobileMenu.yourListingsLink" />
+        </NamedLink>
+      </li>
+    ) : null;
+
+  // Mobile twin of the desktop profile menu's studio entry - see TopbarDesktop's
+  // ProfileMenu for why this link exists and why it points at LaundryProfilePage.
+  // Only rendered for users flagged isLaundry; everyone else never sees it.
+  const laundryProfileLinkMaybe = isLaundryUser(currentUser) ? (
+    <li className={classNames(css.navigationLink, currentPageClass('LaundryProfilePage'))}>
+      <NamedLink name="LaundryProfilePage">
+        <FormattedMessage id="TopbarMobileMenu.laundryProfileLink" />
       </NamedLink>
     </li>
   ) : null;
@@ -180,7 +219,15 @@ const TopbarMobileMenu = props => {
               {notificationCountBadge}
             </NamedLink>
           </li>
+          {borrowLinkMaybe}
+          {laundryProfileLinkMaybe}
           {manageListingsLinkMaybe}
+          {/* Saved garments - see the same entry in TopbarDesktop. */}
+          <li className={classNames(css.navigationLink, currentPageClass('FavoritesPage'))}>
+            <NamedLink name="FavoritesPage">
+              <FormattedMessage id="TopbarMobileMenu.favoritesLink" />
+            </NamedLink>
+          </li>
           <li className={classNames(css.navigationLink, currentPageClass('ProfileSettingsPage'))}>
             <NamedLink name="ProfileSettingsPage">
               <FormattedMessage id="TopbarMobileMenu.profileSettingsLink" />

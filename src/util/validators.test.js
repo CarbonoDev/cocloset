@@ -4,6 +4,7 @@ import {
   requiredStringNoTrim,
   uniqueString,
   minLength,
+  minCountArray,
   maxLength,
   moneySubUnitAmountAtLeast,
   composeValidators,
@@ -271,5 +272,32 @@ describe('validators', () => {
     it('should allow string with valid HKID using brackets in check digit', () => {
       expect(validHKID('pass')('E327824(0)')).toBeUndefined();
     });
+  });
+});
+
+describe('minCountArray()', () => {
+  //   > "el mínimo de imagenes es de dos, si sube solo 1 no puede continuar"
+  // The point of this validator over `nonEmptyArray` is precisely the one-entry case, so
+  // that is the assertion that matters.
+  const FAIL = 'too few';
+  const atLeastTwo = minCountArray(2, FAIL);
+
+  it('rejects an array shorter than the minimum', () => {
+    expect(atLeastTwo([])).toEqual(FAIL);
+    expect(atLeastTwo(['a'])).toEqual(FAIL);
+  });
+
+  it('accepts exactly the minimum - the boundary is inclusive', () => {
+    expect(atLeastTwo(['a', 'b'])).toBeUndefined();
+  });
+
+  it('accepts more than the minimum', () => {
+    expect(atLeastTwo(['a', 'b', 'c'])).toBeUndefined();
+  });
+
+  it('rejects a missing value or a non-array rather than throwing', () => {
+    expect(atLeastTwo(undefined)).toEqual(FAIL);
+    expect(atLeastTwo(null)).toEqual(FAIL);
+    expect(atLeastTwo('ab')).toEqual(FAIL);
   });
 });

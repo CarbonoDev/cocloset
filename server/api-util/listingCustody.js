@@ -1,0 +1,445 @@
+const {
+  ACTIVE_LAST_TRANSITIONS,
+  ACTIVE_STATES,
+  stateFromLastTransition,
+} = require('./coclosetBookingProcess');
+const { computeBufferDays } = require('./availabilityHelpers');
+const { startOfDayInTimeZone } = require('./bookingRules');
+
+// Garment CUSTODY: `listing.metadata.onLaundry`, and the readiness moment
+// `listing.metadata.readyAt` that a real return produces.
+//
+// ── WHAT `onLaundry` MEANS ───────────────────────────────────────────────────
+// Where the physical garment IS, and nothing else:
+//
+//   true  - it is at the laundry (received in, or just returned by a renter)
+//   false - it is with its owner
+//
+// Per the client:
+//
+//   > "Si el producto ya fue devuelto a la lavandería, se queda en estatus para
+//   >  el listing de onLaundry true, pero si se devuelve al dueño de la prenda
+//   >  cambia a false"
+//
+// It is deliberately NOT a third status enum next to `readinessStatus` (design
+// §8) and `state` (the transaction process). Those two answer "how far along is
+// this garment / this booking"; this answers "who is holding it". A garment can
+// be `onLaundry: true` with no transaction at all, and `readinessStatus:
+// available` while sitting in a studio.
+//
+// It lives in `metadata` rather than `publicData` for a reason that carries
+// weight later: metadata is operator/Integration-API-writable only, so a garment
+// owner cannot forge their own custody state. Every write below therefore goes
+// through the Integration API after our own authorization check
+// (api-util/listingOwnerAuth.js), and the value can be trusted as an INPUT to
+// other decisions - which is what makes the assigned-laundry guard in
+// server/api/listing-laundry-assignment.js worth anything at all.
+//
+// ── `readyAt` ────────────────────────────────────────────────────────────────
+//   > "Al momento en que una laundry recibe una prenda (cuando el cliente la
+//   >  devuelve) puede determinar cuantos días va a tardar en lavar para
+//   >  habilitar la disponibilidad, por default son los días que establece en su
+//   >  configuración de la laundry"
+//
+// Stored as a TIMESTAMP, not the day count the laundry typed. A day count is only
+// meaningful next to the moment it was counted from, and that moment - when the
+// garment actually came back - is exactly what the estimate made at `accept` did
+// not know. `readyAt` answers "when is this garment bookable again" directly;
+// a `cleaningDays: 3` on its own answers nothing three days later.
+
+// A laundry may say "ready today" (0). It may not say "ready in three years": a
+// mistyped 3650 would block a calendar for a decade and nobody would find it.
+// Both bounds are rejected loudly (400) rather than silently clamped - a client
+// sending 400 days has a bug, and quietly turning it into 365 hides it.
+const MAX_CLEANING_DAYS = 365;
+
+/**
+ * Validate a caller-supplied `cleaningDays`.
+ *
+ * @param {*} cleaningDays - as received from the request body
+ * @returns {{valid: boolean, provided: boolean, value: number|null}}
+ *   `provided: false` means the caller omitted it and the configured default
+ *   applies. `valid: false` means they sent something unusable.
+ */
+const validateCleaningDays = cleaningDays => {
+  if (cleaningDays === undefined || cleaningDays === null) {
+    return { valid: true, provided: false, value: null };
+  }
+  const isUsable =
+    typeof cleaningDays === 'number' &&
+    Number.isInteger(cleaningDays) &&
+    cleaningDays >= 0 &&
+    cleaningDays <= MAX_CLEANING_DAYS;
+
+  return isUsable
+    ? { valid: true, provided: true, value: cleaningDays }
+    : { valid: false, provided: true, value: null };
+};
+
+/**
+ * How many days will this garment take to clean?
+ *
+ * The laundry's own number when it gave one, otherwise the turnaround it has
+ * configured for this garment's category — which is already in days, so this is
+ * a unit-free choice between two day counts.
+ *
+ * The default still goes through computeBufferDays() rather than using the
+ * number raw, so the "never under-block, always round up" rule stays in one
+ * place: a fractional 1.5-day turnaround out of an env var is 2 days, not 1.
+ *
+ * @param {Object} params
+ * @param {number|null} [params.requestedDays] - validated caller value, or null
+ * @param {number} params.turnaroundDays - resolved per-category turnaround, in days
+ * @returns {{days: number, source: 'laundry'|'configured-turnaround'}}
+ */
+const resolveCleaningDays = ({ requestedDays, turnaroundDays, maxDays }) => {
+  const resolved =
+    typeof requestedDays === 'number'
+      ? { days: requestedDays, source: 'laundry' }
+      : {
+          days: computeBufferDays(turnaroundDays).totalBufferDays,
+          source: 'configured-turnaround',
+        };
+
+  // THE NEXT BOOKING WINS.
+  //
+  //   > "si alguien hace booking el 29 y la prenda es devuelta el día 26, solo se tienen dos
+  //   >  días para hacer el lavado (...) hay que limitarlo para que no sean mas de esos días"
+  //
+  // A garment already reserved for a date cannot be held past it, so the days available
+  // before that reservation are a ceiling on whatever the studio asks for - and on whatever
+  // its configured turnaround would have been. The client chose this over letting the studio
+  // overrun and flagging the next booking as in conflict.
+  //
+  // It is a CLAMP, not a rejection: this runs after a transition that has already succeeded,
+  // and refusing here would leave a returned garment with no readiness recorded at all. The
+  // clamped value is reported back so the caller can say what happened.
+  if (Number.isFinite(maxDays) && resolved.days > maxDays) {
+    return {
+      days: Math.max(0, Math.trunc(maxDays)),
+      source: resolved.source,
+      requestedDays: resolved.days,
+      cappedByNextBooking: true,
+    };
+  }
+
+  return resolved;
+};
+
+/**
+ * How many cleaning days there is room for before this garment's next reservation.
+ *
+ * The wash starts the day AFTER the handover (see computeReadiness), so a garment back on the
+ * 26th whose next rental starts on the 29th has the 27th and the 28th: `29 - 26 - 1 = 2`.
+ *
+ * NEVER NEGATIVE. A late return can leave no room at all - back on the 29th for a rental that
+ * starts on the 29th - and 0 is the honest answer there: ready today, because it has to be.
+ * Returning a negative would flow into `Math.max(0, ...)` anyway; clamping here keeps the
+ * number meaningful to a caller that wants to SHOW it.
+ *
+ * @param {Object} params
+ * @param {Date} params.returnedAt
+ * @param {Date} [params.nextBookingStart] - the start of the next booking on this listing
+ * @param {string} [params.timeZone]
+ * @returns {number|null} null when nothing is booked next, so there is no ceiling
+ */
+const maxCleaningDaysBeforeNextBooking = ({ returnedAt, nextBookingStart, timeZone }) => {
+  if (!(nextBookingStart instanceof Date) || Number.isNaN(nextBookingStart.getTime())) {
+    return null;
+  }
+  const returnDay = startOfDayInTimeZone(returnedAt, timeZone);
+  const nextDay = startOfDayInTimeZone(nextBookingStart, timeZone);
+
+  const wholeDaysBetween = Math.round((nextDay.getTime() - returnDay.getTime()) / MS_IN_DAY);
+  return Math.max(0, wholeDaysBetween - 1);
+};
+
+/**
+ * The readiness moment, and the whole-day window to block until it.
+ *
+ *   > "imagina que devuelven la prenda hoy 13, y la laundry ingresa que necesita 4 días
+ *   >  de lavado, entonces la prenda debe estar disponible el 18, 4 días despues, no antes"
+ *
+ * THE WASH STARTS TOMORROW, NOT TODAY - hence `cleaningDays + 1`.
+ *
+ * This is the same rule, and the same +1, as the initial-cleaning floor in
+ * api-util/bookingRules.js `earliestBookingStart`, stated by the client in the same
+ * shape ("hoy es 12 ... un día de lavado (13 de agosto) y el siguiente día disponible
+ * es 14"). The day the garment is handed back over the counter is already half spent
+ * and is not a wash day; it is the day the studio takes delivery. So a garment returned
+ * on the 13th with 4 cleaning days is washed on the 14th-17th and is bookable on the
+ * 18th, which is exactly the arithmetic above.
+ *
+ * ── WHY THE LISTING'S TIME ZONE AND NOT UTC ─────────────────────────────────
+ * This used to be `returnedAt + n days` as an exact instant, floored/ceiled to whole
+ * UTC days. Both halves of that were wrong for the same reason: the inputs are a wall
+ * clock reading ("the operator pressed the button") and a day count a human typed, and
+ * neither means anything in UTC. A studio in Mexico City (UTC-6) confirming a return at
+ * 19:00 on the 13th stamps 01:00 UTC on the 14th, so the block started on the 14th and
+ * the 13th - the day the garment was demonstrably on a rack, not available - stayed
+ * bookable, while the far end over-blocked by a day to compensate. The window now
+ * lands on the days the operator counted, at every hour of the day.
+ *
+ * The result is also EXACT rather than snapped: both boundaries are midnights in the
+ * listing's zone by construction, so there is no rounding left to get wrong. A listing
+ * booked by the day is unbookable for any day an exception touches, and this window
+ * touches precisely the return day and the wash days.
+ *
+ * `blockWindow` is null when cleaningDays is 0 - "ready today" means there is nothing to
+ * block, and an empty range would throw in subtractBlockedRanges.
+ *
+ * @param {Object} params
+ * @param {Date} params.returnedAt - when the garment physically came back
+ * @param {number} params.cleaningDays
+ * @param {string} [params.timeZone] - the listing's IANA zone; UTC when unknown
+ * @returns {{readyAt: Date, blockWindow: {start: Date, end: Date}|null}}
+ */
+const computeReadiness = ({ returnedAt, cleaningDays, timeZone }) => {
+  const returnDay = startOfDayInTimeZone(returnedAt, timeZone);
+
+  if (cleaningDays <= 0) {
+    return { readyAt: returnDay, blockWindow: null };
+  }
+
+  const readyAt = startOfDayInTimeZone(returnedAt, timeZone, cleaningDays + 1);
+
+  return { readyAt, blockWindow: { start: returnDay, end: readyAt } };
+};
+
+/**
+ * Does this listing have an ACTIVE transaction? See the ACTIVE_STATES block in
+ * api-util/coclosetBookingProcess.js for the definition and its rationale.
+ *
+ * FAILS CLOSED. Two ways this can go wrong and both are handled as "yes, assume
+ * there is one":
+ *
+ *   1. The query rejects (network, credentials, rate limit). Answering "no" on
+ *      an error would turn every Integration API hiccup into permission to
+ *      reassign a garment that is out on rental.
+ *   2. `lastTransitions` matches nothing for an unrecognised transition name
+ *      rather than erroring (verified against Dev). That direction is mitigated
+ *      upstream by deriving ACTIVE_LAST_TRANSITIONS from the process
+ *      transcription instead of hand-listing it; it cannot be detected here.
+ *
+ * `listingId` is passed as a single UUID because that is all transactions.query
+ * accepts - an array or comma-separated string is rejected with
+ * validation-invalid-value (verified; see server/api/laundry-orders.js).
+ *
+ * @param {Object} params
+ * @param {Object} params.integrationSdk
+ * @param {Object|string} params.listingId
+ * @returns {Promise<{active: boolean, states: Array<string>, unknown: boolean}>}
+ *   `unknown: true` means the query failed and `active` is a safe assumption
+ *   rather than an observation.
+ */
+const findActiveTransactions = ({ integrationSdk, listingId }) =>
+  integrationSdk.transactions
+    .query({
+      listingId: listingId?.uuid || listingId,
+      lastTransitions: ACTIVE_LAST_TRANSITIONS,
+      perPage: 100,
+    })
+    .then(response => {
+      const transactions = response?.data?.data || [];
+      const states = transactions
+        .map(tx => stateFromLastTransition(tx?.attributes?.lastTransition))
+        .filter(state => ACTIVE_STATES.includes(state));
+
+      return { active: transactions.length > 0, states, unknown: false };
+    })
+    .catch(() => ({ active: true, states: [], unknown: true }));
+
+const conflictError = message => {
+  const error = new Error(message);
+  error.status = 409;
+  error.statusText = message;
+  error.data = {};
+  return error;
+};
+
+/**
+ * Throw a 409 unless this listing is free of active transactions.
+ *
+ * @param {Object} params - as findActiveTransactions
+ * @returns {Promise<void>}
+ */
+const assertNoActiveTransaction = ({ integrationSdk, listingId }) =>
+  findActiveTransactions({ integrationSdk, listingId }).then(result => {
+    if (!result.active) {
+      return;
+    }
+    throw conflictError(
+      result.unknown
+        ? 'Could not verify whether this listing has an active transaction; refusing the change.'
+        : `This listing has an active transaction (${result.states.join(', ') || 'state unknown'}).`
+    );
+  });
+
+/**
+ * Write custody fields onto a listing via the Integration API.
+ *
+ * Extended-data updates are merged per top-level key server-side, so this does
+ * NOT need to read-and-spread the listing's other `metadata` keys (verified
+ * against the real Dev API - see server/api/listing-readiness-status.js).
+ * `readyAt` is only included when supplied, so a plain custody toggle never
+ * clears a readiness moment it knows nothing about.
+ *
+ * `readyAt` is stored as an ISO string rather than a Date. The SDK would encode
+ * a Date as a transit timestamp, which round-trips back through the Marketplace
+ * API to browsers as a value the client would then have to know to unwrap; a
+ * string is what every consumer here already does `new Date(...)` on.
+ *
+ * @param {Object} params
+ * @param {Object} params.integrationSdk
+ * @param {Object|string} params.listingId
+ * `handedBackAt` is written from `onLaundry` rather than passed in, and it is what the ops
+ * dashboard uses to tell the two garments that both read `onLaundry !== true` apart: one has
+ * never arrived, the other has gone home. Without it a handed-back garment is
+ * indistinguishable from a freshly assigned one - `writeLaundryAssignment` sets neither flag -
+ * and the studio's inventory would either keep listing garments that left or lose the ones it
+ * is still waiting for. See `isInStudioInventory` in server/api/laundry-orders.js.
+ *
+ * Taking custody CLEARS it (null deletes the key), so a garment the owner brings back is an
+ * ordinary garment again rather than one carrying a stale departure date. That includes the
+ * implicit writer on `laundry-confirm-return`, which is exactly right: the garment is here.
+ *
+ * @param {Object} params
+ * @param {Object} params.integrationSdk
+ * @param {Object|string} params.listingId
+ * @param {boolean} params.onLaundry
+ * @param {Date} [params.readyAt]
+ * @param {Date} [params.handedBackAt] - defaults to now on a hand-back; injectable for tests
+ * @returns {Promise<{onLaundry: boolean, readyAt: string|undefined, handedBackAt: string|null}>}
+ */
+const writeCustodyMetadata = ({
+  integrationSdk,
+  listingId,
+  onLaundry,
+  readyAt,
+  handedBackAt = new Date(),
+}) => {
+  const metadata = {
+    onLaundry,
+    handedBackAt: onLaundry === false ? handedBackAt.toISOString() : null,
+    // A pickup QR/PIN (api-util/listingPickupQr.js) is scoped to ONE hand-back. Whichever
+    // door completes it - this write, or the token-gated one the QR drives - the credential
+    // is spent and must not still validate against a garment that has already changed hands.
+    // Clearing it here, in the one function every hand-back path funnels through, means a
+    // stray token cannot outlive the event that consumed it, however custody was actually
+    // flipped.
+    ...(onLaundry === false ? { pickupToken: null } : {}),
+    ...(readyAt ? { readyAt: readyAt.toISOString() } : {}),
+  };
+
+  return integrationSdk.listings
+    .update({ id: listingId, metadata }, { expand: true })
+    .then(() => metadata);
+};
+
+/**
+ * THE WASH IS ACTUALLY FINISHED: drop the hold that was reserved for it.
+ *
+ * `readyAt` and the availability block beside it are both ESTIMATES, written when the work
+ * is scheduled - at `laundry-start-cleaning` for a return (see writeReadiness in
+ * api/laundry-transaction-status.js) and at reception for a first-time drop-off (see
+ * api/laundry-receive-garment.js). Both are computed from the studio's configured turnaround,
+ * which is how long it USUALLY takes. Nothing has ever reacted to the moment it actually
+ * finishes, so a studio that beats its own turnaround kept the garment off the market until
+ * the estimate ran out - by days, on a garment physically sitting on the rack.
+ *
+ * WHY THE FIELD IS DELETED RATHER THAN MOVED. `readyAt` means "when the wash this garment is
+ * in RIGHT NOW finishes, if any" (see resolveReadyAt in src/util/cleaningFloor.js). Once the
+ * studio says it is done there is no such wash, so the honest value is no value: the floor
+ * then falls back to the initial-cleaning rule, which is already spent for a garment at its
+ * studio, and the garment is bookable today. Writing "today" instead would be a date that
+ * claims to be a wash deadline and is not.
+ *
+ * AND TODAY, NOT TOMORROW. The "+1 day" in the estimate exists because a wash booked now
+ * cannot also be done now - it is a rule about work not yet started. This runs at the opposite
+ * end: the work is finished and the garment is on the rack, which is exactly the case
+ * same-day booking was built for.
+ *
+ * ONLY EXCEPTIONS THIS PLATFORM RECORDED ARE DELETED, via the ids kept on the transaction. An
+ * owner's own `seats: 0` exception is indistinguishable from ours to the API - same listing,
+ * same shape - so "delete the blocks over these dates" is not something that can be done
+ * safely without the record. Same rule, and the same key, as api/listing-availability-sweep.js.
+ * A transaction with no recorded ids simply has nothing to release: either its hold predates
+ * the record being kept, or there was no hold (`cleaningDays: 0`).
+ *
+ * NOTHING HERE MAY FAIL THE CALLER. It runs after a transition that has already succeeded, so
+ * every failure is logged and swallowed - the same contract writeReadiness has. A hold that
+ * survives is a garment bookable a few days later than it could be; a 500 is a step the studio
+ * has to do again.
+ *
+ * @param {Object} params
+ * @param {Object} params.integrationSdk
+ * @param {Object} params.listing - the listing entity
+ * @param {Array<string>} [params.exceptionIds] - from transaction.metadata, see
+ *   BUFFER_EXCEPTION_IDS_KEY in api-util/availabilityBuffer.js
+ * @param {Object} params.log
+ * @param {string} [params.txIdForLog]
+ * @returns {Promise<{readyAtCleared: boolean, released: Array<string>, failed: Array<string>}>}
+ */
+const releaseCleaningHold = ({ integrationSdk, listing, exceptionIds, log, txIdForLog }) => {
+  const listingId = listing?.id;
+  const hadReadyAt = !!listing?.attributes?.metadata?.readyAt;
+  const ids = Array.isArray(exceptionIds) ? exceptionIds.filter(id => typeof id === 'string') : [];
+
+  // `null` DELETES an extended-data key rather than storing null - the property this relies on,
+  // verified against Dev and already load-bearing in writeCustodyMetadata's `handedBackAt` and
+  // `pickupToken` clears. Skipped entirely when there is nothing stored, so a garment that
+  // never had a hold does not take a write on every completion.
+  const clearReadyAt = hadReadyAt
+    ? Promise.resolve()
+        .then(() =>
+          integrationSdk.listings.update({ id: listingId, metadata: { readyAt: null } })
+        )
+        .then(() => true)
+        .catch(e => {
+          log.error(e, 'release-cleaning-hold-ready-at-failed', { txId: txIdForLog });
+          return false;
+        })
+    : Promise.resolve(false);
+
+  return clearReadyAt.then(readyAtCleared => {
+    const released = [];
+    const failed = [];
+
+    // Sequential, and each delete caught on its own: one exception that will not go (already
+    // deleted by hand, say) must not abandon the rest of the window.
+    return ids
+      .reduce(
+        (chain, id) =>
+          chain.then(() =>
+            integrationSdk.availabilityExceptions
+              .delete({ id }, { expand: false })
+              .then(() => released.push(id))
+              .catch(e => {
+                log.error(e, 'release-cleaning-hold-exception-delete-failed', {
+                  txId: txIdForLog,
+                  exceptionId: id,
+                });
+                failed.push(id);
+              })
+          ),
+        Promise.resolve()
+      )
+      .then(() => ({ readyAtCleared, released, failed }));
+  });
+};
+
+// Whole days, for the one subtraction above. Both operands are midnights in the same zone by
+// construction, so this cannot drift across a DST boundary the way adding hours would.
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+
+module.exports = {
+  MAX_CLEANING_DAYS,
+  validateCleaningDays,
+  resolveCleaningDays,
+  maxCleaningDaysBeforeNextBooking,
+  computeReadiness,
+  findActiveTransactions,
+  assertNoActiveTransaction,
+  writeCustodyMetadata,
+  releaseCleaningHold,
+};

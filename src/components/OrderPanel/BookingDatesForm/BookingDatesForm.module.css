@@ -24,6 +24,20 @@
   }
 }
 
+/* Why the next few days are unavailable: the garment has not reached its laundry
+   yet and needs its first cleaning. Informational, not an error - it explains the
+   picker rather than reporting a mistake, so it does not use --colorFail. Follows
+   the 24px mobile gutter the sibling .error / .fieldSeats rules use. */
+.initialCleaningNotice {
+  composes: marketplaceTinyFontStyles from global;
+  color: var(--colorGrey700);
+  margin: 0 24px 12px 24px;
+
+  @media (--viewportMedium) {
+    margin: 0 0 16px 0;
+  }
+}
+
 .bookingDates {
   flex-shrink: 0;
 

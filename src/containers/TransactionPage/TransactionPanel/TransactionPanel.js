@@ -6,6 +6,7 @@ import { propTypes } from '../../../util/types';
 import { userDisplayNameAsString } from '../../../util/data';
 import { createSlug } from '../../../util/urlHelpers';
 import { displayPrice } from '../../../util/configHelpers';
+import { subtractTime, getBookingOverdueDays  } from '../../../util/dates';
 
 import { AvatarLarge, NamedLink, UserDisplayName } from '../../../components';
 
@@ -20,7 +21,12 @@ import FeedSection from './FeedSection';
 import DiminishedActionButtonMaybe from './DiminishedActionButtonMaybe';
 import PanelHeading from './PanelHeading';
 
+import HandoverQrMaybe from './HandoverQrMaybe';
+import DamageReportedMaybe from './DamageReportedMaybe';
+
 import css from './TransactionPanel.module.css';
+
+const DATE_FORMAT_NO_YEAR = { month: 'short', day: 'numeric' };
 
 // Helper function to get display names for different roles
 const displayNames = (currentUser, provider, customer, intl) => {
@@ -80,6 +86,7 @@ const allowShowingExtraInfo = (showExtraInfo, transactionPartyInfo) => {
  * @param {propTypes.user} props.provider - The provider
  * @param {boolean} props.hasTransitions - Whether the transitions are shown
  * @param {propTypes.uuid} props.transactionId - The transaction id
+ * @param {Object} [props.metadata] - transaction.attributes.metadata
  * @param {Array<propTypes.message>)} props.messages - The messages
  * @param {boolean} props.savePaymentMethodFailed - Whether the save payment method failed
  * @param {propTypes.error} props.fetchMessagesError - The fetch messages error
@@ -105,9 +112,14 @@ export class TransactionPanelComponent extends Component {
       listing,
       customer,
       provider,
+      booking,
       transitions,
       processName,
       protectedData,
+      // transaction.attributes.metadata. Carries `handoverQr` (the QR record
+      // written when the reservation was created) and `ticketCode`.
+      metadata,
+      transactionId,
       marketplaceName,
       messages,
       savePaymentMethodFailed = false,
@@ -136,6 +148,9 @@ export class TransactionPanelComponent extends Component {
     const isCustomer = transactionRole === 'customer';
     const isProvider = transactionRole === 'provider';
 
+    const bookingEnd = booking?.attributes?.displayEnd || booking?.attributes?.end;
+    const daysOverdue = getBookingOverdueDays(bookingEnd);
+
     const listingDeleted = !!listing?.attributes?.deleted;
     const isCustomerBanned = !!customer?.attributes?.banned;
     const isCustomerDeleted = !!customer?.attributes?.deleted;
@@ -150,6 +165,27 @@ export class TransactionPanelComponent extends Component {
       isProviderBanned,
       isProviderDeleted,
     };
+
+    // WHEN THE OWNER NEEDS TO HAVE DROPPED THE GARMENT OFF.
+    //
+    //   > "si debo ir a entregar una prenda, la fecha que se debe mostrar tanto en el inbox
+    //   >  page como en transaction page es 48 horas antes de la fecha de inicio del
+    //   >  booking" (Jonathan, 2026-09-11)
+    //
+    // The listing's own timezone, same as InboxTransactionPanel's identical computation for
+    // this exact deadline - a day booking is midnight-to-midnight in the marketplace's zone,
+    // and formatting it in the reader's own zone would move it to the previous day for anyone
+    // east of it.
+    const timeZone = listing?.attributes?.availabilityPlan?.timezone || 'Etc/UTC';
+    const bookingStart = booking?.attributes?.displayStart || booking?.attributes?.start;
+    const recommendedDropTime = bookingStart
+      ? subtractTime(bookingStart, 48, 'hours', timeZone)
+      : null;
+
+    const formatDateNoYear = date =>
+      date ? intl.formatDate(new Date(date), { ...DATE_FORMAT_NO_YEAR, timeZone }) : null;
+
+    const dropOffBy = formatDateNoYear(recommendedDropTime);
 
     const { authorDisplayName, customerDisplayName, otherUserDisplayNameString } = displayNames(
       currentUser,
@@ -230,6 +266,54 @@ export class TransactionPanelComponent extends Component {
             {requestQuote}
             {offer}
             {transactionFieldsComponent}
+
+            {daysOverdue > 0 &&
+              ['picked-up', 'overdue'].includes(stateData.processState) &&
+              isCustomer ? (
+                <p className={css.warning}>
+                  <FormattedMessage
+                    id="TransactionPanel.customerDeliveryOverdue"
+                    values={{ daysOverdue }}
+                  />
+                </p>
+              ) : null}
+
+            {/* The handover QR (mockups 16/17). Placed high in the main column,
+                above the message feed, because its whole job is to be found
+                quickly by someone standing at a laundry counter. It renders
+                nothing outside `cocloset-booking` and nothing once both
+                handovers are done - see HandoverQrMaybe. */}
+            {/* CUSTODY, from the flag that means custody.
+                  > "Yo como provider tengo la prenda en mi poder (onLaundry = false)"
+                  >   (Jonathan, 2026-09-08)
+
+                `isAtLaundry` read `readinessStatus`, which is the studio's ops vocabulary for
+                what it intends to do with a garment on its rack. `onLaundry` is the answer to
+                "is it on the rack at all", it is what the owner's two errands turn on, and it
+                is the one the client named. They agree in the ordinary case and come apart
+                exactly where it matters: a garment handed back keeps whatever readiness it
+                had, and only this flag is cleared. */}
+            <HandoverQrMaybe
+              processName={stateData.processName}
+              processState={stateData.processState}
+              transactionId={transactionId}
+              metadata={metadata}
+              isCustomer={isCustomer}
+              isAtLaundry={listing?.attributes?.metadata?.onLaundry === true}
+              dropOffBy={dropOffBy}
+            />
+
+            {/* The laundry's damage report (design §10). Sits directly below the
+                QR because it replaces it in practice: the QR disappears on entry
+                to `returned` and this is what the same spot then carries. Shown
+                to both parties, and only when damage was actually reported - see
+                DamageReportedMaybe. */}
+            <DamageReportedMaybe
+              processName={stateData.processName}
+              transactionRole={transactionRole}
+              metadata={metadata}
+            />
+
             {fileAttachments}
 
             {!isInquiryProcess ? (

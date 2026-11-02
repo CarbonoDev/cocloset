@@ -280,6 +280,158 @@ describe('OrderPanel', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Cocloset: the initial cleaning notice.
+  //
+  //   > "el calendario muestra el siguiente día como disponible, pero no esta
+  //   >  considerando los tiempos de lavado inicial ... si la prenda ya esta en
+  //   >  laundry entonces si debe aparecer disponible al siguiente día"
+  //
+  // BookingDatesForm's own tests cover the arithmetic. What they cannot cover is
+  // the THREADING: `onLaundry` and `initialCleaningDays` live in
+  // `listing.metadata`, and a rule that reads the wrong place - `publicData`, say,
+  // where the rest of the panel's props come from - reads `undefined` and silently
+  // never fires. That failure mode has shipped in this codebase before
+  // (`publicData.category` in EditListingLaundryPanel), so it is asserted here,
+  // from the listing entity down.
+  // ---------------------------------------------------------------------------
+  const dailyGarmentListing = (id, metadata) =>
+    createListing(id, {
+      title: 'the listing',
+      price: new Money(1000, 'USD'),
+      availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
+      publicData: {
+        listingType: 'rent-bicycles-daily',
+        transactionProcessAlias: 'default-booking/release-1',
+        unitType: 'day',
+      },
+      metadata,
+    });
+
+  it('Booking: explains why the near dates are unavailable before the garment reaches its laundry', async () => {
+    const listing = dailyGarmentListing('listing-not-at-laundry', {
+      initialCleaningDays: 3,
+      onLaundry: false,
+    });
+    const props = { ...commonProps, listing, isOwnListing: false, validListingTypes };
+    const { getByText } = render(<OrderPanel {...props} />, { config, routeConfiguration });
+
+    await waitFor(() => {
+      // A calendar that silently refuses the next three days reads as broken.
+      expect(getByText('BookingDatesForm.initialCleaningNotice')).toBeInTheDocument();
+    });
+  });
+
+  it('Booking: says nothing once the garment IS at the laundry', async () => {
+    const listing = dailyGarmentListing('listing-at-laundry', {
+      initialCleaningDays: 30,
+      onLaundry: true,
+    });
+    const props = { ...commonProps, listing, isOwnListing: false, validListingTypes };
+    const { queryByText, getByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
+    });
+    // Tomorrow is correct now, so the panel must look exactly as it did before this
+    // feature existed - no note, no explanation, nothing.
+    expect(queryByText('BookingDatesForm.initialCleaningNotice')).not.toBeInTheDocument();
+  });
+
+  it('Booking: says nothing for a listing with no stored turnaround', async () => {
+    // Every listing assigned before the field existed. No migration is planned - per
+    // the client, "en producción iniciaremos limpio".
+    const listing = dailyGarmentListing('listing-no-turnaround', {});
+    const props = { ...commonProps, listing, isOwnListing: false, validListingTypes };
+    const { queryByText, getByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingDatesForm.initialCleaningNotice')).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Cocloset: the LIVE turnaround, resolved at page load, overrides the snapshot.
+  //
+  //   > "desde el momento de la carga de listingPage, se debe consultar las propiedades
+  //   >  de la laundry seleccionada para este listing para obtener los días que se
+  //   >  necesiten para el lavado siempre que onLaundry sea false"
+  //
+  // `metadata.initialCleaningDays` is only what the laundry's turnaround was on the day it
+  // was assigned. The current number arrives as a prop from the ListingPage duck, and the
+  // panel has to prefer it - the threading is what these assert, for the same reason as
+  // above: the value comes from a different place than the rest of the panel's props, and
+  // a rule reading the wrong one reads `undefined` and silently never fires.
+  // ---------------------------------------------------------------------------
+  it('Booking: applies a live turnaround for a garment with NO stored snapshot at all', async () => {
+    // The strongest form of the claim: the snapshot alone would render no notice, so a
+    // notice here can only have come from the live value.
+    const listing = dailyGarmentListing('listing-live-only', { onLaundry: false });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes,
+      liveInitialCleaningDays: 3,
+    };
+    const { getByText } = render(<OrderPanel {...props} />, { config, routeConfiguration });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.initialCleaningNotice')).toBeInTheDocument();
+    });
+  });
+
+  it('Booking: falls back to the snapshot when the live lookup has not answered', async () => {
+    // null is both the initial state and the outcome of every failure. It must never mean
+    // "no block" - that would hand the customer a garment still in its owner's wardrobe.
+    const listing = dailyGarmentListing('listing-live-null', {
+      initialCleaningDays: 3,
+      onLaundry: false,
+    });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes,
+      liveInitialCleaningDays: null,
+    };
+    const { getByText } = render(<OrderPanel {...props} />, { config, routeConfiguration });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.initialCleaningNotice')).toBeInTheDocument();
+    });
+  });
+
+  it('Booking: a live turnaround cannot resurrect the rule once the garment is at its laundry', async () => {
+    const listing = dailyGarmentListing('listing-live-at-laundry', {
+      initialCleaningDays: 3,
+      onLaundry: true,
+    });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes,
+      liveInitialCleaningDays: 30,
+    };
+    const { queryByText, getByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.bookingStartTitle')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingDatesForm.initialCleaningNotice')).not.toBeInTheDocument();
+  });
+
   it('Booking: nightly', async () => {
     const listing = createListing('listing-night', {
       title: 'the listing',
@@ -574,5 +726,199 @@ describe('OrderPanel', () => {
       expect(getByText('InquiryWithoutPaymentForm.ctaButton')).toBeInTheDocument();
       expect(getByText('OrderPanel.ctaButtonMessageInquiry')).toBeInTheDocument();
     });
+  });
+  // ---------------------------------------------------------------------------
+  // Cocloset: fixed rental periods.
+  //
+  //   > "las reservas sean por semanas, 7 días y 14 días (...) el customer debe seleccionar
+  //   >  uno de dos botones, estos botones deben parecer mas como chips, una vez
+  //   >  seleccionado debe indicar solo un día, que es donde inicia la reserva"
+  //
+  // What this asserts is the SWITCH: that a garment-rental listing gets the period form
+  // instead of the stock date-range form. The window arithmetic is unit-tested next to the
+  // form itself; a form that is never rendered is indistinguishable from one that is
+  // always right, and this codebase has shipped that twice.
+  // ---------------------------------------------------------------------------
+  const garmentRentalTypes = [
+    ...validListingTypes,
+    {
+      listingType: 'garment-rental',
+      transactionType: {
+        process: 'cocloset-booking',
+        alias: 'cocloset-booking/release-1',
+        unitType: 'day',
+      },
+    },
+  ];
+
+  const garmentRentalListing = (id, publicData = {}, metadata = {}) =>
+    createListing(id, {
+      title: 'the listing',
+      price: new Money(10000, 'USD'),
+      availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
+      publicData: {
+        listingType: 'garment-rental',
+        transactionProcessAlias: 'cocloset-booking/release-1',
+        unitType: 'day',
+        priceVariationsEnabled: true,
+        priceVariants: [
+          { name: '7-days', bookingLengthInDays: 7, priceInSubunits: 10000 },
+          { name: '14-days', bookingLengthInDays: 14, priceInSubunits: 18000 },
+        ],
+        ...publicData,
+      },
+      metadata,
+    });
+
+  it('Booking: a garment is offered by fixed period, not by date range', async () => {
+    const listing = garmentRentalListing('listing-periods');
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText, queryByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    // An explicit timeout, because this one waits on the whole OrderPanel mounting - lazy
+    // chunks, the form, and the five-week strip - and the default second is not much when the
+    // suite is running several workers at once. It passes alone and has failed under load both
+    // before and after the strip learned to check rental windows; what it is measuring is the
+    // markup, not how fast the machine is.
+    await waitFor(
+      () => {
+        expect(getByText('BookingRentalPeriodForm.periodLabel')).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
+    // One start date, not a range: the stock form's two labels must be gone.
+    expect(getByText('BookingRentalPeriodForm.startDateLabel')).toBeInTheDocument();
+    expect(queryByText('BookingDatesForm.bookingStartTitle')).not.toBeInTheDocument();
+    expect(queryByText('BookingDatesForm.bookingEndTitle')).not.toBeInTheDocument();
+  });
+
+  it('Booking: renders one chip per priced period, each carrying its own price', async () => {
+    const listing = garmentRentalListing('listing-period-chips');
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getAllByRole, getByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getAllByRole('radio')).toHaveLength(2);
+    });
+    // The price is on the chip because the whole point is that it is NOT a daily rate the
+    // customer has to multiply out.
+    expect(getByText('$100.00')).toBeInTheDocument();
+    expect(getByText('$180.00')).toBeInTheDocument();
+  });
+
+  it('Booking: keeps the start date picker shut until a period is chosen', async () => {
+    //   > "una vez seleccionado debe indicar solo un día"
+    // Before a period is picked there is no window length to test dates against, so
+    // offering the calendar would mean offering days the form cannot validate.
+    const listing = garmentRentalListing('listing-period-order');
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText } = render(<OrderPanel {...props} />, { config, routeConfiguration });
+
+    await waitFor(() => {
+      expect(getByText('BookingRentalPeriodForm.startDateLabel')).toBeInTheDocument();
+    });
+    expect(
+      document.getElementById('OrderPanelBookingRentalPeriodForm_bookingStartDate')
+    ).toBeDisabled();
+  });
+
+  it('Booking: falls back to the price-missing notice when no period is priced', async () => {
+    // `listing.price` and the periods are written together, so a listing with no periods has
+    // no price either. Rendering an empty chip row would be a dead end.
+    const listing = createListing('listing-no-periods', {
+      title: 'the listing',
+      availabilityPlan: { type: 'availability-plan/time', timezone: 'Etc/UTC' },
+      publicData: {
+        listingType: 'garment-rental',
+        transactionProcessAlias: 'cocloset-booking/release-1',
+        unitType: 'day',
+      },
+      metadata: {},
+    });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText, queryByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('OrderPanel.listingPriceMissing')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingRentalPeriodForm.periodLabel')).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  //   > "cuando se puede hacer autoaccept, el label del button no debe ser 'Request...' si no
+  //   >  solo 'Book now' o algo similar"
+  //
+  // `submitButtonMessageId` has its own tests and they pin the rule. These pin the THREADING,
+  // for the same reason the `onLaundry` tests further up this file do: the flag lives in
+  // `listing.metadata`, and a reader that looks in `publicData` - where the rest of the panel's
+  // props come from - gets `undefined` and silently never fires. That exact failure has shipped
+  // in this codebase before.
+  // ---------------------------------------------------------------------------
+  it('Booking: offers to book NOW when the garment is already at its studio', async () => {
+    const listing = garmentRentalListing('listing-at-studio', {}, { onLaundry: true });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText, queryByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingRentalPeriodForm.bookNow')).toBeInTheDocument();
+    });
+    // "Request" would promise a wait that auto-accept is about to make not happen.
+    expect(queryByText('BookingDatesForm.requestToBook')).not.toBeInTheDocument();
+  });
+
+  it('Booking: still asks the owner when the garment is not at its studio yet', async () => {
+    const listing = garmentRentalListing('listing-not-at-studio', {}, { onLaundry: false });
+    const props = {
+      ...commonProps,
+      listing,
+      isOwnListing: false,
+      validListingTypes: garmentRentalTypes,
+    };
+    const { getByText, queryByText } = render(<OrderPanel {...props} />, {
+      config,
+      routeConfiguration,
+    });
+
+    await waitFor(() => {
+      expect(getByText('BookingDatesForm.requestToBook')).toBeInTheDocument();
+    });
+    expect(queryByText('BookingRentalPeriodForm.bookNow')).not.toBeInTheDocument();
   });
 });

@@ -1,0 +1,92 @@
+.root {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.legend {
+  composes: marketplaceDefaultFontStyles from global;
+  font-weight: var(--fontWeightSemiBold);
+  padding: 0;
+  margin: 0 0 8px 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Visually hidden, NOT display:none — the input must stay focusable and reachable by
+   assistive technology. `clip` rather than `opacity: 0` so it cannot be tabbed to at its
+   original position and then appear to do nothing. */
+.chipInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Colours come from the Cocloset token block in marketplaceDefaults.css, NOT from
+   --marketplaceColor*. The derived --marketplaceColorLight/Dark pair is the trap documented
+   at length next to the DatePicker tokens in that file: both are computed from the hosted
+   brand colour by shifting lightness without clamping, and Cocloset's hosted brand is
+   #000000, so a chip painted --marketplaceColorLight with --marketplaceColorDark text
+   renders black on black. The Cocloset tokens are fixed values chosen against each other. */
+.chip {
+  composes: marketplaceDefaultFontStyles from global;
+
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+
+  padding: 10px 18px;
+  border: 1px solid var(--coclosetBorderStrong);
+  border-radius: 999px;
+  background-color: var(--coclosetSurface);
+  color: var(--coclosetInk);
+  cursor: pointer;
+
+  transition: all var(--transitionStyleButton);
+}
+
+.chip:hover {
+  border-color: var(--coclosetBrand);
+}
+
+/* The focus ring belongs on the chip, since the input it belongs to is visually hidden.
+   Without this the keyboard user gets no indication of where they are. */
+.chipInput:focus-visible + .chip {
+  outline: 2px solid var(--coclosetInk);
+  outline-offset: 2px;
+}
+
+/* Selection is carried by fill AND by a heavier border, not by colour alone — the same
+   WCAG 1.4.1 argument the DatePicker tokens carry. */
+.chipSelected {
+  border-color: var(--coclosetBrand);
+  border-width: 2px;
+  padding: 9px 17px; /* keep the outer size identical to an unselected chip */
+  background-color: var(--coclosetBrandSubtle);
+  color: var(--coclosetBrandDark);
+}
+
+.chipDisabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.chipPeriod {
+  font-weight: var(--fontWeightSemiBold);
+}
+
+.chipPrice {
+  composes: marketplaceTinyFontStyles from global;
+  margin: 0;
+}

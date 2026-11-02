@@ -1,0 +1,14 @@
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.explanation {
+  composes: marketplaceBodyFontStyles from global;
+  color: var(--colorGrey700);
+  margin: 0 0 8px 0;
+}
+
+.priceInput {
+  margin-top: 24px;
+}

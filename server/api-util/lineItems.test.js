@@ -729,6 +729,249 @@ describe('transactionLineItems', () => {
     });
   });
 
+  describe('Cleaning Fee (Cocloset laundry feature)', () => {
+    // transactionLineItems() itself stays synchronous - the caller resolves
+    // cleaningFeeInSubunits beforehand via lineItemHelpers.resolveCleaningFeeInSubunits
+    // (Integration API lookup against the assigned laundry's privateData, with an
+    // env-var fallback). See lineItemHelpers.test.js for coverage of that resolution
+    // logic (laundry has a fee set / laundry has none set so it falls back to the env
+    // default / no assigned laundry at all).
+    it('should add a cleaning-fee line item, paid by the customer only, when a positive amount is resolved', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        1250 // e.g. laundry's own privateData.cleaningFee, EUR 12.50 resolved to subunits
+      );
+
+      expect(result).toHaveLength(4); // order + cleaning fee + provider commission + customer commission
+
+      expect(result[1]).toEqual({
+        code: 'line-item/cleaning-fee',
+        unitPrice: new Money(1250, 'EUR'),
+        quantity: 1,
+        includeFor: ['customer'],
+      });
+    });
+
+    it('should not add a cleaning-fee line item when cleaningFeeInSubunits is 0 (no assigned laundry, no env default)', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        0
+      );
+
+      expect(result).toHaveLength(3); // order + provider commission + customer commission
+      expect(result.some(item => item.code === 'line-item/cleaning-fee')).toBe(false);
+    });
+
+    it('should not crash and should not add a cleaning-fee line item when cleaningFeeInSubunits is not provided', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      // No 5th argument at all - mirrors a caller that forgot to resolve the
+      // cleaning fee, or the (impossible today) case where it's undefined.
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission
+      );
+
+      expect(result).toHaveLength(3);
+      expect(result.some(item => item.code === 'line-item/cleaning-fee')).toBe(false);
+    });
+  });
+
+  describe('Special Handling Fee (Cocloset laundry feature)', () => {
+    // transactionLineItems() itself stays synchronous - the caller resolves
+    // specialHandlingFeeInSubunits beforehand via
+    // lineItemHelpers.resolveSpecialHandlingFeeInSubunits (Integration API lookup of the
+    // listing's own privateData.specialCare, with a $15 env-var-overridable default). See
+    // lineItemHelpers.test.js for coverage of that resolution logic.
+    it('should add a special-handling-fee line item, paid by the customer only, when a positive amount is resolved', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        0, // no cleaning fee resolved for this fixture
+        1500 // $15.00 resolved to subunits
+      );
+
+      expect(result).toHaveLength(4); // order + special handling fee + provider commission + customer commission
+      expect(result.some(item => item.code === 'line-item/special-handling-fee')).toBe(true);
+      expect(result.find(item => item.code === 'line-item/special-handling-fee')).toEqual({
+        code: 'line-item/special-handling-fee',
+        unitPrice: new Money(1500, 'EUR'),
+        quantity: 1,
+        includeFor: ['customer'],
+      });
+    });
+
+    it('sits alongside the cleaning fee, both customer-paid, when both are positive', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        1250,
+        1500
+      );
+
+      // order + cleaning fee + special handling fee + provider commission + customer commission
+      expect(result).toHaveLength(5);
+      expect(result.map(item => item.code)).toEqual([
+        `line-item/${listing.attributes.publicData.unitType}`,
+        'line-item/cleaning-fee',
+        'line-item/special-handling-fee',
+        'line-item/provider-commission',
+        'line-item/customer-commission',
+      ]);
+    });
+
+    it('should not add a special-handling-fee line item when specialHandlingFeeInSubunits is 0 (env override, or no Special Care)', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        0,
+        0
+      );
+
+      expect(result).toHaveLength(3); // order + provider commission + customer commission
+      expect(result.some(item => item.code === 'line-item/special-handling-fee')).toBe(false);
+    });
+
+    it('should not crash and should not add a special-handling-fee line item when it is not provided', () => {
+      const listing = {
+        ...mockListing,
+        attributes: {
+          ...mockListing.attributes,
+          publicData: {
+            ...mockListing.attributes.publicData,
+            unitType: 'day',
+          },
+        },
+      };
+
+      const orderData = {
+        bookingStart: '2024-01-01T00:00:00.000Z',
+        bookingEnd: '2024-01-03T00:00:00.000Z',
+      };
+
+      // No 6th argument at all - mirrors a caller that forgot to resolve the
+      // special-handling fee, or the (impossible today) case where it's undefined.
+      const result = transactionLineItems(
+        listing,
+        orderData,
+        mockProviderCommission,
+        mockCustomerCommission,
+        0
+      );
+
+      expect(result).toHaveLength(3);
+      expect(result.some(item => item.code === 'line-item/special-handling-fee')).toBe(false);
+    });
+  });
+
   describe('Currency Handling', () => {
     it('should use currency from orderData when listing price has no currency', () => {
       const listing = {
@@ -775,5 +1018,117 @@ describe('transactionLineItems', () => {
 
       expect(result[0].unitPrice.currency).toBe('USD'); // Uses listing currency
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// COCLOSET: FIXED RENTAL PERIODS
+//
+//   > "el precio que el cliente va a pagar es el precio que marque el provider, es decir,
+//   >  si puso el precio para 7 días en $100, el cliente va a pagar $100, no $700"
+//
+// The whole feature, from this module's side, is that the base line item carries
+// `quantity: 1` even though the booking spans a week. Feeding the day count in as the
+// quantity is precisely the $700 bug.
+// ---------------------------------------------------------------------------
+describe('transactionLineItems: fixed rental periods', () => {
+  const PERIODS = [
+    { name: '7-days', bookingLengthInDays: 7, priceInSubunits: 10000 },
+    { name: '14-days', bookingLengthInDays: 14, priceInSubunits: 18000 },
+  ];
+
+  const garment = (publicData = {}) => ({
+    attributes: {
+      // The cheapest period, which is what the pricing panel writes here.
+      price: new Money(10000, 'EUR'),
+      publicData: {
+        unitType: 'day',
+        transactionProcessAlias: 'cocloset-booking/release-1',
+        priceVariants: PERIODS,
+        ...publicData,
+      },
+    },
+  });
+
+  const weekOrder = (priceVariantName = '7-days', days = 7) => ({
+    bookingStart: '2026-09-01T00:00:00.000Z',
+    bookingEnd: new Date(Date.UTC(2026, 8, 1 + days)).toISOString(),
+    priceVariantName,
+    currency: 'EUR',
+  });
+
+  const baseItem = lineItems => lineItems.find(li => li.code === 'line-item/day');
+
+  it('charges the period price once, not once per day', () => {
+    const result = transactionLineItems(garment(), weekOrder(), null, null);
+    const base = baseItem(result);
+
+    expect(base.quantity).toBe(1);
+    expect(base.unitPrice).toEqual(new Money(10000, 'EUR'));
+  });
+
+  it('charges the longer period its own price', () => {
+    const result = transactionLineItems(garment(), weekOrder('14-days', 14), null, null);
+    const base = baseItem(result);
+
+    expect(base.quantity).toBe(1);
+    expect(base.unitPrice).toEqual(new Money(18000, 'EUR'));
+  });
+
+  it('prices from the period even when priceVariationsEnabled is stored as false', () => {
+    // Every garment created before this feature carries `priceVariationsEnabled: false` -
+    // the pricing panel wrote it explicitly. Keying the price off that flag would make
+    // those listings fall back to `listing.price`, i.e. the CHEAPEST period, so a customer
+    // picking 14 days would be charged the 7-day price.
+    const result = transactionLineItems(
+      garment({ priceVariationsEnabled: false }),
+      weekOrder('14-days', 14),
+      null,
+      null
+    );
+
+    expect(baseItem(result).unitPrice).toEqual(new Money(18000, 'EUR'));
+  });
+
+  it('refuses to price an unknown period rather than falling back to listing.price', () => {
+    // The fallback would be the cheapest period, so a silent undercharge. This is the
+    // backstop for a caller that skipped assertRentalPeriodBooking.
+    expect(() => transactionLineItems(garment(), weekOrder('30-days', 30), null, null)).toThrow(
+      /priceVariantName/
+    );
+  });
+
+  it('bases the commissions on the flat period price', () => {
+    const result = transactionLineItems(
+      garment(),
+      weekOrder(),
+      { percentage: 10 },
+      { percentage: 5 }
+    );
+
+    const provider = result.find(li => li.code === 'line-item/provider-commission');
+    const customer = result.find(li => li.code === 'line-item/customer-commission');
+    // Percentages are applied to the base line item, which is now 100.00 rather than 700.00.
+    expect(provider.unitPrice).toEqual(new Money(10000, 'EUR'));
+    expect(customer.unitPrice).toEqual(new Money(10000, 'EUR'));
+  });
+
+  it('leaves a day listing on another process priced per day', () => {
+    const result = transactionLineItems(
+      {
+        attributes: {
+          price: new Money(10000, 'EUR'),
+          publicData: {
+            unitType: 'day',
+            transactionProcessAlias: 'default-booking/release-1',
+          },
+        },
+      },
+      { bookingStart: '2026-09-01T00:00:00.000Z', bookingEnd: '2026-09-08T00:00:00.000Z' },
+      null,
+      null
+    );
+
+    expect(baseItem(result).quantity).toBe(7);
   });
 });

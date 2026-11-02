@@ -25,9 +25,11 @@ import {
 import {
   getCurrentUserTypeRoles,
   hasPermissionToViewData,
+  isLaundryUser,
   isUserAuthorized,
 } from '../../util/userHelpers';
 import { richText } from '../../util/richText';
+import { BUSINESS_DAYS, formatTime12Hour } from '../../util/businessHours';
 
 import { isScrollingDisabled } from '../../ducks/ui.duck';
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
@@ -261,6 +263,8 @@ export const MainContent = props => {
     intl,
     hideReviews,
     userTypeRoles,
+    isLaundry,
+    laundryProfile = {},
   } = props;
 
   const hasListings = listings.length > 0;
@@ -270,8 +274,40 @@ export const MainContent = props => {
       ? window.matchMedia(`(max-width: ${MAX_MOBILE_SCREEN_WIDTH}px)`)?.matches
       : true;
 
-  const hasBio = !!bio;
-  const bioWithLinks = richText(bio, {
+  // A laundry's neighborhood is a fact about the shop, resolved from its address on
+  // LaundryProfileForm - not the plain-member field below, which a laundry never gets
+  // on its own settings page (see ProfileSettingsForm's isLaundry gate) so the two
+  // values can never disagree.
+  //
+  // Written by the member on their settings page; absent on a profile that has not said.
+  const neighborhood = isLaundry ? laundryProfile.neighborhood : publicData?.neighborhood;
+
+  // BUSINESS HOURS, AS A LIST - NOT THE GROUPED SENTENCE.
+  //
+  //   > "los horarios... actualmente salen asi: Mon 09:00-18:00, Tue 09:00-14:00...
+  //   >  Se muestren mejor en una lista, es más cómodo leer asi" (Jonathan, 2026-09-11)
+  //
+  // `businessHours` (the one-line summary LaundryProfileForm derives and stores
+  // alongside the grid) is what that comma-joined sentence IS - so this reads the
+  // structured `businessHoursByDay` instead and renders one line per day. Only days
+  // the studio is actually open appear at all: `businessHoursByDay` never carries a
+  // closed day (see util/businessHours.js's `toBusinessHoursByDay`).
+  const businessHoursByDay = laundryProfile.businessHoursByDay;
+  const businessHoursEntries = BUSINESS_DAYS.filter(day => businessHoursByDay?.[day]).map(day => ({
+    day,
+    ...businessHoursByDay[day],
+  }));
+  // A studio that saved its profile before the per-day grid existed has only the old
+  // summary sentence stored - shown verbatim rather than left blank, since some
+  // information beats none until the studio saves again and gets the list.
+  const hasBusinessHoursList = businessHoursEntries.length > 0;
+
+  // A laundry's "about" text is its Description (LaundryProfileForm's `description`),
+  // not the base `bio` attribute - see ProfileSettingsForm, which hides Bio entirely
+  // for a laundry so there is only ever one answer to "about this account".
+  const laundryDescription = laundryProfile.description;
+  const hasBio = isLaundry ? !!laundryDescription : !!bio;
+  const bioWithLinks = richText(isLaundry ? laundryDescription : bio, {
     linkify: true,
     longWordMinLength: MIN_LENGTH_FOR_LONG_WORDS,
     longWordClass: css.longWord,
@@ -290,10 +326,98 @@ export const MainContent = props => {
   }
   return (
     <div>
-      <H2 as="h1" className={css.desktopHeading}>
-        <FormattedMessage id="ProfilePage.desktopHeading" values={{ name: displayName }} />
+      <H2 as="h1" className={isLaundry ? css.laundryDesktopHeading : css.desktopHeading}>
+        {/* A LAUNDRY'S HEADING IS JUST ITS BUSINESS NAME.
+              > "Solo el Business Name reemplazando a 'Hello my name is [user name]'"
+              >  (Jonathan, 2026-09-11)
+
+            No "Hello, I'm" framing - a studio is a place, not a person introducing
+            itself. Falls back to displayName only if studioName was never set, so a
+            laundry mid-onboarding still gets a heading rather than a blank one. */}
+        {isLaundry ? (
+          <FormattedMessage
+            id="ProfilePage.laundryDesktopHeading"
+            values={{ name: laundryProfile.studioName || displayName }}
+          />
+        ) : (
+          <FormattedMessage id="ProfilePage.desktopHeading" values={{ name: displayName }} />
+        )}
       </H2>
-      {hasBio ? <p className={css.bio}>{bioWithLinks}</p> : null}
+      {isLaundry ? (
+        // STORE ADDRESS, NEIGHBORHOOD, BUSINESS HOURS, DESCRIPTION - ONE STYLED
+        // PANEL (2026-09-12: "El estilo era para la ruta /u/:id, no el form").
+        // Reuses the brand-accent card + eyebrow-label treatment already
+        // established for the landing page's own sections
+        // (SectionCoclosetSteps.module.css's `.sectionTitle`), which is where this
+        // page's restyle actually belongs per Jonathan - LaundryProfileForm itself
+        // is unchanged.
+        <div className={css.laundryDetails}>
+          {laundryProfile.address ? (
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.address" />
+              </span>
+              <p className={css.laundryDetailValue}>{laundryProfile.address}</p>
+            </div>
+          ) : null}
+          {neighborhood ? (
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.neighborhood" />
+              </span>
+              <p className={css.laundryDetailValue}>{neighborhood}</p>
+            </div>
+          ) : null}
+          {hasBusinessHoursList ? (
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.hours" />
+              </span>
+              <ul className={css.businessHoursList}>
+                {businessHoursEntries.map(({ day, open, close }) => (
+                  <li key={day} className={css.businessHoursRow}>
+                    <span className={css.businessHoursDay}>
+                      <FormattedMessage id={`ProfilePage.day.${day}`} />
+                    </span>
+                    <span>
+                      {formatTime12Hour(open)} – {formatTime12Hour(close)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : laundryProfile.businessHours ? (
+            // Saved before the per-day grid existed - the old sentence, verbatim.
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.hours" />
+              </span>
+              <p className={css.laundryDetailValue}>{laundryProfile.businessHours}</p>
+            </div>
+          ) : null}
+          {hasBio ? (
+            <div className={css.laundryDetailRow}>
+              <span className={css.laundryDetailLabel}>
+                <FormattedMessage id="ProfilePage.laundryDetail.about" />
+              </span>
+              <p className={css.laundryDetailValue}>{bioWithLinks}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          {/* Where this member is, in their own words - written on the settings page
+              (Jonathan, 2026-09-03). Directly under the name because that is what it
+              qualifies: a wardrobe organised around neighborhoods answers "is this
+              person near me" before it answers anything else. Absent when they have
+              not said, rather than rendered as an empty line. */}
+          {/* The member's own words, rendered as content rather than through a message -
+              the same treatment the bio below gets, and for the same reason: there is no
+              UI text here to translate, only what they typed. */}
+          {neighborhood ? <p className={css.neighborhood}>{neighborhood}</p> : null}
+          {hasBio ? <p className={css.bio}>{bioWithLinks}</p> : null}
+        </>
+      )}
 
       {displayName ? (
         <CustomUserFields
@@ -388,6 +512,12 @@ export const ProfilePageComponent = props => {
   const isCurrentUser = currentUser?.id && currentUser?.id?.uuid === pathParams.id;
   const profileUser = useCurrentUser ? currentUser : user;
   const { bio, displayName, publicData, metadata } = profileUser?.attributes?.profile || {};
+  // `metadata` is public-read (Integration-API-write-only, same visibility rule as a
+  // listing's), so this works for ANY visitor viewing a laundry's page, not just the
+  // laundry viewing its own - unlike LaundryProfilePage/LaundryOpsPage, which gate on
+  // `currentUser` instead.
+  const isLaundry = isLaundryUser(profileUser);
+  const laundryProfile = publicData?.laundryProfile || {};
   const { userFields } = config.user;
   const isPrivateMarketplace = config.accessControl.marketplace.private === true;
   const isUnauthorizedUser = currentUser && !isUserAuthorized(currentUser);
@@ -471,7 +601,7 @@ export const ProfilePageComponent = props => {
           <AsideContent
             user={profileUser}
             showLinkToProfileSettingsPage={mounted && isCurrentUser}
-            displayName={displayName}
+            displayName={isLaundry ? laundryProfile.studioName || displayName : displayName}
           />
         }
         footer={<FooterContainer />}
@@ -483,9 +613,14 @@ export const ProfilePageComponent = props => {
           publicData={publicData}
           metadata={metadata}
           userFieldConfig={userFields}
-          hideReviews={hasNoViewingRightsOnPrivateMarketplace}
+          // No reviews for a laundry - it isn't a transaction party, so it never
+          // has any (Jonathan, 2026-09-11: "Hay que quitar la sección de reviews
+          // ya que no reviews para laundry").
+          hideReviews={hasNoViewingRightsOnPrivateMarketplace || isLaundry}
           intl={intl}
           userTypeRoles={userTypeRoles}
+          isLaundry={isLaundry}
+          laundryProfile={laundryProfile}
           {...rest}
         />
       </LayoutSideNavigation>

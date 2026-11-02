@@ -1,0 +1,1 @@
+{{set-translations (asset "content/email-texts.json")}}{{t "BookingAcceptedRequest.Subject" "{listingTitle} Rental Confirmation" listingTitle=transaction.listing.title}}

@@ -241,9 +241,14 @@ describe('ListingPage variants', () => {
       expect(screen.getByTestId('hero')).toBeInTheDocument();
       expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
 
-      // Has order title (rendered for )
+      // Has order title. TWO, not three: the main column used to repeat the order panel's
+      // title, and now carries the garment's OWN heading instead - brand, title, provenance
+      // (SectionListingHeader). What is left is the panel's mobile and desktop copies.
       const orderTitle = queryAllByRole('heading', { name: 'ListingPage.orderTitle' });
-      expect(orderTitle).toHaveLength(3);
+      expect(orderTitle).toHaveLength(2);
+
+      // ...and that own heading is the listing's real title, not a message key.
+      expect(getByRole('heading', { level: 1, name: 'listing1 title' })).toBeInTheDocument();
 
       // Has details section title and selected category info
       expect(getByRole('heading', { name: 'ListingPage.detailsTitle' })).toBeInTheDocument();
@@ -296,9 +301,14 @@ describe('ListingPage variants', () => {
       expect(screen.getByTestId('carousel')).toBeInTheDocument();
       expect(screen.queryByTestId('hero')).not.toBeInTheDocument();
 
-      // Has order title (rendered for )
+      // Has order title. TWO, not three: the main column used to repeat the order panel's
+      // title, and now carries the garment's OWN heading instead - brand, title, provenance
+      // (SectionListingHeader). What is left is the panel's mobile and desktop copies.
       const orderTitle = queryAllByRole('heading', { name: 'ListingPage.orderTitle' });
-      expect(orderTitle).toHaveLength(3);
+      expect(orderTitle).toHaveLength(2);
+
+      // ...and that own heading is the listing's real title, not a message key.
+      expect(getByRole('heading', { level: 1, name: 'listing1 title' })).toBeInTheDocument();
 
       // Has details section title and selected category info
       expect(getByRole('heading', { name: 'ListingPage.detailsTitle' })).toBeInTheDocument();
@@ -359,6 +369,23 @@ describe('Duck', () => {
         sendInquiryInProgress: false,
         sendInquiryError: null,
         inquiryModalOpenForListingId: null,
+        // Cocloset: the assigned laundry's live initial-cleaning turnaround. null means
+        // "no live answer", which is what makes the calendar fall back to the
+        // `metadata.initialCleaningDays` snapshot - see ListingPage.duck.test.js.
+        initialCleaningDays: null,
+        // Cocloset: day ranges another rental's wash has already claimed. null is "not
+        // known" and is deliberately NOT the same as `[]`, which would tell the picker
+        // there is nothing to block.
+        cleaningGaps: null,
+        // Cocloset: the assigned studio's turnaround and this garment's completed-rental
+        // count. Both null until the page-load call answers, and on any failure - the page
+        // leaves the line out rather than stating a number it did not read.
+        cleaningTurnaroundDays: null,
+        completedRentals: null,
+        // Cocloset: the assigned studio's opening hours, for the pickup card. Same contract
+        // as its neighbours - null until the read answers and on any failure, so the card
+        // omits the hours rather than implying the counter is open.
+        assignedLaundryHours: null,
       });
     });
 

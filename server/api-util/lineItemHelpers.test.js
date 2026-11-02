@@ -1,6 +1,37 @@
 const { types } = require('sharetribe-flex-sdk');
 const { Money } = types;
 
+// Silences the (correct) error log a malformed CLEANING_FEE_* value emits — the log
+// itself is asserted in cleaningFeeEnv.test.js, and letting it print here just buries
+// real failures in the suite output.
+jest.mock('../log', () => ({ error: jest.fn() }));
+
+// resolveCleaningFeeInSubunits() used to call the Integration SDK to read the assigned
+// laundry's privateData.cleaningFee. It no longer reads any laundry data at all — the fee
+// is server env configuration now (CLEANING_FEE_<CATEGORY_ID>, see cleaningFeeEnv.js).
+// The Integration SDK is still mocked here so the tests below can assert that NOTHING
+// looks a laundry up on the pricing path: a stored fee that could still reach an invoice
+// is the exact bug that change removed.
+//
+// resolveSpecialHandlingFeeInSubunits(), unlike the cleaning fee, DOES call the
+// Integration SDK — to re-fetch the LISTING itself (not a laundry) and read its own
+// `privateData.specialCare`, which the caller's own session SDK cannot see. Hence
+// `listings.show` is mocked here too.
+const mockUsersShow = jest.fn();
+const mockListingsShow = jest.fn();
+jest.mock('./integrationSdk', () => ({
+  getIntegrationSdk: jest.fn(() => ({
+    users: {
+      show: mockUsersShow,
+    },
+    listings: {
+      show: mockListingsShow,
+    },
+  })),
+}));
+
+const { getIntegrationSdk } = require('./integrationSdk');
+
 const {
   calculateTotalPriceFromQuantity,
   calculateTotalPriceFromPercentage,
@@ -17,7 +48,16 @@ const {
   hasMinimumCommission,
   getProviderCommissionMaybe,
   getCustomerCommissionMaybe,
+  getCleaningFeeLineItemMaybe,
+  resolveCleaningFeeInSubunits,
+  getSpecialHandlingFeeLineItemMaybe,
+  resolveSpecialHandlingFeeInSubunits,
 } = require('./lineItemHelpers');
+
+const { resetReportedMalformedEnvVars } = require('./cleaningFeeEnv');
+const {
+  resetReportedMalformed: resetReportedSpecialHandlingMalformed,
+} = require('./specialHandlingFeeEnv');
 
 describe('calculateTotalPriceFromQuantity()', () => {
   it('should calculate price based on quantity', () => {
@@ -718,5 +758,385 @@ describe('getCustomerCommissionMaybe()', () => {
       },
     ];
     expect(getCustomerCommissionMaybe(commission, order, currency)).toEqual(expectedLineItems);
+  });
+});
+
+describe('getCleaningFeeLineItemMaybe()', () => {
+  it('should return a cleaning-fee line item for a positive amount', () => {
+    expect(getCleaningFeeLineItemMaybe(1250, 'EUR')).toEqual([
+      {
+        code: 'line-item/cleaning-fee',
+        unitPrice: new Money(1250, 'EUR'),
+        quantity: 1,
+        includeFor: ['customer'],
+      },
+    ]);
+  });
+
+  it('should return an empty array for a zero amount (no cleaning fee to charge)', () => {
+    expect(getCleaningFeeLineItemMaybe(0, 'EUR')).toEqual([]);
+  });
+
+  it('should return an empty array when the amount is not a valid number', () => {
+    expect(getCleaningFeeLineItemMaybe(undefined, 'EUR')).toEqual([]);
+    expect(getCleaningFeeLineItemMaybe(null, 'EUR')).toEqual([]);
+    expect(getCleaningFeeLineItemMaybe(NaN, 'EUR')).toEqual([]);
+    expect(getCleaningFeeLineItemMaybe(-500, 'EUR')).toEqual([]);
+  });
+
+  it('should return an empty array when currency is missing', () => {
+    expect(getCleaningFeeLineItemMaybe(1000, null)).toEqual([]);
+  });
+});
+
+describe('resolveCleaningFeeInSubunits()', () => {
+  // Every fee-bearing var is set on process.env here rather than injected, because that
+  // is how the function is really called: it reads the process environment. Snapshot and
+  // restore the whole set so one test's fee cannot decide another's.
+  const FEE_VARS = [
+    'DEFAULT_CLEANING_FEE',
+    'CLEANING_FEE_DRESSES',
+    'CLEANING_FEE_MIDI_DRESS',
+    'CLEANING_FEE_PANTS',
+  ];
+  const originalEnv = {};
+
+  beforeEach(() => {
+    FEE_VARS.forEach(name => {
+      originalEnv[name] = process.env[name];
+      delete process.env[name];
+    });
+    // jest config has resetMocks: true, which wipes mock implementations (not just call
+    // history) before every test - including the one set by the jest.mock() factory
+    // above - so getIntegrationSdk() needs to be re-armed here on every test.
+    getIntegrationSdk.mockReturnValue({ users: { show: mockUsersShow } });
+    resetReportedMalformedEnvVars();
+  });
+
+  afterEach(() => {
+    FEE_VARS.forEach(name => {
+      if (originalEnv[name] === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = originalEnv[name];
+      }
+    });
+  });
+
+  // The laundry id is in `metadata` (Integration-API-only); the category chain stays in
+  // `publicData`, which is where Console writes it.
+  const listingWithLaundry = (laundryId, categoryLevels = {}) => ({
+    attributes: {
+      metadata: { assignedLaundryId: laundryId },
+      publicData: { ...categoryLevels },
+    },
+  });
+
+  const listingWithoutLaundry = { attributes: { publicData: {} } };
+
+  const midiDressListing = laundryId =>
+    listingWithLaundry(laundryId, {
+      categoryLevel1: 'dresses',
+      categoryLevel2: 'midi_dress',
+    });
+
+  // ── THE FEE COMES FROM THE ENVIRONMENT ─────────────────────────────────────
+  // This is the money path: the number these tests pin is what lands on a customer's
+  // invoice. The resolution rule itself is unit-tested exhaustively in
+  // cleaningFeeEnv.test.js; these check that resolveCleaningFeeInSubunits feeds it the
+  // LISTING's own category chain, converts to subunits, and never consults a laundry.
+
+  it("charges the env fee configured for THIS garment's category", async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    process.env.CLEANING_FEE_MIDI_DRESS = '22';
+
+    // 22.00 EUR in cents, not the marketplace default 8.
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(2200);
+  });
+
+  it('charges the HIGHEST matching category fee, not the most specific one', async () => {
+    // The rule the client asked for: "utilizaría el precio mas alto". The subcategory is
+    // CHEAPER here, which is the case that separates highest-wins from deepest-wins — a
+    // most-specific implementation charges 800 and fails.
+    process.env.CLEANING_FEE_DRESSES = '10';
+    process.env.CLEANING_FEE_MIDI_DRESS = '8';
+
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(1000);
+  });
+
+  it('falls back to DEFAULT_CLEANING_FEE for a category with no var of its own', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    process.env.CLEANING_FEE_DRESSES = '22';
+
+    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'pants' });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(800);
+  });
+
+  it('converts a fractional major-unit fee to subunits, rounding half up', async () => {
+    process.env.CLEANING_FEE_DRESSES = '12.505';
+
+    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1251);
+  });
+
+  it('treats an explicit env fee of 0 as configured — free, no line item', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    process.env.CLEANING_FEE_MIDI_DRESS = '0';
+
+    // 0 wins over the default because the default is a fallback, not a competitor, and a
+    // zero fee simply adds no cleaning-fee line item.
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(0);
+  });
+
+  it('charges nothing when no category var and no default are set', async () => {
+    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(0);
+  });
+
+  it('uses the marketplace default for an uncategorised listing', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '15';
+
+    expect(await resolveCleaningFeeInSubunits(listingWithoutLaundry, 'EUR')).toBe(1500);
+  });
+
+  it('ignores a MALFORMED env fee rather than charging 0', async () => {
+    // A typo must not silently zero the charge: resolution falls through to the next
+    // configured level, exactly as if the var were unset.
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    process.env.CLEANING_FEE_MIDI_DRESS = 'twenty-two';
+
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(800);
+  });
+
+  it('never throws, whatever the listing looks like', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+
+    expect(await resolveCleaningFeeInSubunits(undefined, 'EUR')).toBe(800);
+    expect(await resolveCleaningFeeInSubunits({}, 'EUR')).toBe(800);
+    expect(await resolveCleaningFeeInSubunits({ attributes: {} }, 'EUR')).toBe(800);
+  });
+
+  it('returns 0 when no currency is given', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+
+    expect(await resolveCleaningFeeInSubunits(listingWithoutLaundry, null)).toBe(0);
+  });
+
+  // ── NO LAUNDRY DATA REACHES A PRICE ────────────────────────────────────────
+  // These replace the old isLaundry security tests. Those pinned that a fee stored by a
+  // user who is not a flagged laundry could not be honoured; the guarantee is now
+  // stronger and simpler — NO stored fee is honoured, from anyone, because the pricing
+  // path does not read a profile at all. Nothing about a de-flagged laundry, a listing
+  // migrated off the old provider-writable publicData.assignedLaundryId, or a rogue
+  // assignedLaundryId can move a customer's payin total any more.
+
+  it('makes no Integration API call at all', async () => {
+    process.env.CLEANING_FEE_DRESSES = '22';
+
+    const listing = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
+    await resolveCleaningFeeInSubunits(listing, 'EUR');
+
+    expect(mockUsersShow).not.toHaveBeenCalled();
+    expect(getIntegrationSdk).not.toHaveBeenCalled();
+  });
+
+  it("ignores a stored privateData.cleaningFee, even a real laundry's", async () => {
+    // Dead data. The form no longer collects it, and leaving a reader in place would let
+    // a stale stored value keep pricing rentals after the input was removed — which is
+    // precisely the bug this change exists to remove.
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    mockUsersShow.mockResolvedValue({
+      data: {
+        data: {
+          attributes: {
+            profile: { metadata: { isLaundry: true }, privateData: { cleaningFee: 99 } },
+          },
+        },
+      },
+    });
+
+    expect(await resolveCleaningFeeInSubunits(listingWithLaundry('laundry-1'), 'EUR')).toBe(800);
+    expect(mockUsersShow).not.toHaveBeenCalled();
+  });
+
+  it('ignores a stored per-category cleaningFee table', async () => {
+    process.env.DEFAULT_CLEANING_FEE = '8';
+    mockUsersShow.mockResolvedValue({
+      data: {
+        data: {
+          attributes: {
+            profile: {
+              metadata: { isLaundry: true },
+              privateData: { categoryPricing: { midi_dress: { cleaningFee: 5000 } } },
+            },
+          },
+        },
+      },
+    });
+
+    expect(await resolveCleaningFeeInSubunits(midiDressListing('laundry-1'), 'EUR')).toBe(800);
+  });
+
+  it('cannot be influenced by pointing assignedLaundryId at any user', async () => {
+    // The original attack: the id used to be provider-controlled publicData on the
+    // provider's own listing, so a provider could point it at themselves and set their
+    // own privateData.cleaningFee, zeroing the fee or inflating every customer's payin
+    // total. There is nothing left to point at.
+    process.env.CLEANING_FEE_DRESSES = '10';
+    mockUsersShow.mockResolvedValue({
+      data: { data: { attributes: { profile: { privateData: { cleaningFee: 5000 } } } } },
+    });
+
+    const listing = listingWithLaundry('rogue-user', { categoryLevel1: 'dresses' });
+
+    expect(await resolveCleaningFeeInSubunits(listing, 'EUR')).toBe(1000);
+  });
+
+  it('charges the same for a listing with no assigned laundry as for one with', async () => {
+    // The fee is a property of the garment's category, not of who cleans it.
+    process.env.CLEANING_FEE_DRESSES = '11';
+
+    const assigned = listingWithLaundry('laundry-1', { categoryLevel1: 'dresses' });
+    const unassigned = { attributes: { publicData: { categoryLevel1: 'dresses' } } };
+
+    expect(await resolveCleaningFeeInSubunits(assigned, 'EUR')).toBe(1100);
+    expect(await resolveCleaningFeeInSubunits(unassigned, 'EUR')).toBe(1100);
+  });
+});
+
+describe('getSpecialHandlingFeeLineItemMaybe()', () => {
+  it('should return a special-handling-fee line item for a positive amount', () => {
+    expect(getSpecialHandlingFeeLineItemMaybe(1500, 'USD')).toEqual([
+      {
+        code: 'line-item/special-handling-fee',
+        unitPrice: new Money(1500, 'USD'),
+        quantity: 1,
+        includeFor: ['customer'],
+      },
+    ]);
+  });
+
+  it('should return an empty array for a zero amount (fee disabled via env)', () => {
+    expect(getSpecialHandlingFeeLineItemMaybe(0, 'USD')).toEqual([]);
+  });
+
+  it('should return an empty array when the amount is not a valid number', () => {
+    expect(getSpecialHandlingFeeLineItemMaybe(undefined, 'USD')).toEqual([]);
+    expect(getSpecialHandlingFeeLineItemMaybe(null, 'USD')).toEqual([]);
+    expect(getSpecialHandlingFeeLineItemMaybe(NaN, 'USD')).toEqual([]);
+    expect(getSpecialHandlingFeeLineItemMaybe(-500, 'USD')).toEqual([]);
+  });
+
+  it('should return an empty array when currency is missing', () => {
+    expect(getSpecialHandlingFeeLineItemMaybe(1500, null)).toEqual([]);
+  });
+});
+
+describe('resolveSpecialHandlingFeeInSubunits()', () => {
+  const originalEnv = process.env.SPECIAL_HANDLING_FEE;
+
+  beforeEach(() => {
+    delete process.env.SPECIAL_HANDLING_FEE;
+    // jest config has resetMocks: true, so the jest.mock() factory's implementation is
+    // wiped before every test.
+    getIntegrationSdk.mockReturnValue({ listings: { show: mockListingsShow } });
+    resetReportedSpecialHandlingMalformed();
+  });
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.SPECIAL_HANDLING_FEE;
+    } else {
+      process.env.SPECIAL_HANDLING_FEE = originalEnv;
+    }
+  });
+
+  const listingWithSpecialCare = flags => ({
+    id: { uuid: 'listing-1' },
+    attributes: { privateData: { specialCare: { flags } } },
+  });
+
+  const mockFreshListing = privateData =>
+    mockListingsShow.mockResolvedValue({
+      data: { data: { attributes: { privateData } } },
+    });
+
+  it('charges the $15 default when the listing has any Special Care flag set', async () => {
+    mockFreshListing({ specialCare: { flags: ['highValue'] } });
+
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare(['highValue']), 'USD')
+    ).toBe(1500);
+  });
+
+  it('charges nothing when the listing has no Special Care flags', async () => {
+    mockFreshListing({});
+
+    expect(await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare([]), 'USD')).toBe(0);
+  });
+
+  it('charges nothing when the listing has no privateData at all', async () => {
+    mockFreshListing(undefined);
+
+    expect(await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare([]), 'USD')).toBe(0);
+  });
+
+  it('does not matter WHICH flag is set — it is a flat, not per-flag, fee', async () => {
+    mockFreshListing({ specialCare: { flags: ['embellishments', 'leatherSuedeTrim'] } });
+
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(
+        listingWithSpecialCare(['embellishments', 'leatherSuedeTrim']),
+        'USD'
+      )
+    ).toBe(1500);
+  });
+
+  it('uses the env override, including a $0 override that disables the fee outright', async () => {
+    process.env.SPECIAL_HANDLING_FEE = '25';
+    mockFreshListing({ specialCare: { flags: ['highValue'] } });
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare(['highValue']), 'USD')
+    ).toBe(2500);
+
+    process.env.SPECIAL_HANDLING_FEE = '0';
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare(['highValue']), 'USD')
+    ).toBe(0);
+  });
+
+  // ── PREVIEW AND CHARGE AGREE BY CONSTRUCTION ───────────────────────────────
+  // The whole point of re-fetching rather than trusting the passed-in listing: a
+  // customer's own session SDK never carries privateData for someone else's listing, so
+  // if this read the object it was handed instead of a fresh Integration API fetch, the
+  // fee would silently be 0 on every real checkout while still working in a test that
+  // hands it privateData directly.
+
+  it('re-fetches the listing rather than trusting privateData already on the object it was given', async () => {
+    mockFreshListing({ specialCare: { flags: ['highValue'] } });
+
+    // The listing passed in claims no privateData at all — exactly what a customer's own
+    // session SDK would hand this function on a real checkout.
+    const listingFromCustomerSession = { id: { uuid: 'listing-1' }, attributes: {} };
+
+    expect(await resolveSpecialHandlingFeeInSubunits(listingFromCustomerSession, 'USD')).toBe(1500);
+    expect(mockListingsShow).toHaveBeenCalledWith({ id: { uuid: 'listing-1' } });
+  });
+
+  it('never throws, whatever the listing looks like', async () => {
+    expect(await resolveSpecialHandlingFeeInSubunits(undefined, 'USD')).toBe(0);
+    expect(await resolveSpecialHandlingFeeInSubunits({}, 'USD')).toBe(0);
+    expect(mockListingsShow).not.toHaveBeenCalled();
+  });
+
+  it('returns 0 when no currency is given, even with special care set', async () => {
+    mockFreshListing({ specialCare: { flags: ['highValue'] } });
+
+    expect(
+      await resolveSpecialHandlingFeeInSubunits(listingWithSpecialCare(['highValue']), null)
+    ).toBe(0);
   });
 });

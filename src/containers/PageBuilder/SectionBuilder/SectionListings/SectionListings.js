@@ -76,7 +76,8 @@ const calculateCarouselHeight = (
   carouselWidth,
   isMobileBreakpoint = false,
   error,
-  noListingsFound
+  noListingsFound,
+  isEditorial = false
 ) => {
   const errorMessageHeight = 250;
   const noListingsFoundHeight = 220;
@@ -116,8 +117,32 @@ const calculateCarouselHeight = (
   const cardImageHeight = cardWidth / parsedAspectRatio;
   const cardInfoHeight = priceHeight + titleHeightSingleLine + authorInfoHeight + cardInfoPadding;
 
-  const totalCardHeight =
-    cardImageHeight + (isMobileBreakpoint ? cardInfoHeightMobile : cardInfoHeight);
+  // ⚠️ Cocloset: the editorial card is a different stack - a brand eyebrow, a title of up to
+  // TWO lines on its own row, then a size/collection-point + price row below it (moved there
+  // in round 3, 2026-09-18 - it used to sit beside the title). Same hardcoded-pixel bargain
+  // the rest of this function makes, and the same maintenance rule applies: these mirror
+  // .editorial* in ListingCard.module.css.
+  //
+  // The two-line bound is not an assumption, it is enforced - .editorialTitle clamps at two
+  // lines - because this container's height is set in JS and anything taller is CLIPPED. A
+  // card that grows past the estimate loses its bottom row with nothing to say why.
+  const editorialBrandHeight = 16 + 4; // line + margin-bottom
+  const editorialTitleHeight = 2 * 22; // clamped at two lines (line-height 22px, round 3)
+  // The price shares this row now and uses marketplaceDefaultFontStyles (24px line-height),
+  // taller than the meta text's own 16px - the row's height is driven by the taller sibling,
+  // plus the row's own top margin.
+  const editorialMetaHeight = 24 + 4; // taller sibling's line height + row's margin-top
+  const editorialPaddingTop = 12;
+  const editorialInfoHeight =
+    editorialBrandHeight + editorialTitleHeight + editorialMetaHeight + editorialPaddingTop;
+
+  const infoHeight = isEditorial
+    ? editorialInfoHeight
+    : isMobileBreakpoint
+    ? cardInfoHeightMobile
+    : cardInfoHeight;
+
+  const totalCardHeight = cardImageHeight + infoHeight;
   const totalWithPaddings = totalCardHeight + containerPaddingTop + containerPaddingBottom;
 
   return Math.ceil(totalWithPaddings);
@@ -148,6 +173,9 @@ const ListingCarouselComponent = props => {
     error,
     allSections,
     isInsideContainer,
+    // Cocloset: which ListingCard layout to render. Undefined - every stock caller - keeps
+    // the default card, so the search page and the map are untouched.
+    listingCardVariant,
   } = props;
 
   const listingImageConfig = config.layout.listingImage;
@@ -197,6 +225,7 @@ const ListingCarouselComponent = props => {
             darkMode={darkMode}
             renderSizes={getResponsiveImageSizes(numColumns)}
             lazyLoadImage={!isInsideContainer}
+            variant={listingCardVariant}
           />
         </li>
       ))}
@@ -327,7 +356,8 @@ const SectionListings = props => {
     carouselWidthConstant,
     isMobileBreakpoint,
     error,
-    noListingsFound
+    noListingsFound,
+    options?.listingCardVariant === 'editorial'
   );
 
   return (
@@ -338,9 +368,17 @@ const SectionListings = props => {
       appearance={appearance}
     >
       {hasHeaderFields ? (
-        <header className={defaultClasses.sectionDetails}>
-          <Field data={title} className={defaultClasses.title} options={fieldOptions} />
-          <Field data={description} className={defaultClasses.description} options={fieldOptions} />
+        <header className={classNames(defaultClasses.sectionDetails, css.header)}>
+          {/* Cocloset: `listings` is a native sectionType, not name-matched through
+              coclosetLandingSections.js, so it never goes through withCoclosetSkin and
+              `defaultClasses.title` here is SectionBuilder's own small stock default - not
+              the Cocloset skin used everywhere else on a hosted page. `css.title` is this
+              component's own large centered serif, sized to match the other landing-page
+              section headers (2026-09-14) rather than reusing the shared skin, since a
+              future `listings` section on a plainer page shouldn't inherit a hero-scale
+              header just because this carousel wants one. */}
+          <Field data={title} className={classNames(defaultClasses.title, css.title)} options={fieldOptions} />
+          <Field data={description} className={classNames(defaultClasses.description, css.description)} options={fieldOptions} />
           <Field data={callToAction} className={defaultClasses.ctaButton} options={fieldOptions} />
         </header>
       ) : null}
@@ -375,6 +413,7 @@ const SectionListings = props => {
               config={config}
               allSections={allSections}
               isInsideContainer={isInsideContainer}
+              listingCardVariant={options?.listingCardVariant}
             />
           ) : (
             <LazyListingCarouselComponent
@@ -391,6 +430,7 @@ const SectionListings = props => {
               config={config}
               allSections={allSections}
               isInsideContainer={isInsideContainer}
+              listingCardVariant={options?.listingCardVariant}
             />
           )}
         </div>

@@ -1,0 +1,18 @@
+/* Base pill only - no position. Callers that need it pinned to a corner (ListingCard) add
+   their own positioning class alongside this one, since a listing-page mount point wants it
+   in normal flow instead. */
+.root {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+
+  background-color: var(--coclosetToneGreenFg);
+  color: var(--colorWhite);
+
+  font-weight: var(--fontWeightSemiBold);
+  font-size: 12px;
+  line-height: 1;
+
+  padding: 6px 10px;
+  border-radius: 999px;
+}

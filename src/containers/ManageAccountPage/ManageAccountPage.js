@@ -13,6 +13,7 @@ import {
   showPaymentDetailsForUser,
   initialValuesForUserFields,
   pickUserFieldsData,
+  isLaundryUser,
 } from '../../util/userHelpers';
 import { pathByRouteName } from '../../util/routes';
 
@@ -127,6 +128,7 @@ export const ManageAccountPageComponent = props => {
             />
             <UserNav
               currentPage="ManageAccountPage"
+              showLaundryProfileLink={isLaundryUser(currentUser)}
               showManageListingsLink={showManageListingsLink}
             />
           </>

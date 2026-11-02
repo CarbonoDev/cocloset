@@ -18,6 +18,13 @@ import {
   stringifyDateToISO8601,
 } from '../../../util/dates';
 import { LINE_ITEM_DAY, propTypes } from '../../../util/types';
+import {
+  MAX_INITIAL_CLEANING_DAYS,
+  resolveInitialCleaningDays,
+  earliestBookableDate,
+  resolveReadyAt,
+  earliestBookableStart,
+} from '../../../util/cleaningFloor';
 import { timeSlotsPerDate } from '../../../util/generators';
 import { BOOKING_PROCESS_NAME } from '../../../transactions/transaction';
 
@@ -133,6 +140,23 @@ const isBlockedBetween = (allTimeSlots, timeZone) => ([startDate, endDate]) => {
   const isBlockedBetween = !(isInRange(localizedEndDay, ...timeSlotRange) || isExcludedEnd);
   return isBlockedBetween;
 };
+/**
+ * THE CLEANING FLOORS now live in util/cleaningFloor.js, and are re-exported here.
+ *
+ * They moved because the search page needs the same rule and importing it from this file
+ * dragged in `components/index.js` - a cycle that surfaced as a TDZ error in an unrelated page
+ * duck. See the note at the top of that file.
+ *
+ * Re-exported rather than relocated outright: this module's own callers and its tests import
+ * them from here, and a rename across those would be churn with no reader on the other side.
+ */
+export {
+  MAX_INITIAL_CLEANING_DAYS,
+  resolveInitialCleaningDays,
+  earliestBookableDate,
+  resolveReadyAt,
+  earliestBookableStart,
+};
 
 const isOneBoundaryeSelected = (hasTimeSlots, startDate, endDate) => {
   const oneBoundarySelected = (startDate || endDate) && (!startDate || !endDate);
@@ -181,19 +205,33 @@ const getBookableRange = (timeSlotData, startOfAvailableRange, endOfAvailableRan
 /**
  * Returns an isOutsideRange function that can be passed to
  * a DateRangePicker component.
+ *
+ * Exported for testing: `earliestBookableDate` having the right answer is not the
+ * same claim as the picker actually USING it, and this project has shipped a rule
+ * that was never reached more than once.
  */
-const isOutsideRangeFn = (
+export const isOutsideRangeFn = (
   allTimeSlots,
   monthlyTimeSlots,
   startDate,
   endDate,
   lineItemUnitType,
   dayCountAvailableForBooking,
-  timeZone
+  timeZone,
+  // Cocloset: pushes the LOWER bound forward while the garment is still on its way
+  // to the laundry. null (the normal case, and always once it has arrived) leaves
+  // the floor at the start of today, exactly as upstream has it. Note the call site
+  // used to pass a stray `seatsEnabled` in this position that was never a parameter
+  // and never read; this replaces it.
+  initialCleaningDays,
+  // Cocloset: pushes the LOWER bound forward while the garment is in the wash a studio
+  // started when the last renter handed it back. Absent for a garment that is not in one,
+  // which is most of the time.
+  readyAt
 ) => {
   const endOfAvailableRange = dayCountAvailableForBooking;
   const endOfAvailableRangeDate = getStartOf(TODAY, 'day', timeZone, endOfAvailableRange, 'days');
-  const startOfAvailableRangeDate = getStartOf(TODAY, 'day', timeZone);
+  const startOfAvailableRangeDate = earliestBookableStart(initialCleaningDays, readyAt, timeZone);
 
   // Currently available monthly data
   const [startMonth, endMonth] = getMonthlyFetchRange(monthlyTimeSlots, timeZone);
@@ -514,6 +552,11 @@ const onPriceVariantChange = props => value => {
  * @param {Array<Object>} [props.priceVariants] - The price variants
  * @param {ReactNode} [props.priceVariantFieldComponent] - The component to use for the price variant field
  * @param {boolean} props.isPublishedListing - Whether the listing is published
+ * @param {boolean} [props.onLaundry] - Cocloset: true once the garment has reached its laundry
+ * @param {number} [props.initialCleaningDays] - Cocloset: days needed for the garment's first
+ *   cleaning, applied only while `onLaundry` is not true. The assignment-time SNAPSHOT.
+ * @param {number} [props.liveInitialCleaningDays] - Cocloset: the assigned laundry's CURRENT
+ *   turnaround, resolved at ListingPage load. Wins over the snapshot; null falls back to it.
  * @returns {JSX.Element}
  */
 export const BookingDatesForm = props => {
@@ -537,6 +580,23 @@ export const BookingDatesForm = props => {
     priceVariantFieldComponent: PriceVariantFieldComponent,
     preselectedPriceVariant,
     isPublishedListing,
+    // Cocloset: garment custody, from `listing.metadata` (server-written only).
+    // Destructured for the same reason as above - FinalForm would otherwise receive
+    // them as stray props. Together they answer "has this garment ever been at its
+    // laundry, and if not, how long does its first wash take". Re-checked
+    // server-side in server/api-util/bookingRules.js.
+    onLaundry,
+    initialCleaningDays,
+    // Cocloset: the assigned laundry's CURRENT turnaround, resolved at ListingPage load
+    // (ListingPage.duck.js -> /api/listing-initial-cleaning). Takes precedence over the
+    // `initialCleaningDays` snapshot above; null falls back to it. Destructured for the
+    // same reason as the two above - FinalForm must not receive it as a stray prop.
+    liveInitialCleaningDays,
+    // Cocloset: when the wash this garment is in right now finishes, from `listing.metadata`
+    // (server-written only, so an owner cannot clear it to get back on the market early).
+    // Unrelated to the three above: those are about a garment that has never been to a
+    // laundry, this one is about the one it is at today.
+    readyAt,
     ...rest
   } = props;
   const intl = useIntl();
@@ -681,6 +741,31 @@ export const BookingDatesForm = props => {
           endDate,
           timeZone,
         });
+        // The initial cleaning turnaround, applied only while the garment has not
+        // reached its laundry. null means "behave exactly as before". The laundry's live
+        // turnaround wins over the assignment-time snapshot; see resolveInitialCleaningDays.
+        const initialCleaningBlockDays = resolveInitialCleaningDays(
+          initialCleaningDays,
+          onLaundry,
+          liveInitialCleaningDays
+        );
+        // The floor the picker actually uses: the later of the first-cleaning lead time and
+        // the end of the wash this garment is in right now.
+        const earliestStartDate = earliestBookableStart(
+          initialCleaningBlockDays,
+          readyAt,
+          timeZone
+        );
+        // Whether `readyAt` is the binding one, which is what decides which sentence to put
+        // above the picker. Comparing the floors rather than testing `readyAt` for presence:
+        // a readiness date that has already passed moves nothing and must not be announced.
+        const cleaningReadyDate =
+          resolveReadyAt(readyAt) &&
+          earliestStartDate.getTime() >
+            earliestBookableDate(initialCleaningBlockDays, timeZone).getTime()
+            ? earliestStartDate
+            : null;
+
         const isOutsideRange = isOutsideRangeFn(
           relevantTimeSlots,
           monthlyTimeSlots,
@@ -689,7 +774,8 @@ export const BookingDatesForm = props => {
           lineItemUnitType,
           dayCountAvailableForBooking,
           timeZone,
-          seatsEnabled
+          initialCleaningBlockDays,
+          readyAt
         );
 
         const seatsOptions = getMinSeatsOptions(
@@ -710,6 +796,29 @@ export const BookingDatesForm = props => {
                 onPriceVariantChange={onPriceVariantChange(formRenderProps)}
                 disabled={!isPublishedListing}
               />
+            ) : null}
+
+            {/* A calendar that silently refuses the next few days reads as broken,
+                so say why. Rendered ABOVE the picker so it is read before the first
+                click rather than as an explanation of a failed one, and only while
+                the block is actually in force. */}
+            {initialCleaningBlockDays ? (
+              <p className={css.initialCleaningNotice}>
+                <FormattedMessage
+                  id="BookingDatesForm.initialCleaningNotice"
+                  values={{
+                    days: initialCleaningBlockDays,
+                    date: intl.formatDate(earliestStartDate, dateFormatOptions),
+                  }}
+                />
+              </p>
+            ) : cleaningReadyDate ? (
+              <p className={css.initialCleaningNotice}>
+                <FormattedMessage
+                  id="BookingDatesForm.cleaningReadyNotice"
+                  values={{ date: intl.formatDate(cleaningReadyDate, dateFormatOptions) }}
+                />
+              </p>
             ) : null}
 
             <FieldDateRangePicker

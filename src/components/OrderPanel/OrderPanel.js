@@ -25,6 +25,7 @@ import {
 import { formatMoney } from '../../util/currency';
 import { createSlug, parse, stringify } from '../../util/urlHelpers';
 import { userDisplayNameAsString } from '../../util/data';
+import { getRentalPeriods, usesFixedRentalPeriods } from '../../util/rentalPeriods';
 import {
   OFFER,
   REQUEST,
@@ -48,6 +49,11 @@ const BookingTimeForm = loadable(() =>
 );
 const BookingDatesForm = loadable(() =>
   import(/* webpackChunkName: "BookingDatesForm" */ './BookingDatesForm/BookingDatesForm')
+);
+const BookingRentalPeriodForm = loadable(() =>
+  import(
+    /* webpackChunkName: "BookingRentalPeriodForm" */ './BookingRentalPeriodForm/BookingRentalPeriodForm'
+  )
 );
 const BookingFixedDurationForm = loadable(() =>
   import(
@@ -271,6 +277,16 @@ const hasValidPriceVariants = priceVariants => {
  * @param {string} props.marketplaceCurrency - The currency used in the marketplace
  * @param {number} props.dayCountAvailableForBooking - Number of days available for booking
  * @param {string} props.marketplaceName - Name of the marketplace
+ * @param {number} [props.liveInitialCleaningDays] - Cocloset: the assigned laundry's
+ *   CURRENT initial-cleaning turnaround, resolved server-side at page load by
+ *   ListingPage.duck.js. Takes precedence over the `metadata.initialCleaningDays`
+ *   snapshot; null (not yet arrived, or any failure) falls back to it.
+ * @param {Array<{start: Date, end: Date}>} [props.cleaningGaps] - Cocloset: day ranges that
+ *   cannot be a rental start because another booking's wash is owed then, resolved by the
+ *   same endpoint call. null means "not known" and is deliberately not the same as `[]`.
+ *   Passed only to BookingRentalPeriodForm, which is the form a Cocloset garment is rented
+ *   through. BookingDatesForm - the stock free-range picker - does not receive it: the rule
+ *   is still enforced for it by the server gate, which is the authoritative copy either way.
  *
  * @returns {JSX.Element} Component that displays the order panel with appropriate form
  */
@@ -312,11 +328,40 @@ const OrderPanel = props => {
     showListingImage,
     hideAuthorInfo,
     hidePrice,
+    // Cocloset: see the JSDoc above. Resolved by the ListingPage duck through
+    // /api/listing-initial-cleaning, because the number lives in the laundry user's
+    // privateData and the browser cannot read it.
+    liveInitialCleaningDays,
+    // Cocloset: day ranges another rental's wash has already claimed. Resolved by the same
+    // endpoint call, and passed straight through to the picker.
+    cleaningGaps,
   } = props;
 
   const publicData = listing?.attributes?.publicData || {};
   const { listingType, unitType, transactionProcessAlias = '', priceVariants, startTimeInterval } =
     publicData || {};
+
+  // Cocloset: garment custody, written ONLY by our server through the Integration
+  // API (see server/api-util/listingCustody.js and
+  // server/api/listing-laundry-assignment.js). Read from `metadata` and not
+  // `publicData` on purpose - the same two values gate the booking server-side in
+  // server/api-util/bookingRules.js, and `metadata` is the one kind of extended data
+  // a listing's own owner cannot write.
+  //
+  //   onLaundry           - true once a laundry has physically received the garment
+  //   initialCleaningDays - how long its FIRST wash takes, so the calendar can stop
+  //                         offering tomorrow for a garment that is not there yet
+  //   readyAt             - when the wash it is in RIGHT NOW finishes, written by the
+  //                         studio at the counter from the days it asked for at the return
+  //
+  // `initialCleaningDays` here is a SNAPSHOT from the moment the laundry was assigned. It
+  // is still read, and still needed, because it is the FALLBACK: `liveInitialCleaningDays`
+  // is the studio's current number, and it is null until the page-load lookup returns and
+  // for good after any failure. Both are handed to BookingDatesForm, which applies the
+  // same precedence the server gate does (see resolveInitialCleaningDays there and
+  // server/api-util/bookingRules.js `resolveInitialCleaningBlockDays`) - live first,
+  // snapshot second, never "no block" just because a read failed.
+  const { onLaundry, initialCleaningDays, readyAt } = listing?.attributes?.metadata || {};
 
   const processName = resolveLatestProcessName(transactionProcessAlias.split('/')[0]);
   const lineItemUnitType = lineItemUnitTypeMaybe || `line-item/${unitType}`;
@@ -343,9 +388,12 @@ const OrderPanel = props => {
   const shouldHaveBookingTime = isBooking && [LINE_ITEM_HOUR].includes(lineItemUnitType);
   const showBookingTimeForm = mounted && shouldHaveBookingTime && !isClosed && timeZone;
 
+  // Cocloset: a garment rented by fixed period is day-based, so it satisfies this condition
+  // too. `isFixedRentalPeriod` (resolved below, next to the listing type config) takes it
+  // away again: rendering the stock date-range form for a garment would let a customer pick
+  // an arbitrary range that the server then refuses, and would price it per day.
   const shouldHaveBookingDates =
     isBooking && [LINE_ITEM_DAY, LINE_ITEM_NIGHT].includes(lineItemUnitType);
-  const showBookingDatesForm = mounted && shouldHaveBookingDates && !isClosed && timeZone;
 
   // The listing resource has a relationship: `currentStock`,
   // which you should include when making API calls.
@@ -371,6 +419,27 @@ const OrderPanel = props => {
   const { pickupEnabled, shippingEnabled } = listing?.attributes?.publicData || {};
 
   const listingTypeConfig = validListingTypes.find(conf => conf.listingType === listingType);
+
+  // Cocloset: a garment is rented for one of two fixed periods (7 or 14 days) at a flat
+  // price, not for an arbitrary range of days. That replaces the date-range form entirely —
+  // see src/util/rentalPeriods.js and BookingRentalPeriodForm.
+  //
+  // `rentalPeriods` empty means the owner has priced nothing yet. The panel then falls
+  // through to the "price missing" branch above, because `handleSubmitValuesForRentalPeriods`
+  // only writes `listing.price` alongside the periods, so a listing with no periods has no
+  // price either.
+  const isFixedRentalPeriod = usesFixedRentalPeriods(listingTypeConfig);
+  const rentalPeriods = isFixedRentalPeriod ? getRentalPeriods(publicData) : [];
+  const showBookingRentalPeriodForm =
+    mounted && isFixedRentalPeriod && !isClosed && timeZone && rentalPeriods.length > 0;
+  // A garment whose owner has priced no period cannot be booked. `listing.price` may still
+  // be set - a listing priced before this feature kept it - so the stock "price missing"
+  // check does not catch this, and without it the panel would render nothing at all.
+  const showRentalPeriodsMissing = isFixedRentalPeriod && rentalPeriods.length === 0;
+
+  const showBookingDatesForm =
+    mounted && shouldHaveBookingDates && !isFixedRentalPeriod && !isClosed && timeZone;
+
   const displayShipping = displayDeliveryShipping(listingTypeConfig);
   const displayPickup = displayDeliveryPickup(listingTypeConfig);
   const allowOrdersOfMultipleItems = [STOCK_MULTIPLE_ITEMS, STOCK_INFINITE_MULTIPLE_ITEMS].includes(
@@ -481,12 +550,29 @@ const OrderPanel = props => {
           </div>
         )}
 
-        {showPriceMissing ? (
+        {showPriceMissing || showRentalPeriodsMissing ? (
           <PriceMissing />
         ) : showInvalidCurrency ? (
           <InvalidCurrency />
         ) : showInvalidPriceVariantsMessage ? (
           <InvalidPriceVariants />
+        ) : showBookingRentalPeriodForm ? (
+          <BookingRentalPeriodForm
+            className={css.bookingForm}
+            formId="OrderPanelBookingRentalPeriodForm"
+            rentalPeriods={rentalPeriods}
+            onLaundry={onLaundry}
+            initialCleaningDays={initialCleaningDays}
+            liveInitialCleaningDays={liveInitialCleaningDays}
+            readyAt={readyAt}
+            cleaningGaps={cleaningGaps}
+            dayCountAvailableForBooking={dayCountAvailableForBooking}
+            monthlyTimeSlots={monthlyTimeSlots}
+            onFetchTimeSlots={onFetchTimeSlots}
+            timeZone={timeZone}
+            finePrintComponent={SubmitFinePrint}
+            {...sharedProps}
+          />
         ) : showBookingFixedDurationForm ? (
           <BookingFixedDurationForm
             seatsEnabled={seatsEnabled}
@@ -524,6 +610,10 @@ const OrderPanel = props => {
             seatsEnabled={seatsEnabled}
             className={css.bookingForm}
             formId="OrderPanelBookingDatesForm"
+            onLaundry={onLaundry}
+            initialCleaningDays={initialCleaningDays}
+            liveInitialCleaningDays={liveInitialCleaningDays}
+            readyAt={readyAt}
             dayCountAvailableForBooking={dayCountAvailableForBooking}
             monthlyTimeSlots={monthlyTimeSlots}
             onFetchTimeSlots={onFetchTimeSlots}
