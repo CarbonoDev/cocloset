@@ -25,8 +25,8 @@
             </tr>
             <tr style="width:100%">
               <td>
-                <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingPartialRefundCancelled.Title" "Your rental of {listingTitle} has been cancelled" listingTitle=listing.title}}</h1>
-                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPartialRefundCancelled.Content" "Your rental of {listingTitle} from {dateStart, date, ::YYYYMMMd} to {dateEnd, date, ::YYYYMMMd} has been cancelled. Your garment had already reached the laundry for its first cleaning, so a partial refund was issued: the total you paid, minus the cleaning fee, since the laundry had already done real work receiving and inspecting the garment." listingTitle=listing.title dateStart=booking.start dateEnd=(date-transform booking.end days=-1)}}</p>
+                <h1 style="color:#484848;font-size:26px;line-height:1.3;font-weight:700">{{t "BookingPartialRefundCancelled.Title" "Your rental of {listingTitle} has been canceled" listingTitle=listing.title}}</h1>
+                <p style="font-size:16px;line-height:1.4;margin:16px 0;color:#484848">{{t "BookingPartialRefundCancelled.Content" "Your rental of {listingTitle} from {dateStart, date, ::YYYYMMMd} to {dateEnd, date, ::YYYYMMMd} has been canceled. Your garment had already reached the laundry for its first cleaning, so a partial refund was issued: the total you paid, minus the cleaning fee, since the laundry had already done real work receiving and inspecting the garment." listingTitle=listing.title dateStart=booking.start dateEnd=(date-transform booking.end days=-1)}}</p>
                 {{#each tx-line-items}}{{#eq "line-item/cleaning-fee" code}}
                 <table align="center" border="0" cellPadding="0" cellSpacing="0" role="presentation" width="100%" style="margin:16px 0;background-color:#F7F7F7;border-left:4px solid #B2B2B2;border-radius:4px">
                   <tbody>
