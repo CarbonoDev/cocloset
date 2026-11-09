@@ -2,6 +2,10 @@ export class LoggingAnalyticsHandler {
   trackPageView(url) {
     console.log('Analytics page view:', url); // eslint-disable-line no-console
   }
+
+  trackSearch(searchTerm) {
+    console.log('Analytics search:', searchTerm); // eslint-disable-line no-console
+  }
 }
 
 // Google Analytics 4 (GA4) using gtag.js script, which is included in util/includeScripts.js
@@ -21,6 +25,13 @@ export class GoogleAnalyticsHandler {
           page_path: canonicalPath,
         });
       }, 300);
+    }
+  }
+
+  // GA4 recommended event "search" (event parameter: search_term).
+  trackSearch(searchTerm) {
+    if (window.gtag) {
+      window.gtag('event', 'search', { search_term: searchTerm });
     }
   }
 }
